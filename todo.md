@@ -170,3 +170,12 @@
 - [x] 后端：OpenClaw 返回的 output_file 自动上传到 S3 并保存报表记录
 - [x] 前端设置页面：添加 OpenClaw API Key 配置入口（AI 引擎页）
 - [x] 双通道路由：/chat 路由已实现 isOpenClawEnabled() 判断，自动切换
+
+## V11.0 OpenClaw 轮询架构（已完成）
+
+- [x] 数据库新增 openclaw_tasks 表（id/userId/message/fileUrls/fileNames/reply/outputFiles/status/pickedUpAt/completedAt）
+- [x] GET /api/openclaw/tasks/pending — 返回待处理任务，自动标记为 processing
+- [x] POST /api/openclaw/tasks/result — 接收结果，base64 解码上传 S3，更新任务状态
+- [x] Bearer Token 鉴权（OPENCLAW_SESSION_KEY 环境变量）
+- [x] 9 个单元测试全部通过（54 tests total）
+- [x] 环境变量 OPENCLAW_SESSION_KEY=atlas_session_shrimp_20260308 已配置

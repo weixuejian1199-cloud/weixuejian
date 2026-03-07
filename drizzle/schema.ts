@@ -203,3 +203,34 @@ export const hrAttendanceSessions = mysqlTable("hr_attendance_sessions", {
 
 export type HrAttendanceSession = typeof hrAttendanceSessions.$inferSelect;
 export type InsertHrAttendanceSession = typeof hrAttendanceSessions.$inferInsert;
+
+// ── OpenClaw Tasks (Polling Architecture) ─────────────────────────────────────
+// Tasks created when users send messages with files; polled by OpenClaw agent
+
+export const openclawTasks = mysqlTable("openclaw_tasks", {
+  id:          varchar("id", { length: 64 }).primaryKey(),
+  userId:      int("userId").notNull(),
+  /** External user identifier passed to OpenClaw */
+  externalUserId: varchar("externalUserId", { length: 128 }),
+  message:     text("message").notNull(),
+  /** JSON array of S3 presigned URLs */
+  fileUrls:    json("fileUrls").$type<string[]>(),
+  /** JSON array of original file names */
+  fileNames:   json("fileNames").$type<string[]>(),
+  /** Reply text returned by OpenClaw */
+  reply:       text("reply"),
+  /** JSON array of output files: { name, fileKey, fileUrl, mimeType } */
+  outputFiles: json("outputFiles").$type<Array<{ name: string; fileKey: string; fileUrl: string; mimeType: string }>>(),
+  status:      mysqlEnum("status", ["pending", "processing", "completed", "failed"])
+                 .default("pending").notNull(),
+  errorMsg:    text("errorMsg"),
+  /** Milliseconds since epoch when task was picked up by OpenClaw */
+  pickedUpAt:  timestamp("pickedUpAt"),
+  /** Milliseconds since epoch when task was completed */
+  completedAt: timestamp("completedAt"),
+  createdAt:   timestamp("createdAt").defaultNow().notNull(),
+  updatedAt:   timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type OpenclawTask = typeof openclawTasks.$inferSelect;
+export type InsertOpenclawTask = typeof openclawTasks.$inferInsert;

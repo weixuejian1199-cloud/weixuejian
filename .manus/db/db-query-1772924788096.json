@@ -1,0 +1,58 @@
+{
+  "query": "SHOW TABLES LIKE 'openclaw_tasks'; DESCRIBE openclaw_tasks;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute SHOW TABLES LIKE 'openclaw_tasks'; DESCRIBE openclaw_tasks;",
+  "rows": [
+    {
+      "Tables_in_CRyFQH5qGudysyWQuRqoNj (openclaw_tasks)": "openclaw_tasks"
+    },
+    {
+      "Tables_in_CRyFQH5qGudysyWQuRqoNj (openclaw_tasks)": "Field\tType\tNull\tKey\tDefault\tExtra"
+    },
+    {
+      "Tables_in_CRyFQH5qGudysyWQuRqoNj (openclaw_tasks)": "id\tvarchar(64)\tNO\tPRI\tNULL\t"
+    },
+    {
+      "Tables_in_CRyFQH5qGudysyWQuRqoNj (openclaw_tasks)": "userId\tint\tNO\t\tNULL\t"
+    },
+    {
+      "Tables_in_CRyFQH5qGudysyWQuRqoNj (openclaw_tasks)": "externalUserId\tvarchar(128)\tYES\t\tNULL\t"
+    },
+    {
+      "Tables_in_CRyFQH5qGudysyWQuRqoNj (openclaw_tasks)": "message\ttext\tNO\t\tNULL\t"
+    },
+    {
+      "Tables_in_CRyFQH5qGudysyWQuRqoNj (openclaw_tasks)": "fileUrls\tjson\tYES\t\tNULL\t"
+    },
+    {
+      "Tables_in_CRyFQH5qGudysyWQuRqoNj (openclaw_tasks)": "fileNames\tjson\tYES\t\tNULL\t"
+    },
+    {
+      "Tables_in_CRyFQH5qGudysyWQuRqoNj (openclaw_tasks)": "reply\ttext\tYES\t\tNULL\t"
+    },
+    {
+      "Tables_in_CRyFQH5qGudysyWQuRqoNj (openclaw_tasks)": "outputFiles\tjson\tYES\t\tNULL\t"
+    },
+    {
+      "Tables_in_CRyFQH5qGudysyWQuRqoNj (openclaw_tasks)": "status\tenum('pending','processing','completed','failed')\tNO\t\tpending\t"
+    },
+    {
+      "Tables_in_CRyFQH5qGudysyWQuRqoNj (openclaw_tasks)": "errorMsg\ttext\tYES\t\tNULL\t"
+    },
+    {
+      "Tables_in_CRyFQH5qGudysyWQuRqoNj (openclaw_tasks)": "pickedUpAt\ttimestamp\tYES\t\tNULL\t"
+    },
+    {
+      "Tables_in_CRyFQH5qGudysyWQuRqoNj (openclaw_tasks)": "completedAt\ttimestamp\tYES\t\tNULL\t"
+    },
+    {
+      "Tables_in_CRyFQH5qGudysyWQuRqoNj (openclaw_tasks)": "createdAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t"
+    },
+    {
+      "Tables_in_CRyFQH5qGudysyWQuRqoNj (openclaw_tasks)": "updatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_CRyFQH5qGudysyWQuRqoNj (openclaw_tasks)\nopenclaw_tasks\nField\tType\tNull\tKey\tDefault\tExtra\nid\tvarchar(64)\tNO\tPRI\tNULL\t\nuserId\tint\tNO\t\tNULL\t\nexternalUserId\tvarchar(128)\tYES\t\tNULL\t\nmessage\ttext\tNO\t\tNULL\t\nfileUrls\tjson\tYES\t\tNULL\t\nfileNames\tjson\tYES\t\tNULL\t\nreply\ttext\tYES\t\tNULL\t\noutputFiles\tjson\tYES\t\tNULL\t\nstatus\tenum('pending','processing','completed','failed')\tNO\t\tpending\t\nerrorMsg\ttext\tYES\t\tNULL\t\npickedUpAt\ttimestamp\tYES\t\tNULL\t\ncompletedAt\ttimestamp\tYES\t\tNULL\t\ncreatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\t\nupdatedAt\ttimestamp\tNO\t\tCURRENT_TIMESTAMP\tDEFAULT_GENERATED on update CURRENT_TIMESTAMP\n",
+  "stderr": "",
+  "execution_time_ms": 85
+}

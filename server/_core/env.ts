@@ -10,6 +10,8 @@ export const ENV = {
   // OpenClaw (小虾米 Agent) — optional, if not set falls back to Qwen
   openClawApiKey: process.env.OPENCLAW_API_KEY ?? "",
   openClawEndpoint: process.env.OPENCLAW_ENDPOINT ?? "https://gateway.openclaw.ai/v1/chat",
+  // OpenClaw polling session key — used to authenticate OpenClaw agent polling requests
+  openClawSessionKey: process.env.OPENCLAW_SESSION_KEY ?? "",
   // Alibaba DashScope (Qwen3-Max + Kimi-K2.5)
   dashScopeApiKey: process.env.DASHSCOPE_API_KEY ?? "",
   dashScopeBaseUrl: process.env.DASHSCOPE_BASE_URL ?? "https://dashscope.aliyuncs.com/compatible-mode/v1",

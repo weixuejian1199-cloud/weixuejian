@@ -36,6 +36,20 @@
       "when": 1772907554293,
       "tag": "0004_neat_warbird",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1772924703249,
+      "tag": "0005_young_moondragon",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1772924738297,
+      "tag": "0006_third_felicia_hardy",
+      "breakpoints": true
     }
   ]
 }
