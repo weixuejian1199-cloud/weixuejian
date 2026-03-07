@@ -75,13 +75,14 @@ export interface ChatStreamOptions {
   sessionIds?: string[];  // Support multiple files in same conversation
   message: string;
   history?: Array<{ role: "user" | "assistant"; content: string }>;
+  signal?: AbortSignal;  // AbortController signal for cancellation
   onChunk: (chunk: string) => void;
   onDone: (fullText: string) => void;
   onError: (err: Error) => void;
 }
 
 export async function chatStream(opts: ChatStreamOptions): Promise<void> {
-  const { sessionId, sessionIds, message, history, onChunk, onDone, onError } = opts;
+  const { sessionId, sessionIds, message, history, signal, onChunk, onDone, onError } = opts;
   const ids = sessionIds?.length ? sessionIds : sessionId ? [sessionId] : [];
 
   try {
@@ -89,6 +90,7 @@ export async function chatStream(opts: ChatStreamOptions): Promise<void> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
+      signal,
       body: JSON.stringify({ session_ids: ids, session_id: ids[0], message, history }),
     });
 
@@ -114,6 +116,10 @@ export async function chatStream(opts: ChatStreamOptions): Promise<void> {
 
     onDone(fullText);
   } catch (err) {
+    // AbortError means user cancelled — treat as normal completion with partial text
+    if (err instanceof Error && err.name === "AbortError") {
+      return; // silently stop, caller handles UI state
+    }
     onError(err instanceof Error ? err : new Error(String(err)));
   }
 }

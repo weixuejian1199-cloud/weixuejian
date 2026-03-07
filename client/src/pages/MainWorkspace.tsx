@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload, X, FileSpreadsheet, Sparkles, Send,
   Download, Loader2, Copy, Check, BarChart2, Paperclip,
-  ChevronRight,
+  ChevronRight, Square,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
@@ -56,6 +56,16 @@ export default function MainWorkspace() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const handleStop = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsGenerating(false);
+    setIsProcessing(false);
+  }, [setIsProcessing]);
 
   const readyFiles = uploadedFiles.filter(f => f.status === "ready");
   const hasFiles = readyFiles.length > 0;
@@ -196,6 +206,10 @@ export default function MainWorkspace() {
       ];
     };
 
+    // Create new AbortController for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     try {
       if (isReport && primarySessionId) {
         setIsProcessing(true);
@@ -244,6 +258,7 @@ export default function MainWorkspace() {
           sessionIds,
           message: msg,
           history,
+          signal: abortController.signal,
           onChunk: (chunk) => {
             accumulated += chunk;
             updateLastMessage(accumulated);
@@ -270,6 +285,7 @@ export default function MainWorkspace() {
       toast.error("请求失败，请重试");
       setInput(msg);
     } finally {
+      abortControllerRef.current = null;
       setIsGenerating(false);
       setIsProcessing(false);
     }
@@ -467,24 +483,43 @@ export default function MainWorkspace() {
                   Enter 发送
                 </span>
               </div>
-              <button
-                onClick={() => handleSend()}
-                disabled={!input.trim() || isGenerating}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
-                style={{
-                  background: input.trim() && !isGenerating
-                    ? "var(--atlas-accent)"
-                    : "var(--atlas-border)",
-                  color: input.trim() && !isGenerating ? "#fff" : "var(--atlas-text-3)",
-                  transition: "all 0.15s ease",
-                }}
-              >
-                {isGenerating
-                  ? <Loader2 size={13} className="animate-spin" />
-                  : <Send size={13} />
-                }
-                {isGenerating ? "生成中" : "发送"}
-              </button>
+              {isGenerating ? (
+                <button
+                  onClick={handleStop}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                  style={{
+                    background: "rgba(239,68,68,0.12)",
+                    border: "1px solid rgba(239,68,68,0.25)",
+                    color: "#ef4444",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.2)";
+                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(239,68,68,0.45)";
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.12)";
+                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(239,68,68,0.25)";
+                  }}
+                >
+                  <Square size={11} fill="currentColor" />
+                  停止
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleSend()}
+                  disabled={!input.trim()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                  style={{
+                    background: input.trim() ? "var(--atlas-accent)" : "var(--atlas-border)",
+                    color: input.trim() ? "#fff" : "var(--atlas-text-3)",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <Send size={13} />
+                  发送
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -806,72 +841,83 @@ function EmptyState({ onUpload, onQuickAsk }: { onUpload: () => void; onQuickAsk
   ];
 
   return (
-    <div className="flex flex-col items-center justify-center gap-6 w-full max-w-2xl mx-auto text-center">
-      {/* Logo */}
+    <div className="flex flex-col items-center justify-center gap-8 w-full max-w-2xl mx-auto text-center">
+      {/* Brand — primary visual focus */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
+        initial={{ opacity: 0, scale: 0.92 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.3 }}
-        className="flex flex-col items-center gap-3"
+        transition={{ duration: 0.35, ease: "easeOut" }}
+        className="flex flex-col items-center gap-4"
       >
+        {/* Logo mark */}
         <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center"
+          className="w-20 h-20 rounded-3xl flex items-center justify-center"
           style={{
-            background: "rgba(91,140,255,0.08)",
-            border: "1px solid rgba(91,140,255,0.15)",
+            background: "linear-gradient(135deg, rgba(91,140,255,0.15) 0%, rgba(91,140,255,0.06) 100%)",
+            border: "1px solid rgba(91,140,255,0.22)",
+            boxShadow: "0 8px 32px rgba(91,140,255,0.12)",
           }}
         >
-          <BarChart2 size={24} style={{ color: "var(--atlas-accent)" }} />
+          <BarChart2 size={36} style={{ color: "var(--atlas-accent)" }} />
         </div>
-        <div>
-          <h3
-            className="font-semibold mb-1"
-            style={{ color: "var(--atlas-text)", fontSize: "17px", letterSpacing: "-0.3px" }}
+        {/* Brand name + tagline */}
+        <div className="flex flex-col items-center gap-1.5">
+          <h2
+            className="font-bold tracking-tight"
+            style={{ color: "var(--atlas-text)", fontSize: "26px", letterSpacing: "-0.5px" }}
           >
-            你好，我是 ATLAS
-          </h3>
-          <p style={{ color: "var(--atlas-text-2)", fontSize: "13px", lineHeight: "1.6" }}>
+            ATLAS
+          </h2>
+          <p
+            style={{
+              color: "var(--atlas-accent)",
+              fontSize: "13px",
+              letterSpacing: "0.06em",
+              fontWeight: 500,
+              opacity: 0.85,
+            }}
+          >
             行政 · 财务 · 数据分析 三合一智能助手
           </p>
         </div>
       </motion.div>
 
-      {/* Quick questions */}
+      {/* Quick questions — smaller, secondary */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        transition={{ delay: 0.15 }}
         className="w-full"
       >
-        <p className="text-xs mb-3" style={{ color: "var(--atlas-text-3)" }}>直接提问，或上传文件开始分析</p>
-        <div className="grid grid-cols-2 gap-2">
+        <p className="text-xs mb-2.5" style={{ color: "var(--atlas-text-3)", letterSpacing: "0.02em" }}>直接提问，或上传文件开始分析</p>
+        <div className="grid grid-cols-3 gap-1.5">
           {quickQuestions.map((q, i) => (
             <motion.button
               key={i}
-              initial={{ opacity: 0, y: 6 }}
+              initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 + i * 0.04 }}
+              transition={{ delay: 0.15 + i * 0.03 }}
               onClick={() => onQuickAsk(q.q)}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition-all"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-left transition-all"
               style={{
-                background: "var(--atlas-surface)",
+                background: "var(--atlas-elevated)",
                 border: "1px solid var(--atlas-border)",
-                color: "var(--atlas-text-2)",
-                fontSize: "13px",
+                color: "var(--atlas-text-3)",
+                fontSize: "11.5px",
               }}
               onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.4)";
+                (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.35)";
                 (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
-                (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.05)";
+                (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.04)";
               }}
               onMouseLeave={e => {
                 (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border)";
-                (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
-                (e.currentTarget as HTMLElement).style.background = "var(--atlas-surface)";
+                (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+                (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
               }}
             >
-              <span style={{ fontSize: "15px" }}>{q.icon}</span>
-              <span>{q.label}</span>
+              <span style={{ fontSize: "13px", flexShrink: 0 }}>{q.icon}</span>
+              <span className="truncate">{q.label}</span>
             </motion.button>
           ))}
         </div>
