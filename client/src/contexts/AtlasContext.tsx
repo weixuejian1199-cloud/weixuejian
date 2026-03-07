@@ -262,6 +262,13 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Listen for unauthorized API errors and show login modal instead of redirecting
+  useEffect(() => {
+    const handleUnauthorized = () => setShowLoginModal(true);
+    window.addEventListener("atlas:unauthorized", handleUnauthorized);
+    return () => window.removeEventListener("atlas:unauthorized", handleUnauthorized);
+  }, []);
+
   const toggleTheme = useCallback(() => {
     setTheme(t => t === "dark" ? "light" : "dark");
   }, []);

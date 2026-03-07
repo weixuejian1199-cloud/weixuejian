@@ -1,18 +1,18 @@
 /**
  * ATLAS V5.2 — Main Workspace
- * ─────────────────────────────────────────────────────────────────
+ * -------------------------------------------------------------------
  * Layout: Single nav sidebar + full-width chat area
  *
  * Structure:
- *   ┌─────────────────────────────────────────┐
- *   │         AI 对话消息区域（全宽）            │
- *   ├─────────────────────────────────────────┤
- *   │  [📊 经营日报] [🏪 门店排行] [📈 平台对比] │  ← 居中，仅空态或少消息时显示
- *   ├─────────────────────────────────────────┤
- *   │  已上传文件列表（紧凑横排，可滚动）          │  ← 有文件时显示
- *   ├─────────────────────────────────────────┤
- *   │  📎  输入你的需求...              [发送]  │
- *   └─────────────────────────────────────────┘
+ *   +-------------------------------------------+
+ *   |         AI chat area (full width)          |
+ *   +-------------------------------------------+
+ *   |  [templates row - centered]               |
+ *   +-------------------------------------------+
+ *   |  uploaded files (compact chips)           |
+ *   +-------------------------------------------+
+ *   |  input area                    [send]     |
+ *   +-------------------------------------------+
  *
  * V5.2 changes:
  *   - Removed left file panel, full-width chat
@@ -33,7 +33,7 @@ import { api, chatStream } from "@/lib/api";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
-// ── Four pinned quick-action templates ─────────────────────────────────────────────────────────────────────────────
+// -- Four pinned quick-action templates -------------------------------------------------------------------------------
 const PINNED_TEMPLATES = [
   { id: "finance-report",   icon: "💰", name: "财务报表",   prompt: "帮我生成财务分析报表，包含收入、支出、利润、成本占比等核心财务指标，并标注异常项目" },
   { id: "sales-summary",    icon: "📊", name: "销售汇总",   prompt: "帮我汇总销售数据，按时间/地区/品类分组，显示销售额、订单数、客单价和环比变化" },
@@ -74,7 +74,7 @@ export default function MainWorkspace() {
     }
   }, [input]);
 
-  // ── File processing ──────────────────────────────────────────────────────────
+  // -- File processing
 
   const processFile = useCallback(async (file: File) => {
     const ext = file.name.split(".").pop()?.toLowerCase();
@@ -136,7 +136,7 @@ export default function MainWorkspace() {
     handleFiles(e.dataTransfer.files);
   };
 
-  // ── Send message ─────────────────────────────────────────────────────────────
+  // -- Send message
 
   const handleSend = useCallback(async (text?: string) => {
     const msg = (text || input).trim();
@@ -257,7 +257,7 @@ export default function MainWorkspace() {
     toast.success("开始下载");
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────────
+  // -- Render ----------------------------------------------------------------------
 
   return (
     <div
@@ -272,7 +272,7 @@ export default function MainWorkspace() {
         className="hidden" onChange={e => e.target.files && handleFiles(e.target.files)}
       />
 
-      {/* ── Chat header ── */}
+      {/* -- Chat header -- */}
       <div
         className="px-6 py-3 flex items-center gap-2.5 flex-shrink-0"
         style={{ borderBottom: "1px solid var(--atlas-border)" }}
@@ -310,7 +310,7 @@ export default function MainWorkspace() {
         )}
       </div>
 
-      {/* ── Messages area ── */}
+      {/* -- Messages area -- */}
       <div className="flex-1 overflow-y-auto">
         <div className={messages.length === 0 ? "h-full flex items-center justify-center px-6" : "max-w-3xl mx-auto px-6 py-6 space-y-5"}>
           {messages.length === 0 ? (
@@ -324,7 +324,7 @@ export default function MainWorkspace() {
         </div>
       </div>
 
-      {/* ── Bottom area ── */}
+      {/* -- Bottom area -- */}
       <div className="flex-shrink-0" style={{ borderTop: "1px solid var(--atlas-border)" }}>
         <div className="max-w-3xl mx-auto px-6 pt-3 pb-4">
 
@@ -480,7 +480,7 @@ export default function MainWorkspace() {
         </div>
       </div>
 
-      {/* ── Global drag overlay ── */}
+      {/* -- Global drag overlay -- */}
       <AnimatePresence>
         {isDragging && (
           <motion.div
@@ -508,7 +508,7 @@ export default function MainWorkspace() {
   );
 }
 
-// ── FileChip — compact file tag above input ───────────────────────────────────
+// -- FileChip — compact file tag above input -----------------------------------
 
 function FileChip({ file, onRemove }: { file: UploadedFile; onRemove: () => void }) {
   return (
@@ -569,7 +569,7 @@ function FileChip({ file, onRemove }: { file: UploadedFile; onRemove: () => void
   );
 }
 
-// ── MessageBubble ─────────────────────────────────────────────────────────────
+// -- MessageBubble -------------------------------------------------------------
 
 function MessageBubble({
   message,
@@ -662,7 +662,7 @@ function MessageBubble({
   );
 }
 
-// ── EmptyState ────────────────────────────────────────────────────────────────
+// -- EmptyState ----------------------------------------------------------------
 
 function EmptyState({ hasFiles }: { hasFiles: boolean }) {
   if (hasFiles) {
@@ -701,12 +701,12 @@ function EmptyState({ hasFiles }: { hasFiles: boolean }) {
         className="flex items-start gap-4">
         {[
           { step: "1", label: "上传文件", desc: "Excel / CSV", color: "#5B8CFF" },
-          { step: "→", label: "", desc: "", color: "var(--atlas-text-3)" },
+          { step: "arrow2", label: "", desc: "", color: "var(--atlas-text-3)" },
           { step: "2", label: "描述需求", desc: "或点快捷模板", color: "#A78BFA" },
-          { step: "→", label: "", desc: "", color: "var(--atlas-text-3)" },
+          { step: "arrow", label: "", desc: "", color: "var(--atlas-text-3)" },
           { step: "3", label: "下载报表", desc: "Excel 格式", color: "#34D399" },
-        ].map((item, i) => item.step === "→" ? (
-          <span key={i} className="text-base mt-3" style={{ color: item.color }}>→</span>
+        ].map((item, i) => (item.step === "arrow" || item.step === "arrow2") ? (
+          <span key={i} className="text-base mt-3" style={{ color: item.color }}>{"\u2192"}</span>
         ) : (
           <div key={i} className="flex flex-col items-center gap-2">
             <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold"
