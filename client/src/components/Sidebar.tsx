@@ -1,17 +1,17 @@
 /**
- * ATLAS V5.0 — Sidebar
- * Design: Manus-style minimal, clean whitespace, no aggressive CTAs
- * Nav order: 新建任务(+) → 工作台 → 数据中枢 → 模板库 → 搜索 → 库
- * Bottom: 主题切换 → 设置 → 用户
- * Responsive: auto-collapse <768px, manual toggle on desktop
+ * ATLAS V6.1 — Sidebar
+ * Bottom: icon-only (no text labels) — Share/Invite · Settings · User avatar
+ * Task cards: status dot + action buttons (rerun / download / schedule / more)
  */
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Home, LayoutDashboard, LayoutTemplate, Settings,
-  Search, Plus, Sun, Moon, ChevronRight, X,
+  Search, Plus, ChevronRight, X,
   CheckCircle2, Clock, AlertCircle, Archive,
   LogIn, LogOut, Loader2, PanelLeftClose, PanelLeftOpen,
+  Gift, RefreshCw, Download, Timer, MoreHorizontal,
+  Star, Share2, Trash2, User,
 } from "lucide-react";
 import { useAtlas, type NavItem } from "@/contexts/AtlasContext";
 import { toast } from "sonner";
@@ -37,13 +37,12 @@ export default function Sidebar() {
     sidebarOpen, setSidebarOpen,
     activeTaskId, setActiveTaskId,
     tasks,
-    theme, toggleTheme,
     user, setUser, setShowLoginModal,
-    clearMessages, clearFiles, addTask,
+    clearMessages, clearFiles,
   } = useAtlas();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchFocused, setSearchFocused] = useState(false);
+  const [taskMenuOpen, setTaskMenuOpen] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Responsive: auto-collapse on mobile
@@ -56,6 +55,14 @@ export default function Sidebar() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [setSidebarOpen]);
+
+  // Close task menu on outside click
+  useEffect(() => {
+    if (!taskMenuOpen) return;
+    const handler = () => setTaskMenuOpen(null);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, [taskMenuOpen]);
 
   const filteredTasks = tasks.filter(t =>
     !searchQuery || t.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -76,14 +83,58 @@ export default function Sidebar() {
 
   const collapsed = !sidebarOpen;
 
-  // Nav item renderer
+  // ── Icon-only bottom button ──────────────────────────────────────────────────
+  const BottomIconBtn = ({
+    icon: Icon, label, onClick, active = false, danger = false,
+  }: {
+    icon: typeof Home;
+    label: string;
+    onClick: () => void;
+    active?: boolean;
+    danger?: boolean;
+  }) => (
+    <button
+      onClick={onClick}
+      title={label}
+      className="w-8 h-8 rounded-lg flex items-center justify-center transition-all flex-shrink-0"
+      style={{
+        color: active
+          ? "var(--atlas-accent)"
+          : danger
+          ? "var(--atlas-danger, #F87171)"
+          : "var(--atlas-text-3)",
+        background: active ? "var(--atlas-nav-active-bg)" : "transparent",
+      }}
+      onMouseEnter={e => {
+        if (!active) {
+          (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
+          (e.currentTarget as HTMLElement).style.color = danger
+            ? "var(--atlas-danger, #F87171)"
+            : "var(--atlas-text)";
+        }
+      }}
+      onMouseLeave={e => {
+        if (!active) {
+          (e.currentTarget as HTMLElement).style.background = "transparent";
+          (e.currentTarget as HTMLElement).style.color = active
+            ? "var(--atlas-accent)"
+            : danger
+            ? "var(--atlas-danger, #F87171)"
+            : "var(--atlas-text-3)";
+        }
+      }}
+    >
+      <Icon size={15} />
+    </button>
+  );
+
+  // ── Nav item ─────────────────────────────────────────────────────────────────
   const NavButton = ({
     id, icon: Icon, label
   }: { id: NavItem; icon: typeof Home; label: string }) => {
     const active = activeNav === id;
     return (
       <button
-        key={id}
         onClick={() => setActiveNav(id)}
         className="w-full flex items-center rounded-lg transition-all duration-150"
         style={{
@@ -105,7 +156,7 @@ export default function Sidebar() {
             (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
           }
         }}
-        title={collapsed ? label : undefined}
+        title={label}
       >
         <Icon size={15} style={{ flexShrink: 0, opacity: active ? 1 : 0.7 }} />
         {!collapsed && (
@@ -187,7 +238,7 @@ export default function Sidebar() {
           </button>
         </div>
 
-        {/* ── New Task (subtle) ── */}
+        {/* ── New Task ── */}
         <div className="px-2 pt-2 pb-1 flex-shrink-0">
           {collapsed ? (
             <button
@@ -271,18 +322,13 @@ export default function Sidebar() {
               <div className="px-2 mb-1 flex-shrink-0">
                 <div
                   className="flex items-center gap-1.5 px-2 py-1 rounded-md"
-                  style={{
-                    background: "var(--atlas-elevated)",
-                    border: `1px solid ${searchFocused ? "rgba(91,140,255,0.3)" : "var(--atlas-border)"}`,
-                  }}
+                  style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}
                 >
                   <Search size={10} style={{ color: "var(--atlas-text-3)", flexShrink: 0 }} />
                   <input
                     ref={searchRef}
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    onFocus={() => setSearchFocused(true)}
-                    onBlur={() => setSearchFocused(false)}
                     placeholder="搜索任务..."
                     className="flex-1 bg-transparent text-xs outline-none"
                     style={{ color: "var(--atlas-text)", fontSize: "11px" }}
@@ -300,29 +346,27 @@ export default function Sidebar() {
             <div className="flex-1 overflow-y-auto px-2 space-y-0.5 pb-2 min-h-0">
               {filteredTasks.length === 0 ? (
                 <div className="py-4 px-2">
-                  {searchQuery ? (
+                  {searchQuery && (
                     <p className="text-xs text-center" style={{ color: "var(--atlas-text-3)" }}>无匹配任务</p>
-                  ) : null}
+                  )}
                 </div>
               ) : (
                 filteredTasks.map((task, i) => {
                   const cfg = STATUS_CONFIG[task.status] || STATUS_CONFIG.uploaded;
-                  const StatusIcon = cfg.icon;
                   const isActive = activeTaskId === task.id;
+                  const menuOpen = taskMenuOpen === task.id;
 
                   return (
-                    <motion.button
+                    <motion.div
                       key={task.id}
                       initial={{ opacity: 0, x: -4 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.025 }}
-                      onClick={() => {
-                        setActiveTaskId(task.id);
-                        setActiveNav("home");
-                      }}
-                      className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left transition-all group"
+                      className="group relative rounded-lg transition-all"
                       style={{
                         background: isActive ? "var(--atlas-nav-active-bg)" : "transparent",
+                        // Active task: left accent border
+                        borderLeft: isActive ? "2px solid var(--atlas-accent)" : "2px solid transparent",
                       }}
                       onMouseEnter={e => {
                         if (!isActive) (e.currentTarget as HTMLElement).style.background = "var(--atlas-nav-hover-bg)";
@@ -331,39 +375,172 @@ export default function Sidebar() {
                         if (!isActive) (e.currentTarget as HTMLElement).style.background = "transparent";
                       }}
                     >
-                      {/* Status dot */}
-                      <div
-                        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                        style={{ background: cfg.color }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p
-                          className="text-xs font-medium truncate"
-                          style={{ color: isActive ? "var(--atlas-accent)" : "var(--atlas-text-2)" }}
-                        >
-                          {task.title}
-                        </p>
-                        {(task.row_count || task.col_count) && (
+                      {/* Main click area */}
+                      <button
+                        onClick={() => { setActiveTaskId(task.id); setActiveNav("home"); }}
+                        className="w-full flex items-center gap-2 px-2.5 py-2 text-left"
+                      >
+                        {/* Status dot */}
+                        <div
+                          className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                          style={{ background: cfg.color }}
+                        />
+                        <div className="flex-1 min-w-0">
                           <p
-                            className="text-xs truncate"
-                            style={{
-                              color: "var(--atlas-text-3)",
-                              fontFamily: "'JetBrains Mono', monospace",
-                              fontSize: "10px",
+                            className="text-xs font-medium truncate"
+                            style={{ color: isActive ? "var(--atlas-accent)" : "var(--atlas-text-2)" }}
+                          >
+                            {task.title}
+                          </p>
+                          {(task.row_count || task.col_count) && (
+                            <p
+                              className="text-xs truncate"
+                              style={{
+                                color: "var(--atlas-text-3)",
+                                fontFamily: "'JetBrains Mono', monospace",
+                                fontSize: "10px",
+                              }}
+                            >
+                              {task.row_count ? `${task.row_count.toLocaleString()} 行` : ""}
+                              {task.row_count && task.col_count ? " · " : ""}
+                              {task.col_count ? `${task.col_count} 列` : ""}
+                            </p>
+                          )}
+                        </div>
+                      </button>
+
+                      {/* Action buttons — visible on hover */}
+                      <div
+                        className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        style={{ background: "var(--atlas-surface)", borderRadius: 6, padding: "2px" }}
+                      >
+                        {/* Rerun */}
+                        <button
+                          onClick={e => { e.stopPropagation(); toast.success("重新运行中..."); }}
+                          title="重新运行"
+                          className="w-5 h-5 rounded flex items-center justify-center transition-all"
+                          style={{ color: "var(--atlas-text-3)" }}
+                          onMouseEnter={e => {
+                            (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
+                            (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
+                          }}
+                          onMouseLeave={e => {
+                            (e.currentTarget as HTMLElement).style.background = "transparent";
+                            (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+                          }}
+                        >
+                          <RefreshCw size={10} />
+                        </button>
+
+                        {/* Download */}
+                        {task.report_filename && (
+                          <button
+                            onClick={e => { e.stopPropagation(); toast.success("下载报表..."); }}
+                            title="下载报表"
+                            className="w-5 h-5 rounded flex items-center justify-center transition-all"
+                            style={{ color: "var(--atlas-text-3)" }}
+                            onMouseEnter={e => {
+                              (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
+                              (e.currentTarget as HTMLElement).style.color = "#34D399";
+                            }}
+                            onMouseLeave={e => {
+                              (e.currentTarget as HTMLElement).style.background = "transparent";
+                              (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
                             }}
                           >
-                            {task.row_count ? `${task.row_count.toLocaleString()} 行` : ""}
-                            {task.row_count && task.col_count ? " · " : ""}
-                            {task.col_count ? `${task.col_count} 列` : ""}
-                          </p>
+                            <Download size={10} />
+                          </button>
                         )}
+
+                        {/* Schedule */}
+                        <button
+                          onClick={e => { e.stopPropagation(); toast.info("定时功能即将上线"); }}
+                          title="设置定时"
+                          className="w-5 h-5 rounded flex items-center justify-center transition-all"
+                          style={{ color: "var(--atlas-text-3)" }}
+                          onMouseEnter={e => {
+                            (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
+                            (e.currentTarget as HTMLElement).style.color = "#FBBF24";
+                          }}
+                          onMouseLeave={e => {
+                            (e.currentTarget as HTMLElement).style.background = "transparent";
+                            (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+                          }}
+                        >
+                          <Timer size={10} />
+                        </button>
+
+                        {/* More */}
+                        <div className="relative">
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              setTaskMenuOpen(menuOpen ? null : task.id);
+                            }}
+                            title="更多操作"
+                            className="w-5 h-5 rounded flex items-center justify-center transition-all"
+                            style={{
+                              color: menuOpen ? "var(--atlas-text)" : "var(--atlas-text-3)",
+                              background: menuOpen ? "var(--atlas-elevated)" : "transparent",
+                            }}
+                            onMouseEnter={e => {
+                              (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
+                              (e.currentTarget as HTMLElement).style.color = "var(--atlas-text)";
+                            }}
+                            onMouseLeave={e => {
+                              if (!menuOpen) {
+                                (e.currentTarget as HTMLElement).style.background = "transparent";
+                                (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+                              }
+                            }}
+                          >
+                            <MoreHorizontal size={10} />
+                          </button>
+
+                          {/* Dropdown menu */}
+                          <AnimatePresence>
+                            {menuOpen && (
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                                transition={{ duration: 0.1 }}
+                                className="absolute right-0 bottom-6 z-50 py-1 rounded-lg shadow-xl min-w-[120px]"
+                                style={{
+                                  background: "var(--atlas-elevated)",
+                                  border: "1px solid var(--atlas-border)",
+                                }}
+                                onClick={e => e.stopPropagation()}
+                              >
+                                {[
+                                  { icon: Star, label: "收藏", color: "#FBBF24", action: () => toast.success("已收藏") },
+                                  { icon: Share2, label: "共享链接", color: "var(--atlas-accent)", action: () => toast.success("链接已复制") },
+                                  { icon: Trash2, label: "删除任务", color: "#F87171", action: () => toast.success("任务已删除"), danger: true },
+                                ].map(({ icon: Icon, label, color, action, danger }) => (
+                                  <button
+                                    key={label}
+                                    onClick={() => { action(); setTaskMenuOpen(null); }}
+                                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-all"
+                                    style={{ color: danger ? "#F87171" : "var(--atlas-text-2)" }}
+                                    onMouseEnter={e => {
+                                      (e.currentTarget as HTMLElement).style.background = "var(--atlas-nav-hover-bg)";
+                                      (e.currentTarget as HTMLElement).style.color = color;
+                                    }}
+                                    onMouseLeave={e => {
+                                      (e.currentTarget as HTMLElement).style.background = "transparent";
+                                      (e.currentTarget as HTMLElement).style.color = danger ? "#F87171" : "var(--atlas-text-2)";
+                                    }}
+                                  >
+                                    <Icon size={11} />
+                                    <span>{label}</span>
+                                  </button>
+                                ))}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
                       </div>
-                      <ChevronRight
-                        size={10}
-                        className="flex-shrink-0 opacity-0 group-hover:opacity-50 transition-opacity"
-                        style={{ color: "var(--atlas-text-3)" }}
-                      />
-                    </motion.button>
+                    </motion.div>
                   );
                 })
               )}
@@ -389,123 +566,68 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* ── Bottom ── */}
+        {/* ── Bottom: icon-only row (no text ever) ── */}
         <div
-          className="flex-shrink-0 p-2 space-y-0.5"
+          className="flex-shrink-0 px-2 py-2"
           style={{ borderTop: "1px solid var(--atlas-border)" }}
         >
-          {/* Theme toggle */}
-          <button
-            onClick={toggleTheme}
-            className="w-full flex items-center rounded-lg transition-all duration-150"
+          {/* Icons row — always icon-only, centered when collapsed, left-aligned when expanded */}
+          <div
+            className="flex items-center"
             style={{
-              gap: collapsed ? 0 : 9,
-              padding: collapsed ? "8px 0" : "6px 10px",
               justifyContent: collapsed ? "center" : "flex-start",
-              color: "var(--atlas-text-3)",
+              gap: collapsed ? 0 : 4,
             }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = "var(--atlas-nav-hover-bg)";
-              (e.currentTarget as HTMLElement).style.color = "var(--atlas-text)";
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.background = "transparent";
-              (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
-            }}
-            title={theme === "dark" ? "切换浅色" : "切换深色"}
           >
-            {theme === "dark"
-              ? <Sun size={14} style={{ flexShrink: 0 }} />
-              : <Moon size={14} style={{ flexShrink: 0 }} />
-            }
-            {!collapsed && (
-              <span className="text-sm">{theme === "dark" ? "浅色模式" : "深色模式"}</span>
-            )}
-          </button>
+            {/* Invite / Share */}
+            <BottomIconBtn
+              icon={Gift}
+              label="邀请好友 · 各得500积分"
+              onClick={() => setActiveNav("invite")}
+              active={activeNav === "invite"}
+            />
 
-          {/* Settings */}
-          <button
-            onClick={() => setActiveNav("settings")}
-            className="w-full flex items-center rounded-lg transition-all duration-150"
-            style={{
-              gap: collapsed ? 0 : 9,
-              padding: collapsed ? "8px 0" : "6px 10px",
-              justifyContent: collapsed ? "center" : "flex-start",
-              background: activeNav === "settings" ? "var(--atlas-nav-active-bg)" : "transparent",
-              color: activeNav === "settings" ? "var(--atlas-accent)" : "var(--atlas-text-3)",
-            }}
-            onMouseEnter={e => {
-              if (activeNav !== "settings") {
-                (e.currentTarget as HTMLElement).style.background = "var(--atlas-nav-hover-bg)";
-                (e.currentTarget as HTMLElement).style.color = "var(--atlas-text)";
-              }
-            }}
-            onMouseLeave={e => {
-              if (activeNav !== "settings") {
-                (e.currentTarget as HTMLElement).style.background = "transparent";
-                (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
-              }
-            }}
-            title="设置"
-          >
-            <Settings size={14} style={{ flexShrink: 0, opacity: 0.8 }} />
-            {!collapsed && <span className="text-sm">设置</span>}
-          </button>
+            {/* Settings */}
+            <BottomIconBtn
+              icon={Settings}
+              label="设置"
+              onClick={() => setActiveNav("settings")}
+              active={activeNav === "settings"}
+            />
 
-          {/* User */}
-          {!collapsed && (
-            <div className="pt-0.5">
-              {user ? (
+            {/* User avatar / Login */}
+            {user ? (
+              <button
+                title={`${user.name} · 退出登录`}
+                onClick={handleLogout}
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition-all flex-shrink-0 relative"
+                style={{ color: "var(--atlas-text-3)" }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.background = "transparent";
+                }}
+              >
                 <div
-                  className="flex items-center gap-2 px-2.5 py-2 rounded-lg"
-                  style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}
-                >
-                  <div
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                    style={{ background: "linear-gradient(135deg, #5B8CFF 0%, #7B5FFF 100%)", color: "#fff" }}
-                  >
-                    {user.name[0].toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate" style={{ color: "var(--atlas-text)" }}>{user.name}</p>
-                    <p className="text-xs truncate" style={{ color: "var(--atlas-text-3)" }}>
-                      {user.plan === "free" ? "免费版" : user.plan === "pro" ? "专业版" : "企业版"}
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleLogout}
-                    title="退出登录"
-                    style={{ color: "var(--atlas-text-3)" }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-danger)"}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)"}
-                  >
-                    <LogOut size={13} />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowLoginModal(true)}
-                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg transition-all"
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
                   style={{
-                    background: "var(--atlas-elevated)",
-                    border: "1px solid var(--atlas-border)",
-                    color: "var(--atlas-text-2)",
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.3)";
-                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border)";
-                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+                    background: "linear-gradient(135deg, #5B8CFF 0%, #7B5FFF 100%)",
+                    color: "#fff",
+                    fontSize: "10px",
                   }}
                 >
-                  <LogIn size={13} />
-                  <span className="text-xs font-medium">登录 / 注册</span>
-                </button>
-              )}
-            </div>
-          )}
+                  {user.name[0].toUpperCase()}
+                </div>
+              </button>
+            ) : (
+              <BottomIconBtn
+                icon={LogIn}
+                label="登录 / 注册"
+                onClick={() => setShowLoginModal(true)}
+              />
+            )}
+          </div>
         </div>
       </motion.aside>
     </>

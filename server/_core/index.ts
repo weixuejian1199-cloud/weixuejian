@@ -5,6 +5,7 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerChatRoutes } from "./chat";
+import { registerAtlasRoutes } from "../atlas";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -38,6 +39,8 @@ async function startServer() {
   registerOAuthRoutes(app);
   // Chat API with streaming and tool calling
   registerChatRoutes(app);
+  // ATLAS core API (file upload, AI chat, report generation)
+  registerAtlasRoutes(app);
   // tRPC API
   app.use(
     "/api/trpc",

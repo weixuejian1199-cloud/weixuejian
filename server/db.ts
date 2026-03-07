@@ -198,3 +198,111 @@ export async function deleteScheduledTask(id: string) {
   if (!db) return;
   await db.delete(scheduledTasks).where(eq(scheduledTasks.id, id));
 }
+
+// ── Invite & Credits ──────────────────────────────────────────────────────────
+
+import { nanoid } from "nanoid";
+import { inviteRecords } from "../drizzle/schema";
+import type { InsertInviteRecord } from "../drizzle/schema";
+
+/** Generate a short unique invite code (8 chars) */
+export function generateInviteCode(): string {
+  return nanoid(8).toUpperCase();
+}
+
+/** Get user by invite code */
+export async function getUserByInviteCode(inviteCode: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users)
+    .where(eq(users.inviteCode, inviteCode))
+    .limit(1);
+  return result[0];
+}
+
+/** Ensure user has an invite code, generate one if missing */
+export async function ensureInviteCode(userId: number): Promise<string> {
+  const db = await getDb();
+  if (!db) return generateInviteCode();
+
+  const result = await db.select({ inviteCode: users.inviteCode })
+    .from(users).where(eq(users.id, userId)).limit(1);
+
+  if (result[0]?.inviteCode) return result[0].inviteCode;
+
+  // Generate and save a new invite code
+  const code = generateInviteCode();
+  await db.update(users).set({ inviteCode: code }).where(eq(users.id, userId));
+  return code;
+}
+
+/** Award credits to a user */
+export async function addCredits(userId: number, amount: number) {
+  const db = await getDb();
+  if (!db) return;
+  // Use raw SQL increment to avoid race conditions
+  await db.execute(
+    `UPDATE users SET credits = credits + ${amount} WHERE id = ${userId}`
+  );
+}
+
+/** Create an invite record and award credits to both parties */
+export async function redeemInviteCode(inviteeUserId: number, inviteCode: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  // Find inviter
+  const inviter = await getUserByInviteCode(inviteCode);
+  if (!inviter) return false;
+  if (inviter.id === inviteeUserId) return false; // Can't invite yourself
+
+  // Check if already redeemed
+  const existing = await db.select().from(inviteRecords)
+    .where(eq(inviteRecords.inviteeUserId, inviteeUserId))
+    .limit(1);
+  if (existing.length > 0) return false; // Already redeemed an invite
+
+  // Record the invite
+  const record: InsertInviteRecord = {
+    id: nanoid(),
+    inviterUserId: inviter.id,
+    inviteeUserId,
+    inviteCode,
+    inviterCredits: 500,
+    inviteeCredits: 500,
+    status: "completed",
+  };
+  await db.insert(inviteRecords).values(record);
+
+  // Mark invitee as invited by this code
+  await db.update(users).set({ invitedBy: inviteCode }).where(eq(users.id, inviteeUserId));
+
+  // Award credits to both
+  await addCredits(inviter.id, 500);
+  await addCredits(inviteeUserId, 500);
+
+  return true;
+}
+
+/** Get invite stats for a user */
+export async function getInviteStats(userId: number) {
+  const db = await getDb();
+  if (!db) return { inviteCount: 0, totalCreditsEarned: 0 };
+
+  const records = await db.select().from(inviteRecords)
+    .where(eq(inviteRecords.inviterUserId, userId));
+
+  return {
+    inviteCount: records.length,
+    totalCreditsEarned: records.reduce((sum, r) => sum + r.inviterCredits, 0),
+  };
+}
+
+/** Get user's current credits balance */
+export async function getUserCredits(userId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db.select({ credits: users.credits })
+    .from(users).where(eq(users.id, userId)).limit(1);
+  return result[0]?.credits ?? 0;
+}

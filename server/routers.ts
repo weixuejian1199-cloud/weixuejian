@@ -9,6 +9,7 @@ import {
   createSession, updateSession, getSession, getUserSessions, deleteSession,
   createReport, updateReport, getReport, getUserReports,
   createScheduledTask, updateScheduledTask, getUserScheduledTasks, deleteScheduledTask,
+  ensureInviteCode, redeemInviteCode, getInviteStats, getUserCredits,
 } from "./db";
 import { storageDelete } from "./storage";
 
@@ -243,6 +244,38 @@ export const appRouter = router({
         await deleteScheduledTask(input.id);
         return { success: true };
       }),
+  }),
+
+  // ── Invite & Credits ──────────────────────────────────────────────────────────────
+
+  invite: router({
+    /** Get current user's invite code (generates one if not exists) */
+    getMyCode: protectedProcedure.query(async ({ ctx }) => {
+      const code = await ensureInviteCode(ctx.user.id);
+      const stats = await getInviteStats(ctx.user.id);
+      const credits = await getUserCredits(ctx.user.id);
+      return { code, ...stats, credits };
+    }),
+
+    /** Redeem an invite code (called after user registers) */
+    redeem: protectedProcedure
+      .input(z.object({ code: z.string().min(1).max(16) }))
+      .mutation(async ({ ctx, input }) => {
+        const success = await redeemInviteCode(ctx.user.id, input.code.toUpperCase());
+        if (!success) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "邀请码无效或已使用",
+          });
+        }
+        return { success: true, creditsAwarded: 500 };
+      }),
+
+    /** Get credits balance */
+    getCredits: protectedProcedure.query(async ({ ctx }) => {
+      const credits = await getUserCredits(ctx.user.id);
+      return { credits };
+    }),
   }),
 });
 

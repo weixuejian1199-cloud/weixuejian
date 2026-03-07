@@ -21,6 +21,12 @@ export const users = mysqlTable("users", {
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   plan: mysqlEnum("plan", ["free", "pro", "enterprise"]).default("free").notNull(),
+  /** Unique invite code for sharing, auto-generated on first login */
+  inviteCode: varchar("inviteCode", { length: 16 }).unique(),
+  /** Invited by which user's inviteCode */
+  invitedBy: varchar("invitedBy", { length: 16 }),
+  /** Credits balance, 500 awarded per successful invite */
+  credits: int("credits").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -102,3 +108,22 @@ export const scheduledTasks = mysqlTable("scheduled_tasks", {
 
 export type ScheduledTask = typeof scheduledTasks.$inferSelect;
 export type InsertScheduledTask = typeof scheduledTasks.$inferInsert;
+
+// ── Invite Records ────────────────────────────────────────────────────────────
+// Tracks successful invitations and credit awards
+
+export const inviteRecords = mysqlTable("invite_records", {
+  id:            varchar("id", { length: 64 }).primaryKey(),
+  inviterUserId: int("inviterUserId").notNull(),
+  inviteeUserId: int("inviteeUserId").notNull(),
+  inviteCode:    varchar("inviteCode", { length: 16 }).notNull(),
+  /** Credits awarded to inviter */
+  inviterCredits: int("inviterCredits").default(500).notNull(),
+  /** Credits awarded to invitee */
+  inviteeCredits: int("inviteeCredits").default(500).notNull(),
+  status:        mysqlEnum("status", ["pending", "completed"]).default("completed").notNull(),
+  createdAt:     timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type InviteRecord = typeof inviteRecords.$inferSelect;
+export type InsertInviteRecord = typeof inviteRecords.$inferInsert;

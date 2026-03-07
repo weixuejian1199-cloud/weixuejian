@@ -1,9 +1,8 @@
 /**
- * ATLAS API Client
- * Connects to FastAPI backend at port 8000
+ * ATLAS API Client — V6.1
+ * Connects to Express backend at /api/atlas/*
+ * All endpoints are same-origin (no CORS issues)
  */
-
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 export interface FieldInfo {
   name: string;
@@ -12,11 +11,6 @@ export interface FieldInfo {
   null_count: number;
   unique_count: number;
   sample: (string | number)[];
-  stats: {
-    min?: number;
-    max?: number;
-    mean?: number;
-  };
 }
 
 export interface DataFrameInfo {
@@ -29,128 +23,157 @@ export interface DataFrameInfo {
 export interface UploadResponse {
   session_id: string;
   filename: string;
+  file_url: string;
   df_info: DataFrameInfo;
   ai_analysis: string;
-}
-
-export interface ChatResponse {
-  response: string;
-  session_id: string;
-}
-
-export interface ReportPlan {
-  title: string;
-  description: string;
-  sheets: Array<{
-    name: string;
-    type: string;
-    group_by: string[];
-    metrics: Array<{ field: string; agg: string; alias: string }>;
-  }>;
-  insights: string;
 }
 
 export interface GenerateReportResponse {
   report_id: string;
   filename: string;
-  plan: ReportPlan;
   download_url: string;
   ai_message: string;
-}
-
-export interface HistoryItem {
-  id: string;
-  filename: string;
-  created_at: string;
-  status: "uploaded" | "completed" | "failed";
-  row_count: number;
-  col_count: number;
-  report_id?: string;
-  report_filename?: string;
-}
-
-export interface SessionInfo {
-  session_id: string;
-  filename: string;
-  df_info: DataFrameInfo;
-  messages: Array<{
-    role: "user" | "assistant";
-    content: string;
-    timestamp: string;
-    report_id?: string;
-    report_filename?: string;
-  }>;
-  last_report?: {
-    report_id: string;
-    filename: string;
-    plan: ReportPlan;
-    created_at: string;
+  plan: {
+    title: string;
+    sheets: Array<{ name: string; summary: string }>;
+    insights: string;
   };
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      ...options?.headers,
-    },
+// ── Upload ────────────────────────────────────────────────────────────────────
+
+export async function uploadFile(file: File): Promise<UploadResponse> {
+  const form = new FormData();
+  form.append("file", file);
+
+  const res = await fetch("/api/atlas/upload", {
+    method: "POST",
+    body: form,
+    credentials: "include",
   });
 
   if (!res.ok) {
-    let errorMsg = `HTTP ${res.status}`;
-    try {
-      const err = await res.json();
-      errorMsg = err.detail || errorMsg;
-    } catch {}
-    throw new Error(errorMsg);
+    let msg = `HTTP ${res.status}`;
+    try { const err = await res.json(); msg = err.error || msg; } catch {}
+    throw new Error(msg);
   }
 
   return res.json();
 }
 
-export const api = {
-  health: () => request<{ status: string; version: string; ai_enabled: boolean }>("/api/health"),
+// ── Chat (streaming) ──────────────────────────────────────────────────────────
 
-  upload: async (file: File): Promise<UploadResponse> => {
-    const form = new FormData();
-    form.append("file", file);
-    return request<UploadResponse>("/api/upload", {
+export interface ChatStreamOptions {
+  sessionId: string;
+  message: string;
+  history?: Array<{ role: "user" | "assistant"; content: string }>;
+  onChunk: (chunk: string) => void;
+  onDone: (fullText: string) => void;
+  onError: (err: Error) => void;
+}
+
+export async function chatStream(opts: ChatStreamOptions): Promise<void> {
+  const { sessionId, message, history, onChunk, onDone, onError } = opts;
+
+  try {
+    const res = await fetch("/api/atlas/chat", {
       method: "POST",
-      body: form,
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ session_id: sessionId, message, history }),
+    });
+
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try { const err = await res.json(); msg = err.error || msg; } catch {}
+      throw new Error(msg);
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error("No response body");
+
+    const decoder = new TextDecoder();
+    let fullText = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      fullText += chunk;
+      onChunk(chunk);
+    }
+
+    onDone(fullText);
+  } catch (err) {
+    onError(err instanceof Error ? err : new Error(String(err)));
+  }
+}
+
+// ── Generate Report ───────────────────────────────────────────────────────────
+
+export async function generateReport(
+  sessionId: string,
+  requirement: string,
+  reportTitle?: string
+): Promise<GenerateReportResponse> {
+  const res = await fetch("/api/atlas/generate-report", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({
+      session_id: sessionId,
+      requirement,
+      report_title: reportTitle,
+    }),
+  });
+
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try { const err = await res.json(); msg = err.error || msg; } catch {}
+    throw new Error(msg);
+  }
+
+  return res.json();
+}
+
+// ── Download URL ──────────────────────────────────────────────────────────────
+
+export function getDownloadUrl(reportId: string): string {
+  return `/api/atlas/download/${reportId}`;
+}
+
+// ── Health check ────────────────────────────────────────────────────────────
+
+export async function healthCheck(): Promise<{ status: string }> {
+  const res = await fetch("/api/trpc/auth.me", { credentials: "include" });
+  if (!res.ok) throw new Error("Server unreachable");
+  return { status: "ok" };
+}
+
+// ── Legacy compat (kept for any remaining references) ─────────────────────────
+
+export const api = {
+  health: healthCheck,
+  upload: uploadFile,
+  chat: async (session_id: string, message: string) => {
+    return new Promise<{ response: string; session_id: string }>((resolve, reject) => {
+      let fullText = "";
+      chatStream({
+        sessionId: session_id,
+        message,
+        onChunk: (c) => { fullText += c; },
+        onDone: (text) => resolve({ response: text, session_id }),
+        onError: reject,
+      });
     });
   },
-
-  chat: (session_id: string, message: string): Promise<ChatResponse> =>
-    request<ChatResponse>("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id, message }),
-    }),
-
-  generateReport: (
-    session_id: string,
-    requirement: string,
-    report_title?: string
-  ): Promise<GenerateReportResponse> =>
-    request<GenerateReportResponse>("/api/generate-report", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id, requirement, report_title }),
-    }),
-
-  getSession: (session_id: string): Promise<SessionInfo> =>
-    request<SessionInfo>(`/api/session/${session_id}`),
-
-  getHistory: (): Promise<{ history: HistoryItem[] }> =>
-    request<{ history: HistoryItem[] }>("/api/history"),
-
-  deleteSession: (session_id: string): Promise<{ status: string }> =>
-    request<{ status: string }>(`/api/session/${session_id}`, { method: "DELETE" }),
-
-  getDownloadUrl: (report_id: string): string =>
-    `${API_BASE}/api/download/${report_id}`,
-
-  setBaseUrl: (url: string): void => {
-    (api as any)._baseUrl = url;
-  },
+  generateReport: (session_id: string, requirement: string, report_title?: string) =>
+    generateReport(session_id, requirement, report_title).then(r => ({
+      report_id: r.report_id,
+      filename: r.filename,
+      plan: r.plan as any,
+      download_url: r.download_url,
+      ai_message: r.ai_message,
+    })),
+  getDownloadUrl,
 };

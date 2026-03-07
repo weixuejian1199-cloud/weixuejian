@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { useAtlas, type UploadedFile } from "@/contexts/AtlasContext";
-import { api } from "@/lib/api";
+import { api, chatStream } from "@/lib/api";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
 
@@ -173,8 +173,28 @@ export default function MainWorkspace() {
         ));
         toast.success("报表生成成功！");
       } else {
-        const result = await api.chat(sessionId, msg);
-        updateLastMessage(result.response);
+        // Streaming AI chat
+        const history = messages
+          .filter(m => m.role === "user" || (m.role === "assistant" && m.content && !m.isStreaming))
+          .slice(-6)
+          .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
+        let accumulated = "";
+        await chatStream({
+          sessionId,
+          message: msg,
+          history,
+          onChunk: (chunk) => {
+            accumulated += chunk;
+            updateLastMessage(accumulated);
+          },
+          onDone: (fullText) => {
+            updateLastMessage(fullText || accumulated);
+          },
+          onError: (err) => {
+            updateLastMessage(`对话失败：${err.message}`);
+            toast.error("对话请求失败");
+          },
+        });
       }
     } catch (err: any) {
       updateLastMessage(`处理失败：${err.message || "请检查后端服务是否正常运行"}`);
