@@ -32,6 +32,12 @@ const ICON_MAP: Record<string, typeof FileSpreadsheet> = {
 };
 
 const BUILTIN_TEMPLATES: Template[] = [
+  // ── HR 模板 ──
+  { id: "hr1", title: "工资条生成", category: "HR", desc: "批量生成员工工资条，自动计算个税和社保", iconName: "Users", color: "#34D399", prompt: "请生成工资条，包含：员工姓名、基本工资、绩效奖金、各项扣款、应发工资、个税计算、实发工资，按人生成独立工资条", pinned: true, custom: false, usageCount: 0 },
+  { id: "hr2", title: "考勤汇总报表", category: "HR", desc: "按月汇总出勤、迟到、旷工、加班数据", iconName: "Table2", color: "#5B8CFF", prompt: "请生成考勤汇总报表，包含：员工姓名、部门、出勤天数、迟到次数、早退次数、旷工天数、加班时长、异常明细", pinned: true, custom: false, usageCount: 0 },
+  { id: "hr3", title: "部门薪资分析", category: "HR", desc: "各部门薪资对比、平均薪资、薪资分布", iconName: "BarChart2", color: "#FBBF24", prompt: "请生成部门薪资分析报表，包含：各部门平均薪资、薪资总额、人均成本、薪资分布区间、部门薪资占比", pinned: false, custom: false, usageCount: 0 },
+  { id: "hr4", title: "员工入离职分析", category: "HR", desc: "入职、离职、流失率、在职周期分析", iconName: "TrendingUp", color: "#A78BFA", prompt: "请生成员工入离职分析报表，包含：当月入职人数、离职人数、流失率、离职原因分类、平均在职周期、部门分布", pinned: false, custom: false, usageCount: 0 },
+  // ── 原有模板 ──
   { id: "t1", title: "销售汇总报表", category: "销售", desc: "按时间、品类、渠道汇总销售额、订单量、客单价", iconName: "TrendingUp", color: "#5B8CFF", prompt: "请生成销售汇总报表，包含：总销售额、订单数、客单价、按日期趋势、按品类分布、环比增长率", pinned: true, custom: false, usageCount: 128 },
   { id: "t2", title: "库存盘点报表", category: "库存", desc: "统计各 SKU 库存量、周转率、滞销预警", iconName: "Package", color: "#34D399", prompt: "请生成库存盘点报表，包含：各SKU当前库存、库存周转天数、滞销预警（超过30天未售）、补货建议", pinned: false, custom: false, usageCount: 87 },
   { id: "t3", title: "财务利润报表", category: "财务", desc: "收入、成本、毛利润、净利润多维度分析", iconName: "DollarSign", color: "#FBBF24", prompt: "请生成财务利润报表，包含：总收入、总成本、毛利润、净利润、利润率、按月对比", pinned: true, custom: false, usageCount: 203 },
@@ -41,7 +47,7 @@ const BUILTIN_TEMPLATES: Template[] = [
   { id: "t7", title: "自定义数据透视", category: "通用", desc: "灵活配置行列维度，生成数据透视表", iconName: "Table2", color: "#5B8CFF", prompt: "请根据我的数据生成数据透视表，我会告诉你具体的行、列维度和汇总方式", pinned: false, custom: false, usageCount: 45 },
 ];
 
-const CATEGORIES = ["全部", "销售", "财务", "库存", "用户", "商品", "通用", "自定义"];
+const CATEGORIES = ["全部", "HR", "销售", "财务", "库存", "用户", "商品", "通用", "自定义"];
 
 function CreateTemplateModal({ onClose, onSave }: { onClose: () => void; onSave: (t: Template) => void }) {
   const [mode, setMode] = useState<"manual" | "ai">("manual");

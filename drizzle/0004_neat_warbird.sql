@@ -1,0 +1,40 @@
+CREATE TABLE `hr_attendance_sessions` (
+	`id` varchar(64) NOT NULL,
+	`userId` int NOT NULL,
+	`filename` varchar(255) NOT NULL,
+	`fileKey` varchar(512),
+	`fileUrl` text,
+	`fileSizeKb` int,
+	`rowCount` int,
+	`period` varchar(20),
+	`fieldMap` json,
+	`summary` json,
+	`reportFileKey` varchar(512),
+	`reportFileUrl` text,
+	`status` enum('analyzing','ready','error') NOT NULL DEFAULT 'analyzing',
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `hr_attendance_sessions_id` PRIMARY KEY(`id`)
+);
+--> statement-breakpoint
+CREATE TABLE `hr_payslip_records` (
+	`id` varchar(64) NOT NULL,
+	`userId` int NOT NULL,
+	`filename` varchar(255) NOT NULL,
+	`fileKey` varchar(512),
+	`fileUrl` text,
+	`fileSizeKb` int,
+	`employeeCount` int,
+	`period` varchar(20),
+	`fieldMap` json,
+	`summary` json,
+	`reportFileKey` varchar(512),
+	`reportFileUrl` text,
+	`emailStatus` varchar(20),
+	`emailSentCount` int DEFAULT 0,
+	`expiresAt` timestamp NOT NULL,
+	`status` enum('generating','ready','error') NOT NULL DEFAULT 'generating',
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `hr_payslip_records_id` PRIMARY KEY(`id`)
+);

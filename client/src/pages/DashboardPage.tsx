@@ -17,7 +17,7 @@ import {
   BarChart2, DollarSign, Package, Users, Activity,
   ChevronDown, ExternalLink, Wifi, WifiOff, Plus, Clock,
 } from "lucide-react";
-import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { AreaChart, Area, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useAtlas } from "@/contexts/AtlasContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -561,6 +561,38 @@ export default function DashboardPage() {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* ── ATLAS Report Trend ── */}
+        <div className="mt-4 rounded-xl p-4" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-semibold" style={{ color: "var(--atlas-text)" }}>ATLAS 报表生成趋势</h3>
+              <p className="text-xs mt-0.5" style={{ color: "var(--atlas-text-3)" }}>近 7 天每日生成报表数量</p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full" style={{ background: "#5B8CFF" }} />
+              <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>报表数</span>
+            </div>
+          </div>
+          {statsLoading ? (
+            <div className="h-16 rounded-lg animate-pulse" style={{ background: "var(--atlas-elevated)" }} />
+          ) : (
+            <ResponsiveContainer width="100%" height={80}>
+              <LineChart data={stats?.trendData ?? []} margin={{ top: 4, right: 8, bottom: 0, left: -30 }}>
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--atlas-text-3)" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "var(--atlas-text-3)" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={{ background: "var(--atlas-card)", border: "1px solid var(--atlas-border-2)", borderRadius: 8, fontSize: 12 }}
+                  formatter={(v: any) => [`${v} 份`, "报表"]}
+                />
+                <Line type="monotone" dataKey="count" stroke="#5B8CFF" strokeWidth={2}
+                  dot={{ fill: "#5B8CFF", r: 3, strokeWidth: 0 }}
+                  activeDot={{ r: 5, fill: "#5B8CFF" }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
         {/* ── Bottom note ── */}

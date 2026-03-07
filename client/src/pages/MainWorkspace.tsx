@@ -668,38 +668,74 @@ function MessageBubble({
 // ── EmptyState ────────────────────────────────────────────────────────────────
 
 function EmptyState({ hasFiles }: { hasFiles: boolean }) {
+  if (hasFiles) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-4">
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}>
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+            style={{ background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.2)" }}>
+            <Check size={24} style={{ color: "#34D399" }} />
+          </div>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="text-center">
+          <h3 className="font-semibold mb-1.5" style={{ color: "var(--atlas-text)", fontSize: "17px" }}>文件已就绪，开始对话</h3>
+          <p style={{ color: "var(--atlas-text-2)", fontSize: "14px" }}>AI 已分析数据结构，点击上方模板或直接描述需求</p>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col items-center justify-center py-20 gap-5">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.3 }}
-      >
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center"
-          style={{ background: "rgba(91,140,255,0.08)", border: "1px solid rgba(91,140,255,0.15)" }}
-        >
+    <div className="flex flex-col items-center justify-center py-12 gap-6">
+      {/* Logo + title */}
+      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }} className="text-center">
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+          style={{ background: "rgba(91,140,255,0.08)", border: "1px solid rgba(91,140,255,0.15)" }}>
           <BarChart2 size={24} style={{ color: "var(--atlas-accent)" }} />
         </div>
+        <h3 className="font-semibold mb-1.5" style={{ color: "var(--atlas-text)", fontSize: "18px" }}>把数据拖进来，剩下的交给 ATLAS</h3>
+        <p style={{ color: "var(--atlas-text-2)", fontSize: "14px" }}>支持 Excel / CSV，可同时上传多个文件</p>
       </motion.div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="text-center"
-      >
-        <h3
-          className="font-semibold mb-2"
-          style={{ color: "var(--atlas-text)", fontSize: "17px" }}
-        >
-          {hasFiles ? "文件已就绪，开始对话" : "把数据拖进来，剩下的交给 ATLAS"}
-        </h3>
-        <p style={{ color: "var(--atlas-text-2)", fontSize: "14px" }}>
-          {hasFiles
-            ? "AI 已分析数据结构，点击上方模板或直接描述需求"
-            : "上传 Excel 或 CSV，支持同时上传多个文件"}
-        </p>
+      {/* 3-step guide */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+        className="flex items-center gap-3">
+        {[
+          { step: "1", label: "上传文件", desc: "Excel / CSV", color: "#5B8CFF" },
+          { step: "→", label: "", desc: "", color: "var(--atlas-text-3)" },
+          { step: "2", label: "描述需求", desc: "或选模板", color: "#A78BFA" },
+          { step: "→", label: "", desc: "", color: "var(--atlas-text-3)" },
+          { step: "3", label: "下载报表", desc: "Excel 格式", color: "#34D399" },
+        ].map((item, i) => item.step === "→" ? (
+          <span key={i} className="text-sm" style={{ color: item.color }}>→</span>
+        ) : (
+          <div key={i} className="flex flex-col items-center gap-1">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
+              style={{ background: `${item.color}18`, color: item.color, border: `1px solid ${item.color}30` }}>
+              {item.step}
+            </div>
+            <span className="text-xs font-medium" style={{ color: "var(--atlas-text-2)" }}>{item.label}</span>
+            <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{item.desc}</span>
+          </div>
+        ))}
+      </motion.div>
+
+      {/* Capability tags */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+        className="flex flex-wrap justify-center gap-2">
+        {[
+          { label: "📊 销售报表", color: "#5B8CFF" },
+          { label: "💰 财务分析", color: "#FBBF24" },
+          { label: "👥 工资条", color: "#34D399" },
+          { label: "📅 考勤汇总", color: "#5B8CFF" },
+          { label: "📦 库存盘点", color: "#A78BFA" },
+          { label: "📱 多平台对比", color: "#FF6B35" },
+        ].map(tag => (
+          <span key={tag.label} className="text-xs px-2.5 py-1 rounded-full"
+            style={{ background: `${tag.color}12`, color: tag.color, border: `1px solid ${tag.color}25` }}>
+            {tag.label}
+          </span>
+        ))}
       </motion.div>
     </div>
   );

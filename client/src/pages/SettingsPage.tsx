@@ -21,6 +21,37 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
 
+// ── Countdown Component ─────────────────────────────────────────────────────
+
+function NextRunCountdown({ nextRunAt }: { nextRunAt: Date | null | undefined }) {
+  const [remaining, setRemaining] = useState("");
+
+  useEffect(() => {
+    if (!nextRunAt) return;
+    const update = () => {
+      const diff = new Date(nextRunAt).getTime() - Date.now();
+      if (diff <= 0) { setRemaining("即将执行"); return; }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      if (h > 0) setRemaining(`${h}小时 ${m}分钟后执行`);
+      else if (m > 0) setRemaining(`${m}分钟 ${s}秒后执行`);
+      else setRemaining(`${s}秒后执行`);
+    };
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [nextRunAt]);
+
+  if (!nextRunAt || !remaining) return null;
+  return (
+    <span className="text-xs px-1.5 py-0.5 rounded-md"
+      style={{ background: "rgba(52,211,153,0.1)", color: "#34D399", border: "1px solid rgba(52,211,153,0.2)", fontFamily: "'JetBrains Mono', monospace", fontSize: "10px" }}>
+      ⏱ {remaining}
+    </span>
+  );
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface ApiKeyEntry {
@@ -891,7 +922,14 @@ function ScheduleSection() {
                     <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>⏰ {t.scheduleDesc || t.cronExpr}</span>
                     {t.notifyEmail && <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>✉️ {t.notifyEmail}</span>}
                     {t.runCount > 0 && <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>已执行 {t.runCount} 次</span>}
-                    {t.nextRunAt && isActive && <span className="text-xs" style={{ color: "#34D399" }}>下次：{new Date(t.nextRunAt).toLocaleString()}</span>}
+                    {t.nextRunAt && isActive && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs" style={{ color: "var(--atlas-text-3)", fontSize: "10px" }}>
+                          {new Date(t.nextRunAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                        <NextRunCountdown nextRunAt={t.nextRunAt} />
+                      </div>
+                    )}
                   </div>
                 </div>
                 <button onClick={() => deleteTask(t.id)} className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"

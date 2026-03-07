@@ -7,12 +7,176 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart2, Download, FileSpreadsheet, Calendar,
   RefreshCw, Clock, Trash2, MoreHorizontal, Play,
-  Loader2, CheckCircle, XCircle, Plus, Search, Filter, X, Star,
+  Loader2, CheckCircle, XCircle, Plus, Search, Filter, X, Star, Eye,
+  FileText, Hash, HardDrive, MessageSquare,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAtlas } from "@/contexts/AtlasContext";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+
+// ── Report Preview Dialog ─────────────────────────────────────────────────────
+
+function ReportPreviewDialog({
+  reportId,
+  onClose,
+  onDownload,
+}: {
+  reportId: string;
+  onClose: () => void;
+  onDownload: () => void;
+}) {
+  const { data: report, isLoading } = trpc.report.get.useQuery({ id: reportId });
+
+  const formatDate = (d: Date | null | undefined) =>
+    d ? new Date(d).toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+
+  const expiryInfo = (() => {
+    if (!report?.createdAt || report.status !== "completed") return null;
+    const expiresAt = new Date(report.createdAt).getTime() + 24 * 60 * 60 * 1000;
+    const remaining = expiresAt - Date.now();
+    if (remaining <= 0) return { label: "已过期", color: "#F87171" };
+    const hours = Math.floor(remaining / (60 * 60 * 1000));
+    const mins = Math.floor((remaining % (60 * 60 * 1000)) / 60000);
+    if (hours < 1) return { label: `${mins}分钟后过期`, color: "#F87171" };
+    if (hours < 6) return { label: `${hours}小时后过期`, color: "#FBBF24" };
+    return { label: `${hours}小时后过期`, color: "var(--atlas-text-3)" };
+  })();
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.65)" }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0, y: 8 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.95, opacity: 0, y: 8 }}
+        className="w-full max-w-lg mx-4 rounded-2xl overflow-hidden"
+        style={{ background: "var(--atlas-card)", border: "1px solid var(--atlas-border-2)", boxShadow: "0 24px 64px rgba(0,0,0,0.5)" }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--atlas-border)" }}>
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: "rgba(91,140,255,0.12)" }}>
+            <FileSpreadsheet size={16} style={{ color: "var(--atlas-accent)" }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold truncate" style={{ color: "var(--atlas-text)" }}>
+              {isLoading ? "加载中..." : report?.title || "未命名报表"}
+            </h3>
+            <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>报表预览</p>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center"
+            style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-3)" }}>
+            <X size={14} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-5">
+          {isLoading ? (
+            <div className="space-y-3">
+              {[1,2,3,4].map(i => (
+                <div key={i} className="h-10 rounded-lg animate-pulse" style={{ background: "var(--atlas-elevated)" }} />
+              ))}
+            </div>
+          ) : report ? (
+            <div className="space-y-4">
+              {/* Meta info grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl p-3" style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Calendar size={11} style={{ color: "var(--atlas-text-3)" }} />
+                    <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>生成时间</span>
+                  </div>
+                  <p className="text-xs font-medium" style={{ color: "var(--atlas-text)" }}>{formatDate(report.createdAt)}</p>
+                </div>
+                <div className="rounded-xl p-3" style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <HardDrive size={11} style={{ color: "var(--atlas-text-3)" }} />
+                    <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>文件大小</span>
+                  </div>
+                  <p className="text-xs font-medium" style={{ color: "var(--atlas-text)" }}>
+                    {report.fileSizeKb ? (report.fileSizeKb > 1024 ? `${(report.fileSizeKb/1024).toFixed(1)} MB` : `${report.fileSizeKb} KB`) : "未知"}
+                  </p>
+                </div>
+                <div className="rounded-xl p-3" style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <FileText size={11} style={{ color: "var(--atlas-text-3)" }} />
+                    <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>文件名</span>
+                  </div>
+                  <p className="text-xs font-medium truncate" style={{ color: "var(--atlas-text)" }}>{report.filename}</p>
+                </div>
+                <div className="rounded-xl p-3" style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Hash size={11} style={{ color: "var(--atlas-text-3)" }} />
+                    <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>状态</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {report.status === "completed"
+                      ? <CheckCircle size={11} style={{ color: "var(--atlas-success)" }} />
+                      : <XCircle size={11} style={{ color: "var(--atlas-danger)" }} />}
+                    <p className="text-xs font-medium" style={{ color: report.status === "completed" ? "var(--atlas-success)" : "var(--atlas-danger)" }}>
+                      {report.status === "completed" ? "已完成" : "失败"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Prompt */}
+              {report.prompt && (
+                <div className="rounded-xl p-3" style={{ background: "rgba(91,140,255,0.06)", border: "1px solid rgba(91,140,255,0.15)" }}>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <MessageSquare size={11} style={{ color: "var(--atlas-accent)" }} />
+                    <span className="text-xs font-medium" style={{ color: "var(--atlas-accent)" }}>分析指令</span>
+                  </div>
+                  <p className="text-xs leading-relaxed" style={{ color: "var(--atlas-text-2)" }}>{report.prompt}</p>
+                </div>
+              )}
+
+              {/* Expiry warning */}
+              {expiryInfo && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
+                  style={{ background: `${expiryInfo.color}12`, border: `1px solid ${expiryInfo.color}30`, color: expiryInfo.color }}>
+                  <Clock size={11} />
+                  {expiryInfo.label}—请及时下载保存
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-center py-8" style={{ color: "var(--atlas-text-3)" }}>报表不存在或已删除</p>
+          )}
+        </div>
+
+        {/* Footer */}
+        {report?.status === "completed" && (
+          <div className="px-5 pb-5 flex gap-2">
+            <button
+              onClick={() => { onDownload(); onClose(); }}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-medium"
+              style={{ background: "var(--atlas-accent)", color: "#fff" }}
+            >
+              <Download size={14} /> 下载报表
+            </button>
+            <button
+              onClick={onClose}
+              className="px-4 py-2.5 rounded-xl text-sm"
+              style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-2)", border: "1px solid var(--atlas-border)" }}
+            >
+              关闭
+            </button>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
 
 // ── Quick Schedule Dialog ─────────────────────────────────────────────────────
 
@@ -219,11 +383,13 @@ function ReportCard({
   index,
   onSchedule,
   onRerun,
+  onPreview,
 }: {
   report: { id: string; title: string; filename: string; fileUrl?: string | null; fileSizeKb?: number | null; status: string; createdAt: Date | null; sessionId: string };
   index: number;
   onSchedule: (title: string) => void;
   onRerun: (sessionId: string, title: string) => void;
+  onPreview: (id: string) => void;
 }) {
   const [showMore, setShowMore] = useState(false);
   const utils = trpc.useUtils();
@@ -328,6 +494,18 @@ function ReportCard({
 
       {/* Action buttons */}
       <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Preview */}
+        <button
+          onClick={() => onPreview(report.id)}
+          title="预览报表"
+          className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+          style={{ background: "rgba(91,140,255,0.08)", color: "var(--atlas-text-3)" }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.15)"; (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.08)"; (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)"; }}
+        >
+          <Eye size={13} />
+        </button>
+
         {/* Download */}
         {isCompleted && (
           <button
@@ -420,6 +598,7 @@ function ReportCard({
 export default function ReportsPage() {
   const { setActiveNav } = useAtlas();
   const [scheduleTarget, setScheduleTarget] = useState<string | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "month">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "completed" | "failed">("all");
@@ -591,6 +770,7 @@ export default function ReportsPage() {
                   index={i}
                   onSchedule={(title) => setScheduleTarget(title)}
                   onRerun={handleRerun}
+                  onPreview={(id) => setPreviewId(id)}
                 />
               ))
             )}
@@ -606,6 +786,29 @@ export default function ReportsPage() {
             onClose={() => setScheduleTarget(null)}
           />
         )}
+      </AnimatePresence>
+
+      {/* Report Preview Dialog */}
+      <AnimatePresence>
+        {previewId && (() => {
+          const r = reports.find(rep => rep.id === previewId);
+          const handleDownload = () => {
+            if (r?.fileUrl) {
+              const a = document.createElement("a");
+              a.href = r.fileUrl;
+              a.download = r.filename;
+              a.target = "_blank";
+              a.click();
+            }
+          };
+          return (
+            <ReportPreviewDialog
+              reportId={previewId}
+              onClose={() => setPreviewId(null)}
+              onDownload={handleDownload}
+            />
+          );
+        })()}
       </AnimatePresence>
     </div>
   );

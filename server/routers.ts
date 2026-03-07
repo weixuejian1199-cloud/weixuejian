@@ -381,12 +381,48 @@ export const appRouter = router({
         return { success: true, creditsAwarded: 500 };
       }),
 
-    /** Get credits balance */
+     /** Get credits balance */
     getCredits: protectedProcedure.query(async ({ ctx }) => {
       const credits = await getUserCredits(ctx.user.id);
       return { credits };
     }),
   }),
-});
 
+  // ── Search ────────────────────────────────────────────────────────────────────
+
+  search: router({
+    /** Global search across sessions and reports */
+    query: protectedProcedure
+      .input(z.object({ q: z.string().min(1).max(100) }))
+      .query(async ({ ctx, input }) => {
+        const q = input.q.toLowerCase().trim();
+        const [sessions, reports] = await Promise.all([
+          getUserSessions(ctx.user.id),
+          getUserReports(ctx.user.id),
+        ]);
+        const matchedSessions = sessions.filter(s =>
+          s.filename?.toLowerCase().includes(q) ||
+          s.originalName?.toLowerCase().includes(q)
+        ).slice(0, 10);
+        const matchedReports = reports.filter(r =>
+          r.title?.toLowerCase().includes(q) ||
+          r.prompt?.toLowerCase().includes(q) ||
+          r.filename?.toLowerCase().includes(q)
+        ).slice(0, 10);
+        return { sessions: matchedSessions, reports: matchedReports };
+      }),
+
+    /** Get recent sessions and reports for empty state */
+    recent: protectedProcedure.query(async ({ ctx }) => {
+      const [sessions, reports] = await Promise.all([
+        getUserSessions(ctx.user.id),
+        getUserReports(ctx.user.id),
+      ]);
+      return {
+        sessions: sessions.slice(0, 5),
+        reports: reports.slice(0, 5),
+      };
+    }),
+  }),
+});
 export type AppRouter = typeof appRouter;

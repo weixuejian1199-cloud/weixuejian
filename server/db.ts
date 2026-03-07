@@ -376,3 +376,82 @@ export async function getSimilarExamples(columnSignature: string, limit = 3) {
 
   return scored;
 }
+
+// ── HR: Payslip ───────────────────────────────────────────────────────────────
+
+import {
+  hrPayslipRecords, hrAttendanceSessions,
+  type InsertHrPayslipRecord, type InsertHrAttendanceSession,
+} from "../drizzle/schema";
+
+export async function createHrPayslip(data: InsertHrPayslipRecord) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(hrPayslipRecords).values(data);
+  return data;
+}
+
+export async function updateHrPayslip(id: string, data: Partial<InsertHrPayslipRecord>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(hrPayslipRecords).set(data).where(eq(hrPayslipRecords.id, id));
+}
+
+export async function getHrPayslip(id: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(hrPayslipRecords)
+    .where(eq(hrPayslipRecords.id, id)).limit(1);
+  return result[0];
+}
+
+export async function getUserHrPayslips(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(hrPayslipRecords)
+    .where(eq(hrPayslipRecords.userId, userId))
+    .orderBy(hrPayslipRecords.createdAt);
+}
+
+export async function deleteHrPayslip(id: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(hrPayslipRecords).where(eq(hrPayslipRecords.id, id));
+}
+
+// ── HR: Attendance ────────────────────────────────────────────────────────────
+
+export async function createHrAttendance(data: InsertHrAttendanceSession) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(hrAttendanceSessions).values(data);
+  return data;
+}
+
+export async function updateHrAttendance(id: string, data: Partial<InsertHrAttendanceSession>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(hrAttendanceSessions).set(data).where(eq(hrAttendanceSessions.id, id));
+}
+
+export async function getHrAttendance(id: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(hrAttendanceSessions)
+    .where(eq(hrAttendanceSessions.id, id)).limit(1);
+  return result[0];
+}
+
+export async function getUserHrAttendances(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(hrAttendanceSessions)
+    .where(eq(hrAttendanceSessions.userId, userId))
+    .orderBy(hrAttendanceSessions.createdAt);
+}
+
+export async function deleteHrAttendance(id: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(hrAttendanceSessions).where(eq(hrAttendanceSessions.id, id));
+}

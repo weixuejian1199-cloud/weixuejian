@@ -149,3 +149,57 @@ export const reportFeedback = mysqlTable("report_feedback", {
 
 export type ReportFeedback = typeof reportFeedback.$inferSelect;
 export type InsertReportFeedback = typeof reportFeedback.$inferInsert;
+// ── HR: Payslip Records ────────────────────────────────────────────────────────
+// Each payslip generation batch creates one record
+
+export const hrPayslipRecords = mysqlTable("hr_payslip_records", {
+  id:             varchar("id", { length: 64 }).primaryKey(),
+  userId:         int("userId").notNull(),
+  filename:       varchar("filename", { length: 255 }).notNull(),
+  fileKey:        varchar("fileKey", { length: 512 }),
+  fileUrl:        text("fileUrl"),
+  fileSizeKb:     int("fileSizeKb"),
+  employeeCount:  int("employeeCount"),
+  period:         varchar("period", { length: 20 }),   // e.g. "2024-03"
+  /** JSON: { nameCol, emailCol, baseSalaryCol, bonusCol, deductionCol, insuranceCol } */
+  fieldMap:       json("fieldMap"),
+  /** JSON: { totalPayroll, avgSalary, totalTax, totalNetPay } */
+  summary:        json("summary"),
+  reportFileKey:  varchar("reportFileKey", { length: 512 }),
+  reportFileUrl:  text("reportFileUrl"),
+  emailStatus:    varchar("emailStatus", { length: 20 }),  // null | 'sending' | 'done' | 'partial'
+  emailSentCount: int("emailSentCount").default(0),
+  expiresAt:      timestamp("expiresAt").notNull(),          // 1h expiry for sensitive data
+  status:         mysqlEnum("status", ["generating", "ready", "error"]).default("generating").notNull(),
+  createdAt:      timestamp("createdAt").defaultNow().notNull(),
+  updatedAt:      timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type HrPayslipRecord = typeof hrPayslipRecords.$inferSelect;
+export type InsertHrPayslipRecord = typeof hrPayslipRecords.$inferInsert;
+
+// ── HR: Attendance Sessions ────────────────────────────────────────────────────
+// Each attendance analysis creates one record
+
+export const hrAttendanceSessions = mysqlTable("hr_attendance_sessions", {
+  id:             varchar("id", { length: 64 }).primaryKey(),
+  userId:         int("userId").notNull(),
+  filename:       varchar("filename", { length: 255 }).notNull(),
+  fileKey:        varchar("fileKey", { length: 512 }),
+  fileUrl:        text("fileUrl"),
+  fileSizeKb:     int("fileSizeKb"),
+  rowCount:       int("rowCount"),
+  period:         varchar("period", { length: 20 }),   // e.g. "2024-03"
+  /** JSON: { nameCol, dateCol, checkInCol, checkOutCol, deptCol } */
+  fieldMap:       json("fieldMap"),
+  /** JSON: { totalEmployees, attendanceRate, lateCount, absentCount, overtimeHours } */
+  summary:        json("summary"),
+  reportFileKey:  varchar("reportFileKey", { length: 512 }),
+  reportFileUrl:  text("reportFileUrl"),
+  status:         mysqlEnum("status", ["analyzing", "ready", "error"]).default("analyzing").notNull(),
+  createdAt:      timestamp("createdAt").defaultNow().notNull(),
+  updatedAt:      timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type HrAttendanceSession = typeof hrAttendanceSessions.$inferSelect;
+export type InsertHrAttendanceSession = typeof hrAttendanceSessions.$inferInsert;
