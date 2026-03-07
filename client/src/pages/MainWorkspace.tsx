@@ -33,16 +33,13 @@ import { api, chatStream } from "@/lib/api";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
-
-// ── Three pinned templates ────────────────────────────────────────────────────
-
+// ── Four pinned quick-action templates ─────────────────────────────────────────────────────────────────────────────
 const PINNED_TEMPLATES = [
-  { id: "daily-report",     icon: "📋", name: "经营日报",   prompt: "生成今日经营日报，包含总销售额GMV、订单数量、退款金额和退款率、客单价、平台占比，并标注异常数据" },
-  { id: "store-sales",      icon: "🏪", name: "门店排行",   prompt: "帮我汇总所有门店的销售数据，按门店分组，显示销售额、订单数量、客单价，并标注排名" },
-  { id: "platform-compare", icon: "📊", name: "平台对比",   prompt: "对比各平台的销售数据，生成平台销售对比报表，包含销售额、占比、环比变化" },
+  { id: "finance-report",   icon: "💰", name: "财务报表",   prompt: "帮我生成财务分析报表，包含收入、支出、利润、成本占比等核心财务指标，并标注异常项目" },
+  { id: "sales-summary",    icon: "📊", name: "销售汇总",   prompt: "帮我汇总销售数据，按时间/地区/品类分组，显示销售额、订单数、客单价和环比变化" },
+  { id: "attendance",       icon: "📅", name: "考勤汇总",   prompt: "帮我分析考勤数据，统计每人出勤天数、迟到次数、早退次数和旷工记录，生成月度考勤汇总表" },
+  { id: "payslip",          icon: "📝", name: "工资条生成", prompt: "帮我根据工资表生成工资条，包含基本工资、绩效奖金、各项扣款、应缴个税和实发工资，按人生成明细" },
 ];
-
-// ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function MainWorkspace() {
   const {
@@ -331,7 +328,36 @@ export default function MainWorkspace() {
       <div className="flex-shrink-0" style={{ borderTop: "1px solid var(--atlas-border)" }}>
         <div className="max-w-3xl mx-auto px-6 pt-3 pb-4">
 
-          {/* Template shortcuts removed — users upload files first then describe needs */}
+          {/* Quick action buttons: Finance / Sales / Attendance / Payslip */}
+          {messages.length === 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {PINNED_TEMPLATES.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => { setInput(t.prompt); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                  style={{
+                    background: "var(--atlas-elevated)",
+                    border: "1px solid var(--atlas-border-2)",
+                    color: "var(--atlas-text-2)",
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.5)";
+                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
+                    (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.06)";
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border-2)";
+                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+                    (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
+                  }}
+                >
+                  <span>{t.icon}</span>
+                  <span>{t.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Uploaded files chips */}
           <AnimatePresence>

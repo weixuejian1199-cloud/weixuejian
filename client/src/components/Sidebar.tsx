@@ -567,42 +567,87 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* ── Bottom: icon-only row (no text ever) ── */}
+        {/* ── Bottom area ── */}
         <div
-          className="flex-shrink-0 px-2 py-2"
+          className="flex-shrink-0 px-3 py-3 flex flex-col gap-1"
           style={{ borderTop: "1px solid var(--atlas-border)" }}
         >
-          {/* Icons row — always icon-only, centered when collapsed, left-aligned when expanded */}
-          <div
-            className="flex items-center"
+          {/* Invite / Share — Manus-style full-width text button */}
+          <button
+            onClick={() => setActiveNav("invite")}
+            className="w-full flex items-center rounded-xl transition-all duration-150"
             style={{
+              gap: collapsed ? 0 : 10,
+              padding: collapsed ? "9px 0" : "8px 10px",
               justifyContent: collapsed ? "center" : "flex-start",
-              gap: collapsed ? 0 : 4,
+              background: activeNav === "invite" ? "var(--atlas-nav-active-bg)" : "transparent",
+              color: activeNav === "invite" ? "var(--atlas-accent)" : "var(--atlas-text-2)",
             }}
+            onMouseEnter={e => {
+              if (activeNav !== "invite") {
+                (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
+                (e.currentTarget as HTMLElement).style.color = "var(--atlas-text)";
+              }
+            }}
+            onMouseLeave={e => {
+              if (activeNav !== "invite") {
+                (e.currentTarget as HTMLElement).style.background = "transparent";
+                (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+              }
+            }}
+            title="与好友分享 ATLAS"
           >
-            {/* Invite / Share */}
-            <BottomIconBtn
-              icon={Gift}
-              label="邀请好友 · 各得500积分"
-              onClick={() => setActiveNav("invite")}
-              active={activeNav === "invite"}
-            />
+            <div
+              className="flex-shrink-0 flex items-center justify-center rounded-lg"
+              style={{
+                width: 28, height: 28,
+                background: activeNav === "invite"
+                  ? "rgba(91,140,255,0.15)"
+                  : "rgba(91,140,255,0.08)",
+              }}
+            >
+              <Gift size={15} style={{ color: activeNav === "invite" ? "var(--atlas-accent)" : "#5B8CFF" }} />
+            </div>
+            {!collapsed && (
+              <span className="text-sm font-medium truncate">与好友分享 ATLAS</span>
+            )}
+          </button>
 
+          {/* Settings + User/Login row */}
+          <div className="flex items-center" style={{ gap: 6 }}>
             {/* Settings */}
-            <BottomIconBtn
-              icon={Settings}
-              label="设置"
+            <button
               onClick={() => setActiveNav("settings")}
-              active={activeNav === "settings"}
-            />
+              title="设置"
+              className="flex items-center justify-center rounded-xl transition-all flex-shrink-0"
+              style={{
+                width: collapsed ? "100%" : 38, height: 38,
+                background: activeNav === "settings" ? "var(--atlas-nav-active-bg)" : "transparent",
+                color: activeNav === "settings" ? "var(--atlas-accent)" : "var(--atlas-text-3)",
+              }}
+              onMouseEnter={e => {
+                if (activeNav !== "settings") {
+                  (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
+                  (e.currentTarget as HTMLElement).style.color = "var(--atlas-text)";
+                }
+              }}
+              onMouseLeave={e => {
+                if (activeNav !== "settings") {
+                  (e.currentTarget as HTMLElement).style.background = "transparent";
+                  (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+                }
+              }}
+            >
+              <Settings size={18} />
+            </button>
 
-            {/* User avatar / Login */}
+            {/* User avatar / Login — icon-only, no text */}
             {user ? (
               <button
                 title={`${user.name} · 退出登录`}
                 onClick={handleLogout}
-                className="w-8 h-8 rounded-lg flex items-center justify-center transition-all flex-shrink-0 relative"
-                style={{ color: "var(--atlas-text-3)" }}
+                className="flex items-center justify-center rounded-xl transition-all flex-shrink-0"
+                style={{ width: 38, height: 38 }}
                 onMouseEnter={e => {
                   (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
                 }}
@@ -611,23 +656,35 @@ export default function Sidebar() {
                 }}
               >
                 <div
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                  className="w-7 h-7 rounded-full flex items-center justify-center font-bold"
                   style={{
                     background: "linear-gradient(135deg, #5B8CFF 0%, #7B5FFF 100%)",
                     color: "#fff",
-                    fontSize: "10px",
+                    fontSize: "11px",
                   }}
                 >
                   {user.name[0].toUpperCase()}
                 </div>
               </button>
             ) : (
-              <BottomIconBtn
-                icon={LogIn}
-                label="登录 / 注册"
+              <button
                 onClick={() => setShowLoginModal(true)}
-              />
+                title="登录 / 注册"
+                className="flex items-center justify-center rounded-xl transition-all flex-shrink-0"
+                style={{ width: 38, height: 38, color: "var(--atlas-text-3)" }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
+                  (e.currentTarget as HTMLElement).style.color = "var(--atlas-text)";
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.background = "transparent";
+                  (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+                }}
+              >
+                <LogIn size={18} />
+              </button>
             )}
+
           </div>
         </div>
       </motion.aside>
