@@ -246,6 +246,52 @@ export const appRouter = router({
       }),
   }),
 
+  // ── Stats / Dashboard ───────────────────────────────────────────────────────
+
+  stats: router({
+    dashboard: protectedProcedure.query(async ({ ctx }) => {
+      const [sessions, reports, tasks, credits] = await Promise.all([
+        getUserSessions(ctx.user.id),
+        getUserReports(ctx.user.id),
+        getUserScheduledTasks(ctx.user.id),
+        getUserCredits(ctx.user.id),
+      ]);
+      const completedReports = reports.filter(r => r.status === "completed");
+      const activeTasks = tasks.filter(t => t.status === "active");
+      // Build recent activity (last 7 days)
+      const now = Date.now();
+      const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+      const recentReports = completedReports.filter(r => r.createdAt && new Date(r.createdAt).getTime() > sevenDaysAgo);
+      // Daily report counts for the past 7 days
+      const dailyCounts: Record<string, number> = {};
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now - i * 24 * 60 * 60 * 1000);
+        const key = `${d.getMonth() + 1}/${d.getDate()}`;
+        dailyCounts[key] = 0;
+      }
+      for (const r of recentReports) {
+        if (!r.createdAt) continue;
+        const d = new Date(r.createdAt);
+        const key = `${d.getMonth() + 1}/${d.getDate()}`;
+        if (key in dailyCounts) dailyCounts[key]++;
+      }
+      const trendData = Object.entries(dailyCounts).map(([date, count]) => ({ date, count }));
+      return {
+        totalSessions: sessions.length,
+        totalReports: completedReports.length,
+        activeScheduledTasks: activeTasks.length,
+        credits,
+        recentReports: completedReports.slice(-5).reverse().map(r => ({
+          id: r.id,
+          title: r.title,
+          createdAt: r.createdAt,
+          fileSizeKb: r.fileSizeKb,
+        })),
+        trendData,
+      };
+    }),
+  }),
+
   // ── Invite & Credits ──────────────────────────────────────────────────────────────
 
   invite: router({

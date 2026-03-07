@@ -30,6 +30,7 @@ import {
 import { Streamdown } from "streamdown";
 import { useAtlas, type UploadedFile } from "@/contexts/AtlasContext";
 import { api, chatStream } from "@/lib/api";
+import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
 
@@ -61,6 +62,9 @@ export default function MainWorkspace() {
   const readyFiles = uploadedFiles.filter(f => f.status === "ready");
   const hasFiles = readyFiles.length > 0;
   const hasAnyFiles = uploadedFiles.length > 0;
+
+  // Multi-file merge mutation
+  const mergeMutation = trpc.session.merge.useMutation();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -147,7 +151,28 @@ export default function MainWorkspace() {
     addMessage({ role: "user", content: msg });
     addMessage({ role: "assistant", content: "", isStreaming: true });
 
-    const sessionId = readyFiles[0]?.sessionId;
+    // If multiple files, merge them first
+    let sessionId: string | undefined;
+    if (readyFiles.length > 1) {
+      const sessionIds = readyFiles.map(f => f.sessionId).filter(Boolean) as string[];
+      if (sessionIds.length < 2) { toast.error("文件尚未就绪"); setIsGenerating(false); return; }
+      try {
+        updateLastMessage("正在合并多个文件数据...");
+        const mergeResult = await mergeMutation.mutateAsync({ sessionIds });
+        sessionId = mergeResult.id;
+        toast.success(`已合并 ${readyFiles.length} 个文件`);
+      } catch (mergeErr: any) {
+        updateLastMessage(`文件合并失败：${mergeErr.message}`);
+        toast.error("多文件合并失败，请重试");
+        setIsGenerating(false);
+        setIsProcessing(false);
+        // Restore user input so they can retry
+        setInput(msg);
+        return;
+      }
+    } else {
+      sessionId = readyFiles[0]?.sessionId;
+    }
     if (!sessionId) { toast.error("文件尚未就绪"); setIsGenerating(false); return; }
 
     const isReport = /生成|报表|汇总|统计|分析|导出|excel|xlsx|日报|排行|对比/i.test(msg);
@@ -156,7 +181,17 @@ export default function MainWorkspace() {
       if (isReport) {
         setIsProcessing(true);
         updateLastMessage("正在分析需求，生成报表中...");
-        const result = await api.generateReport(sessionId, msg);
+        let result;
+        try {
+          result = await api.generateReport(sessionId, msg);
+        } catch (reportErr: any) {
+          const errMsg = reportErr.message || "未知错误";
+          updateLastMessage(`报表生成失败：${errMsg}\n\n请检查数据格式或稍后重试。`);
+          toast.error(`报表生成失败：${errMsg}`, { action: { label: "重试", onClick: () => handleSend(msg) } });
+          // Restore user input for retry
+          setInput(msg);
+          return;
+        }
         updateLastMessage(result.ai_message, {
           report_id: result.report_id,
           report_filename: result.filename,
@@ -179,6 +214,7 @@ export default function MainWorkspace() {
           .slice(-6)
           .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
         let accumulated = "";
+        let chatFailed = false;
         await chatStream({
           sessionId,
           message: msg,
@@ -191,14 +227,21 @@ export default function MainWorkspace() {
             updateLastMessage(fullText || accumulated);
           },
           onError: (err) => {
-            updateLastMessage(`对话失败：${err.message}`);
-            toast.error("对话请求失败");
+            chatFailed = true;
+            const errMsg = err.message || "请求失败";
+            updateLastMessage(`对话失败：${errMsg}\n\n请检查网络连接或稍后重试。`);
+            toast.error("对话请求失败", { action: { label: "重试", onClick: () => handleSend(msg) } });
+            // Restore user input for retry
+            setInput(msg);
           },
         });
       }
     } catch (err: any) {
-      updateLastMessage(`处理失败：${err.message || "请检查后端服务是否正常运行"}`);
-      toast.error("请求失败");
+      const errMsg = err.message || "请检查后端服务是否正常运行";
+      updateLastMessage(`处理失败：${errMsg}`);
+      toast.error("请求失败，请重试", { action: { label: "重试", onClick: () => handleSend(msg) } });
+      // Restore user input for retry
+      setInput(msg);
     } finally {
       setIsGenerating(false);
       setIsProcessing(false);

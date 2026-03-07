@@ -17,6 +17,7 @@ import {
   RefreshCw, AlertCircle, Loader2,
 } from "lucide-react";
 import { useAtlas } from "@/contexts/AtlasContext";
+import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
 
@@ -796,23 +797,52 @@ function IntegrationsSection() {
 
 // ── Schedule ──────────────────────────────────────────────────────────────────
 
+// CRON presets for user-friendly schedule selection
+const CRON_PRESETS = [
+  { label: "每天 09:00",    cron: "0 0 9 * * *",   desc: "每天早上9点" },
+  { label: "每天 18:00",    cron: "0 0 18 * * *",  desc: "每天下午6点" },
+  { label: "每周一 08:00",  cron: "0 0 8 * * 1",   desc: "每周一早上8点" },
+  { label: "每月1日 09:00", cron: "0 0 9 1 * *",   desc: "每月1日早上9点" },
+  { label: "每周五 17:00",  cron: "0 0 17 * * 5",  desc: "每周五下午5点" },
+];
+
 function ScheduleSection() {
-  const [tasks, setTasks] = useState<ScheduledTaskItem[]>([
-    { id: "s1", name: "每日销售汇总", template: "销售汇总报表", schedule: "每天 09:00", enabled: true, lastRun: "今天 09:00", nextRun: "明天 09:00" },
-    { id: "s2", name: "周度财务报告", template: "财务利润报表", schedule: "每周一 08:00", enabled: false, lastRun: "上周一", nextRun: "下周一" },
-  ]);
+  const utils = trpc.useUtils();
+  const { data: tasks = [], isLoading } = trpc.scheduledTask.list.useQuery();
+  const createMut = trpc.scheduledTask.create.useMutation({
+    onSuccess: () => { utils.scheduledTask.list.invalidate(); toast.success("定时任务已创建"); setAdding(false); setNewName(""); setNewEmail(""); },
+    onError: (e) => toast.error(`创建失败：${e.message}`),
+  });
+  const updateMut = trpc.scheduledTask.update.useMutation({
+    onSuccess: () => { utils.scheduledTask.list.invalidate(); toast.success("定时任务已更新"); },
+    onError: (e) => toast.error(`更新失败：${e.message}`),
+  });
+  const deleteMut = trpc.scheduledTask.delete.useMutation({
+    onSuccess: () => { utils.scheduledTask.list.invalidate(); toast.success("定时任务已删除"); },
+    onError: (e) => toast.error(`删除失败：${e.message}`),
+  });
+
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [newTemplate, setNewTemplate] = useState("销售汇总报表");
-  const [newSchedule, setNewSchedule] = useState("每天 09:00");
+  const [newCronPreset, setNewCronPreset] = useState(CRON_PRESETS[0]);
+  const [newEmail, setNewEmail] = useState("");
 
-  const toggleTask = (id: string) => { setTasks(prev => prev.map(t => t.id === id ? { ...t, enabled: !t.enabled } : t)); toast.success("定时任务已更新"); };
-  const deleteTask = (id: string) => { setTasks(prev => prev.filter(t => t.id !== id)); toast.success("定时任务已删除"); };
+  const toggleTask = (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === "active" ? "paused" : "active";
+    updateMut.mutate({ id, status: newStatus as "active" | "paused" | "error" });
+  };
+  const deleteTask = (id: string) => deleteMut.mutate({ id });
   const addTask = () => {
-    if (!newName) { toast.error("请填写任务名称"); return; }
-    setTasks(prev => [...prev, { id: nanoid(), name: newName, template: newTemplate, schedule: newSchedule, enabled: true }]);
-    setNewName(""); setAdding(false);
-    toast.success("定时任务已创建");
+    if (!newName.trim()) { toast.error("请填写任务名称"); return; }
+    createMut.mutate({
+      name: newName.trim(),
+      templatePrompt: `生成${newTemplate}，分析数据趋势和关键指标`,
+      templateName: newTemplate,
+      cronExpr: newCronPreset.cron,
+      scheduleDesc: newCronPreset.desc,
+      notifyEmail: newEmail.trim() || undefined,
+    });
   };
 
   return (
@@ -827,38 +857,54 @@ function ScheduleSection() {
           </button>
         </div>
         <div style={{ background: "var(--atlas-surface)" }}>
-          {tasks.map((t, i) => (
-            <div key={t.id} className="px-5 py-3 flex items-center gap-3" style={{ borderTop: i > 0 ? "1px solid var(--atlas-border)" : "none" }}>
-              <button onClick={() => toggleTask(t.id)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
-                style={{ background: t.enabled ? "rgba(52,211,153,0.1)" : "var(--atlas-elevated)", border: t.enabled ? "1px solid rgba(52,211,153,0.2)" : "1px solid var(--atlas-border)" }}>
-                {t.enabled ? <Play size={13} style={{ color: "#34D399" }} /> : <Pause size={13} style={{ color: "var(--atlas-text-3)" }} />}
-              </button>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>{t.name}</span>
-                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-3)", fontSize: "10px" }}>{t.template}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>⏰ {t.schedule}</span>
-                  {t.lastRun && <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>上次：{t.lastRun}</span>}
-                  {t.nextRun && t.enabled && <span className="text-xs" style={{ color: "#34D399" }}>下次：{t.nextRun}</span>}
-                </div>
-              </div>
-              <button onClick={() => deleteTask(t.id)} className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
-                style={{ color: "var(--atlas-text-3)" }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLElement).style.background = "rgba(248,113,113,0.1)";
-                  (e.currentTarget as HTMLElement).style.color = "#F87171";
-                }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLElement).style.background = "transparent";
-                  (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
-                }}>
-                <Trash2 size={13} />
-              </button>
+          {isLoading && (
+            <div className="px-5 py-6 flex items-center justify-center gap-2" style={{ color: "var(--atlas-text-3)" }}>
+              <Loader2 size={14} className="animate-spin" />
+              <span className="text-sm">加载中...</span>
             </div>
-          ))}
+          )}
+          {!isLoading && tasks.length === 0 && (
+            <div className="px-5 py-6 text-center text-sm" style={{ color: "var(--atlas-text-3)" }}>
+              暂无定时任务，点击「新建任务」开始配置
+            </div>
+          )}
+          {tasks.map((t, i) => {
+            const isActive = t.status === "active";
+            return (
+              <div key={t.id} className="px-5 py-3 flex items-center gap-3" style={{ borderTop: i > 0 ? "1px solid var(--atlas-border)" : "none" }}>
+                <button onClick={() => toggleTask(t.id, t.status)}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
+                  style={{ background: isActive ? "rgba(52,211,153,0.1)" : "var(--atlas-elevated)", border: isActive ? "1px solid rgba(52,211,153,0.2)" : "1px solid var(--atlas-border)" }}>
+                  {isActive ? <Play size={13} style={{ color: "#34D399" }} /> : <Pause size={13} style={{ color: "var(--atlas-text-3)" }} />}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>{t.name}</span>
+                    {t.templateName && <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-3)", fontSize: "10px" }}>{t.templateName}</span>}
+                    <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: isActive ? "rgba(52,211,153,0.08)" : "var(--atlas-elevated)", color: isActive ? "#34D399" : "var(--atlas-text-3)", fontSize: "10px" }}>{isActive ? "运行中" : "已暂停"}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>⏰ {t.scheduleDesc || t.cronExpr}</span>
+                    {t.notifyEmail && <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>✉️ {t.notifyEmail}</span>}
+                    {t.runCount > 0 && <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>已执行 {t.runCount} 次</span>}
+                    {t.nextRunAt && isActive && <span className="text-xs" style={{ color: "#34D399" }}>下次：{new Date(t.nextRunAt).toLocaleString()}</span>}
+                  </div>
+                </div>
+                <button onClick={() => deleteTask(t.id)} className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                  style={{ color: "var(--atlas-text-3)" }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.background = "rgba(248,113,113,0.1)";
+                    (e.currentTarget as HTMLElement).style.color = "#F87171";
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.background = "transparent";
+                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+                  }}>
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
       <AnimatePresence>
@@ -878,14 +924,20 @@ function ScheduleSection() {
             </div>
             <div>
               <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--atlas-text-2)" }}>执行频率</label>
-              <select value={newSchedule} onChange={e => setNewSchedule(e.target.value)}
+              <select value={newCronPreset.cron} onChange={e => setNewCronPreset(CRON_PRESETS.find(p => p.cron === e.target.value) || CRON_PRESETS[0])}
                 className="w-full px-3 py-2 rounded-lg text-sm outline-none"
                 style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)", color: "var(--atlas-text)" }}>
-                {["每天 09:00", "每天 18:00", "每周一 08:00", "每月1日 09:00"].map(s => <option key={s} value={s}>{s}</option>)}
+                {CRON_PRESETS.map(p => <option key={p.cron} value={p.cron}>{p.label}</option>)}
               </select>
             </div>
+            <FieldInput label="通知邮符1（可选）" value={newEmail} onChange={setNewEmail} placeholder="boss@company.com" type="email" />
             <div className="flex gap-2">
-              <button onClick={addTask} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "var(--atlas-accent)", color: "#fff" }}>创建</button>
+              <button onClick={addTask} disabled={createMut.isPending}
+                className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5"
+                style={{ background: "var(--atlas-accent)", color: "#fff", opacity: createMut.isPending ? 0.7 : 1 }}>
+                {createMut.isPending && <Loader2 size={12} className="animate-spin" />}
+                创建
+              </button>
               <button onClick={() => setAdding(false)} className="px-4 py-2 rounded-lg text-sm" style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-2)", border: "1px solid var(--atlas-border)" }}>取消</button>
             </div>
           </motion.div>

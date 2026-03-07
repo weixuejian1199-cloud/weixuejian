@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useAtlas } from "@/contexts/AtlasContext";
+import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -240,7 +241,11 @@ export default function DashboardPage() {
   const [timeRange, setTimeRange] = useState<TimeRange>("today");
   const [lastUpdated, setLastUpdated] = useState("刚刚");
 
-  // Compute scaled data based on time range
+  // Real stats from API
+  const utils = trpc.useUtils();
+  const { data: stats, isLoading: statsLoading } = trpc.stats.dashboard.useQuery();
+
+  // Compute scaled demo data based on time range
   const multiplier = RANGE_MULTIPLIER[timeRange];
   const stores = useMemo(() => BASE_STORES.map(s => ({
     ...s,
@@ -254,7 +259,7 @@ export default function DashboardPage() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await new Promise(r => setTimeout(r, 1200));
+    await utils.stats.dashboard.invalidate();
     setRefreshing(false);
     setLastUpdated("刚刚");
     toast.success("数据已刷新");
@@ -347,23 +352,17 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* ── KPI Cards ── */}
-        <motion.div
-          key={timeRange}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-          className="grid grid-cols-4 gap-3 mb-6"
-        >
-          <MetricCard icon={DollarSign} label={`${trendLabel} GMV`} value={`¥${(totalGmv / 10000).toFixed(1)}万`}
-            sub="5 个平台合计" trend={14.2} color="#5B8CFF" />
-          <MetricCard icon={ShoppingBag} label="总订单数" value={totalOrders.toLocaleString()}
-            sub="含待付款" trend={8.7} color="#34D399" />
-          <MetricCard icon={Users} label="平均客单价" value={`¥${Math.round(totalGmv / totalOrders)}`}
-            trend={5.3} color="#A78BFA" />
-          <MetricCard icon={Activity} label="平均退款率" value={`${avgRefund}%`}
-            sub="行业均值 4.2%" trend={-0.8} color="#FBBF24" />
-        </motion.div>
+        {/* ── KPI Cards — Real ATLAS Stats ── */}
+        <div className="grid grid-cols-4 gap-3 mb-6">
+          <MetricCard icon={BarChart2} label="已生成报表" value={statsLoading ? "-" : String(stats?.totalReports ?? 0)}
+            sub="历史报表总数" color="#5B8CFF" />
+          <MetricCard icon={Package} label="分析会话" value={statsLoading ? "-" : String(stats?.totalSessions ?? 0)}
+            sub="已上传文件数" color="#34D399" />
+          <MetricCard icon={Clock} label="定时任务" value={statsLoading ? "-" : String(stats?.activeScheduledTasks ?? 0)}
+            sub="运行中的自动化任务" color="#A78BFA" />
+          <MetricCard icon={Activity} label="我的积分" value={statsLoading ? "-" : String(stats?.credits ?? 0)}
+            sub="可用于高级功能" color="#FBBF24" />
+        </div>
 
         {/* ── Charts Row ── */}
         <div className="grid grid-cols-3 gap-4 mb-6">
@@ -483,47 +482,44 @@ export default function DashboardPage() {
             </motion.div>
           </div>
 
-          {/* Alerts */}
+          {/* Recent Reports — Real Data */}
           <div className="rounded-xl overflow-hidden" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
             <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: "1px solid var(--atlas-border)" }}>
-              <Zap size={13} style={{ color: "var(--atlas-warning)" }} />
-              <h3 className="text-sm font-semibold" style={{ color: "var(--atlas-text)" }}>实时动态</h3>
+              <BarChart2 size={13} style={{ color: "var(--atlas-accent)" }} />
+              <h3 className="text-sm font-semibold" style={{ color: "var(--atlas-text)" }}>最近报表</h3>
               <div className="ml-auto w-1.5 h-1.5 rounded-full pulse-dot" style={{ background: "var(--atlas-success)" }} />
             </div>
             <div className="p-3 space-y-2">
-              {MOCK_ALERTS.map((alert, i) => (
+              {statsLoading && (
+                <div className="flex items-center justify-center py-4 gap-2" style={{ color: "var(--atlas-text-3)" }}>
+                  <RefreshCw size={12} className="animate-spin" />
+                  <span className="text-xs">加载中...</span>
+                </div>
+              )}
+              {!statsLoading && (!stats?.recentReports || stats.recentReports.length === 0) && (
+                <div className="py-6 text-center text-xs" style={{ color: "var(--atlas-text-3)" }}>
+                  暂无报表记录，上传文件并生成报表后显示
+                </div>
+              )}
+              {stats?.recentReports?.map((report, i) => (
                 <motion.div
-                  key={alert.id}
+                  key={report.id}
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.1 }}
+                  transition={{ delay: i * 0.08 }}
                   className="p-3 rounded-lg"
-                  style={{
-                    background: alert.type === "warning"
-                      ? "rgba(251,191,36,0.06)"
-                      : alert.type === "success"
-                      ? "rgba(52,211,153,0.06)"
-                      : "rgba(91,140,255,0.06)",
-                    border: `1px solid ${
-                      alert.type === "warning"
-                        ? "rgba(251,191,36,0.15)"
-                        : alert.type === "success"
-                        ? "rgba(52,211,153,0.15)"
-                        : "rgba(91,140,255,0.15)"
-                    }`,
-                  }}
+                  style={{ background: "rgba(91,140,255,0.06)", border: "1px solid rgba(91,140,255,0.15)" }}
                 >
                   <div className="flex items-start gap-2">
-                    {alert.type === "warning"
-                      ? <AlertTriangle size={12} style={{ color: "var(--atlas-warning)", flexShrink: 0, marginTop: 1 }} />
-                      : alert.type === "success"
-                      ? <TrendingUp size={12} style={{ color: "var(--atlas-success)", flexShrink: 0, marginTop: 1 }} />
-                      : <Activity size={12} style={{ color: "var(--atlas-accent)", flexShrink: 0, marginTop: 1 }} />
-                    }
-                    <div>
-                      <p className="text-xs font-medium" style={{ color: "var(--atlas-text)" }}>{alert.store}</p>
-                      <p className="text-xs mt-0.5" style={{ color: "var(--atlas-text-2)" }}>{alert.msg}</p>
-                      <p className="text-xs mt-1" style={{ color: "var(--atlas-text-3)", fontFamily: "monospace" }}>{alert.time}</p>
+                    <TrendingUp size={12} style={{ color: "var(--atlas-accent)", flexShrink: 0, marginTop: 1 }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium truncate" style={{ color: "var(--atlas-text)" }}>{report.title}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {report.fileSizeKb && <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{(report.fileSizeKb / 1024).toFixed(1)} MB</span>}
+                        <p className="text-xs" style={{ color: "var(--atlas-text-3)", fontFamily: "monospace" }}>
+                          {report.createdAt ? new Date(report.createdAt).toLocaleString() : ""}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </motion.div>
