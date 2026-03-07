@@ -2,12 +2,12 @@
  * ATLAS V7.1 — Reports Page
  * 报表中心：从真实 API 加载，支持下载/重新运行/定时/删除操作
  */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart2, Download, FileSpreadsheet, Calendar,
   RefreshCw, Clock, Trash2, MoreHorizontal, Play,
-  Loader2, CheckCircle, XCircle, Plus,
+  Loader2, CheckCircle, XCircle, Plus, Search, Filter, X,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAtlas } from "@/contexts/AtlasContext";
@@ -313,9 +313,32 @@ function ReportCard({
 export default function ReportsPage() {
   const { setActiveNav } = useAtlas();
   const [scheduleTarget, setScheduleTarget] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "month">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "completed" | "failed">("all");
 
   // Load from real API
   const { data: reports = [], isLoading } = trpc.report.list.useQuery();
+
+  // Filtered reports
+  const filteredReports = useMemo(() => {
+    const now = Date.now();
+    return reports.filter(r => {
+      // Search filter
+      if (searchQuery && !r.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+          !r.filename.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      // Status filter
+      if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      // Date filter
+      if (dateFilter !== "all" && r.createdAt) {
+        const ts = new Date(r.createdAt).getTime();
+        if (dateFilter === "today" && now - ts > 24 * 60 * 60 * 1000) return false;
+        if (dateFilter === "week" && now - ts > 7 * 24 * 60 * 60 * 1000) return false;
+        if (dateFilter === "month" && now - ts > 30 * 24 * 60 * 60 * 1000) return false;
+      }
+      return true;
+    });
+  }, [reports, searchQuery, dateFilter, statusFilter]);
 
   const handleRerun = (sessionId: string, title: string) => {
     // Navigate to workspace and pre-fill the prompt
@@ -327,7 +350,7 @@ export default function ReportsPage() {
     <div className="h-full overflow-y-auto p-6" style={{ background: "var(--atlas-bg)" }}>
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center"
               style={{ background: "rgba(91,140,255,0.1)", border: "1px solid rgba(91,140,255,0.2)" }}>
@@ -336,7 +359,7 @@ export default function ReportsPage() {
             <div>
               <h1 className="text-lg font-semibold" style={{ color: "var(--atlas-text)" }}>报表中心</h1>
               <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>
-                {isLoading ? "加载中..." : `共 ${reports.length} 份报表`}
+                {isLoading ? "加载中..." : `共 ${reports.length} 份报表${filteredReports.length !== reports.length ? `，筛选后 ${filteredReports.length} 份` : ""}`}
               </p>
             </div>
           </div>
@@ -348,6 +371,60 @@ export default function ReportsPage() {
             <Plus size={12} /> 生成新报表
           </button>
         </div>
+
+        {/* Search & Filter Bar */}
+        {!isLoading && reports.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            {/* Search */}
+            <div className="flex items-center gap-2 flex-1 min-w-[200px] px-3 py-2 rounded-lg"
+              style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
+              <Search size={13} style={{ color: "var(--atlas-text-3)", flexShrink: 0 }} />
+              <input
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="搜索报表名称..."
+                className="flex-1 bg-transparent outline-none text-sm"
+                style={{ color: "var(--atlas-text)" }}
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery("")}>
+                  <X size={12} style={{ color: "var(--atlas-text-3)" }} />
+                </button>
+              )}
+            </div>
+
+            {/* Date filter */}
+            <div className="flex items-center gap-1">
+              <Filter size={12} style={{ color: "var(--atlas-text-3)", marginRight: 2 }} />
+              {(["all", "today", "week", "month"] as const).map(f => (
+                <button key={f} onClick={() => setDateFilter(f)}
+                  className="px-2.5 py-1.5 rounded-lg text-xs transition-all"
+                  style={{
+                    background: dateFilter === f ? "rgba(91,140,255,0.15)" : "var(--atlas-surface)",
+                    color: dateFilter === f ? "var(--atlas-accent)" : "var(--atlas-text-3)",
+                    border: dateFilter === f ? "1px solid rgba(91,140,255,0.3)" : "1px solid var(--atlas-border)",
+                  }}>
+                  {{ all: "全部", today: "今天", week: "本周", month: "本月" }[f]}
+                </button>
+              ))}
+            </div>
+
+            {/* Status filter */}
+            <div className="flex items-center gap-1">
+              {(["all", "completed", "failed"] as const).map(s => (
+                <button key={s} onClick={() => setStatusFilter(s)}
+                  className="px-2.5 py-1.5 rounded-lg text-xs transition-all"
+                  style={{
+                    background: statusFilter === s ? (s === "failed" ? "rgba(248,113,113,0.15)" : "rgba(52,211,153,0.1)") : "var(--atlas-surface)",
+                    color: statusFilter === s ? (s === "failed" ? "var(--atlas-danger)" : s === "completed" ? "var(--atlas-success)" : "var(--atlas-accent)") : "var(--atlas-text-3)",
+                    border: statusFilter === s ? `1px solid ${s === "failed" ? "rgba(248,113,113,0.3)" : s === "completed" ? "rgba(52,211,153,0.3)" : "rgba(91,140,255,0.3)"}` : "1px solid var(--atlas-border)",
+                  }}>
+                  {{ all: "全部状态", completed: "已完成", failed: "失败" }[s]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Loading */}
         {isLoading && (
@@ -378,24 +455,38 @@ export default function ReportsPage() {
         {/* Report list */}
         {!isLoading && reports.length > 0 && (
           <div className="space-y-2">
-            {reports.map((r, i) => (
-              <ReportCard
-                key={r.id}
-                report={{
-                  id: r.id,
-                  title: r.title,
-                  filename: r.filename,
-                  fileUrl: r.fileUrl,
-                  fileSizeKb: r.fileSizeKb,
-                  status: r.status,
-                  createdAt: r.createdAt,
-                  sessionId: r.sessionId,
-                }}
-                index={i}
-                onSchedule={(title) => setScheduleTarget(title)}
-                onRerun={handleRerun}
-              />
-            ))}
+            {filteredReports.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <Search size={24} style={{ color: "var(--atlas-text-3)" }} />
+                <p className="text-sm" style={{ color: "var(--atlas-text-2)" }}>没有符合条件的报表</p>
+                <button
+                  onClick={() => { setSearchQuery(""); setDateFilter("all"); setStatusFilter("all"); }}
+                  className="text-xs px-3 py-1.5 rounded-lg"
+                  style={{ background: "var(--atlas-elevated)", color: "var(--atlas-accent)", border: "1px solid rgba(91,140,255,0.2)" }}
+                >
+                  清除筛选条件
+                </button>
+              </div>
+            ) : (
+              filteredReports.map((r, i) => (
+                <ReportCard
+                  key={r.id}
+                  report={{
+                    id: r.id,
+                    title: r.title,
+                    filename: r.filename,
+                    fileUrl: r.fileUrl,
+                    fileSizeKb: r.fileSizeKb,
+                    status: r.status,
+                    createdAt: r.createdAt,
+                    sessionId: r.sessionId,
+                  }}
+                  index={i}
+                  onSchedule={(title) => setScheduleTarget(title)}
+                  onRerun={handleRerun}
+                />
+              ))
+            )}
           </div>
         )}
       </div>

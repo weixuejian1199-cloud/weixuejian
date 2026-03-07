@@ -810,7 +810,7 @@ function ScheduleSection() {
   const utils = trpc.useUtils();
   const { data: tasks = [], isLoading } = trpc.scheduledTask.list.useQuery();
   const createMut = trpc.scheduledTask.create.useMutation({
-    onSuccess: () => { utils.scheduledTask.list.invalidate(); toast.success("定时任务已创建"); setAdding(false); setNewName(""); setNewEmail(""); },
+    onSuccess: () => { utils.scheduledTask.list.invalidate(); toast.success("定时任务已创建"); setAdding(false); setNewName(""); setNewEmail(""); setNewSessionId(""); },
     onError: (e) => toast.error(`创建失败：${e.message}`),
   });
   const updateMut = trpc.scheduledTask.update.useMutation({
@@ -822,11 +822,13 @@ function ScheduleSection() {
     onError: (e) => toast.error(`删除失败：${e.message}`),
   });
 
+  const { data: sessions = [] } = trpc.session.list.useQuery();
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [newTemplate, setNewTemplate] = useState("销售汇总报表");
   const [newCronPreset, setNewCronPreset] = useState(CRON_PRESETS[0]);
   const [newEmail, setNewEmail] = useState("");
+  const [newSessionId, setNewSessionId] = useState("");
 
   const toggleTask = (id: string, currentStatus: string) => {
     const newStatus = currentStatus === "active" ? "paused" : "active";
@@ -835,6 +837,7 @@ function ScheduleSection() {
   const deleteTask = (id: string) => deleteMut.mutate({ id });
   const addTask = () => {
     if (!newName.trim()) { toast.error("请填写任务名称"); return; }
+    if (!newSessionId) { toast.error("请选择要分析的数据文件"); return; }
     createMut.mutate({
       name: newName.trim(),
       templatePrompt: `生成${newTemplate}，分析数据趋势和关键指标`,
@@ -842,6 +845,7 @@ function ScheduleSection() {
       cronExpr: newCronPreset.cron,
       scheduleDesc: newCronPreset.desc,
       notifyEmail: newEmail.trim() || undefined,
+      lastSessionId: newSessionId,
     });
   };
 
@@ -929,6 +933,30 @@ function ScheduleSection() {
                 style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)", color: "var(--atlas-text)" }}>
                 {CRON_PRESETS.map(p => <option key={p.cron} value={p.cron}>{p.label}</option>)}
               </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--atlas-text-2)" }}>
+                数据文件 <span style={{ color: "#F87171" }}>*</span>
+              </label>
+              <select value={newSessionId} onChange={e => setNewSessionId(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                style={{ background: "var(--atlas-elevated)", border: `1px solid ${newSessionId ? "var(--atlas-border)" : "rgba(248,113,113,0.4)"}`, color: newSessionId ? "var(--atlas-text)" : "var(--atlas-text-3)" }}>
+                <option value="">— 选择已上传的数据文件 —</option>
+                {sessions.filter(s => s.status === "ready").map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.originalName || s.filename}
+                    {s.rowCount ? ` (${s.rowCount}行)` : ""}
+                  </option>
+                ))}
+                {sessions.filter(s => s.status === "ready").length === 0 && (
+                  <option disabled value="">请先在工作台上传文件</option>
+                )}
+              </select>
+              {sessions.filter(s => s.status === "ready").length === 0 && (
+                <p className="text-xs mt-1" style={{ color: "var(--atlas-text-3)" }}>
+                  还没有可用的文件，请先到「工作台」上传 Excel 文件。
+                </p>
+              )}
             </div>
             <FieldInput label="通知邮符1（可选）" value={newEmail} onChange={setNewEmail} placeholder="boss@company.com" type="email" />
             <div className="flex gap-2">

@@ -216,6 +216,7 @@ export const appRouter = router({
         cronExpr: z.string(),
         scheduleDesc: z.string().optional(),
         notifyEmail: z.string().optional(),
+        lastSessionId: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const id = nanoid();
@@ -228,6 +229,7 @@ export const appRouter = router({
           cronExpr: input.cronExpr,
           scheduleDesc: input.scheduleDesc,
           notifyEmail: input.notifyEmail,
+          lastSessionId: input.lastSessionId,
           status: "active",
           runCount: 0,
         });
