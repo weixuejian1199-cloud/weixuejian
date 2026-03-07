@@ -1,37 +1,39 @@
 /**
- * ATLAS V3.0 — App Root
- * Layout: Left Sidebar (240px) + Center Panel + Right Chat Panel
- * Style: Dark / Minimal / Structured / Calm
+ * ATLAS V4.0 — App Root
+ * Layout: Sidebar (collapsible) + Main Content
+ * Theme: Dark (cold black) / Light (Manus white) switchable
  */
-
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ThemeProvider } from "./contexts/ThemeContext";
 import { AtlasProvider, useAtlas } from "./contexts/AtlasContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
+import LoginModal from "./components/LoginModal";
 import MainWorkspace from "./pages/MainWorkspace";
-import ReportsPage from "./pages/ReportsPage";
+import DashboardPage from "./pages/DashboardPage";
 import TemplatesPage from "./pages/TemplatesPage";
-import HistoryPage from "./pages/HistoryPage";
 import SettingsPage from "./pages/SettingsPage";
+import NotFound from "./pages/NotFound";
 
 function AppContent() {
-  const { activeNav } = useAtlas();
+  const { activeNav, theme, showLoginModal } = useAtlas();
 
   const renderPage = () => {
     switch (activeNav) {
-      case "reports":   return <ReportsPage />;
-      case "templates": return <TemplatesPage />;
-      case "history":   return <HistoryPage />;
-      case "settings":  return <SettingsPage />;
-      default:          return <MainWorkspace />;
+      case "dashboard":  return <DashboardPage />;
+      case "templates":  return <TemplatesPage />;
+      case "settings":   return <SettingsPage />;
+      case "home":
+      default:           return <MainWorkspace />;
     }
   };
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ background: "var(--atlas-bg)" }}>
+    <div
+      className={`flex flex-col h-screen overflow-hidden ${theme}`}
+      style={{ background: "var(--atlas-bg)" }}
+    >
       <TopBar />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
@@ -39,6 +41,7 @@ function AppContent() {
           {renderPage()}
         </main>
       </div>
+      {showLoginModal && <LoginModal />}
     </div>
   );
 }
@@ -46,25 +49,22 @@ function AppContent() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="dark">
-        <AtlasProvider>
-          <TooltipProvider>
-            <Toaster
-              theme="dark"
-              position="bottom-right"
-              toastOptions={{
-                style: {
-                  background: "var(--atlas-elevated)",
-                  border: "1px solid var(--atlas-border)",
-                  color: "var(--atlas-text)",
-                  fontSize: "13px",
-                },
-              }}
-            />
-            <AppContent />
-          </TooltipProvider>
-        </AtlasProvider>
-      </ThemeProvider>
+      <AtlasProvider>
+        <TooltipProvider>
+          <Toaster
+            position="bottom-right"
+            toastOptions={{
+              style: {
+                background: "var(--atlas-elevated)",
+                border: "1px solid var(--atlas-border)",
+                color: "var(--atlas-text)",
+                fontSize: "13px",
+              },
+            }}
+          />
+          <AppContent />
+        </TooltipProvider>
+      </AtlasProvider>
     </ErrorBoundary>
   );
 }

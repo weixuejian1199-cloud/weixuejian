@@ -1,49 +1,14 @@
-/**
- * ATLAS V3.0 — Global Design System
- * Philosophy: Dark / Minimal / Structured / Calm
- * Inspired by Manus, Linear, Vercel
- * Colors: #0F1115 bg · #181B21 surface · #1E2128 elevated · #5B8CFF accent
- * Typography: Inter (UI) + JetBrains Mono (code/data)
- */
-
 @import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
-/* ── ATLAS Design Tokens ─────────────────────────────────────── */
-:root {
-  /* Backgrounds */
-  --atlas-bg:       #0F1115;
-  --atlas-surface:  #181B21;
-  --atlas-elevated: #1E2128;
-  --atlas-border:   rgba(255,255,255,0.07);
-  --atlas-border-2: rgba(255,255,255,0.12);
+/* ═══════════════════════════════════════════════════════════════
+   ATLAS V4.0 — Design System
+   Dark: #0F1115 cold black / Light: Manus-inspired warm white
+   Accent: #5B8CFF electric blue
+═══════════════════════════════════════════════════════════════ */
 
-  /* Text */
-  --atlas-text:   #F0F2F5;
-  --atlas-text-2: #8B92A0;
-  --atlas-text-3: #4A5260;
-
-  /* Accent: Science Blue */
-  --atlas-accent:     #5B8CFF;
-  --atlas-accent-dim: rgba(91,140,255,0.1);
-  --atlas-accent-2:   #7BA3FF;
-
-  /* Semantic */
-  --atlas-success: #34D399;
-  --atlas-warning: #FBBF24;
-  --atlas-danger:  #F87171;
-
-  /* Layout */
-  --atlas-topbar-h:  48px;
-  --atlas-sidebar-w: 220px;
-  --atlas-radius:    10px;
-  --atlas-radius-sm: 6px;
-  --atlas-radius-lg: 14px;
-}
-
-/* ── Tailwind Theme Override ─────────────────────────────────── */
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -64,324 +29,187 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* ── Dark Theme (default) ─────────────────────────────────────── */
+:root,
 .dark {
-  --radius: 0.65rem;
-  --background:          oklch(0.12 0.008 240);
-  --foreground:          oklch(0.93 0.005 240);
-  --card:                oklch(0.16 0.008 240);
-  --card-foreground:     oklch(0.93 0.005 240);
-  --popover:             oklch(0.16 0.008 240);
-  --popover-foreground:  oklch(0.93 0.005 240);
-  --primary:             oklch(0.62 0.18 255);
-  --primary-foreground:  oklch(0.99 0 0);
-  --secondary:           oklch(0.20 0.008 240);
-  --secondary-foreground:oklch(0.75 0.01 240);
-  --muted:               oklch(0.20 0.008 240);
-  --muted-foreground:    oklch(0.55 0.01 240);
-  --accent:              oklch(0.20 0.008 240);
-  --accent-foreground:   oklch(0.93 0.005 240);
-  --destructive:         oklch(0.65 0.22 25);
-  --destructive-foreground: oklch(0.99 0 0);
-  --border:              oklch(1 0 0 / 8%);
-  --input:               oklch(1 0 0 / 10%);
-  --ring:                oklch(0.62 0.18 255);
-  --sidebar:             oklch(0.16 0.008 240);
-  --sidebar-foreground:  oklch(0.93 0.005 240);
-  --sidebar-primary:     oklch(0.62 0.18 255);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent:      oklch(0.20 0.008 240);
-  --sidebar-accent-foreground: oklch(0.93 0.005 240);
-  --sidebar-border:      oklch(1 0 0 / 8%);
-  --sidebar-ring:        oklch(0.62 0.18 255);
+  --radius: 0.5rem;
+
+  /* Shadcn compat */
+  --background: oklch(0.12 0.008 260);
+  --foreground: oklch(0.92 0.005 260);
+  --card: oklch(0.16 0.008 260);
+  --card-foreground: oklch(0.92 0.005 260);
+  --popover: oklch(0.16 0.008 260);
+  --popover-foreground: oklch(0.92 0.005 260);
+  --primary: oklch(0.62 0.18 255);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.20 0.008 260);
+  --secondary-foreground: oklch(0.75 0.01 260);
+  --muted: oklch(0.20 0.008 260);
+  --muted-foreground: oklch(0.55 0.01 260);
+  --accent: oklch(0.20 0.008 260);
+  --accent-foreground: oklch(0.92 0.005 260);
+  --destructive: oklch(0.65 0.22 25);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 10%);
+  --ring: oklch(0.62 0.18 255);
+  --sidebar: oklch(0.155 0.008 260);
+  --sidebar-foreground: oklch(0.92 0.005 260);
+  --sidebar-border: oklch(1 0 0 / 8%);
+
+  /* ATLAS custom tokens */
+  --atlas-bg:          #0F1115;
+  --atlas-surface:     #181B21;
+  --atlas-elevated:    #1E2128;
+  --atlas-card:        #22262F;
+  --atlas-border:      rgba(255,255,255,0.07);
+  --atlas-border-2:    rgba(255,255,255,0.12);
+  --atlas-text:        #E8EAF0;
+  --atlas-text-2:      #9BA3B4;
+  --atlas-text-3:      #5C6478;
+  --atlas-accent:      #5B8CFF;
+  --atlas-accent-2:    #7B5FFF;
+  --atlas-success:     #34D399;
+  --atlas-warning:     #FBBF24;
+  --atlas-danger:      #F87171;
+  --atlas-sidebar-w:   240px;
+  --atlas-topbar-h:    48px;
+  --atlas-radius:      8px;
 }
 
-/* ── Base Resets ─────────────────────────────────────────────── */
+/* ── Light Theme ──────────────────────────────────────────────── */
+.light {
+  /* Shadcn compat */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.15 0.01 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0.01 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0.01 260);
+  --primary: oklch(0.55 0.18 255);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.96 0.003 260);
+  --secondary-foreground: oklch(0.35 0.01 260);
+  --muted: oklch(0.96 0.003 260);
+  --muted-foreground: oklch(0.55 0.01 260);
+  --accent: oklch(0.96 0.003 260);
+  --accent-foreground: oklch(0.15 0.01 260);
+  --destructive: oklch(0.58 0.22 25);
+  --border: oklch(0.9 0.005 260);
+  --input: oklch(0.9 0.005 260);
+  --ring: oklch(0.55 0.18 255);
+  --sidebar: oklch(0.97 0.003 260);
+  --sidebar-foreground: oklch(0.15 0.01 260);
+  --sidebar-border: oklch(0.9 0.005 260);
+
+  /* ATLAS custom tokens — light */
+  --atlas-bg:          #FFFFFF;
+  --atlas-surface:     #F7F8FA;
+  --atlas-elevated:    #FFFFFF;
+  --atlas-card:        #FFFFFF;
+  --atlas-border:      rgba(0,0,0,0.07);
+  --atlas-border-2:    rgba(0,0,0,0.12);
+  --atlas-text:        #111318;
+  --atlas-text-2:      #4B5568;
+  --atlas-text-3:      #9CA3AF;
+  --atlas-accent:      #4F7FFF;
+  --atlas-accent-2:    #6B4FFF;
+  --atlas-success:     #10B981;
+  --atlas-warning:     #F59E0B;
+  --atlas-danger:      #EF4444;
+}
+
+/* ── Base ─────────────────────────────────────────────────────── */
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-    box-sizing: border-box;
-  }
-
-  html, body, #root {
-    height: 100%;
-    overflow: hidden;
-  }
-
+  * { @apply border-border outline-ring/50; }
   body {
-    background: var(--atlas-bg);
-    color: var(--atlas-text);
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    font-size: 14px;
-    line-height: 1.5;
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.25s ease, color 0.25s ease;
   }
-
-  button:not(:disabled),
-  [role="button"]:not([aria-disabled="true"]) {
-    cursor: pointer;
-  }
-
-  ::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
-  }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.1);
-    border-radius: 2px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255,255,255,0.18);
-  }
+  button:not(:disabled), [role="button"]:not([aria-disabled="true"]),
+  [type="button"]:not(:disabled), [type="submit"]:not(:disabled),
+  a[href], select:not(:disabled) { @apply cursor-pointer; }
 }
 
-/* ── Layout Components ───────────────────────────────────────── */
+/* ── Components ───────────────────────────────────────────────── */
 @layer components {
-  /* Top navigation bar */
-  .atlas-topbar {
-    height: var(--atlas-topbar-h);
-    background: var(--atlas-surface);
-    border-bottom: 1px solid var(--atlas-border);
-    display: flex;
-    align-items: center;
-    padding: 0 16px;
-    gap: 8px;
-    flex-shrink: 0;
-    position: relative;
-    z-index: 40;
+  .container {
+    width: 100%; margin-left: auto; margin-right: auto;
+    padding-left: 1rem; padding-right: 1rem;
   }
+  @media (min-width: 640px) { .container { padding-left: 1.5rem; padding-right: 1.5rem; } }
+  @media (min-width: 1024px) { .container { padding-left: 2rem; padding-right: 2rem; max-width: 1280px; } }
+  .flex { min-height: 0; min-width: 0; }
 
-  /* Left sidebar */
-  .atlas-sidebar {
-    width: var(--atlas-sidebar-w);
-    background: var(--atlas-surface);
-    border-right: 1px solid var(--atlas-border);
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    overflow: hidden;
-  }
-
-  /* Sidebar nav item */
-  .atlas-nav-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 7px 10px;
-    border-radius: var(--atlas-radius-sm);
-    color: var(--atlas-text-2);
-    font-size: 13px;
-    font-weight: 500;
-    transition: all 0.15s ease;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-  }
-  .atlas-nav-item:hover {
-    background: rgba(255,255,255,0.05);
-    color: var(--atlas-text);
-  }
-
-  /* Divider */
-  .atlas-divider {
-    height: 1px;
-    background: var(--atlas-border);
-    margin: 4px 0;
-  }
-
-  /* Upload zone */
-  .atlas-upload-zone {
-    border: 1.5px dashed rgba(91,140,255,0.3);
-    border-radius: var(--atlas-radius);
-    background: rgba(91,140,255,0.03);
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-  .atlas-upload-zone:hover {
-    border-color: rgba(91,140,255,0.6);
-    background: rgba(91,140,255,0.06);
-  }
-
-  /* Chat input container */
-  .atlas-chat-input {
+  /* Atlas chip */
+  .atlas-chip {
+    display: inline-flex; align-items: center;
+    padding: 4px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 500;
     background: var(--atlas-elevated);
     border: 1px solid var(--atlas-border-2);
-    border-radius: var(--atlas-radius);
-    transition: border-color 0.15s ease;
-  }
-  .atlas-chat-input:focus-within {
-    border-color: rgba(91,140,255,0.4);
-  }
-
-  /* Message bubbles */
-  .atlas-msg-user {
-    background: rgba(91,140,255,0.12);
-    border: 1px solid rgba(91,140,255,0.2);
-    border-radius: var(--atlas-radius);
-    padding: 10px 14px;
-  }
-
-  .atlas-msg-ai {
-    background: var(--atlas-surface);
-    border: 1px solid var(--atlas-border);
-    border-radius: var(--atlas-radius);
-    padding: 12px 14px;
-    max-width: 100%;
-  }
-
-  /* Primary button */
-  .atlas-btn-primary {
-    background: var(--atlas-accent);
-    color: #fff;
-    border-radius: var(--atlas-radius-sm);
-    font-weight: 500;
-    transition: all 0.15s ease;
-    border: none;
-    cursor: pointer;
-  }
-  .atlas-btn-primary:hover {
-    background: var(--atlas-accent-2);
-    transform: translateY(-1px);
-  }
-
-  /* Quick prompt chips */
-  .atlas-chip {
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 500;
-    background: var(--atlas-elevated);
-    border: 1px solid var(--atlas-border);
     color: var(--atlas-text-2);
     transition: all 0.15s ease;
     cursor: pointer;
   }
   .atlas-chip:hover {
-    border-color: var(--atlas-accent);
+    background: rgba(91,140,255,0.1);
+    border-color: rgba(91,140,255,0.3);
     color: var(--atlas-accent);
-    background: rgba(91,140,255,0.08);
   }
 
-  /* Thinking animation dots */
-  .atlas-thinking-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--atlas-accent);
-    animation: atlas-bounce 1.2s ease-in-out infinite;
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--atlas-border-2); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--atlas-text-3); }
+
+  /* Sidebar transition */
+  .atlas-sidebar {
+    transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.22s ease,
+                transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Prose styles for AI messages */
-  .atlas-prose {
-    font-size: 13.5px;
-    line-height: 1.65;
-    color: var(--atlas-text);
-  }
-  .atlas-prose p { margin: 0 0 8px; }
-  .atlas-prose p:last-child { margin-bottom: 0; }
-  .atlas-prose strong { color: var(--atlas-text); font-weight: 600; }
-  .atlas-prose code {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    background: rgba(255,255,255,0.07);
-    padding: 1px 5px;
-    border-radius: 4px;
-    color: var(--atlas-accent-2);
-  }
-  .atlas-prose pre {
-    background: var(--atlas-elevated);
-    border: 1px solid var(--atlas-border);
-    border-radius: var(--atlas-radius-sm);
-    padding: 12px;
-    overflow-x: auto;
-    margin: 8px 0;
-  }
-  .atlas-prose pre code {
-    background: none;
-    padding: 0;
-    font-size: 12px;
-    color: var(--atlas-text-2);
-  }
-  .atlas-prose ul, .atlas-prose ol {
-    padding-left: 18px;
-    margin: 4px 0 8px;
-  }
-  .atlas-prose li { margin: 2px 0; }
-  .atlas-prose h1, .atlas-prose h2, .atlas-prose h3 {
-    color: var(--atlas-text);
-    font-weight: 600;
-    margin: 12px 0 6px;
-  }
-  .atlas-prose h1 { font-size: 16px; }
-  .atlas-prose h2 { font-size: 14px; }
-  .atlas-prose h3 { font-size: 13px; }
-  .atlas-prose table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-    margin: 8px 0;
-    font-family: 'JetBrains Mono', monospace;
-  }
-  .atlas-prose th {
-    background: var(--atlas-elevated);
-    color: var(--atlas-text-2);
-    font-weight: 600;
-    padding: 6px 10px;
-    text-align: left;
-    border-bottom: 1px solid var(--atlas-border);
-  }
-  .atlas-prose td {
-    padding: 5px 10px;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    color: var(--atlas-text);
-  }
-  .atlas-prose tr:last-child td { border-bottom: none; }
-
-  /* Container */
-  .container {
-    width: 100%;
-    margin-left: auto;
-    margin-right: auto;
-    padding-left: 1rem;
-    padding-right: 1rem;
+  /* Theme transition */
+  *, *::before, *::after {
+    transition-property: background-color, border-color, color;
+    transition-duration: 0.2s;
+    transition-timing-function: ease;
   }
 
-  .flex {
-    min-height: 0;
-    min-width: 0;
+  /* Pulse dot animation */
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+  .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+
+  /* Number counter */
+  @keyframes count-up {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .count-up { animation: count-up 0.4s ease forwards; }
+
+  /* Dashboard card shimmer */
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .shimmer {
+    background: linear-gradient(90deg, var(--atlas-elevated) 25%, var(--atlas-card) 50%, var(--atlas-elevated) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
   }
 }
-
-/* ── Animations ──────────────────────────────────────────────── */
-@keyframes atlas-bounce {
-  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-  40% { transform: scale(1); opacity: 1; }
-}
-
-@keyframes atlas-fade-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes atlas-slide-in {
-  from { opacity: 0; transform: translateX(-8px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-.atlas-fade-in { animation: atlas-fade-in 0.3s ease forwards; }
-.atlas-slide-in { animation: atlas-slide-in 0.25s ease forwards; }

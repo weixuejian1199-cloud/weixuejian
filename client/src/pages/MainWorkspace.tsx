@@ -75,9 +75,13 @@ export default function MainWorkspace() {
       });
       addMessage({ role: "assistant", content: result.ai_analysis });
       addHistory({
-        id: result.session_id, filename: result.filename,
-        created_at: new Date().toISOString(), status: "uploaded",
-        row_count: result.df_info.row_count, col_count: result.df_info.col_count,
+        id: result.session_id,
+        title: result.filename,
+        filename: result.filename,
+        created_at: new Date().toISOString(),
+        status: "uploaded",
+        row_count: result.df_info.row_count,
+        col_count: result.df_info.col_count,
       });
       toast.success(`${file.name} 解析成功，共 ${result.df_info.row_count.toLocaleString()} 行`);
     } catch (err: any) {

@@ -1,120 +1,613 @@
 /**
- * ATLAS V3.0 — Settings Page
+ * ATLAS V4.0 — 设置页
+ * Sections: 账户 / 个性化 / API Key 管理 / 平台授权 / 邮箱 / 集成 / 定时任务
  */
 import { useState } from "react";
-import { Settings, Key, Server, Save, Eye, EyeOff } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Settings, User, Key, Link2, Mail, Zap, Clock,
+  Plus, Trash2, Eye, EyeOff, Check, Server,
+  Sun, Moon, Bell, Shield, ChevronRight,
+  Play, Pause, Copy, Save,
+} from "lucide-react";
 import { useAtlas } from "@/contexts/AtlasContext";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { nanoid } from "nanoid";
 
-export default function SettingsPage() {
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface ApiKeyEntry { id: string; label: string; platform: string; key: string; visible: boolean; active: boolean; }
+interface EmailEntry { id: string; address: string; type: string; verified: boolean; }
+interface ScheduledTask { id: string; name: string; template: string; schedule: string; enabled: boolean; lastRun?: string; nextRun?: string; }
+
+// ── Nav ───────────────────────────────────────────────────────────────────────
+
+const NAV_ITEMS = [
+  { id: "profile",      label: "账户",     icon: User },
+  { id: "appearance",   label: "个性化",   icon: Moon },
+  { id: "apikeys",      label: "API Key",  icon: Key },
+  { id: "platforms",    label: "平台授权", icon: Link2 },
+  { id: "email",        label: "邮箱",     icon: Mail },
+  { id: "integrations", label: "集成",     icon: Zap },
+  { id: "schedule",     label: "定时任务", icon: Clock },
+];
+
+// ── Shared ────────────────────────────────────────────────────────────────────
+
+function SectionHeader({ icon: Icon, title, desc }: { icon: typeof Settings; title: string; desc: string }) {
+  return (
+    <div className="flex items-center gap-3 mb-5">
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(91,140,255,0.1)" }}>
+        <Icon size={15} style={{ color: "var(--atlas-accent)" }} />
+      </div>
+      <div>
+        <h2 className="text-base font-semibold" style={{ color: "var(--atlas-text)" }}>{title}</h2>
+        <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{desc}</p>
+      </div>
+    </div>
+  );
+}
+
+function FieldInput({ label, value, onChange, placeholder, type = "text" }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string;
+}) {
+  return (
+    <div>
+      <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--atlas-text-2)" }}>{label}</label>
+      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} type={type}
+        className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+        style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border-2)", color: "var(--atlas-text)" }} />
+    </div>
+  );
+}
+
+function ToggleRow({ label, desc, defaultOn }: { label: string; desc: string; defaultOn?: boolean }) {
+  const [on, setOn] = useState(defaultOn ?? false);
+  return (
+    <div className="flex items-center justify-between py-2">
+      <div>
+        <p className="text-sm" style={{ color: "var(--atlas-text)" }}>{label}</p>
+        <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{desc}</p>
+      </div>
+      <button onClick={() => setOn(!on)} className="w-10 h-5 rounded-full relative transition-all"
+        style={{ background: on ? "var(--atlas-accent)" : "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}>
+        <div className="w-3.5 h-3.5 rounded-full absolute top-0.5 transition-all"
+          style={{ background: "#fff", left: on ? "calc(100% - 18px)" : "2px" }} />
+      </button>
+    </div>
+  );
+}
+
+// ── Profile ───────────────────────────────────────────────────────────────────
+
+function ProfileSection() {
+  const { user } = useAtlas();
+  const [name, setName] = useState(user?.name || "管理员");
+  const [email, setEmail] = useState(user?.email || "admin@example.com");
+  return (
+    <div className="space-y-4">
+      <SectionHeader icon={User} title="账户信息" desc="管理你的个人资料和账号安全" />
+      <div className="p-5 rounded-xl space-y-4" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold"
+            style={{ background: "linear-gradient(135deg, #5B8CFF 0%, #7B5FFF 100%)", color: "#fff" }}>
+            {name.charAt(0)}
+          </div>
+          <div>
+            <p className="text-sm font-semibold" style={{ color: "var(--atlas-text)" }}>{name}</p>
+            <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{email}</p>
+            <span className="text-xs px-2 py-0.5 rounded mt-1 inline-block"
+              style={{ background: "rgba(91,140,255,0.1)", color: "var(--atlas-accent)", fontSize: "10px" }}>管理员</span>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <FieldInput label="显示名称" value={name} onChange={setName} />
+          <FieldInput label="邮箱地址" value={email} onChange={setEmail} type="email" />
+        </div>
+        <button className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "var(--atlas-accent)", color: "#fff" }}
+          onClick={() => toast.success("账户信息已保存")}>
+          <Save size={13} className="inline mr-1.5" />保存更改
+        </button>
+      </div>
+      <div className="p-5 rounded-xl" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
+        <div className="flex items-center gap-2 mb-3">
+          <Shield size={13} style={{ color: "var(--atlas-text-2)" }} />
+          <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>账号安全</span>
+        </div>
+        {[{ label: "修改密码", desc: "上次修改：30天前" }, { label: "两步验证", desc: "未启用" }, { label: "登录记录", desc: "查看最近登录" }].map(item => (
+          <button key={item.label} className="w-full flex items-center justify-between py-2.5 group border-t" style={{ borderColor: "var(--atlas-border)" }}
+            onClick={() => toast.info("功能开发中")}>
+            <div className="text-left">
+              <p className="text-sm" style={{ color: "var(--atlas-text)" }}>{item.label}</p>
+              <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{item.desc}</p>
+            </div>
+            <ChevronRight size={14} style={{ color: "var(--atlas-text-3)" }} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Appearance ────────────────────────────────────────────────────────────────
+
+function AppearanceSection() {
+  const { theme, setTheme } = useAtlas();
+  return (
+    <div className="space-y-4">
+      <SectionHeader icon={Moon} title="个性化" desc="自定义 ATLAS 的外观和显示偏好" />
+      <div className="p-5 rounded-xl" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
+        <p className="text-sm font-medium mb-3" style={{ color: "var(--atlas-text)" }}>主题模式</p>
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { id: "dark", label: "深色", desc: "ATLAS 冷黑风格", icon: Moon },
+            { id: "light", label: "浅色", desc: "Manus 白灰风格", icon: Sun },
+          ].map(t => (
+            <button key={t.id} onClick={() => setTheme(t.id as any)}
+              className="flex items-center gap-3 p-4 rounded-xl transition-all"
+              style={{ background: theme === t.id ? "rgba(91,140,255,0.08)" : "var(--atlas-elevated)", border: theme === t.id ? "1px solid rgba(91,140,255,0.3)" : "1px solid var(--atlas-border)" }}>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={{ background: theme === t.id ? "rgba(91,140,255,0.15)" : "var(--atlas-surface)" }}>
+                <t.icon size={15} style={{ color: theme === t.id ? "var(--atlas-accent)" : "var(--atlas-text-2)" }} />
+              </div>
+              <div className="text-left flex-1">
+                <p className="text-sm font-medium" style={{ color: theme === t.id ? "var(--atlas-accent)" : "var(--atlas-text)" }}>{t.label}</p>
+                <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{t.desc}</p>
+              </div>
+              {theme === t.id && <Check size={14} style={{ color: "var(--atlas-accent)" }} />}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="p-5 rounded-xl" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
+        <div className="flex items-center gap-2 mb-3">
+          <Bell size={13} style={{ color: "var(--atlas-text-2)" }} />
+          <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>通知设置</span>
+        </div>
+        <ToggleRow label="报表生成完成通知" desc="报表生成后发送提醒" defaultOn />
+        <ToggleRow label="定时任务通知" desc="定时任务执行结果提醒" />
+        <ToggleRow label="系统更新通知" desc="ATLAS 版本更新提醒" />
+      </div>
+    </div>
+  );
+}
+
+// ── API Keys ──────────────────────────────────────────────────────────────────
+
+function ApiKeysSection() {
   const { apiKey, setApiKey, backendUrl, setBackendUrl } = useAtlas();
-  const [localKey, setLocalKey] = useState(apiKey);
   const [localUrl, setLocalUrl] = useState(backendUrl);
-  const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testOk, setTestOk] = useState<boolean | null>(null);
-
-  const handleSave = () => {
-    setApiKey(localKey);
-    setBackendUrl(localUrl);
-    api.setBaseUrl(localUrl);
-    toast.success("设置已保存");
-  };
+  const [keys, setKeys] = useState<ApiKeyEntry[]>([
+    { id: "k1", label: "GLM-5 主账号", platform: "智谱 AI", key: apiKey || "sk-••••••••••••••••••••••••••••••••", visible: false, active: true },
+  ]);
+  const [adding, setAdding] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [newPlatform, setNewPlatform] = useState("智谱 AI");
+  const [newKey, setNewKey] = useState("");
 
   const handleTest = async () => {
     setTesting(true); setTestOk(null);
     api.setBaseUrl(localUrl);
-    try {
-      await api.health();
-      setTestOk(true); toast.success("后端连接正常");
-    } catch {
-      setTestOk(false); toast.error("无法连接后端，请检查地址");
-    } finally { setTesting(false); }
+    try { await api.health(); setTestOk(true); toast.success("后端连接正常"); }
+    catch { setTestOk(false); toast.error("无法连接后端"); }
+    finally { setTesting(false); }
+  };
+
+  const saveUrl = () => { setBackendUrl(localUrl); api.setBaseUrl(localUrl); toast.success("后端地址已保存"); };
+
+  const toggleVisible = (id: string) => setKeys(prev => prev.map(k => k.id === id ? { ...k, visible: !k.visible } : k));
+  const toggleActive = (id: string) => { setKeys(prev => prev.map(k => ({ ...k, active: k.id === id }))); toast.success("已切换默认模型"); };
+  const deleteKey = (id: string) => { setKeys(prev => prev.filter(k => k.id !== id)); toast.success("Key 已删除"); };
+  const addKey = () => {
+    if (!newLabel || !newKey) { toast.error("请填写完整信息"); return; }
+    const entry: ApiKeyEntry = { id: nanoid(), label: newLabel, platform: newPlatform, key: newKey, visible: false, active: false };
+    setKeys(prev => [...prev, entry]);
+    if (newPlatform === "智谱 AI") setApiKey(newKey);
+    setNewLabel(""); setNewPlatform("智谱 AI"); setNewKey(""); setAdding(false);
+    toast.success("API Key 已添加");
   };
 
   return (
-    <div className="h-full overflow-y-auto p-6" style={{ background: "var(--atlas-bg)" }}>
-      <div className="max-w-2xl mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-            style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
-            <Settings size={18} style={{ color: "var(--atlas-text-2)" }} />
-          </div>
-          <div>
-            <h1 className="text-lg font-semibold" style={{ color: "var(--atlas-text)" }}>设置</h1>
-            <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>配置 API 和后端连接</p>
-          </div>
+    <div className="space-y-4">
+      <SectionHeader icon={Key} title="API Key 管理" desc="管理所有 AI 模型的 API Key，支持多模型切换" />
+
+      {/* Backend URL */}
+      <div className="p-5 rounded-xl" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
+        <div className="flex items-center gap-2 mb-3">
+          <Server size={13} style={{ color: "var(--atlas-accent)" }} />
+          <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>后端服务地址</span>
         </div>
+        <div className="flex gap-2">
+          <input value={localUrl} onChange={e => setLocalUrl(e.target.value)}
+            className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
+            style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border-2)", color: "var(--atlas-text)", fontFamily: "'JetBrains Mono', monospace" }}
+            placeholder="http://localhost:8000" />
+          <button onClick={handleTest} disabled={testing}
+            className="px-3 py-2 rounded-lg text-sm font-medium"
+            style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)", color: testOk === true ? "var(--atlas-success)" : testOk === false ? "var(--atlas-danger)" : "var(--atlas-text-2)" }}>
+            {testing ? "测试中..." : testOk === true ? "✓ 正常" : testOk === false ? "✗ 失败" : "测试"}
+          </button>
+          <button onClick={saveUrl} className="px-3 py-2 rounded-lg text-sm font-medium" style={{ background: "var(--atlas-accent)", color: "#fff" }}>保存</button>
+        </div>
+        <p className="text-xs mt-2" style={{ color: "var(--atlas-text-3)" }}>FastAPI 后端地址，默认 http://localhost:8000</p>
+      </div>
 
-        <div className="space-y-4">
-          <div className="p-5 rounded-xl" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
-            <div className="flex items-center gap-2 mb-3">
-              <Server size={14} style={{ color: "var(--atlas-accent)" }} />
-              <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>后端服务地址</span>
-            </div>
-            <div className="flex gap-2">
-              <input value={localUrl} onChange={e => setLocalUrl(e.target.value)}
-                className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
-                style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)", color: "var(--atlas-text)", fontFamily: "'JetBrains Mono', monospace" }}
-                placeholder="http://localhost:8000" />
-              <button onClick={handleTest} disabled={testing}
-                className="px-4 py-2 rounded-lg text-sm font-medium transition-all"
-                style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)",
-                  color: testOk === true ? "var(--atlas-success)" : testOk === false ? "var(--atlas-danger)" : "var(--atlas-text-2)" }}>
-                {testing ? "测试中..." : testOk === true ? "✓ 已连接" : testOk === false ? "✗ 失败" : "测试连接"}
-              </button>
-            </div>
-            <p className="text-xs mt-2" style={{ color: "var(--atlas-text-3)" }}>FastAPI 后端地址，默认 http://localhost:8000</p>
-          </div>
-
-          <div className="p-5 rounded-xl" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
-            <div className="flex items-center gap-2 mb-3">
-              <Key size={14} style={{ color: "#A78BFA" }} />
-              <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>GLM-4 API Key</span>
-            </div>
-            <div className="relative">
-              <input value={localKey} onChange={e => setLocalKey(e.target.value)}
-                type={showKey ? "text" : "password"}
-                className="w-full px-3 py-2 pr-10 rounded-lg text-sm outline-none"
-                style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)", color: "var(--atlas-text)", fontFamily: "'JetBrains Mono', monospace" }}
-                placeholder="输入 GLM-4 API Key..." />
-              <button onClick={() => setShowKey(!showKey)}
-                className="absolute right-3 top-1/2 -translate-y-1/2"
-                style={{ color: "var(--atlas-text-3)" }}>
-                {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-            </div>
-            <p className="text-xs mt-2" style={{ color: "var(--atlas-text-3)" }}>
-              前往 <a href="https://open.bigmodel.cn" target="_blank" rel="noopener noreferrer"
-                style={{ color: "var(--atlas-accent)" }}>open.bigmodel.cn</a> 获取 API Key
-            </p>
-          </div>
-
-          <button onClick={handleSave}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all"
-            style={{ background: "var(--atlas-accent)", color: "#fff" }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = "0.9"}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = "1"}>
-            <Save size={14} /> 保存设置
+      {/* Keys list */}
+      <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--atlas-border)" }}>
+        <div className="px-5 py-3 flex items-center justify-between" style={{ background: "var(--atlas-surface)", borderBottom: "1px solid var(--atlas-border)" }}>
+          <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>已配置的 Key</span>
+          <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "var(--atlas-accent)", color: "#fff" }}>
+            <Plus size={12} />添加
           </button>
         </div>
-
-        <div className="mt-8 p-5 rounded-xl" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
-          <p className="text-xs font-medium mb-3" style={{ color: "var(--atlas-text-2)" }}>关于 ATLAS</p>
-          <div className="space-y-1.5">
-            {([
-              ["版本", "v3.0.0"],
-              ["技术栈", "React + FastAPI + Pandas + GLM-4"],
-              ["支持格式", "Excel (.xlsx/.xls) · CSV"],
-              ["最大文件", "50 MB"],
-            ] as [string, string][]).map(([k, v]) => (
-              <div key={k} className="flex items-center justify-between">
-                <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{k}</span>
-                <span className="text-xs" style={{ color: "var(--atlas-text-2)", fontFamily: "'JetBrains Mono', monospace" }}>{v}</span>
+        <div style={{ background: "var(--atlas-surface)" }}>
+          {keys.map((k, i) => (
+            <div key={k.id} className="px-5 py-3 flex items-center gap-3" style={{ borderTop: i > 0 ? "1px solid var(--atlas-border)" : "none" }}>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>{k.label}</span>
+                  {k.active && <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(52,211,153,0.1)", color: "#34D399", fontSize: "10px" }}>使用中</span>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-3)", fontSize: "10px" }}>{k.platform}</span>
+                  <code className="text-xs" style={{ color: "var(--atlas-text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
+                    {k.visible ? k.key : "sk-••••••••••••••••••••••"}
+                  </code>
+                </div>
               </div>
-            ))}
+              <div className="flex items-center gap-1">
+                <button onClick={() => toggleVisible(k.id)} className="w-7 h-7 rounded flex items-center justify-center" style={{ color: "var(--atlas-text-3)" }}>
+                  {k.visible ? <EyeOff size={13} /> : <Eye size={13} />}
+                </button>
+                <button onClick={() => { navigator.clipboard.writeText(k.key); toast.success("已复制"); }}
+                  className="w-7 h-7 rounded flex items-center justify-center" style={{ color: "var(--atlas-text-3)" }}>
+                  <Copy size={13} />
+                </button>
+                {!k.active && (
+                  <button onClick={() => toggleActive(k.id)} className="px-2 py-1 rounded text-xs"
+                    style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-2)", border: "1px solid var(--atlas-border)" }}>
+                    设为默认
+                  </button>
+                )}
+                <button onClick={() => deleteKey(k.id)} className="w-7 h-7 rounded flex items-center justify-center"
+                  style={{ color: "var(--atlas-text-3)" }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-danger)"}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)"}>
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {adding && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+            className="rounded-xl p-4 space-y-3" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border-2)" }}>
+            <p className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>添加新 Key</p>
+            <div className="grid grid-cols-2 gap-3">
+              <FieldInput label="备注名称" value={newLabel} onChange={setNewLabel} placeholder="GLM-5 备用" />
+              <div>
+                <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--atlas-text-2)" }}>平台</label>
+                <select value={newPlatform} onChange={e => setNewPlatform(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border-2)", color: "var(--atlas-text)" }}>
+                  {["智谱 AI", "月之暗面", "阿里百炼", "MiniMax", "Ollama"].map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+            </div>
+            <FieldInput label="API Key" value={newKey} onChange={setNewKey} placeholder="sk-..." type="password" />
+            <div className="flex gap-2">
+              <button onClick={addKey} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "var(--atlas-accent)", color: "#fff" }}>保存</button>
+              <button onClick={() => setAdding(false)} className="px-4 py-2 rounded-lg text-sm" style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-2)", border: "1px solid var(--atlas-border)" }}>取消</button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Platforms ─────────────────────────────────────────────────────────────────
+
+function PlatformsSection() {
+  const platforms = [
+    { id: "p1", name: "天猫", icon: "🛒", color: "#FF4400", connected: false },
+    { id: "p2", name: "抖音店铺", icon: "🎵", color: "#000000", connected: false },
+    { id: "p3", name: "拼多多", icon: "🛍️", color: "#E02020", connected: false },
+    { id: "p4", name: "小程序商城", icon: "📱", color: "#07C160", connected: false },
+    { id: "p5", name: "京东", icon: "🔴", color: "#CC0000", connected: false },
+    { id: "p6", name: "网点通 ERP", icon: "📦", color: "#5B8CFF", connected: false },
+  ];
+  return (
+    <div className="space-y-4">
+      <SectionHeader icon={Link2} title="平台授权" desc="连接电商平台，自动同步店铺数据到数据中枢" />
+      <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--atlas-border)" }}>
+        <div className="px-5 py-3 flex items-center gap-2" style={{ background: "var(--atlas-surface)", borderBottom: "1px solid var(--atlas-border)" }}>
+          <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#FBBF24" }} />
+          <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>平台接入功能将在第二阶段上线，现已开放授权入口</span>
+        </div>
+        <div style={{ background: "var(--atlas-surface)" }}>
+          {platforms.map((p, i) => (
+            <div key={p.id} className="px-5 py-3 flex items-center gap-3" style={{ borderTop: i > 0 ? "1px solid var(--atlas-border)" : "none" }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ background: `${p.color}15` }}>{p.icon}</div>
+              <div className="flex-1">
+                <p className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>{p.name}</p>
+                <p className="text-xs" style={{ color: p.connected ? "#34D399" : "var(--atlas-text-3)" }}>{p.connected ? "已连接" : "未连接"}</p>
+              </div>
+              <button onClick={() => toast.info("平台授权功能开发中，第二阶段上线")}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                style={{ background: "rgba(91,140,255,0.1)", color: "var(--atlas-accent)", border: "1px solid rgba(91,140,255,0.2)" }}>
+                授权
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Email ─────────────────────────────────────────────────────────────────────
+
+function EmailSection() {
+  const [emails, setEmails] = useState<EmailEntry[]>([
+    { id: "e1", address: "admin@company.com", type: "企业邮箱", verified: true },
+  ]);
+  const [adding, setAdding] = useState(false);
+  const [newAddr, setNewAddr] = useState("");
+  const [newType, setNewType] = useState("企业邮箱");
+
+  const addEmail = () => {
+    if (!newAddr.includes("@")) { toast.error("请输入有效的邮箱地址"); return; }
+    setEmails(prev => [...prev, { id: nanoid(), address: newAddr, type: newType, verified: false }]);
+    setNewAddr(""); setAdding(false);
+    toast.success("邮箱已添加，请查收验证邮件");
+  };
+
+  return (
+    <div className="space-y-4">
+      <SectionHeader icon={Mail} title="邮箱管理" desc="绑定邮箱用于接收报表推送和系统通知" />
+      <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--atlas-border)" }}>
+        <div className="px-5 py-3 flex items-center justify-between" style={{ background: "var(--atlas-surface)", borderBottom: "1px solid var(--atlas-border)" }}>
+          <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>已绑定邮箱</span>
+          <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "var(--atlas-accent)", color: "#fff" }}>
+            <Plus size={12} />添加邮箱
+          </button>
+        </div>
+        <div style={{ background: "var(--atlas-surface)" }}>
+          {emails.map((e, i) => (
+            <div key={e.id} className="px-5 py-3 flex items-center gap-3" style={{ borderTop: i > 0 ? "1px solid var(--atlas-border)" : "none" }}>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--atlas-elevated)" }}>
+                <Mail size={14} style={{ color: "var(--atlas-text-2)" }} />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>{e.address}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-3)", fontSize: "10px" }}>{e.type}</span>
+                  {e.verified ? <span className="text-xs" style={{ color: "#34D399", fontSize: "10px" }}>✓ 已验证</span> : <span className="text-xs" style={{ color: "#FBBF24", fontSize: "10px" }}>待验证</span>}
+                </div>
+              </div>
+              <button onClick={() => { setEmails(prev => prev.filter(em => em.id !== e.id)); toast.success("邮箱已移除"); }}
+                className="w-7 h-7 rounded flex items-center justify-center" style={{ color: "var(--atlas-text-3)" }}
+                onMouseEnter={ev => (ev.currentTarget as HTMLElement).style.color = "var(--atlas-danger)"}
+                onMouseLeave={ev => (ev.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)"}>
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+      <AnimatePresence>
+        {adding && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+            className="rounded-xl p-4 space-y-3" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border-2)" }}>
+            <div className="grid grid-cols-2 gap-3">
+              <FieldInput label="邮箱地址" value={newAddr} onChange={setNewAddr} placeholder="name@example.com" type="email" />
+              <div>
+                <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--atlas-text-2)" }}>邮箱类型</label>
+                <select value={newType} onChange={e => setNewType(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border-2)", color: "var(--atlas-text)" }}>
+                  {["企业邮箱", "QQ 邮箱", "Gmail", "163 邮箱", "Outlook"].map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={addEmail} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "var(--atlas-accent)", color: "#fff" }}>添加</button>
+              <button onClick={() => setAdding(false)} className="px-4 py-2 rounded-lg text-sm" style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-2)", border: "1px solid var(--atlas-border)" }}>取消</button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Integrations ──────────────────────────────────────────────────────────────
+
+function IntegrationsSection() {
+  const integrations = [
+    { name: "飞书", icon: "🪶", color: "#3370FF", available: true, desc: "推送报表到飞书群/文档" },
+    { name: "钉钉", icon: "📌", color: "#1677FF", available: true, desc: "推送报表到钉钉群" },
+    { name: "企业微信", icon: "💬", color: "#07C160", available: true, desc: "推送报表到企业微信" },
+    { name: "Notion", icon: "📝", color: "#000000", available: false, desc: "同步报表到 Notion 数据库" },
+    { name: "Google Sheets", icon: "📊", color: "#34A853", available: false, desc: "同步数据到 Google 表格" },
+    { name: "Slack", icon: "💼", color: "#4A154B", available: false, desc: "推送报表到 Slack 频道" },
+  ];
+  return (
+    <div className="space-y-4">
+      <SectionHeader icon={Zap} title="集成" desc="连接办公软件，自动推送报表和数据" />
+      <div className="grid grid-cols-2 gap-3">
+        {integrations.map(item => (
+          <div key={item.name} className="rounded-xl p-4 flex items-center gap-3"
+            style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)", opacity: item.available ? 1 : 0.6 }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ background: `${item.color}15` }}>{item.icon}</div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>{item.name}</p>
+              <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{item.desc}</p>
+            </div>
+            <button onClick={() => toast.info(item.available ? "集成配置功能开发中" : "即将支持")}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium"
+              style={{ background: item.available ? "rgba(91,140,255,0.1)" : "var(--atlas-elevated)", color: item.available ? "var(--atlas-accent)" : "var(--atlas-text-3)", border: item.available ? "1px solid rgba(91,140,255,0.2)" : "1px solid var(--atlas-border)" }}>
+              {item.available ? "配置" : "即将"}
+            </button>
           </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Schedule ──────────────────────────────────────────────────────────────────
+
+function ScheduleSection() {
+  const [tasks, setTasks] = useState<ScheduledTask[]>([
+    { id: "s1", name: "每日销售汇总", template: "销售汇总报表", schedule: "每天 09:00", enabled: true, lastRun: "今天 09:00", nextRun: "明天 09:00" },
+    { id: "s2", name: "周度财务报告", template: "财务利润报表", schedule: "每周一 08:00", enabled: false, lastRun: "上周一", nextRun: "下周一" },
+  ]);
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newTemplate, setNewTemplate] = useState("销售汇总报表");
+  const [newSchedule, setNewSchedule] = useState("每天 09:00");
+
+  const toggleTask = (id: string) => { setTasks(prev => prev.map(t => t.id === id ? { ...t, enabled: !t.enabled } : t)); toast.success("定时任务已更新"); };
+  const deleteTask = (id: string) => { setTasks(prev => prev.filter(t => t.id !== id)); toast.success("定时任务已删除"); };
+  const addTask = () => {
+    if (!newName) { toast.error("请填写任务名称"); return; }
+    setTasks(prev => [...prev, { id: nanoid(), name: newName, template: newTemplate, schedule: newSchedule, enabled: true }]);
+    setNewName(""); setAdding(false);
+    toast.success("定时任务已创建");
+  };
+
+  return (
+    <div className="space-y-4">
+      <SectionHeader icon={Clock} title="定时任务" desc="设置自动报表生成计划，定时推送到邮箱或群组" />
+      <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--atlas-border)" }}>
+        <div className="px-5 py-3 flex items-center justify-between" style={{ background: "var(--atlas-surface)", borderBottom: "1px solid var(--atlas-border)" }}>
+          <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>已配置的任务</span>
+          <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "var(--atlas-accent)", color: "#fff" }}>
+            <Plus size={12} />新建任务
+          </button>
+        </div>
+        <div style={{ background: "var(--atlas-surface)" }}>
+          {tasks.map((t, i) => (
+            <div key={t.id} className="px-5 py-3 flex items-center gap-3" style={{ borderTop: i > 0 ? "1px solid var(--atlas-border)" : "none" }}>
+              <button onClick={() => toggleTask(t.id)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={{ background: t.enabled ? "rgba(52,211,153,0.1)" : "var(--atlas-elevated)", border: t.enabled ? "1px solid rgba(52,211,153,0.2)" : "1px solid var(--atlas-border)" }}>
+                {t.enabled ? <Play size={13} style={{ color: "#34D399" }} /> : <Pause size={13} style={{ color: "var(--atlas-text-3)" }} />}
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>{t.name}</span>
+                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-3)", fontSize: "10px" }}>{t.template}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>⏰ {t.schedule}</span>
+                  {t.lastRun && <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>上次：{t.lastRun}</span>}
+                  {t.nextRun && t.enabled && <span className="text-xs" style={{ color: "#34D399" }}>下次：{t.nextRun}</span>}
+                </div>
+              </div>
+              <button onClick={() => deleteTask(t.id)} className="w-7 h-7 rounded flex items-center justify-center"
+                style={{ color: "var(--atlas-text-3)" }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-danger)"}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)"}>
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+      <AnimatePresence>
+        {adding && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+            className="rounded-xl p-4 space-y-3" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border-2)" }}>
+            <div className="grid grid-cols-2 gap-3">
+              <FieldInput label="任务名称" value={newName} onChange={setNewName} placeholder="每日销售汇总" />
+              <div>
+                <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--atlas-text-2)" }}>使用模板</label>
+                <select value={newTemplate} onChange={e => setNewTemplate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border-2)", color: "var(--atlas-text)" }}>
+                  {["销售汇总报表", "财务利润报表", "库存盘点报表", "多平台对比报表"].map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--atlas-text-2)" }}>执行频率</label>
+              <select value={newSchedule} onChange={e => setNewSchedule(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border-2)", color: "var(--atlas-text)" }}>
+                {["每天 09:00", "每天 18:00", "每周一 08:00", "每月1日 09:00"].map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={addTask} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "var(--atlas-accent)", color: "#fff" }}>创建</button>
+              <button onClick={() => setAdding(false)} className="px-4 py-2 rounded-lg text-sm" style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-2)", border: "1px solid var(--atlas-border)" }}>取消</button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+export default function SettingsPage() {
+  const [activeSection, setActiveSection] = useState("profile");
+
+  const renderSection = () => {
+    switch (activeSection) {
+      case "profile":      return <ProfileSection />;
+      case "appearance":   return <AppearanceSection />;
+      case "apikeys":      return <ApiKeysSection />;
+      case "platforms":    return <PlatformsSection />;
+      case "email":        return <EmailSection />;
+      case "integrations": return <IntegrationsSection />;
+      case "schedule":     return <ScheduleSection />;
+      default:             return <ProfileSection />;
+    }
+  };
+
+  return (
+    <div className="h-full flex overflow-hidden" style={{ background: "var(--atlas-bg)" }}>
+      {/* Left nav */}
+      <div className="w-48 flex-shrink-0 h-full overflow-y-auto py-5 px-3"
+        style={{ background: "var(--atlas-surface)", borderRight: "1px solid var(--atlas-border)" }}>
+        <p className="text-xs font-semibold uppercase tracking-wider px-3 mb-3"
+          style={{ color: "var(--atlas-text-3)", fontSize: "10px", letterSpacing: "0.08em" }}>设置</p>
+        <nav className="space-y-0.5">
+          {NAV_ITEMS.map(item => (
+            <button key={item.id} onClick={() => setActiveSection(item.id)}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all"
+              style={{ background: activeSection === item.id ? "rgba(91,140,255,0.1)" : "transparent", color: activeSection === item.id ? "var(--atlas-accent)" : "var(--atlas-text-2)" }}>
+              <item.icon size={14} />{item.label}
+            </button>
+          ))}
+        </nav>
+        <div className="mt-6 px-3 pt-4" style={{ borderTop: "1px solid var(--atlas-border)" }}>
+          <p className="text-xs font-medium mb-2" style={{ color: "var(--atlas-text-3)" }}>关于 ATLAS</p>
+          <p className="text-xs" style={{ color: "var(--atlas-text-3)", fontFamily: "'JetBrains Mono', monospace" }}>v4.0.0</p>
+          <p className="text-xs mt-1" style={{ color: "var(--atlas-text-3)" }}>React + FastAPI</p>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto px-6 py-6">
+          <AnimatePresence mode="wait">
+            <motion.div key={activeSection}
+              initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }}
+              transition={{ duration: 0.15 }}>
+              {renderSection()}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
     </div>
