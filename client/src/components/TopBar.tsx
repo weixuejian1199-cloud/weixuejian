@@ -22,7 +22,7 @@ export default function TopBar() {
   const {
     activeNav, setActiveNav,
     sidebarOpen, setSidebarOpen,
-    clearMessages, clearFiles,
+    createNewTask,
     user, setShowLoginModal,
   } = useAtlas();
 
@@ -42,8 +42,7 @@ export default function TopBar() {
   }, []);
 
   const handleNew = () => {
-    clearMessages();
-    clearFiles();
+    createNewTask();
     setActiveNav("home");
     toast.success("已新建工作区");
   };

@@ -20,12 +20,19 @@ export interface DataFrameInfo {
   preview: Record<string, unknown>[];
 }
 
+export interface SuggestedAction {
+  icon: string;
+  label: string;
+  prompt: string; // empty string = open custom input
+}
+
 export interface UploadResponse {
   session_id: string;
   filename: string;
   file_url: string;
   df_info: DataFrameInfo;
   ai_analysis: string;
+  suggested_actions?: SuggestedAction[];
 }
 
 export interface GenerateReportResponse {
@@ -35,7 +42,7 @@ export interface GenerateReportResponse {
   ai_message: string;
   plan: {
     title: string;
-    sheets: Array<{ name: string; summary: string }>;
+    sheets: Array<{ name: string; headers: string[]; rows: (string | number)[][]; summary: string }>;
     insights: string;
   };
 }
@@ -64,7 +71,8 @@ export async function uploadFile(file: File): Promise<UploadResponse> {
 // ── Chat (streaming) ──────────────────────────────────────────────────────────
 
 export interface ChatStreamOptions {
-  sessionId: string;
+  sessionId?: string;
+  sessionIds?: string[];  // Support multiple files in same conversation
   message: string;
   history?: Array<{ role: "user" | "assistant"; content: string }>;
   onChunk: (chunk: string) => void;
@@ -73,14 +81,15 @@ export interface ChatStreamOptions {
 }
 
 export async function chatStream(opts: ChatStreamOptions): Promise<void> {
-  const { sessionId, message, history, onChunk, onDone, onError } = opts;
+  const { sessionId, sessionIds, message, history, onChunk, onDone, onError } = opts;
+  const ids = sessionIds?.length ? sessionIds : sessionId ? [sessionId] : [];
 
   try {
     const res = await fetch("/api/atlas/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ session_id: sessionId, message, history }),
+      body: JSON.stringify({ session_ids: ids, session_id: ids[0], message, history }),
     });
 
     if (!res.ok) {

@@ -14,7 +14,7 @@
  *   - No in-memory stores → survives server restarts
  */
 
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import multer from "multer";
 import { nanoid } from "nanoid";
 import * as XLSX from "xlsx";
@@ -25,6 +25,19 @@ import { ENV } from "./_core/env";
 import { createPatchedFetch } from "./_core/patchedFetch";
 import { storagePut, storageGet } from "./storage";
 import { getSession, createSession, updateSession, createReport, updateReport, getReport, getSimilarExamples } from "./db";
+import { sdk } from "./_core/sdk";
+
+// Optional auth middleware: injects req.userId if session cookie is valid
+async function optionalAuth(req: Request, _res: Response, next: NextFunction) {
+  try {
+    const user = await sdk.authenticateRequest(req);
+    (req as any).userId = user.id;
+    (req as any).atlasUser = user;
+  } catch {
+    // Not authenticated — proceed as anonymous (userId = 0)
+  }
+  next();
+}
 
 // ── LLM Provider ──────────────────────────────────────────────────────────────
 
@@ -165,7 +178,7 @@ export function registerAtlasRoutes(app: Express) {
 
   // ── POST /api/atlas/upload ────────────────────────────────────────────────
 
-  app.post("/api/atlas/upload", upload.single("file"), async (req: Request, res: Response) => {
+  app.post("/api/atlas/upload", optionalAuth, upload.single("file"), async (req: Request, res: Response) => {
     try {
       if (!req.file) {
         res.status(400).json({ error: "No file uploaded" });
@@ -222,17 +235,64 @@ export function registerAtlasRoutes(app: Express) {
       try {
         const result = await streamText({
           model: openai.chat("gemini-2.5-flash"),
-          system: "你是 ATLAS 数据分析助手。用简洁的中文分析数据，不超过150字。",
+          system: `你是 ATLAS，一个友好、自然的数据助手，像朋友一样和用户交流。
+用户刚刚拖入了一份数据文件，你需要：
+1. 简短友好地打招呼（1句话，不要说"你好我是ATLAS"这种机械语气，要自然）
+2. 用1-2句话说明你看到了什么数据（文件名、行数、关键字段）
+3. 直接问用户想要什么，给出2-3个具体的可操作建议（例如：提取某些字段、生成汇总表、分析排名等）
+语气：轻松、自然、专业，像一个懂数据的朋友。不超过120字。`,
           messages: [{
             role: "user",
-            content: `文件：${originalname}，共 ${dfInfo.row_count} 行 ${dfInfo.col_count} 列。字段：${fieldSummary}。请简要描述这份数据的内容和可以做哪些分析。`,
+            content: `文件名：${originalname}，共 ${dfInfo.row_count} 行 ${dfInfo.col_count} 列。字段：${fieldSummary}。`,
           }],
         });
         aiAnalysis = await result.text;
       } catch (e) {
         console.warn("[Atlas] AI analysis failed:", e);
-        aiAnalysis = `已解析 **${originalname}**，共 ${dfInfo.row_count.toLocaleString()} 行、${dfInfo.col_count} 列数据。\n\n包含字段：${dfInfo.fields.map(f => f.name).join("、")}。\n\n请描述您需要什么样的报表分析。`;
+        aiAnalysis = `收到了！**${originalname}** 共 ${dfInfo.row_count.toLocaleString()} 行数据，包含字段：${dfInfo.fields.slice(0, 6).map(f => f.name).join("、")}${dfInfo.fields.length > 6 ? "等" : ""}。
+
+你想怎么处理这份数据？可以提取指定字段、生成汇总表、排名分析，或者直接告诉我你想要什么。`;
       }
+
+      // Generate smart suggested actions based on field names
+      const fieldNames = dfInfo.fields.map(f => f.name.toLowerCase());
+      const suggestedActions: Array<{ label: string; prompt: string; icon: string }> = [];
+
+      // Detect data type and suggest relevant actions
+      const hasSales = fieldNames.some(f => /销售|金额|订单|gmv|amount|sales|revenue/.test(f));
+      const hasPayroll = fieldNames.some(f => /工资|薪资|工资|工资|工资|工资|salary|pay|wage/.test(f));
+      const hasAttendance = fieldNames.some(f => /出勤|考勤|迟到|早退|attendance|clock/.test(f));
+      const hasDividend = fieldNames.some(f => /分红|分配|奖金|dividend|bonus/.test(f));
+      const hasStore = fieldNames.some(f => /门店|店铺|店名|store|shop/.test(f));
+      const hasDate = fieldNames.some(f => /日期|时间|月份|date|time|month/.test(f));
+      const hasName = fieldNames.some(f => /姓名|名字|员工|人员|name|staff|employee/.test(f));
+
+      if (hasPayroll || (hasName && dfInfo.fields.some(f => /numeric/.test(f.type)))) {
+        suggestedActions.push({ icon: "📝", label: "生成工资条", prompt: "帮我根据这份数据生成工资条，包含姓名、工资明细和实发金额" });
+      }
+      if (hasDividend) {
+        suggestedActions.push({ icon: "💰", label: "分红明细表", prompt: "帮我生成分红明细表，按分红金额从高到低排序" });
+        suggestedActions.push({ icon: "🏆", label: "Top10 排名", prompt: "帮我找出分红最高的前10名和最低的后10名" });
+      }
+      if (hasSales) {
+        suggestedActions.push({ icon: "📊", label: "销售汇总表", prompt: "帮我汇总销售数据，显示总销售额、订单数和关键指标" });
+      }
+      if (hasStore) {
+        suggestedActions.push({ icon: "🏦", label: "门店对比", prompt: "帮我按门店分组汇总，对比各门店表现" });
+      }
+      if (hasAttendance) {
+        suggestedActions.push({ icon: "📅", label: "考勤汇总", prompt: "帮我汇总考勤数据，统计出勤天数、迟到次数和早退记录" });
+      }
+      if (hasDate) {
+        suggestedActions.push({ icon: "📈", label: "趋势分析", prompt: "帮我按时间分析数据趋势，看看有什么规律" });
+      }
+
+      // Always add generic options
+      if (suggestedActions.length < 2) {
+        suggestedActions.push({ icon: "📊", label: "生成汇总表", prompt: "帮我生成数据汇总表，包含关键指标和统计" });
+        suggestedActions.push({ icon: "🔍", label: "数据分析", prompt: "帮我分析这份数据，找出关键规律和异常值" });
+      }
+      suggestedActions.push({ icon: "✨", label: "自定义需求", prompt: "" }); // empty prompt = open input
 
       res.json({
         session_id: sessionId,
@@ -245,6 +305,7 @@ export function registerAtlasRoutes(app: Express) {
           preview: dfInfo.preview,
         },
         ai_analysis: aiAnalysis,
+        suggested_actions: suggestedActions,
       });
     } catch (err: any) {
       console.error("[Atlas] Upload error:", err);
@@ -255,36 +316,41 @@ export function registerAtlasRoutes(app: Express) {
   // ── POST /api/atlas/chat ──────────────────────────────────────────────────
   // Streaming text response about the uploaded data
 
-  app.post("/api/atlas/chat", async (req: Request, res: Response) => {
+    app.post("/api/atlas/chat", optionalAuth, async (req: Request, res: Response) => {
     try {
-      const { session_id, message, history } = req.body as {
-        session_id: string;
+      const { session_id, session_ids, message, history } = req.body as {
+        session_id?: string;
+        session_ids?: string[];
         message: string;
         history?: Array<{ role: "user" | "assistant"; content: string }>;
       };
-
-      if (!session_id || !message) {
-        res.status(400).json({ error: "session_id and message are required" });
+      // Support both single session_id and multiple session_ids
+      const allSessionIds = session_ids?.length ? session_ids : session_id ? [session_id] : [];
+      if (!allSessionIds.length || !message) {
+        res.status(400).json({ error: "session_id(s) and message are required" });
         return;
       }
-
-      // Load session from DB
-      const sessionRecord = await getSession(session_id);
-      if (!sessionRecord) {
+      // Load all sessions
+      const sessionRecords = await Promise.all(allSessionIds.map(id => getSession(id)));
+      const validSessions = sessionRecords.filter(Boolean);
+      if (!validSessions.length) {
         res.status(404).json({ error: "Session not found. Please re-upload the file." });
         return;
       }
-
+      // Use first session as primary, merge context from others
+      const sessionRecord = validSessions[0]!;
       const dfInfo = sessionRecord.dfInfo as DataFrameInfo | null;
-      const filename = sessionRecord.originalName;
+      const filename = validSessions.length > 1
+        ? validSessions.map(s => s!.originalName).join("、")
+        : sessionRecord.originalName;
 
       if (!dfInfo) {
         res.status(404).json({ error: "Session data not found. Please re-upload the file." });
         return;
       }
 
-      // Load parsed data from S3
-      const data = await loadSessionData(session_id);
+      // Load parsed data from S3 (use first valid session)
+      const data = await loadSessionData(allSessionIds[0]);
       if (!data) {
         res.status(404).json({ error: "Session data expired. Please re-upload the file." });
         return;
@@ -300,19 +366,22 @@ export function registerAtlasRoutes(app: Express) {
         Object.entries(row).slice(0, 8).map(([k, v]) => `${k}=${v}`).join(", ")
       ).join("\n");
 
-      const systemPrompt = `你是 ATLAS 数据分析助手，专门帮助用户分析电商/零售数据。
+        const systemPrompt = `你是 ATLAS，一个懂数据的朋友，不是冷冰冰的工具。和用户自然对话，像朋友一样交流。
 
-当前数据文件：${filename}
-数据规模：${dfInfo.row_count} 行 × ${dfInfo.col_count} 列
-
-字段信息：
+当前数据：${filename}（${dfInfo.row_count} 行 × ${dfInfo.col_count} 列）
+字段：
 ${fieldSummary}
-
-数据样例（前10行）：
+数据样例：
 ${sampleRows}
 
-请根据数据内容回答用户问题。如果用户要求生成报表，请告知他们可以使用"生成报表"功能。
-回答要简洁、专业，使用中文。`;
+对话原则：
+1. 语气自然、轻松，可以用「好的」「没问题」「稍等」等口语
+2. 用户说「谢谢」「不错」等，正常回应，像朋友一样
+3. 如果用户要生成表格/报表/汇总/分析，直接告诉他「好的，马上为你生成」，不要让他去找按钮
+4. 如果用户说「再细化」「换个格式」「加上XXX」，理解为对上一次结果的修改需求
+5. 回答简洁，不要废话，最多3-4句话
+6. 遇到数据问题可以直接给出数字分析结果
+使用中文，语气友好专业。`;
 
       const openai = createLLM();
 
@@ -340,7 +409,7 @@ ${sampleRows}
   // ── POST /api/atlas/generate-report ──────────────────────────────────────
   // Generate Excel report based on user requirement
 
-  app.post("/api/atlas/generate-report", async (req: Request, res: Response) => {
+  app.post("/api/atlas/generate-report", optionalAuth, async (req: Request, res: Response) => {
     try {
       const { session_id, requirement, report_title } = req.body as {
         session_id: string;
@@ -374,8 +443,7 @@ ${sampleRows}
         res.status(404).json({ error: "Session data expired. Please re-upload the file." });
         return;
       }
-
-      // 1. Ask AI to generate the report data as JSON
+      // 1. Ask AI to generate the report data as JSONN
       const openai = createLLM();
       const fieldNames = dfInfo.fields.map((f: FieldInfo) => f.name).join(", ");
       const sampleRows = JSON.stringify(data.slice(0, 20), null, 2);
@@ -389,7 +457,7 @@ ${sampleRows}
 
       const aiPrompt = `你是数据分析专家。根据以下数据和需求，生成一份报表数据。${ragSection}
 
-数据文件：${filename}（${dfInfo.row_count}行 xd7 ${dfInfo.col_count}列）
+数据文件：${filename}（${dfInfo.row_count}行 x ${dfInfo.col_count}列）
 字段：${fieldNames}
 
 数据样例（前20行）：
@@ -511,7 +579,12 @@ ${sampleRows}
         ai_message: aiMessage,
         plan: {
           title: reportData.title,
-          sheets: reportData.sheets.map(s => ({ name: s.name, summary: s.summary || "" })),
+          sheets: reportData.sheets.map(s => ({
+            name: s.name,
+            headers: s.headers,
+            rows: s.rows.slice(0, 50),
+            summary: s.summary || "",
+          })),
           insights: reportData.insights,
         },
       });

@@ -39,7 +39,7 @@ export default function Sidebar() {
     activeTaskId, setActiveTaskId,
     tasks,
     user, setUser, setShowLoginModal,
-    clearMessages, clearFiles,
+    createNewTask,
   } = useAtlas();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -70,9 +70,7 @@ export default function Sidebar() {
   );
 
   const handleNewTask = () => {
-    clearMessages();
-    clearFiles();
-    setActiveTaskId(null);
+    createNewTask();
     setActiveNav("home");
     if (!sidebarOpen) setSidebarOpen(true);
   };

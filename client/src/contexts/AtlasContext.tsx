@@ -1,8 +1,9 @@
 /**
- * ATLAS V4.0 — Global State Context
- * Manages: layout, theme, auth, files, chat, reports, templates, platforms
+ * ATLAS V5.0 — Global State Context
+ * Multi-task architecture: each task has its own messages + files
+ * Switching activeTaskId instantly restores the full session
  */
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 
 export type NavItem = "home" | "dashboard" | "templates" | "settings" | "search" | "library" | "invite" | "hr";
 export type Theme = "dark" | "light";
@@ -15,29 +16,6 @@ export interface User {
   email: string;
   avatar?: string;
   plan: "free" | "pro" | "enterprise";
-}
-
-export interface Task {
-  id: string;
-  title: string;
-  filename: string;
-  created_at: string;
-  status: "uploaded" | "processing" | "completed" | "failed";
-  row_count?: number;
-  col_count?: number;
-  report_id?: string;
-  report_filename?: string;
-  messages?: Message[];
-}
-
-export interface UploadedFile {
-  id: string;
-  name: string;
-  size: number;
-  sessionId?: string;
-  dfInfo?: DataFrameInfo;
-  status: "uploading" | "ready" | "error";
-  uploadedAt: Date;
 }
 
 export interface DataFrameInfo {
@@ -57,6 +35,23 @@ export interface ColumnInfo {
   inferred_type: string;
 }
 
+export interface UploadedFile {
+  id: string;
+  name: string;
+  size: number;
+  sessionId?: string;
+  dfInfo?: DataFrameInfo;
+  status: "uploading" | "ready" | "error";
+  uploadedAt: Date;
+}
+
+export interface TableSheet {
+  name: string;
+  headers: string[];
+  rows: (string | number)[][];
+  summary?: string;
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
@@ -65,6 +60,8 @@ export interface Message {
   isStreaming?: boolean;
   report_id?: string;
   report_filename?: string;
+  download_url?: string;
+  tableData?: TableSheet[];
 }
 
 export interface ReportRecord {
@@ -74,6 +71,22 @@ export interface ReportRecord {
   created_at: string;
   session_id: string;
   status: "completed" | "failed";
+}
+
+// A Task now owns its own messages and files
+export interface Task {
+  id: string;
+  title: string;
+  filename: string;
+  created_at: string;
+  status: "uploaded" | "processing" | "completed" | "failed";
+  row_count?: number;
+  col_count?: number;
+  report_id?: string;
+  report_filename?: string;
+  // Per-task session data
+  messages: Message[];
+  uploadedFiles: UploadedFile[];
 }
 
 export interface Template {
@@ -142,19 +155,20 @@ interface AtlasContextType {
   showLoginModal: boolean;
   setShowLoginModal: (v: boolean) => void;
 
-  // Tasks (Manus-style task list)
+  // Tasks
   tasks: Task[];
   addTask: (t: Task) => void;
-  updateTask: (id: string, updates: Partial<Task>) => void;
+  updateTask: (id: string, updates: Partial<Omit<Task, "messages" | "uploadedFiles">>) => void;
+  createNewTask: () => string; // returns new task id
 
-  // Files (current session)
+  // Current task's files (scoped to activeTaskId)
   uploadedFiles: UploadedFile[];
   addUploadedFile: (file: UploadedFile) => void;
   updateUploadedFile: (id: string, updates: Partial<UploadedFile>) => void;
   removeUploadedFile: (id: string) => void;
   clearFiles: () => void;
 
-  // Chat
+  // Current task's messages (scoped to activeTaskId)
   messages: Message[];
   addMessage: (msg: Omit<Message, "id" | "timestamp">) => void;
   updateLastMessage: (content: string, extra?: Partial<Message>) => void;
@@ -196,12 +210,13 @@ interface AtlasContextType {
   // Settings
   backendUrl: string;
   setBackendUrl: (url: string) => void;
-  // legacy compat
+
+  // Legacy compat
   apiKey: string;
   setApiKey: (key: string) => void;
   history: Task[];
   setHistory: React.Dispatch<React.SetStateAction<Task[]>>;
-  addHistory: (h: Task) => void;
+  addHistory: (h: Omit<Task, "messages" | "uploadedFiles">) => void;
 }
 
 const AtlasContext = createContext<AtlasContextType | null>(null);
@@ -227,13 +242,11 @@ export const SYSTEM_TEMPLATES: Template[] = [
 export function AtlasProvider({ children }: { children: React.ReactNode }) {
   const [activeNav, setActiveNav] = useState<NavItem>("home");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [activeTaskId, setActiveTaskIdState] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("atlas_theme") as Theme) || "dark");
   const [user, setUser] = useState<User | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [reports, setReports] = useState<ReportRecord[]>([]);
   const [templates, setTemplates] = useState<Template[]>(SYSTEM_TEMPLATES);
@@ -262,41 +275,113 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Listen for unauthorized API errors and show login modal instead of redirecting
+  // Listen for unauthorized API errors
   useEffect(() => {
     const handleUnauthorized = () => setShowLoginModal(true);
     window.addEventListener("atlas:unauthorized", handleUnauthorized);
     return () => window.removeEventListener("atlas:unauthorized", handleUnauthorized);
   }, []);
 
-  const toggleTheme = useCallback(() => {
-    setTheme(t => t === "dark" ? "light" : "dark");
+  // ── Task management ──────────────────────────────────────────────────────
+
+  // Create a brand-new empty task and activate it
+  const createNewTask = useCallback((): string => {
+    const id = `task-${Date.now()}`;
+    const newTask: Task = {
+      id,
+      title: "新建任务",
+      filename: "",
+      created_at: new Date().toISOString(),
+      status: "uploaded",
+      messages: [],
+      uploadedFiles: [],
+    };
+    setTasks(prev => [newTask, ...prev]);
+    setActiveTaskIdState(id);
+    return id;
   }, []);
 
-  const addTask = useCallback((t: Task) => setTasks(prev => [t, ...prev]), []);
-  const updateTask = useCallback((id: string, updates: Partial<Task>) => {
+  const setActiveTaskId = useCallback((id: string | null) => {
+    setActiveTaskIdState(id);
+  }, []);
+
+  const addTask = useCallback((t: Task) => {
+    setTasks(prev => [t, ...prev]);
+  }, []);
+
+  const updateTask = useCallback((id: string, updates: Partial<Omit<Task, "messages" | "uploadedFiles">>) => {
     setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
   }, []);
 
-  const addUploadedFile = useCallback((file: UploadedFile) => setUploadedFiles(prev => [file, ...prev]), []);
+  // ── Per-task files (scoped to activeTaskId) ──────────────────────────────
+
+  // Get current task (memoized by activeTaskId)
+  const activeTask = tasks.find(t => t.id === activeTaskId) ?? null;
+  const uploadedFiles = activeTask?.uploadedFiles ?? [];
+  const messages = activeTask?.messages ?? [];
+
+  const addUploadedFile = useCallback((file: UploadedFile) => {
+    setTasks(prev => prev.map(t =>
+      t.id === activeTaskId
+        ? { ...t, uploadedFiles: [file, ...t.uploadedFiles] }
+        : t
+    ));
+  }, [activeTaskId]);
+
   const updateUploadedFile = useCallback((id: string, updates: Partial<UploadedFile>) => {
-    setUploadedFiles(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
-  }, []);
-  const removeUploadedFile = useCallback((id: string) => setUploadedFiles(prev => prev.filter(f => f.id !== id)), []);
-  const clearFiles = useCallback(() => setUploadedFiles([]), []);
+    setTasks(prev => prev.map(t =>
+      t.id === activeTaskId
+        ? { ...t, uploadedFiles: t.uploadedFiles.map(f => f.id === id ? { ...f, ...updates } : f) }
+        : t
+    ));
+  }, [activeTaskId]);
+
+  const removeUploadedFile = useCallback((id: string) => {
+    setTasks(prev => prev.map(t =>
+      t.id === activeTaskId
+        ? { ...t, uploadedFiles: t.uploadedFiles.filter(f => f.id !== id) }
+        : t
+    ));
+  }, [activeTaskId]);
+
+  const clearFiles = useCallback(() => {
+    setTasks(prev => prev.map(t =>
+      t.id === activeTaskId ? { ...t, uploadedFiles: [] } : t
+    ));
+  }, [activeTaskId]);
+
+  // ── Per-task messages ────────────────────────────────────────────────────
 
   const addMessage = useCallback((msg: Omit<Message, "id" | "timestamp">) => {
-    setMessages(prev => [...prev, { ...msg, id: genId(), timestamp: new Date() }]);
-  }, []);
+    const newMsg: Message = { ...msg, id: genId(), timestamp: new Date() };
+    setTasks(prev => prev.map(t =>
+      t.id === activeTaskId
+        ? { ...t, messages: [...t.messages, newMsg] }
+        : t
+    ));
+  }, [activeTaskId]);
+
   const updateLastMessage = useCallback((content: string, extra?: Partial<Message>) => {
-    setMessages(prev => {
-      if (!prev.length) return prev;
-      return [...prev.slice(0, -1), { ...prev[prev.length - 1], content, isStreaming: false, ...extra }];
-    });
-  }, []);
-  const clearMessages = useCallback(() => setMessages([]), []);
+    setTasks(prev => prev.map(t => {
+      if (t.id !== activeTaskId) return t;
+      if (!t.messages.length) return t;
+      const msgs = [...t.messages];
+      msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], content, isStreaming: false, ...extra };
+      return { ...t, messages: msgs };
+    }));
+  }, [activeTaskId]);
+
+  const clearMessages = useCallback(() => {
+    setTasks(prev => prev.map(t =>
+      t.id === activeTaskId ? { ...t, messages: [] } : t
+    ));
+  }, [activeTaskId]);
+
+  // ── Reports ──────────────────────────────────────────────────────────────
 
   const addReport = useCallback((r: ReportRecord) => setReports(prev => [r, ...prev]), []);
+
+  // ── Templates ────────────────────────────────────────────────────────────
 
   const addTemplate = useCallback((t: Template) => setTemplates(prev => [t, ...prev]), []);
   const updateTemplate = useCallback((id: string, updates: Partial<Template>) => {
@@ -307,11 +392,15 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
     setTemplates(prev => prev.map(t => t.id === id ? { ...t, isPinned: !t.isPinned } : t));
   }, []);
 
+  // ── Platforms ────────────────────────────────────────────────────────────
+
   const addPlatform = useCallback((p: PlatformConnection) => setPlatforms(prev => [p, ...prev]), []);
   const updatePlatform = useCallback((id: string, updates: Partial<PlatformConnection>) => {
     setPlatforms(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
   }, []);
   const removePlatform = useCallback((id: string) => setPlatforms(prev => prev.filter(p => p.id !== id)), []);
+
+  // ── API Keys ─────────────────────────────────────────────────────────────
 
   const addApiKey = useCallback((k: ApiKeyConfig) => {
     setApiKeys(prev => {
@@ -335,6 +424,8 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // ── Scheduled Tasks ──────────────────────────────────────────────────────
+
   const addScheduledTask = useCallback((t: ScheduledTask) => setScheduledTasks(prev => [...prev, t]), []);
   const updateScheduledTask = useCallback((id: string, updates: Partial<ScheduledTask>) => {
     setScheduledTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
@@ -344,6 +435,10 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
   const setBackendUrl = useCallback((url: string) => {
     setBackendUrlState(url);
     localStorage.setItem("atlas_backend_url", url);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(t => t === "dark" ? "light" : "dark");
   }, []);
 
   // Legacy compat
@@ -356,6 +451,17 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
     }
   }, [apiKeys, addApiKey, updateApiKey]);
 
+  // addHistory: creates a task with empty messages/files (legacy compat for processFile)
+  const addHistory = useCallback((h: Omit<Task, "messages" | "uploadedFiles">) => {
+    setTasks(prev => {
+      // If task already exists (same id), just update metadata
+      if (prev.some(t => t.id === h.id)) {
+        return prev.map(t => t.id === h.id ? { ...t, ...h } : t);
+      }
+      return [{ ...h, messages: [], uploadedFiles: [] }, ...prev];
+    });
+  }, []);
+
   return (
     <AtlasContext.Provider value={{
       activeNav, setActiveNav,
@@ -364,7 +470,7 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
       theme, toggleTheme, setTheme,
       user, setUser,
       showLoginModal, setShowLoginModal,
-      tasks, addTask, updateTask,
+      tasks, addTask, updateTask, createNewTask,
       uploadedFiles, addUploadedFile, updateUploadedFile, removeUploadedFile, clearFiles,
       messages, addMessage, updateLastMessage, clearMessages,
       isProcessing, setIsProcessing,
@@ -375,7 +481,7 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
       scheduledTasks, addScheduledTask, updateScheduledTask, removeScheduledTask,
       backendUrl, setBackendUrl,
       apiKey, setApiKey,
-      history: tasks, setHistory: setTasks, addHistory: addTask,
+      history: tasks, setHistory: setTasks as any, addHistory,
     }}>
       {children}
     </AtlasContext.Provider>
