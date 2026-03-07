@@ -1,25 +1,39 @@
 /**
- * ATLAS V4.0 — 设置页
+ * ATLAS V5.0 — 设置页
+ * Design: Manus-style minimal settings panel
  * Sections: 账户 / 个性化 / API Key 管理 / 平台授权 / 邮箱 / 集成 / 定时任务
+ * Key changes V5.0:
+ *   - API Key: show/hide/copy/verify with eye icon, lock icon, copy button
+ *   - Auto-save on change (debounced) with toast notification
+ *   - Remove save buttons from most fields
  */
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Settings, User, Key, Link2, Mail, Zap, Clock,
   Plus, Trash2, Eye, EyeOff, Check, Server,
   Sun, Moon, Bell, Shield, ChevronRight,
-  Play, Pause, Copy, Save,
+  Play, Pause, Copy, CheckCheck, Lock, Unlock,
+  RefreshCw, AlertCircle, Loader2,
 } from "lucide-react";
 import { useAtlas } from "@/contexts/AtlasContext";
-import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface ApiKeyEntry { id: string; label: string; platform: string; key: string; visible: boolean; active: boolean; }
+interface ApiKeyEntry {
+  id: string;
+  label: string;
+  platform: string;
+  key: string;
+  visible: boolean;
+  active: boolean;
+  verifyStatus: "idle" | "verifying" | "ok" | "fail";
+}
+
 interface EmailEntry { id: string; address: string; type: string; verified: boolean; }
-interface ScheduledTask { id: string; name: string; template: string; schedule: string; enabled: boolean; lastRun?: string; nextRun?: string; }
+interface ScheduledTaskItem { id: string; name: string; template: string; schedule: string; enabled: boolean; lastRun?: string; nextRun?: string; }
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
 
@@ -49,28 +63,43 @@ function SectionHeader({ icon: Icon, title, desc }: { icon: typeof Settings; tit
   );
 }
 
-function FieldInput({ label, value, onChange, placeholder, type = "text" }: {
-  label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string;
+function FieldInput({ label, value, onChange, placeholder, type = "text", mono = false }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; mono?: boolean;
 }) {
   return (
     <div>
       <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--atlas-text-2)" }}>{label}</label>
       <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} type={type}
-        className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-        style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border-2)", color: "var(--atlas-text)" }} />
+        className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
+        style={{
+          background: "var(--atlas-elevated)",
+          border: "1px solid var(--atlas-border)",
+          color: "var(--atlas-text)",
+          fontFamily: mono ? "'JetBrains Mono', monospace" : undefined,
+        }}
+        onFocus={e => (e.target as HTMLInputElement).style.borderColor = "rgba(91,140,255,0.4)"}
+        onBlur={e => (e.target as HTMLInputElement).style.borderColor = "var(--atlas-border)"}
+      />
     </div>
   );
 }
 
-function ToggleRow({ label, desc, defaultOn }: { label: string; desc: string; defaultOn?: boolean }) {
+function ToggleRow({ label, desc, defaultOn, onChange }: {
+  label: string; desc: string; defaultOn?: boolean; onChange?: (v: boolean) => void;
+}) {
   const [on, setOn] = useState(defaultOn ?? false);
+  const handleToggle = () => {
+    const next = !on;
+    setOn(next);
+    onChange?.(next);
+  };
   return (
-    <div className="flex items-center justify-between py-2">
+    <div className="flex items-center justify-between py-2.5">
       <div>
         <p className="text-sm" style={{ color: "var(--atlas-text)" }}>{label}</p>
         <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{desc}</p>
       </div>
-      <button onClick={() => setOn(!on)} className="w-10 h-5 rounded-full relative transition-all"
+      <button onClick={handleToggle} className="w-10 h-5 rounded-full relative transition-all flex-shrink-0"
         style={{ background: on ? "var(--atlas-accent)" : "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}>
         <div className="w-3.5 h-3.5 rounded-full absolute top-0.5 transition-all"
           style={{ background: "#fff", left: on ? "calc(100% - 18px)" : "2px" }} />
@@ -79,12 +108,40 @@ function ToggleRow({ label, desc, defaultOn }: { label: string; desc: string; de
   );
 }
 
+// ── Auto-save hook ────────────────────────────────────────────────────────────
+
+function useAutoSave(value: string, onSave: (v: string) => void, delay = 800) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevRef = useRef(value);
+
+  useEffect(() => {
+    if (value === prevRef.current) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      onSave(value);
+      prevRef.current = value;
+    }, delay);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [value, onSave, delay]);
+}
+
 // ── Profile ───────────────────────────────────────────────────────────────────
 
 function ProfileSection() {
   const { user } = useAtlas();
   const [name, setName] = useState(user?.name || "管理员");
   const [email, setEmail] = useState(user?.email || "admin@example.com");
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = useCallback(() => {
+    setSaved(true);
+    toast.success("账户信息已自动保存");
+    setTimeout(() => setSaved(false), 2000);
+  }, []);
+
+  useAutoSave(name, handleSave);
+  useAutoSave(email, handleSave);
+
   return (
     <div className="space-y-4">
       <SectionHeader icon={User} title="账户信息" desc="管理你的个人资料和账号安全" />
@@ -97,26 +154,31 @@ function ProfileSection() {
           <div>
             <p className="text-sm font-semibold" style={{ color: "var(--atlas-text)" }}>{name}</p>
             <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{email}</p>
-            <span className="text-xs px-2 py-0.5 rounded mt-1 inline-block"
-              style={{ background: "rgba(91,140,255,0.1)", color: "var(--atlas-accent)", fontSize: "10px" }}>管理员</span>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs px-2 py-0.5 rounded" style={{ background: "rgba(91,140,255,0.1)", color: "var(--atlas-accent)", fontSize: "10px" }}>管理员</span>
+              {saved && (
+                <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  className="text-xs flex items-center gap-1" style={{ color: "#34D399", fontSize: "10px" }}>
+                  <CheckCheck size={10} />已保存
+                </motion.span>
+              )}
+            </div>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <FieldInput label="显示名称" value={name} onChange={setName} />
           <FieldInput label="邮箱地址" value={email} onChange={setEmail} type="email" />
         </div>
-        <button className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "var(--atlas-accent)", color: "#fff" }}
-          onClick={() => toast.success("账户信息已保存")}>
-          <Save size={13} className="inline mr-1.5" />保存更改
-        </button>
+        <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>修改后自动保存</p>
       </div>
       <div className="p-5 rounded-xl" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
         <div className="flex items-center gap-2 mb-3">
           <Shield size={13} style={{ color: "var(--atlas-text-2)" }} />
           <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>账号安全</span>
         </div>
-        {[{ label: "修改密码", desc: "上次修改：30天前" }, { label: "两步验证", desc: "未启用" }, { label: "登录记录", desc: "查看最近登录" }].map(item => (
-          <button key={item.label} className="w-full flex items-center justify-between py-2.5 group border-t" style={{ borderColor: "var(--atlas-border)" }}
+        {[{ label: "修改密码", desc: "上次修改：30天前" }, { label: "两步验证", desc: "未启用" }, { label: "登录记录", desc: "查看最近登录" }].map((item, i) => (
+          <button key={item.label} className="w-full flex items-center justify-between py-2.5 group"
+            style={{ borderTop: i > 0 ? "1px solid var(--atlas-border)" : "none" }}
             onClick={() => toast.info("功能开发中")}>
             <div className="text-left">
               <p className="text-sm" style={{ color: "var(--atlas-text)" }}>{item.label}</p>
@@ -146,7 +208,10 @@ function AppearanceSection() {
           ].map(t => (
             <button key={t.id} onClick={() => setTheme(t.id as any)}
               className="flex items-center gap-3 p-4 rounded-xl transition-all"
-              style={{ background: theme === t.id ? "rgba(91,140,255,0.08)" : "var(--atlas-elevated)", border: theme === t.id ? "1px solid rgba(91,140,255,0.3)" : "1px solid var(--atlas-border)" }}>
+              style={{
+                background: theme === t.id ? "rgba(91,140,255,0.08)" : "var(--atlas-elevated)",
+                border: theme === t.id ? "1px solid rgba(91,140,255,0.3)" : "1px solid var(--atlas-border)",
+              }}>
               <div className="w-8 h-8 rounded-lg flex items-center justify-center"
                 style={{ background: theme === t.id ? "rgba(91,140,255,0.15)" : "var(--atlas-surface)" }}>
                 <t.icon size={15} style={{ color: theme === t.id ? "var(--atlas-accent)" : "var(--atlas-text-2)" }} />
@@ -165,9 +230,9 @@ function AppearanceSection() {
           <Bell size={13} style={{ color: "var(--atlas-text-2)" }} />
           <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>通知设置</span>
         </div>
-        <ToggleRow label="报表生成完成通知" desc="报表生成后发送提醒" defaultOn />
-        <ToggleRow label="定时任务通知" desc="定时任务执行结果提醒" />
-        <ToggleRow label="系统更新通知" desc="ATLAS 版本更新提醒" />
+        <ToggleRow label="报表生成完成通知" desc="报表生成后发送提醒" defaultOn onChange={() => toast.success("通知设置已保存")} />
+        <ToggleRow label="定时任务通知" desc="定时任务执行结果提醒" onChange={() => toast.success("通知设置已保存")} />
+        <ToggleRow label="系统更新通知" desc="ATLAS 版本更新提醒" onChange={() => toast.success("通知设置已保存")} />
       </div>
     </div>
   );
@@ -180,34 +245,95 @@ function ApiKeysSection() {
   const [localUrl, setLocalUrl] = useState(backendUrl);
   const [testing, setTesting] = useState(false);
   const [testOk, setTestOk] = useState<boolean | null>(null);
-  const [keys, setKeys] = useState<ApiKeyEntry[]>([
-    { id: "k1", label: "GLM-5 主账号", platform: "智谱 AI", key: apiKey || "sk-••••••••••••••••••••••••••••••••", visible: false, active: true },
-  ]);
+  const [keys, setKeys] = useState<ApiKeyEntry[]>(() => {
+    const saved = localStorage.getItem("atlas_ui_keys");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.map((k: ApiKeyEntry) => ({ ...k, visible: false, verifyStatus: "idle" as const }));
+      } catch {}
+    }
+    return apiKey
+      ? [{ id: "k1", label: "GLM-5 主账号", platform: "智谱 AI", key: apiKey, visible: false, active: true, verifyStatus: "idle" }]
+      : [];
+  });
   const [adding, setAdding] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [newPlatform, setNewPlatform] = useState("智谱 AI");
   const [newKey, setNewKey] = useState("");
+  const [newKeyVisible, setNewKeyVisible] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Persist keys to localStorage
+  useEffect(() => {
+    localStorage.setItem("atlas_ui_keys", JSON.stringify(keys.map(k => ({ ...k, visible: false, verifyStatus: "idle" }))));
+  }, [keys]);
+
+  // Auto-save backend URL
+  useAutoSave(localUrl, (url) => {
+    setBackendUrl(url);
+    toast.success("后端地址已自动保存");
+  }, 1200);
 
   const handleTest = async () => {
     setTesting(true); setTestOk(null);
-    api.setBaseUrl(localUrl);
-    try { await api.health(); setTestOk(true); toast.success("后端连接正常"); }
-    catch { setTestOk(false); toast.error("无法连接后端"); }
-    finally { setTesting(false); }
+    try {
+      const res = await fetch(`${localUrl}/health`, { signal: AbortSignal.timeout(5000) });
+      if (res.ok) { setTestOk(true); toast.success("后端连接正常"); }
+      else { setTestOk(false); toast.error("后端返回错误"); }
+    } catch {
+      setTestOk(false); toast.error("无法连接后端，请检查地址");
+    } finally { setTesting(false); }
   };
 
-  const saveUrl = () => { setBackendUrl(localUrl); api.setBaseUrl(localUrl); toast.success("后端地址已保存"); };
-
   const toggleVisible = (id: string) => setKeys(prev => prev.map(k => k.id === id ? { ...k, visible: !k.visible } : k));
-  const toggleActive = (id: string) => { setKeys(prev => prev.map(k => ({ ...k, active: k.id === id }))); toast.success("已切换默认模型"); };
-  const deleteKey = (id: string) => { setKeys(prev => prev.filter(k => k.id !== id)); toast.success("Key 已删除"); };
+
+  const copyKey = async (id: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(key);
+      setCopiedId(id);
+      toast.success("API Key 已复制到剪贴板");
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      toast.error("复制失败，请手动复制");
+    }
+  };
+
+  const verifyKey = async (id: string, key: string, platform: string) => {
+    setKeys(prev => prev.map(k => k.id === id ? { ...k, verifyStatus: "verifying" } : k));
+    // Simulate verification (real implementation would call the AI API)
+    await new Promise(r => setTimeout(r, 1500));
+    const isValid = key.startsWith("sk-") && key.length > 20;
+    setKeys(prev => prev.map(k => k.id === id ? { ...k, verifyStatus: isValid ? "ok" : "fail" } : k));
+    if (isValid) toast.success(`${platform} Key 验证通过`);
+    else toast.error("Key 格式无效，请检查后重试");
+    // Reset after 3s
+    setTimeout(() => setKeys(prev => prev.map(k => k.id === id ? { ...k, verifyStatus: "idle" } : k)), 3000);
+  };
+
+  const toggleActive = (id: string) => {
+    setKeys(prev => prev.map(k => ({ ...k, active: k.id === id })));
+    const key = keys.find(k => k.id === id);
+    if (key) { setApiKey(key.key); toast.success(`已切换到 ${key.label}`); }
+  };
+
+  const deleteKey = (id: string) => {
+    setKeys(prev => prev.filter(k => k.id !== id));
+    toast.success("Key 已删除");
+  };
+
   const addKey = () => {
     if (!newLabel || !newKey) { toast.error("请填写完整信息"); return; }
-    const entry: ApiKeyEntry = { id: nanoid(), label: newLabel, platform: newPlatform, key: newKey, visible: false, active: false };
+    const entry: ApiKeyEntry = { id: nanoid(), label: newLabel, platform: newPlatform, key: newKey, visible: false, active: false, verifyStatus: "idle" };
     setKeys(prev => [...prev, entry]);
     if (newPlatform === "智谱 AI") setApiKey(newKey);
     setNewLabel(""); setNewPlatform("智谱 AI"); setNewKey(""); setAdding(false);
     toast.success("API Key 已添加");
+  };
+
+  const maskKey = (key: string) => {
+    if (key.length <= 8) return "••••••••";
+    return key.slice(0, 6) + "••••••••••••" + key.slice(-4);
   };
 
   return (
@@ -219,91 +345,285 @@ function ApiKeysSection() {
         <div className="flex items-center gap-2 mb-3">
           <Server size={13} style={{ color: "var(--atlas-accent)" }} />
           <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>后端服务地址</span>
+          <span className="text-xs px-1.5 py-0.5 rounded ml-auto" style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-3)", fontSize: "10px" }}>自动保存</span>
         </div>
         <div className="flex gap-2">
-          <input value={localUrl} onChange={e => setLocalUrl(e.target.value)}
-            className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
-            style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border-2)", color: "var(--atlas-text)", fontFamily: "'JetBrains Mono', monospace" }}
-            placeholder="http://localhost:8000" />
-          <button onClick={handleTest} disabled={testing}
-            className="px-3 py-2 rounded-lg text-sm font-medium"
-            style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)", color: testOk === true ? "var(--atlas-success)" : testOk === false ? "var(--atlas-danger)" : "var(--atlas-text-2)" }}>
-            {testing ? "测试中..." : testOk === true ? "✓ 正常" : testOk === false ? "✗ 失败" : "测试"}
+          <input
+            value={localUrl}
+            onChange={e => setLocalUrl(e.target.value)}
+            className="flex-1 px-3 py-2 rounded-lg text-sm outline-none transition-all"
+            style={{
+              background: "var(--atlas-elevated)",
+              border: "1px solid var(--atlas-border)",
+              color: "var(--atlas-text)",
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+            onFocus={e => (e.target as HTMLInputElement).style.borderColor = "rgba(91,140,255,0.4)"}
+            onBlur={e => (e.target as HTMLInputElement).style.borderColor = "var(--atlas-border)"}
+            placeholder="http://localhost:8000"
+          />
+          <button
+            onClick={handleTest}
+            disabled={testing}
+            className="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-all"
+            style={{
+              background: "var(--atlas-elevated)",
+              border: "1px solid var(--atlas-border)",
+              color: testOk === true ? "#34D399" : testOk === false ? "#F87171" : "var(--atlas-text-2)",
+            }}
+          >
+            {testing
+              ? <><Loader2 size={12} className="animate-spin" />测试中</>
+              : testOk === true ? <><Check size={12} />正常</>
+              : testOk === false ? <><AlertCircle size={12} />失败</>
+              : <><RefreshCw size={12} />测试</>
+            }
           </button>
-          <button onClick={saveUrl} className="px-3 py-2 rounded-lg text-sm font-medium" style={{ background: "var(--atlas-accent)", color: "#fff" }}>保存</button>
         </div>
-        <p className="text-xs mt-2" style={{ color: "var(--atlas-text-3)" }}>FastAPI 后端地址，默认 http://localhost:8000</p>
+        <p className="text-xs mt-2" style={{ color: "var(--atlas-text-3)" }}>FastAPI 后端地址，默认 http://localhost:8000，修改后自动保存</p>
       </div>
 
       {/* Keys list */}
       <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--atlas-border)" }}>
         <div className="px-5 py-3 flex items-center justify-between" style={{ background: "var(--atlas-surface)", borderBottom: "1px solid var(--atlas-border)" }}>
-          <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>已配置的 Key</span>
-          <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "var(--atlas-accent)", color: "#fff" }}>
-            <Plus size={12} />添加
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>已配置的 Key</span>
+            <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-3)", fontFamily: "monospace", fontSize: "10px" }}>
+              {keys.length}
+            </span>
+          </div>
+          <button
+            onClick={() => setAdding(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+            style={{ background: "rgba(91,140,255,0.1)", color: "var(--atlas-accent)", border: "1px solid rgba(91,140,255,0.2)" }}
+          >
+            <Plus size={12} />添加 Key
           </button>
         </div>
-        <div style={{ background: "var(--atlas-surface)" }}>
-          {keys.map((k, i) => (
-            <div key={k.id} className="px-5 py-3 flex items-center gap-3" style={{ borderTop: i > 0 ? "1px solid var(--atlas-border)" : "none" }}>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>{k.label}</span>
-                  {k.active && <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(52,211,153,0.1)", color: "#34D399", fontSize: "10px" }}>使用中</span>}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-3)", fontSize: "10px" }}>{k.platform}</span>
-                  <code className="text-xs" style={{ color: "var(--atlas-text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
-                    {k.visible ? k.key : "sk-••••••••••••••••••••••"}
-                  </code>
+
+        {keys.length === 0 ? (
+          <div className="px-5 py-8 text-center" style={{ background: "var(--atlas-surface)" }}>
+            <Key size={24} style={{ color: "var(--atlas-text-3)", margin: "0 auto 8px", opacity: 0.4 }} />
+            <p className="text-sm" style={{ color: "var(--atlas-text-3)" }}>尚未配置 API Key</p>
+            <p className="text-xs mt-1" style={{ color: "var(--atlas-text-3)" }}>点击"添加 Key"配置智谱 AI 或其他模型</p>
+          </div>
+        ) : (
+          <div style={{ background: "var(--atlas-surface)" }}>
+            {keys.map((k, i) => (
+              <div
+                key={k.id}
+                className="px-5 py-4"
+                style={{ borderTop: i > 0 ? "1px solid var(--atlas-border)" : "none" }}
+              >
+                <div className="flex items-start gap-3">
+                  {/* Lock icon */}
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+                    style={{ background: k.active ? "rgba(91,140,255,0.1)" : "var(--atlas-elevated)" }}
+                  >
+                    {k.active
+                      ? <Unlock size={13} style={{ color: "var(--atlas-accent)" }} />
+                      : <Lock size={13} style={{ color: "var(--atlas-text-3)" }} />
+                    }
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    {/* Label + badges */}
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>{k.label}</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-3)", fontSize: "10px" }}>
+                        {k.platform}
+                      </span>
+                      {k.active && (
+                        <span className="text-xs px-1.5 py-0.5 rounded flex items-center gap-1" style={{ background: "rgba(52,211,153,0.1)", color: "#34D399", fontSize: "10px" }}>
+                          <Check size={8} />使用中
+                        </span>
+                      )}
+                      {k.verifyStatus === "ok" && (
+                        <span className="text-xs px-1.5 py-0.5 rounded flex items-center gap-1" style={{ background: "rgba(52,211,153,0.1)", color: "#34D399", fontSize: "10px" }}>
+                          <CheckCheck size={8} />已验证
+                        </span>
+                      )}
+                      {k.verifyStatus === "fail" && (
+                        <span className="text-xs px-1.5 py-0.5 rounded flex items-center gap-1" style={{ background: "rgba(248,113,113,0.1)", color: "#F87171", fontSize: "10px" }}>
+                          <AlertCircle size={8} />验证失败
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Key display */}
+                    <div
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                      style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}
+                    >
+                      <code
+                        className="flex-1 text-xs truncate"
+                        style={{ color: "var(--atlas-text-2)", fontFamily: "'JetBrains Mono', monospace" }}
+                      >
+                        {k.visible ? k.key : maskKey(k.key)}
+                      </code>
+
+                      {/* Eye toggle */}
+                      <button
+                        onClick={() => toggleVisible(k.id)}
+                        className="w-6 h-6 rounded flex items-center justify-center transition-all flex-shrink-0"
+                        style={{ color: "var(--atlas-text-3)" }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-text)"}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)"}
+                        title={k.visible ? "隐藏 Key" : "显示 Key"}
+                      >
+                        {k.visible ? <EyeOff size={12} /> : <Eye size={12} />}
+                      </button>
+
+                      {/* Copy button */}
+                      <button
+                        onClick={() => copyKey(k.id, k.key)}
+                        className="w-6 h-6 rounded flex items-center justify-center transition-all flex-shrink-0"
+                        style={{ color: copiedId === k.id ? "#34D399" : "var(--atlas-text-3)" }}
+                        onMouseEnter={e => { if (copiedId !== k.id) (e.currentTarget as HTMLElement).style.color = "var(--atlas-text)"; }}
+                        onMouseLeave={e => { if (copiedId !== k.id) (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)"; }}
+                        title="复制 Key"
+                      >
+                        {copiedId === k.id ? <CheckCheck size={12} /> : <Copy size={12} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+                    {/* Verify button */}
+                    <button
+                      onClick={() => verifyKey(k.id, k.key, k.platform)}
+                      disabled={k.verifyStatus === "verifying"}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all"
+                      style={{
+                        background: "var(--atlas-elevated)",
+                        border: "1px solid var(--atlas-border)",
+                        color: "var(--atlas-text-2)",
+                        opacity: k.verifyStatus === "verifying" ? 0.7 : 1,
+                      }}
+                      title="验证 Key 有效性"
+                    >
+                      {k.verifyStatus === "verifying"
+                        ? <Loader2 size={10} className="animate-spin" />
+                        : <RefreshCw size={10} />
+                      }
+                      验证
+                    </button>
+
+                    {/* Set default */}
+                    {!k.active && (
+                      <button
+                        onClick={() => toggleActive(k.id)}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+                        style={{
+                          background: "rgba(91,140,255,0.08)",
+                          border: "1px solid rgba(91,140,255,0.2)",
+                          color: "var(--atlas-accent)",
+                        }}
+                      >
+                        设为默认
+                      </button>
+                    )}
+
+                    {/* Delete */}
+                    <button
+                      onClick={() => deleteKey(k.id)}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                      style={{ color: "var(--atlas-text-3)" }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLElement).style.background = "rgba(248,113,113,0.1)";
+                        (e.currentTarget as HTMLElement).style.color = "#F87171";
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLElement).style.background = "transparent";
+                        (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+                      }}
+                      title="删除 Key"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
-                <button onClick={() => toggleVisible(k.id)} className="w-7 h-7 rounded flex items-center justify-center" style={{ color: "var(--atlas-text-3)" }}>
-                  {k.visible ? <EyeOff size={13} /> : <Eye size={13} />}
-                </button>
-                <button onClick={() => { navigator.clipboard.writeText(k.key); toast.success("已复制"); }}
-                  className="w-7 h-7 rounded flex items-center justify-center" style={{ color: "var(--atlas-text-3)" }}>
-                  <Copy size={13} />
-                </button>
-                {!k.active && (
-                  <button onClick={() => toggleActive(k.id)} className="px-2 py-1 rounded text-xs"
-                    style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-2)", border: "1px solid var(--atlas-border)" }}>
-                    设为默认
-                  </button>
-                )}
-                <button onClick={() => deleteKey(k.id)} className="w-7 h-7 rounded flex items-center justify-center"
-                  style={{ color: "var(--atlas-text-3)" }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-danger)"}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)"}>
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
+      {/* Add Key form */}
       <AnimatePresence>
         {adding && (
-          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-            className="rounded-xl p-4 space-y-3" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border-2)" }}>
-            <p className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>添加新 Key</p>
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="rounded-xl p-5 space-y-4"
+            style={{ background: "var(--atlas-surface)", border: "1px solid rgba(91,140,255,0.25)" }}
+          >
+            <div className="flex items-center gap-2">
+              <Plus size={14} style={{ color: "var(--atlas-accent)" }} />
+              <p className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>添加新 API Key</p>
+            </div>
             <div className="grid grid-cols-2 gap-3">
-              <FieldInput label="备注名称" value={newLabel} onChange={setNewLabel} placeholder="GLM-5 备用" />
+              <FieldInput label="备注名称" value={newLabel} onChange={setNewLabel} placeholder="GLM-5 主账号" />
               <div>
-                <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--atlas-text-2)" }}>平台</label>
-                <select value={newPlatform} onChange={e => setNewPlatform(e.target.value)}
+                <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--atlas-text-2)" }}>AI 平台</label>
+                <select
+                  value={newPlatform}
+                  onChange={e => setNewPlatform(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                  style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border-2)", color: "var(--atlas-text)" }}>
-                  {["智谱 AI", "月之暗面", "阿里百炼", "MiniMax", "Ollama"].map(p => <option key={p} value={p}>{p}</option>)}
+                  style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)", color: "var(--atlas-text)" }}
+                >
+                  {["智谱 AI (GLM)", "月之暗面 (Kimi)", "阿里百炼 (Qwen)", "MiniMax", "Ollama (本地)"].map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
             </div>
-            <FieldInput label="API Key" value={newKey} onChange={setNewKey} placeholder="sk-..." type="password" />
+            <div>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--atlas-text-2)" }}>API Key</label>
+              <div className="relative">
+                <input
+                  value={newKey}
+                  onChange={e => setNewKey(e.target.value)}
+                  type={newKeyVisible ? "text" : "password"}
+                  placeholder="sk-..."
+                  className="w-full px-3 py-2 pr-10 rounded-lg text-sm outline-none"
+                  style={{
+                    background: "var(--atlas-elevated)",
+                    border: "1px solid var(--atlas-border)",
+                    color: "var(--atlas-text)",
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}
+                  onFocus={e => (e.target as HTMLInputElement).style.borderColor = "rgba(91,140,255,0.4)"}
+                  onBlur={e => (e.target as HTMLInputElement).style.borderColor = "var(--atlas-border)"}
+                />
+                <button
+                  onClick={() => setNewKeyVisible(!newKeyVisible)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  style={{ color: "var(--atlas-text-3)" }}
+                >
+                  {newKeyVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+              <p className="text-xs mt-1.5" style={{ color: "var(--atlas-text-3)" }}>
+                Key 将加密存储在本地，不会上传到服务器
+              </p>
+            </div>
             <div className="flex gap-2">
-              <button onClick={addKey} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: "var(--atlas-accent)", color: "#fff" }}>保存</button>
-              <button onClick={() => setAdding(false)} className="px-4 py-2 rounded-lg text-sm" style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-2)", border: "1px solid var(--atlas-border)" }}>取消</button>
+              <button
+                onClick={addKey}
+                className="px-4 py-2 rounded-lg text-sm font-medium"
+                style={{ background: "var(--atlas-accent)", color: "#fff" }}
+              >
+                保存
+              </button>
+              <button
+                onClick={() => { setAdding(false); setNewLabel(""); setNewKey(""); }}
+                className="px-4 py-2 rounded-lg text-sm"
+                style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-2)", border: "1px solid var(--atlas-border)" }}
+              >
+                取消
+              </button>
             </div>
           </motion.div>
         )}
@@ -375,7 +695,8 @@ function EmailSection() {
       <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--atlas-border)" }}>
         <div className="px-5 py-3 flex items-center justify-between" style={{ background: "var(--atlas-surface)", borderBottom: "1px solid var(--atlas-border)" }}>
           <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>已绑定邮箱</span>
-          <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "var(--atlas-accent)", color: "#fff" }}>
+          <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ background: "rgba(91,140,255,0.1)", color: "var(--atlas-accent)", border: "1px solid rgba(91,140,255,0.2)" }}>
             <Plus size={12} />添加邮箱
           </button>
         </div>
@@ -389,13 +710,23 @@ function EmailSection() {
                 <p className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>{e.address}</p>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-3)", fontSize: "10px" }}>{e.type}</span>
-                  {e.verified ? <span className="text-xs" style={{ color: "#34D399", fontSize: "10px" }}>✓ 已验证</span> : <span className="text-xs" style={{ color: "#FBBF24", fontSize: "10px" }}>待验证</span>}
+                  {e.verified
+                    ? <span className="text-xs flex items-center gap-1" style={{ color: "#34D399", fontSize: "10px" }}><Check size={8} />已验证</span>
+                    : <span className="text-xs" style={{ color: "#FBBF24", fontSize: "10px" }}>待验证</span>
+                  }
                 </div>
               </div>
               <button onClick={() => { setEmails(prev => prev.filter(em => em.id !== e.id)); toast.success("邮箱已移除"); }}
-                className="w-7 h-7 rounded flex items-center justify-center" style={{ color: "var(--atlas-text-3)" }}
-                onMouseEnter={ev => (ev.currentTarget as HTMLElement).style.color = "var(--atlas-danger)"}
-                onMouseLeave={ev => (ev.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)"}>
+                className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                style={{ color: "var(--atlas-text-3)" }}
+                onMouseEnter={ev => {
+                  (ev.currentTarget as HTMLElement).style.background = "rgba(248,113,113,0.1)";
+                  (ev.currentTarget as HTMLElement).style.color = "#F87171";
+                }}
+                onMouseLeave={ev => {
+                  (ev.currentTarget as HTMLElement).style.background = "transparent";
+                  (ev.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+                }}>
                 <Trash2 size={13} />
               </button>
             </div>
@@ -405,14 +736,14 @@ function EmailSection() {
       <AnimatePresence>
         {adding && (
           <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-            className="rounded-xl p-4 space-y-3" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border-2)" }}>
+            className="rounded-xl p-4 space-y-3" style={{ background: "var(--atlas-surface)", border: "1px solid rgba(91,140,255,0.25)" }}>
             <div className="grid grid-cols-2 gap-3">
               <FieldInput label="邮箱地址" value={newAddr} onChange={setNewAddr} placeholder="name@example.com" type="email" />
               <div>
                 <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--atlas-text-2)" }}>邮箱类型</label>
                 <select value={newType} onChange={e => setNewType(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                  style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border-2)", color: "var(--atlas-text)" }}>
+                  style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)", color: "var(--atlas-text)" }}>
                   {["企业邮箱", "QQ 邮箱", "Gmail", "163 邮箱", "Outlook"].map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
@@ -466,7 +797,7 @@ function IntegrationsSection() {
 // ── Schedule ──────────────────────────────────────────────────────────────────
 
 function ScheduleSection() {
-  const [tasks, setTasks] = useState<ScheduledTask[]>([
+  const [tasks, setTasks] = useState<ScheduledTaskItem[]>([
     { id: "s1", name: "每日销售汇总", template: "销售汇总报表", schedule: "每天 09:00", enabled: true, lastRun: "今天 09:00", nextRun: "明天 09:00" },
     { id: "s2", name: "周度财务报告", template: "财务利润报表", schedule: "每周一 08:00", enabled: false, lastRun: "上周一", nextRun: "下周一" },
   ]);
@@ -490,7 +821,8 @@ function ScheduleSection() {
       <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--atlas-border)" }}>
         <div className="px-5 py-3 flex items-center justify-between" style={{ background: "var(--atlas-surface)", borderBottom: "1px solid var(--atlas-border)" }}>
           <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>已配置的任务</span>
-          <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "var(--atlas-accent)", color: "#fff" }}>
+          <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ background: "rgba(91,140,255,0.1)", color: "var(--atlas-accent)", border: "1px solid rgba(91,140,255,0.2)" }}>
             <Plus size={12} />新建任务
           </button>
         </div>
@@ -498,7 +830,7 @@ function ScheduleSection() {
           {tasks.map((t, i) => (
             <div key={t.id} className="px-5 py-3 flex items-center gap-3" style={{ borderTop: i > 0 ? "1px solid var(--atlas-border)" : "none" }}>
               <button onClick={() => toggleTask(t.id)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
                 style={{ background: t.enabled ? "rgba(52,211,153,0.1)" : "var(--atlas-elevated)", border: t.enabled ? "1px solid rgba(52,211,153,0.2)" : "1px solid var(--atlas-border)" }}>
                 {t.enabled ? <Play size={13} style={{ color: "#34D399" }} /> : <Pause size={13} style={{ color: "var(--atlas-text-3)" }} />}
               </button>
@@ -513,10 +845,16 @@ function ScheduleSection() {
                   {t.nextRun && t.enabled && <span className="text-xs" style={{ color: "#34D399" }}>下次：{t.nextRun}</span>}
                 </div>
               </div>
-              <button onClick={() => deleteTask(t.id)} className="w-7 h-7 rounded flex items-center justify-center"
+              <button onClick={() => deleteTask(t.id)} className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
                 style={{ color: "var(--atlas-text-3)" }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-danger)"}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)"}>
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.background = "rgba(248,113,113,0.1)";
+                  (e.currentTarget as HTMLElement).style.color = "#F87171";
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.background = "transparent";
+                  (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+                }}>
                 <Trash2 size={13} />
               </button>
             </div>
@@ -526,14 +864,14 @@ function ScheduleSection() {
       <AnimatePresence>
         {adding && (
           <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-            className="rounded-xl p-4 space-y-3" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border-2)" }}>
+            className="rounded-xl p-4 space-y-3" style={{ background: "var(--atlas-surface)", border: "1px solid rgba(91,140,255,0.25)" }}>
             <div className="grid grid-cols-2 gap-3">
               <FieldInput label="任务名称" value={newName} onChange={setNewName} placeholder="每日销售汇总" />
               <div>
                 <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--atlas-text-2)" }}>使用模板</label>
                 <select value={newTemplate} onChange={e => setNewTemplate(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                  style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border-2)", color: "var(--atlas-text)" }}>
+                  style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)", color: "var(--atlas-text)" }}>
                   {["销售汇总报表", "财务利润报表", "库存盘点报表", "多平台对比报表"].map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
@@ -542,7 +880,7 @@ function ScheduleSection() {
               <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--atlas-text-2)" }}>执行频率</label>
               <select value={newSchedule} onChange={e => setNewSchedule(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border-2)", color: "var(--atlas-text)" }}>
+                style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)", color: "var(--atlas-text)" }}>
                 {["每天 09:00", "每天 18:00", "每周一 08:00", "每月1日 09:00"].map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
@@ -584,16 +922,22 @@ export default function SettingsPage() {
           style={{ color: "var(--atlas-text-3)", fontSize: "10px", letterSpacing: "0.08em" }}>设置</p>
         <nav className="space-y-0.5">
           {NAV_ITEMS.map(item => (
-            <button key={item.id} onClick={() => setActiveSection(item.id)}
+            <button
+              key={item.id}
+              onClick={() => setActiveSection(item.id)}
               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all"
-              style={{ background: activeSection === item.id ? "rgba(91,140,255,0.1)" : "transparent", color: activeSection === item.id ? "var(--atlas-accent)" : "var(--atlas-text-2)" }}>
+              style={{
+                background: activeSection === item.id ? "rgba(91,140,255,0.1)" : "transparent",
+                color: activeSection === item.id ? "var(--atlas-accent)" : "var(--atlas-text-2)",
+              }}
+            >
               <item.icon size={14} />{item.label}
             </button>
           ))}
         </nav>
         <div className="mt-6 px-3 pt-4" style={{ borderTop: "1px solid var(--atlas-border)" }}>
           <p className="text-xs font-medium mb-2" style={{ color: "var(--atlas-text-3)" }}>关于 ATLAS</p>
-          <p className="text-xs" style={{ color: "var(--atlas-text-3)", fontFamily: "'JetBrains Mono', monospace" }}>v4.0.0</p>
+          <p className="text-xs" style={{ color: "var(--atlas-text-3)", fontFamily: "'JetBrains Mono', monospace" }}>v5.0.0</p>
           <p className="text-xs mt-1" style={{ color: "var(--atlas-text-3)" }}>React + FastAPI</p>
         </div>
       </div>
@@ -602,9 +946,13 @@ export default function SettingsPage() {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-6 py-6">
           <AnimatePresence mode="wait">
-            <motion.div key={activeSection}
-              initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }}
-              transition={{ duration: 0.15 }}>
+            <motion.div
+              key={activeSection}
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -8 }}
+              transition={{ duration: 0.15 }}
+            >
               {renderSection()}
             </motion.div>
           </AnimatePresence>

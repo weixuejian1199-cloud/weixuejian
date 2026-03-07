@@ -4,7 +4,7 @@
  */
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 
-export type NavItem = "home" | "dashboard" | "templates" | "settings";
+export type NavItem = "home" | "dashboard" | "templates" | "settings" | "search" | "library";
 export type Theme = "dark" | "light";
 
 // ── Types ──────────────────────────────────────────────────────────────────

@@ -1,7 +1,8 @@
 /**
- * ATLAS V4.0 — App Root
+ * ATLAS V5.0 — App Root
  * Layout: Sidebar (collapsible) + Main Content
  * Theme: Dark (cold black) / Light (Manus white) switchable
+ * Nav: home / dashboard / templates / search / library / settings
  */
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,7 +15,8 @@ import MainWorkspace from "./pages/MainWorkspace";
 import DashboardPage from "./pages/DashboardPage";
 import TemplatesPage from "./pages/TemplatesPage";
 import SettingsPage from "./pages/SettingsPage";
-import NotFound from "./pages/NotFound";
+import SearchPage from "./pages/SearchPage";
+import LibraryPage from "./pages/LibraryPage";
 
 function AppContent() {
   const { activeNav, theme, showLoginModal } = useAtlas();
@@ -24,6 +26,8 @@ function AppContent() {
       case "dashboard":  return <DashboardPage />;
       case "templates":  return <TemplatesPage />;
       case "settings":   return <SettingsPage />;
+      case "search":     return <SearchPage />;
+      case "library":    return <LibraryPage />;
       case "home":
       default:           return <MainWorkspace />;
     }
