@@ -236,7 +236,7 @@ function AppearanceSection() {
         <div className="grid grid-cols-2 gap-3">
           {[
             { id: "dark", label: "深色", desc: "ATLAS 冷黑风格", icon: Moon },
-            { id: "light", label: "浅色", desc: "Manus 白灰风格", icon: Sun },
+            { id: "light", label: "浅色", desc: "ATLAS 白灰风格", icon: Sun },
           ].map(t => (
             <button key={t.id} onClick={() => setTheme(t.id as any)}
               className="flex items-center gap-3 p-4 rounded-xl transition-all"
