@@ -7,7 +7,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
   createSession, updateSession, getSession, getUserSessions, deleteSession,
-  createReport, updateReport, getReport, getUserReports,
+  createReport, updateReport, getReport, getUserReports, deleteReport,
   createScheduledTask, updateScheduledTask, getUserScheduledTasks, deleteScheduledTask,
   ensureInviteCode, redeemInviteCode, getInviteStats, getUserCredits,
 } from "./db";
@@ -186,6 +186,17 @@ export const appRouter = router({
           throw new TRPCError({ code: "NOT_FOUND" });
         }
         await updateReport(input.id, { status: "failed" });
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const report = await getReport(input.id);
+        if (!report || report.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "NOT_FOUND" });
+        }
+        await deleteReport(input.id);
         return { success: true };
       }),
   }),

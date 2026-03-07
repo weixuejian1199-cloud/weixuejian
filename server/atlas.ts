@@ -1,11 +1,17 @@
 /**
- * ATLAS Core API Routes
+ * ATLAS Core API Routes  (V7.1 — Persistent Sessions)
  * ─────────────────────────────────────────────────────────────────
  * Endpoints:
  *   POST /api/atlas/upload      — Upload Excel/CSV → S3 → parse → AI analysis
  *   POST /api/atlas/chat        — Streaming AI chat about uploaded data
  *   POST /api/atlas/generate-report — Generate Excel report → S3 → download URL
  *   GET  /api/atlas/download/:reportId — Redirect to S3 download URL
+ *
+ * Persistence strategy:
+ *   - Parsed data rows → stored as JSON in S3 (atlas-data/<sessionId>-data.json)
+ *   - dfInfo + fileKey → stored in sessions table (dfInfo JSON column)
+ *   - Reports → stored in reports table (fileKey + fileUrl columns)
+ *   - No in-memory stores → survives server restarts
  */
 
 import type { Express, Request, Response } from "express";
@@ -18,6 +24,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { ENV } from "./_core/env";
 import { createPatchedFetch } from "./_core/patchedFetch";
 import { storagePut, storageGet } from "./storage";
+import { getSession, createSession, updateSession, createReport, updateReport, getReport } from "./db";
 
 // ── LLM Provider ──────────────────────────────────────────────────────────────
 
@@ -131,17 +138,26 @@ function buildDataFrameInfo(data: Record<string, unknown>[], sheetNames?: string
   };
 }
 
-// ── In-memory session store (cleared on server restart) ───────────────────────
-// For production, store data in Redis or DB. Here we keep parsed data in memory
-// so AI can reference it during the session.
+// ── Persistent session helpers ────────────────────────────────────────────────
+// Parsed data rows are stored in S3 as JSON; dfInfo is stored in sessions.dfInfo column.
+// This survives server restarts.
 
-const sessionDataStore = new Map<string, {
-  data: Record<string, unknown>[];
-  dfInfo: DataFrameInfo;
-  filename: string;
-  fileKey: string;
-  fileUrl: string;
-}>();
+const DATA_KEY = (sessionId: string) => `atlas-data/${sessionId}-data.json`;
+
+async function storeSessionData(sessionId: string, data: Record<string, unknown>[]): Promise<void> {
+  await storagePut(DATA_KEY(sessionId), JSON.stringify(data), "application/json");
+}
+
+async function loadSessionData(sessionId: string): Promise<Record<string, unknown>[] | null> {
+  try {
+    const { url } = await storageGet(DATA_KEY(sessionId));
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await res.json() as Record<string, unknown>[];
+  } catch {
+    return null;
+  }
+}
 
 // ── Register routes ───────────────────────────────────────────────────────────
 
@@ -161,7 +177,7 @@ export function registerAtlasRoutes(app: Express) {
       const sessionId = nanoid();
       const fileKey = `atlas-uploads/${sessionId}-${Date.now()}.${ext}`;
 
-      // 1. Upload to S3
+      // 1. Upload original file to S3
       const { url: fileUrl } = await storagePut(fileKey, buffer, mimetype);
 
       // 2. Parse data
@@ -177,10 +193,26 @@ export function registerAtlasRoutes(app: Express) {
 
       const dfInfo = buildDataFrameInfo(data, sheetNames);
 
-      // 3. Store in memory for AI chat
-      sessionDataStore.set(sessionId, { data, dfInfo, filename: originalname, fileKey, fileUrl });
+      // 3. Persist parsed data to S3 (for AI chat — survives restarts)
+      await storeSessionData(sessionId, data);
 
-      // 4. AI analysis (non-streaming, fast summary)
+      // 4. Create session record in DB (dfInfo stored in JSON column)
+      await createSession({
+        id: sessionId,
+        userId: (req as any).userId || 0, // userId injected by auth middleware if available
+        filename: fileKey,
+        originalName: originalname,
+        fileKey,
+        fileUrl,
+        fileSizeKb: Math.ceil(buffer.length / 1024),
+        rowCount: dfInfo.row_count,
+        colCount: dfInfo.col_count,
+        dfInfo: dfInfo as any,
+        isMerged: 0,
+        status: "ready",
+      });
+
+      // 5. AI analysis (non-streaming, fast summary)
       const openai = createLLM();
       const fieldSummary = dfInfo.fields.slice(0, 15).map(f =>
         `${f.name}(${f.type}, ${f.unique_count}个唯一值, 示例:${f.sample.slice(0, 3).join("/")})`
@@ -236,16 +268,30 @@ export function registerAtlasRoutes(app: Express) {
         return;
       }
 
-      const session = sessionDataStore.get(session_id);
-      if (!session) {
-        res.status(404).json({ error: "Session not found or expired. Please re-upload the file." });
+      // Load session from DB
+      const sessionRecord = await getSession(session_id);
+      if (!sessionRecord) {
+        res.status(404).json({ error: "Session not found. Please re-upload the file." });
         return;
       }
 
-      const { dfInfo, filename, data } = session;
+      const dfInfo = sessionRecord.dfInfo as DataFrameInfo | null;
+      const filename = sessionRecord.originalName;
+
+      if (!dfInfo) {
+        res.status(404).json({ error: "Session data not found. Please re-upload the file." });
+        return;
+      }
+
+      // Load parsed data from S3
+      const data = await loadSessionData(session_id);
+      if (!data) {
+        res.status(404).json({ error: "Session data expired. Please re-upload the file." });
+        return;
+      }
 
       // Build data context for AI
-      const fieldSummary = dfInfo.fields.slice(0, 20).map(f =>
+      const fieldSummary = dfInfo.fields.slice(0, 20).map((f: FieldInfo) =>
         `- ${f.name}: ${f.type}类型, ${dfInfo.row_count}行, ${f.null_count}个空值, 示例值: ${f.sample.slice(0, 3).join(", ")}`
       ).join("\n");
 
@@ -307,17 +353,31 @@ ${sampleRows}
         return;
       }
 
-      const session = sessionDataStore.get(session_id);
-      if (!session) {
-        res.status(404).json({ error: "Session not found or expired. Please re-upload the file." });
+      // Load session from DB
+      const sessionRecord = await getSession(session_id);
+      if (!sessionRecord) {
+        res.status(404).json({ error: "Session not found. Please re-upload the file." });
         return;
       }
 
-      const { dfInfo, filename, data } = session;
+      const dfInfo = sessionRecord.dfInfo as DataFrameInfo | null;
+      const filename = sessionRecord.originalName;
+
+      if (!dfInfo) {
+        res.status(404).json({ error: "Session data not found. Please re-upload the file." });
+        return;
+      }
+
+      // Load parsed data from S3
+      const data = await loadSessionData(session_id);
+      if (!data) {
+        res.status(404).json({ error: "Session data expired. Please re-upload the file." });
+        return;
+      }
 
       // 1. Ask AI to generate the report data as JSON
       const openai = createLLM();
-      const fieldNames = dfInfo.fields.map(f => f.name).join(", ");
+      const fieldNames = dfInfo.fields.map((f: FieldInfo) => f.name).join(", ");
       const sampleRows = JSON.stringify(data.slice(0, 20), null, 2);
 
       const aiPrompt = `你是数据分析专家。根据以下数据和需求，生成一份报表数据。
@@ -378,8 +438,8 @@ ${sampleRows}
       } catch (e) {
         console.warn("[Atlas] AI report generation failed, using fallback:", e);
         // Fallback: create a simple summary sheet
-        const headers = dfInfo.fields.map(f => f.name);
-        const rows = data.slice(0, 30).map(row => headers.map(h => row[h] ?? ""));
+        const headers = dfInfo.fields.map((f: FieldInfo) => f.name);
+        const rows = data.slice(0, 30).map(row => headers.map((h: string) => row[h] ?? ""));
         reportData = {
           title: report_title || requirement.slice(0, 30),
           sheets: [{
@@ -420,8 +480,21 @@ ${sampleRows}
       const reportKey = `atlas-reports/${reportId}-${safeTitle}.xlsx`;
       const { url: reportUrl } = await storagePut(reportKey, excelBuffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
-      // 4. Store report metadata in memory (for download redirect)
-      reportStore.set(reportId, { key: reportKey, url: reportUrl, filename: `${safeTitle}.xlsx` });
+      // 4. Persist report to DB (replaces in-memory reportStore)
+      const userId = (req as any).userId || 0;
+      await createReport({
+        id: reportId,
+        sessionId: session_id,
+        userId,
+        title: reportData.title || safeTitle,
+        filename: `${safeTitle}.xlsx`,
+        fileKey: reportKey,
+        fileUrl: reportUrl,
+        fileSizeKb: Math.ceil(excelBuffer.length / 1024),
+        prompt: requirement,
+        status: "completed",
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      });
 
       const aiMessage = `✅ **${reportData.title}** 已生成完毕！\n\n${reportData.insights}\n\n报表包含 ${reportData.sheets.length} 个工作表：${reportData.sheets.map(s => s.name).join("、")}。`;
 
@@ -447,13 +520,14 @@ ${sampleRows}
   app.get("/api/atlas/download/:reportId", async (req: Request, res: Response) => {
     try {
       const { reportId } = req.params;
-      const report = reportStore.get(reportId);
-      if (!report) {
+      // Load from DB instead of in-memory store
+      const report = await getReport(reportId);
+      if (!report || !report.fileKey) {
         res.status(404).json({ error: "Report not found or expired" });
         return;
       }
       // Get fresh presigned URL from S3
-      const { url } = await storageGet(report.key);
+      const { url } = await storageGet(report.fileKey);
       res.redirect(url);
     } catch (err: any) {
       console.error("[Atlas] Download error:", err);
@@ -461,6 +535,3 @@ ${sampleRows}
     }
   });
 }
-
-// ── In-memory report store ────────────────────────────────────────────────────
-const reportStore = new Map<string, { key: string; url: string; filename: string }>();

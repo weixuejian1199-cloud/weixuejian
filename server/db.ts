@@ -158,6 +158,12 @@ export async function getUserReports(userId: number) {
     .orderBy(reports.createdAt);
 }
 
+export async function deleteReport(id: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(reports).where(eq(reports.id, id));
+}
+
 /** Delete expired reports and return their S3 keys for cleanup */
 export async function deleteExpiredReports() {
   const db = await getDb();
