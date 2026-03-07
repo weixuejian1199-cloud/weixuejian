@@ -330,7 +330,7 @@ export default function MainWorkspace() {
 
           {/* Quick action buttons: Finance / Sales / Attendance / Payslip */}
           {messages.length === 0 && (
-            <div className="flex flex-wrap gap-2 mb-3">
+            <div className="flex flex-wrap gap-2 mb-3 justify-center">
               {PINNED_TEMPLATES.map(t => (
                 <button
                   key={t.id}
