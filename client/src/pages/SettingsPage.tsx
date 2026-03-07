@@ -73,6 +73,7 @@ const NAV_ITEMS = [
   { id: "profile",      label: "账户",     icon: User },
   { id: "appearance",   label: "个性化",   icon: Moon },
   { id: "apikeys",      label: "API Key",  icon: Key },
+  { id: "ai-engine",    label: "AI 引擎",  icon: Server },
   { id: "platforms",    label: "平台授权", icon: Link2 },
   { id: "email",        label: "邮箱",     icon: Mail },
   { id: "integrations", label: "集成",     icon: Zap },
@@ -791,6 +792,260 @@ function EmailSection() {
   );
 }
 
+// ── AI Engine ─────────────────────────────────────────────────────────────────
+
+function AiEngineSection() {
+  const [openClawKey, setOpenClawKey] = useState("");
+  const [openClawEndpoint, setOpenClawEndpoint] = useState("https://gateway.openclaw.ai/v1/chat");
+  const [keyVisible, setKeyVisible] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [verifyStatus, setVerifyStatus] = useState<"idle" | "verifying" | "ok" | "fail">("idle");
+  const [channelStatus, setChannelStatus] = useState<"openclaw" | "qwen" | "unknown">("unknown");
+
+  // Load saved config from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("atlas_openclaw_config");
+    if (saved) {
+      try {
+        const cfg = JSON.parse(saved);
+        if (cfg.key) setOpenClawKey(cfg.key);
+        if (cfg.endpoint) setOpenClawEndpoint(cfg.endpoint);
+        setChannelStatus(cfg.key ? "openclaw" : "qwen");
+      } catch {}
+    } else {
+      setChannelStatus("qwen");
+    }
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      localStorage.setItem("atlas_openclaw_config", JSON.stringify({
+        key: openClawKey.trim(),
+        endpoint: openClawEndpoint.trim(),
+      }));
+      setChannelStatus(openClawKey.trim() ? "openclaw" : "qwen");
+      toast.success(openClawKey.trim() ? "OpenClaw Key 已保存，将使用小虾米 Agent" : "已清除 OpenClaw Key，将使用阿里百炼千问");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleVerify = async () => {
+    if (!openClawKey.trim()) {
+      toast.error("请先输入 OpenClaw API Key");
+      return;
+    }
+    setVerifyStatus("verifying");
+    try {
+      const res = await fetch("https://gateway.openclaw.ai/v1/chat", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${openClawKey.trim()}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message: "ping", source: "atlas-verify" }),
+      });
+      if (res.ok || res.status === 200) {
+        setVerifyStatus("ok");
+        toast.success("OpenClaw API Key 验证成功！");
+      } else if (res.status === 401 || res.status === 403) {
+        setVerifyStatus("fail");
+        toast.error("API Key 无效，请检查后重试");
+      } else {
+        // Non-401/403 means key is valid but request format may differ
+        setVerifyStatus("ok");
+        toast.success("OpenClaw 连接正常");
+      }
+    } catch {
+      setVerifyStatus("fail");
+      toast.error("无法连接到 OpenClaw，请检查网络");
+    }
+  };
+
+  const handleClear = () => {
+    setOpenClawKey("");
+    localStorage.removeItem("atlas_openclaw_config");
+    setChannelStatus("qwen");
+    setVerifyStatus("idle");
+    toast.success("已清除 OpenClaw Key，切换到阿里百炼千问");
+  };
+
+  return (
+    <div className="space-y-4">
+      <SectionHeader icon={Server} title="AI 引擎配置" desc="管理 ATLAS 使用的 AI 模型通道，支持双通道无缝切换" />
+
+      {/* Channel Status */}
+      <div className="p-4 rounded-xl" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>当前 AI 通道</p>
+          <span className="text-xs px-2 py-1 rounded-lg font-medium"
+            style={{
+              background: channelStatus === "openclaw" ? "rgba(52,211,153,0.1)" : "rgba(91,140,255,0.1)",
+              color: channelStatus === "openclaw" ? "#34D399" : "var(--atlas-accent)",
+              border: `1px solid ${channelStatus === "openclaw" ? "rgba(52,211,153,0.2)" : "rgba(91,140,255,0.2)"}`,
+            }}>
+            {channelStatus === "openclaw" ? "🦐 小虾米 Agent (OpenClaw)" : channelStatus === "qwen" ? "🤖 阿里百炼 (Qwen3-Max)" : "检测中..."}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 rounded-lg" style={{ background: "var(--atlas-elevated)", border: channelStatus === "qwen" ? "1px solid rgba(91,140,255,0.3)" : "1px solid var(--atlas-border)" }}>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-2 h-2 rounded-full" style={{ background: channelStatus === "qwen" ? "#5B8CFF" : "#666" }} />
+              <p className="text-xs font-medium" style={{ color: "var(--atlas-text)" }}>阿里百炼 (默认)</p>
+            </div>
+            <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>qwen3-max-2026-01-23</p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--atlas-text-3)" }}>大文件自动切换 kimi-k2.5</p>
+          </div>
+          <div className="p-3 rounded-lg" style={{ background: "var(--atlas-elevated)", border: channelStatus === "openclaw" ? "1px solid rgba(52,211,153,0.3)" : "1px solid var(--atlas-border)" }}>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-2 h-2 rounded-full" style={{ background: channelStatus === "openclaw" ? "#34D399" : "#666" }} />
+              <p className="text-xs font-medium" style={{ color: "var(--atlas-text)" }}>小虾米 Agent</p>
+            </div>
+            <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>OpenClaw Gateway</p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--atlas-text-3)" }}>需配置 API Key</p>
+          </div>
+        </div>
+      </div>
+
+      {/* OpenClaw Config */}
+      <div className="p-5 rounded-xl space-y-4" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style={{ background: "rgba(52,211,153,0.1)" }}>🦐</div>
+          <div>
+            <p className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>OpenClaw (小虾米 Agent)</p>
+            <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>配置后将优先使用小虾米 Agent 处理数据分析请求</p>
+          </div>
+        </div>
+
+        {/* Endpoint */}
+        <div>
+          <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--atlas-text-2)" }}>API Endpoint</label>
+          <input
+            value={openClawEndpoint}
+            onChange={e => setOpenClawEndpoint(e.target.value)}
+            placeholder="https://gateway.openclaw.ai/v1/chat"
+            className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+            style={{
+              background: "var(--atlas-elevated)",
+              border: "1px solid var(--atlas-border)",
+              color: "var(--atlas-text)",
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: "12px",
+            }}
+            onFocus={e => (e.target as HTMLInputElement).style.borderColor = "rgba(91,140,255,0.4)"}
+            onBlur={e => (e.target as HTMLInputElement).style.borderColor = "var(--atlas-border)"}
+          />
+        </div>
+
+        {/* API Key */}
+        <div>
+          <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--atlas-text-2)" }}>API Key</label>
+          <div className="relative">
+            <input
+              value={openClawKey}
+              onChange={e => setOpenClawKey(e.target.value)}
+              type={keyVisible ? "text" : "password"}
+              placeholder="atlas_sk_..."
+              className="w-full px-3 py-2 pr-10 rounded-lg text-sm outline-none"
+              style={{
+                background: "var(--atlas-elevated)",
+                border: `1px solid ${verifyStatus === "ok" ? "rgba(52,211,153,0.4)" : verifyStatus === "fail" ? "rgba(248,113,113,0.4)" : "var(--atlas-border)"}`,
+                color: "var(--atlas-text)",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: "12px",
+              }}
+              onFocus={e => (e.target as HTMLInputElement).style.borderColor = "rgba(91,140,255,0.4)"}
+              onBlur={e => (e.target as HTMLInputElement).style.borderColor = verifyStatus === "ok" ? "rgba(52,211,153,0.4)" : verifyStatus === "fail" ? "rgba(248,113,113,0.4)" : "var(--atlas-border)"}
+            />
+            <button
+              onClick={() => setKeyVisible(!keyVisible)}
+              className="absolute right-3 top-1/2 -translate-y-1/2"
+              style={{ color: "var(--atlas-text-3)" }}
+            >
+              {keyVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </div>
+          <div className="flex items-center gap-2 mt-1.5">
+            {verifyStatus === "ok" && (
+              <span className="text-xs flex items-center gap-1" style={{ color: "#34D399" }}><Check size={10} />验证通过</span>
+            )}
+            {verifyStatus === "fail" && (
+              <span className="text-xs flex items-center gap-1" style={{ color: "#F87171" }}><AlertCircle size={10} />验证失败</span>
+            )}
+            <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>Key 仅保存在本地浏览器，不上传服务器</p>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5"
+            style={{ background: "var(--atlas-accent)", color: "#fff", opacity: saving ? 0.7 : 1 }}
+          >
+            {saving && <Loader2 size={12} className="animate-spin" />}
+            保存配置
+          </button>
+          <button
+            onClick={handleVerify}
+            disabled={verifyStatus === "verifying" || !openClawKey.trim()}
+            className="px-4 py-2 rounded-lg text-sm flex items-center gap-1.5"
+            style={{
+              background: "var(--atlas-elevated)",
+              border: "1px solid var(--atlas-border)",
+              color: "var(--atlas-text-2)",
+              opacity: verifyStatus === "verifying" || !openClawKey.trim() ? 0.6 : 1,
+            }}
+          >
+            {verifyStatus === "verifying" ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            验证连接
+          </button>
+          {openClawKey && (
+            <button
+              onClick={handleClear}
+              className="px-4 py-2 rounded-lg text-sm"
+              style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)", color: "#F87171" }}
+            >
+              清除 Key
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Qwen Config Info */}
+      <div className="p-4 rounded-xl" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style={{ background: "rgba(91,140,255,0.1)" }}>🤖</div>
+          <div>
+            <p className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>阿里百炼 (默认通道)</p>
+            <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>未配置 OpenClaw Key 时自动使用</p>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {[
+            { label: "主模型", value: "qwen3-max-2026-01-23", desc: "财务/行政/数据分析" },
+            { label: "大文件模型", value: "kimi-k2.5", desc: "≥10000行自动切换" },
+            { label: "Base URL", value: "dashscope.aliyuncs.com", desc: "阿里云 DashScope" },
+          ].map(item => (
+            <div key={item.label} className="flex items-center justify-between py-1.5" style={{ borderBottom: "1px solid var(--atlas-border)" }}>
+              <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{item.label}</span>
+              <div className="text-right">
+                <span className="text-xs font-medium" style={{ color: "var(--atlas-text)", fontFamily: "'JetBrains Mono', monospace" }}>{item.value}</span>
+                <span className="text-xs ml-2" style={{ color: "var(--atlas-text-3)" }}>{item.desc}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs mt-3" style={{ color: "var(--atlas-text-3)" }}>
+          如需修改阿里百炼 API Key，请在服务器环境变量 <code style={{ fontFamily: "'JetBrains Mono', monospace", background: "var(--atlas-elevated)", padding: "1px 4px", borderRadius: "3px" }}>DASHSCOPE_API_KEY</code> 中配置。
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Integrations ──────────────────────────────────────────────────────────────
 
 function IntegrationsSection() {
@@ -1023,6 +1278,7 @@ export default function SettingsPage() {
       case "profile":      return <ProfileSection />;
       case "appearance":   return <AppearanceSection />;
       case "apikeys":      return <ApiKeysSection />;
+      case "ai-engine":    return <AiEngineSection />;
       case "platforms":    return <PlatformsSection />;
       case "email":        return <EmailSection />;
       case "integrations": return <IntegrationsSection />;

@@ -163,3 +163,10 @@
 - [x] 双模型策略：<10000行用 qwen3-max，≥ 10000行自动切换 kimi-k2.5
 - [x] 修复 isReport 正则（「怎么算工资条」不应触发报表生成）
 - [x] 修复所有 vitest 测试通过（45/45）
+## V10.9 OpenClaw 接入（已完成）
+
+- [x] 配置 OPENCLAW_API_KEY 和 OPENCLAW_ENDPOINT 到环境变量
+- [x] 后端新建 openclaw.ts：转发用户消息 + 文件路径到 OpenClaw API
+- [x] 后端：OpenClaw 返回的 output_file 自动上传到 S3 并保存报表记录
+- [x] 前端设置页面：添加 OpenClaw API Key 配置入口（AI 引擎页）
+- [x] 双通道路由：/chat 路由已实现 isOpenClawEnabled() 判断，自动切换

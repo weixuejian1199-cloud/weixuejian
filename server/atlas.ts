@@ -26,6 +26,7 @@ import { createPatchedFetch } from "./_core/patchedFetch";
 import { storagePut, storageGet } from "./storage";
 import { getSession, createSession, updateSession, createReport, updateReport, getReport, getSimilarExamples, getUserReports } from "./db";
 import { sdk } from "./_core/sdk";
+import { isOpenClawEnabled, callOpenClaw, getPresignedUrlsForSessions } from "./openclaw";
 
 // Optional auth middleware: injects req.userId if session cookie is valid
 async function optionalAuth(req: Request, _res: Response, next: NextFunction) {
@@ -800,6 +801,73 @@ ${dataTable}
 使用中文，语气友好专业，分析要有深度，不要说空话。`;
 
       const totalRows = data.length;
+
+      // ── Dual-channel routing ─────────────────────────────────────────────
+      // If OpenClaw (小虾米) is configured, route through it.
+      // Otherwise fall back to Qwen3-Max streaming.
+      if (isOpenClawEnabled()) {
+        console.log("[Atlas] Routing to OpenClaw (小虾米 Agent)");
+        try {
+          // Get presigned S3 URLs for all session files
+          const sessionDataKeys = allSessionIds.map(id => `atlas-data/${id}-data.json`);
+          const fileUrls = await getPresignedUrlsForSessions(sessionDataKeys);
+          const fileNames = validSessions.map(s => s!.originalName);
+
+          const userId = (req as any).userId ?? "anonymous";
+          const openClawResult = await callOpenClaw(
+            {
+              message,
+              file_urls: fileUrls,
+              file_names: fileNames,
+              user_id: userId,
+              source: "atlas",
+            },
+            userId
+          );
+
+          // If OpenClaw returned output files, save them as reports
+          if (openClawResult.savedFiles.length > 0) {
+            for (const file of openClawResult.savedFiles) {
+              try {
+                await createReport({
+                  id: nanoid(),
+                  userId: typeof userId === 'number' ? userId : 0,
+                  sessionId: allSessionIds[0] ?? nanoid(),
+                  title: file.name.replace(/\.[^.]+$/, ""),
+                  filename: file.name,
+                  fileKey: file.key,
+                  fileUrl: file.url,
+                  prompt: message,
+                  status: "completed",
+                  expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                });
+              } catch (dbErr) {
+                console.warn("[Atlas] Failed to save OpenClaw output report:", dbErr);
+              }
+            }
+          }
+
+          // Stream the reply as plain text (simulate streaming for UI consistency)
+          res.setHeader("Content-Type", "text/plain; charset=utf-8");
+          res.setHeader("Transfer-Encoding", "chunked");
+          let replyText = openClawResult.reply;
+          // Append download links if output files were saved
+          if (openClawResult.savedFiles.length > 0) {
+            replyText += "\n\n📎 **生成的文件：**\n";
+            for (const file of openClawResult.savedFiles) {
+              replyText += `- [${file.name}](${file.url})\n`;
+            }
+          }
+          res.write(replyText);
+          res.end();
+          return;
+        } catch (openClawErr: any) {
+          console.error("[Atlas] OpenClaw failed, falling back to Qwen:", openClawErr.message);
+          // Fall through to Qwen on error
+        }
+      }
+
+      // ── Qwen3-Max / Kimi-K2.5 streaming (default channel) ───────────────
       const openai = createLLM(totalRows);
 
       // Build message history

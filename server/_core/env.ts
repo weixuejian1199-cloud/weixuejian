@@ -7,6 +7,12 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  // OpenClaw (小虾米 Agent) — optional, if not set falls back to Qwen
+  openClawApiKey: process.env.OPENCLAW_API_KEY ?? "",
+  openClawEndpoint: process.env.OPENCLAW_ENDPOINT ?? "https://gateway.openclaw.ai/v1/chat",
+  // Alibaba DashScope (Qwen3-Max + Kimi-K2.5)
+  dashScopeApiKey: process.env.DASHSCOPE_API_KEY ?? "",
+  dashScopeBaseUrl: process.env.DASHSCOPE_BASE_URL ?? "https://dashscope.aliyuncs.com/compatible-mode/v1",
   // Email (optional — if not set, email sending is silently skipped)
   smtpHost: process.env.SMTP_HOST ?? "",
   smtpPort: parseInt(process.env.SMTP_PORT ?? "465"),
