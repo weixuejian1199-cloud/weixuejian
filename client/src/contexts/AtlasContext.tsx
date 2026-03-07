@@ -242,11 +242,30 @@ export const SYSTEM_TEMPLATES: Template[] = [
 export function AtlasProvider({ children }: { children: React.ReactNode }) {
   const [activeNav, setActiveNav] = useState<NavItem>("home");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeTaskId, setActiveTaskIdState] = useState<string | null>(null);
+  const [activeTaskId, setActiveTaskIdState] = useState<string | null>(() => localStorage.getItem("atlas_active_task"));
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("atlas_theme") as Theme) || "dark");
   const [user, setUser] = useState<User | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    try {
+      const saved = localStorage.getItem("atlas_tasks");
+      if (!saved) return [];
+      const parsed = JSON.parse(saved) as Task[];
+      // Restore Date objects and clear streaming state
+      return parsed.map(t => ({
+        ...t,
+        messages: t.messages.map(m => ({
+          ...m,
+          timestamp: new Date(m.timestamp),
+          isStreaming: false,
+        })),
+        uploadedFiles: t.uploadedFiles.map(f => ({
+          ...f,
+          uploadedAt: new Date(f.uploadedAt),
+        })),
+      }));
+    } catch { return []; }
+  });
   const [isProcessing, setIsProcessing] = useState(false);
   const [reports, setReports] = useState<ReportRecord[]>([]);
   const [templates, setTemplates] = useState<Template[]>(SYSTEM_TEMPLATES);
@@ -263,6 +282,36 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.classList.toggle("light", theme === "light");
     localStorage.setItem("atlas_theme", theme);
   }, [theme]);
+  // Persist tasks to localStorage (debounced to avoid excessive writes)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        // Limit stored tasks to last 20 to avoid localStorage quota issues
+        const toStore = tasks.slice(0, 20).map(t => ({
+          ...t,
+          // Limit messages per task to last 50 to save space
+          messages: t.messages.slice(-50).map(m => ({
+            ...m,
+            isStreaming: false,
+            // Truncate very long content to avoid quota issues
+            content: m.content.length > 10000 ? m.content.slice(0, 10000) + '...' : m.content,
+          })),
+          // Don't persist file binary data
+          uploadedFiles: t.uploadedFiles.map(f => ({ ...f })),
+        }));
+        localStorage.setItem("atlas_tasks", JSON.stringify(toStore));
+      } catch (e) {
+        // If quota exceeded, clear old tasks
+        try { localStorage.removeItem("atlas_tasks"); } catch {}
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [tasks]);
+  // Persist activeTaskId
+  useEffect(() => {
+    if (activeTaskId) localStorage.setItem("atlas_active_task", activeTaskId);
+    else localStorage.removeItem("atlas_active_task");
+  }, [activeTaskId]);
 
   // Responsive: auto-close sidebar on small screens
   useEffect(() => {
