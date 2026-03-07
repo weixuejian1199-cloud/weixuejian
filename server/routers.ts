@@ -10,6 +10,7 @@ import {
   createReport, updateReport, getReport, getUserReports, deleteReport,
   createScheduledTask, updateScheduledTask, getUserScheduledTasks, deleteScheduledTask,
   ensureInviteCode, redeemInviteCode, getInviteStats, getUserCredits,
+  createReportFeedback, getReportFeedback, updateReportFeedback, getSimilarExamples,
 } from "./db";
 import { storageDelete } from "./storage";
 
@@ -305,7 +306,57 @@ export const appRouter = router({
     }),
   }),
 
-  // ── Invite & Credits ──────────────────────────────────────────────────────────────
+  // ── Feedback (Self-Learning / RAG) ──────────────────────────────────────────
+
+  feedback: router({
+    /** Submit or update rating for a report (1-5 stars) */
+    submit: protectedProcedure
+      .input(z.object({
+        reportId: z.string(),
+        rating: z.number().int().min(1).max(5),
+        comment: z.string().max(500).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const report = await getReport(input.reportId);
+        if (!report || report.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "报表不存在" });
+        }
+        const session = await getSession(report.sessionId);
+        const dfInfo = session?.dfInfo as Array<{ column?: string }> | null;
+        const columnSignature = dfInfo
+          ? dfInfo.map(c => c.column ?? "").join(",")
+          : "";
+        const existing = await getReportFeedback(input.reportId, ctx.user.id);
+        if (existing) {
+          await updateReportFeedback(existing.id, {
+            rating: input.rating,
+            comment: input.comment ?? null,
+          });
+          return { updated: true };
+        }
+        await createReportFeedback({
+          id: nanoid(),
+          reportId: input.reportId,
+          sessionId: report.sessionId,
+          userId: ctx.user.id,
+          rating: input.rating,
+          comment: input.comment ?? null,
+          columnSignature,
+          prompt: report.prompt,
+          exampleDataKey: null,
+        });
+        return { created: true };
+      }),
+
+    /** Get my feedback for a report */
+    getMine: protectedProcedure
+      .input(z.object({ reportId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        return getReportFeedback(input.reportId, ctx.user.id);
+      }),
+  }),
+
+  // ── Invite & Credits ───────────────────────────────────────────────────────────────────────────────────────
 
   invite: router({
     /** Get current user's invite code (generates one if not exists) */

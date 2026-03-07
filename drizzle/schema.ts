@@ -127,3 +127,25 @@ export const inviteRecords = mysqlTable("invite_records", {
 
 export type InviteRecord = typeof inviteRecords.$inferSelect;
 export type InsertInviteRecord = typeof inviteRecords.$inferInsert;
+
+// ── Report Feedback (Self-Learning) ──────────────────────────────────────────
+// Users rate reports; high-rated examples are used as RAG few-shot context
+
+export const reportFeedback = mysqlTable("report_feedback", {
+  id:         varchar("id", { length: 64 }).primaryKey(),
+  reportId:   varchar("reportId", { length: 64 }).notNull(),
+  sessionId:  varchar("sessionId", { length: 64 }).notNull(),
+  userId:     int("userId").notNull(),
+  rating:     int("rating").notNull(), // 1-5 stars
+  comment:    text("comment"),
+  /** Snapshot of dfInfo columns for similarity matching */
+  columnSignature: text("columnSignature"),
+  /** The prompt used to generate this report */
+  prompt:     text("prompt"),
+  /** S3 key of the example data (first 50 rows JSON) */
+  exampleDataKey: varchar("exampleDataKey", { length: 512 }),
+  createdAt:  timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ReportFeedback = typeof reportFeedback.$inferSelect;
+export type InsertReportFeedback = typeof reportFeedback.$inferInsert;

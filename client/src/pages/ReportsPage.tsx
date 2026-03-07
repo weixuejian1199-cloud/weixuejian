@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart2, Download, FileSpreadsheet, Calendar,
   RefreshCw, Clock, Trash2, MoreHorizontal, Play,
-  Loader2, CheckCircle, XCircle, Plus, Search, Filter, X,
+  Loader2, CheckCircle, XCircle, Plus, Search, Filter, X, Star,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAtlas } from "@/contexts/AtlasContext";
@@ -138,6 +138,82 @@ function QuickScheduleDialog({
 
 // ── Report Card ───────────────────────────────────────────────────────────────
 
+function StarRating({ reportId, isCompleted }: { reportId: string; isCompleted: boolean }) {
+  const [hovered, setHovered] = useState(0);
+  const [showRating, setShowRating] = useState(false);
+  const utils = trpc.useUtils();
+
+  const { data: existing } = trpc.feedback.getMine.useQuery(
+    { reportId },
+    { enabled: isCompleted }
+  );
+
+  const submitMut = trpc.feedback.submit.useMutation({
+    onSuccess: () => {
+      utils.feedback.getMine.invalidate({ reportId });
+      toast.success("感谢评分！系统将持续学习优化 ✨");
+      setShowRating(false);
+    },
+    onError: (e) => toast.error(`评分失败：${e.message}`),
+  });
+
+  if (!isCompleted) return null;
+
+  const currentRating = existing?.rating ?? 0;
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setShowRating(!showRating)}
+        title={currentRating ? `已评 ${currentRating} 星` : "评分此报表"}
+        className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+        style={{
+          background: currentRating ? "rgba(251,191,36,0.15)" : "rgba(251,191,36,0.08)",
+          color: currentRating ? "#FBBF24" : "var(--atlas-text-3)",
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(251,191,36,0.2)"; (e.currentTarget as HTMLElement).style.color = "#FBBF24"; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = currentRating ? "rgba(251,191,36,0.15)" : "rgba(251,191,36,0.08)"; (e.currentTarget as HTMLElement).style.color = currentRating ? "#FBBF24" : "var(--atlas-text-3)"; }}
+      >
+        <Star size={13} fill={currentRating ? "#FBBF24" : "none"} />
+      </button>
+      <AnimatePresence>
+        {showRating && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -4 }}
+            className="absolute right-0 top-9 z-20 rounded-xl p-3 min-w-[160px]"
+            style={{ background: "var(--atlas-card)", border: "1px solid var(--atlas-border-2)", boxShadow: "0 8px 24px rgba(0,0,0,0.3)" }}
+          >
+            <p className="text-xs mb-2 font-medium" style={{ color: "var(--atlas-text-2)" }}>报表质量评分</p>
+            <div className="flex gap-1 justify-center">
+              {[1, 2, 3, 4, 5].map(star => (
+                <button
+                  key={star}
+                  onMouseEnter={() => setHovered(star)}
+                  onMouseLeave={() => setHovered(0)}
+                  onClick={() => submitMut.mutate({ reportId, rating: star })}
+                  className="p-1 transition-transform hover:scale-125"
+                  disabled={submitMut.isPending}
+                >
+                  <Star
+                    size={18}
+                    fill={(hovered || currentRating) >= star ? "#FBBF24" : "none"}
+                    stroke={(hovered || currentRating) >= star ? "#FBBF24" : "var(--atlas-text-3)"}
+                  />
+                </button>
+              ))}
+            </div>
+            <p className="text-xs mt-2 text-center" style={{ color: "var(--atlas-text-3)" }}>
+              {hovered === 1 ? "😕 需要改进" : hovered === 2 ? "😐 一般" : hovered === 3 ? "🙂 还不错" : hovered === 4 ? "😄 很好" : hovered === 5 ? "🌟 完美" : "点击星星评分"}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function ReportCard({
   report,
   index,
@@ -176,6 +252,20 @@ function ReportCard({
 
   const isCompleted = report.status === "completed";
 
+  // Expiry: reports expire 24h after creation
+  const expiryInfo = (() => {
+    if (!report.createdAt || !isCompleted) return null;
+    const createdMs = new Date(report.createdAt).getTime();
+    const expiresAt = createdMs + 24 * 60 * 60 * 1000;
+    const remaining = expiresAt - Date.now();
+    if (remaining <= 0) return { label: "已过期", color: "#F87171", urgent: true };
+    const hours = Math.floor(remaining / (60 * 60 * 1000));
+    const mins = Math.floor((remaining % (60 * 60 * 1000)) / 60000);
+    if (hours < 1) return { label: `${mins}分钟后过期`, color: "#F87171", urgent: true };
+    if (hours < 6) return { label: `${hours}小时后过期`, color: "#FBBF24", urgent: true };
+    return { label: `${hours}小时后过期`, color: "var(--atlas-text-3)", urgent: false };
+  })();
+
   return (
     <motion.div
       key={report.id}
@@ -204,6 +294,20 @@ function ReportCard({
           {report.fileSizeKb && (
             <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>
               {report.fileSizeKb > 1024 ? `${(report.fileSizeKb / 1024).toFixed(1)} MB` : `${report.fileSizeKb} KB`}
+            </span>
+          )}
+          {expiryInfo && (
+            <span
+              className="text-xs px-1.5 py-0.5 rounded-md"
+              style={{
+                color: expiryInfo.color,
+                background: expiryInfo.urgent ? `${expiryInfo.color}18` : "transparent",
+                border: expiryInfo.urgent ? `1px solid ${expiryInfo.color}40` : "none",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: "10px",
+              }}
+            >
+              {expiryInfo.label}
             </span>
           )}
         </div>
@@ -249,6 +353,9 @@ function ReportCard({
         >
           <Play size={12} />
         </button>
+
+        {/* Star Rating */}
+        <StarRating reportId={report.id} isCompleted={isCompleted} />
 
         {/* Schedule */}
         <button

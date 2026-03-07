@@ -1,7 +1,7 @@
 import { and, eq, gt, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, sessions, reports, scheduledTasks } from "../drizzle/schema";
-import type { InsertSession, InsertReport, InsertScheduledTask } from "../drizzle/schema";
+import { InsertUser, users, sessions, reports, scheduledTasks, reportFeedback } from "../drizzle/schema";
+import type { InsertSession, InsertReport, InsertScheduledTask, InsertReportFeedback } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -311,4 +311,68 @@ export async function getUserCredits(userId: number): Promise<number> {
   const result = await db.select({ credits: users.credits })
     .from(users).where(eq(users.id, userId)).limit(1);
   return result[0]?.credits ?? 0;
+}
+
+// ── Report Feedback (Self-Learning / RAG) ──────────────────────────────────────
+
+/** Save user feedback for a report */
+export async function createReportFeedback(data: InsertReportFeedback) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(reportFeedback).values(data);
+  return data;
+}
+
+/** Get existing feedback for a report by a user */
+export async function getReportFeedback(reportId: string, userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(reportFeedback)
+    .where(and(eq(reportFeedback.reportId, reportId), eq(reportFeedback.userId, userId)))
+    .limit(1);
+  return result[0];
+}
+
+/** Update existing feedback */
+export async function updateReportFeedback(id: string, data: Partial<InsertReportFeedback>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(reportFeedback).set(data).where(eq(reportFeedback.id, id));
+}
+
+/**
+ * RAG: Retrieve top-rated similar examples based on column signature overlap.
+ * Returns up to `limit` examples with rating >= 4 that share column names.
+ */
+export async function getSimilarExamples(columnSignature: string, limit = 3) {
+  const db = await getDb();
+  if (!db) return [];
+
+  // Get all high-rated feedback with column signatures
+  const examples = await db.select().from(reportFeedback)
+    .where(and(
+      gt(reportFeedback.rating, 3), // rating >= 4
+    ))
+    .orderBy(reportFeedback.createdAt)
+    .limit(50);
+
+  if (examples.length === 0) return [];
+
+  // Simple similarity: count overlapping column names
+  const inputCols = new Set(columnSignature.toLowerCase().split(',').map(c => c.trim()));
+
+  const scored = examples
+    .filter(e => e.columnSignature && e.prompt)
+    .map(e => {
+      const exCols = new Set(e.columnSignature!.toLowerCase().split(',').map(c => c.trim()));
+      let overlap = 0;
+      inputCols.forEach(c => { if (exCols.has(c)) overlap++; });
+      const score = overlap / Math.max(inputCols.size, exCols.size);
+      return { ...e, score };
+    })
+    .filter(e => e.score > 0)
+    .sort((a, b) => b.score - a.score || b.rating - a.rating)
+    .slice(0, limit);
+
+  return scored;
 }

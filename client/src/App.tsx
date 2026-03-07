@@ -4,6 +4,7 @@
  * Theme: Dark (cold black) / Light (Manus white) switchable
  * Nav: home / dashboard / templates / search / library / settings
  */
+import { AnimatePresence, motion } from "framer-motion";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AtlasProvider, useAtlas } from "./contexts/AtlasContext";
@@ -44,7 +45,18 @@ function AppContent() {
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
         <main className="flex-1 overflow-hidden">
-          {renderPage()}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeNav}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+              className="h-full"
+            >
+              {renderPage()}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
       {showLoginModal && <LoginModal />}

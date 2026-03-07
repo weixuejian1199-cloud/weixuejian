@@ -354,14 +354,29 @@ export default function DashboardPage() {
 
         {/* ── KPI Cards — Real ATLAS Stats ── */}
         <div className="grid grid-cols-4 gap-3 mb-6">
-          <MetricCard icon={BarChart2} label="已生成报表" value={statsLoading ? "-" : String(stats?.totalReports ?? 0)}
-            sub="历史报表总数" color="#5B8CFF" />
-          <MetricCard icon={Package} label="分析会话" value={statsLoading ? "-" : String(stats?.totalSessions ?? 0)}
-            sub="已上传文件数" color="#34D399" />
-          <MetricCard icon={Clock} label="定时任务" value={statsLoading ? "-" : String(stats?.activeScheduledTasks ?? 0)}
-            sub="运行中的自动化任务" color="#A78BFA" />
-          <MetricCard icon={Activity} label="我的积分" value={statsLoading ? "-" : String(stats?.credits ?? 0)}
-            sub="可用于高级功能" color="#FBBF24" />
+          {statsLoading ? Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-xl p-4 flex flex-col gap-3 animate-pulse"
+              style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
+              <div className="flex items-center justify-between">
+                <div className="w-8 h-8 rounded-lg" style={{ background: "var(--atlas-border)" }} />
+              </div>
+              <div>
+                <div className="h-7 w-16 rounded-md mb-2" style={{ background: "var(--atlas-border)" }} />
+                <div className="h-3 w-20 rounded-md" style={{ background: "var(--atlas-border)" }} />
+              </div>
+            </div>
+          )) : (
+            <>
+              <MetricCard icon={BarChart2} label="已生成报表" value={String(stats?.totalReports ?? 0)}
+                sub="历史报表总数" color="#5B8CFF" />
+              <MetricCard icon={Package} label="分析会话" value={String(stats?.totalSessions ?? 0)}
+                sub="已上传文件数" color="#34D399" />
+              <MetricCard icon={Clock} label="定时任务" value={String(stats?.activeScheduledTasks ?? 0)}
+                sub="运行中的自动化任务" color="#A78BFA" />
+              <MetricCard icon={Activity} label="我的积分" value={String(stats?.credits ?? 0)}
+                sub="可用于高级功能" color="#FBBF24" />
+            </>
+          )}
         </div>
 
         {/* ── Charts Row ── */}

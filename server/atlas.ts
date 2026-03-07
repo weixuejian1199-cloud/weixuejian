@@ -24,7 +24,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { ENV } from "./_core/env";
 import { createPatchedFetch } from "./_core/patchedFetch";
 import { storagePut, storageGet } from "./storage";
-import { getSession, createSession, updateSession, createReport, updateReport, getReport } from "./db";
+import { getSession, createSession, updateSession, createReport, updateReport, getReport, getSimilarExamples } from "./db";
 
 // ── LLM Provider ──────────────────────────────────────────────────────────────
 
@@ -380,9 +380,16 @@ ${sampleRows}
       const fieldNames = dfInfo.fields.map((f: FieldInfo) => f.name).join(", ");
       const sampleRows = JSON.stringify(data.slice(0, 20), null, 2);
 
-      const aiPrompt = `你是数据分析专家。根据以下数据和需求，生成一份报表数据。
+      // RAG: retrieve similar high-rated examples for self-learning
+      const columnSignature = dfInfo.fields.map((f: FieldInfo) => f.name).join(",");
+      const ragExamples = await getSimilarExamples(columnSignature, 2);
+      const ragSection = ragExamples.length > 0
+        ? `\n\n参考示例（这是用户评分较高的历史报表，请学习其分析风格和结构）：\n${ragExamples.map((ex, i) => `示例${i + 1}：需求「${ex.prompt}」，用户评分：${ex.rating}星`).join("\n")}`
+        : "";
 
-数据文件：${filename}（${dfInfo.row_count}行 × ${dfInfo.col_count}列）
+      const aiPrompt = `你是数据分析专家。根据以下数据和需求，生成一份报表数据。${ragSection}
+
+数据文件：${filename}（${dfInfo.row_count}行 xd7 ${dfInfo.col_count}列）
 字段：${fieldNames}
 
 数据样例（前20行）：
@@ -396,10 +403,9 @@ ${sampleRows}
   "sheets": [
     {
       "name": "Sheet名称",
-      "headers": ["列1", "列2", "列3"],
+      "headers": ["入1", "入2", "入3"],
       "rows": [
-        ["值1", "值2", "值3"],
-        ...
+        ["倃1", "倃2", "倃3"]
       ],
       "summary": "本sheet的说明"
     }
