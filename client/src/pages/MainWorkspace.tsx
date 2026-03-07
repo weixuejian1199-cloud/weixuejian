@@ -1,25 +1,47 @@
 /**
- * ATLAS V5.1 — Main Workspace
+ * ATLAS V5.2 — Main Workspace
  * ─────────────────────────────────────────────────────────────────
- * Layout: ALWAYS two-column — left panel (280px) + right chat panel
- * Empty state: left shows upload zone, right shows slogan + prompt chips
- * Active state: left shows file list, right shows AI conversation
+ * Layout: Single nav sidebar + full-width chat area
  *
- * V5.1 fix: Removed full-bleed hero that replaced the layout.
- * Slogan "把数据拖进来，剩下的交给 ATLAS" lives inside the chat empty state.
+ * Structure:
+ *   ┌─────────────────────────────────────────┐
+ *   │         AI 对话消息区域（全宽）            │
+ *   ├─────────────────────────────────────────┤
+ *   │  [📊 经营日报] [🏪 门店排行] [📈 平台对比] │  ← 居中，仅空态或少消息时显示
+ *   ├─────────────────────────────────────────┤
+ *   │  已上传文件列表（紧凑横排，可滚动）          │  ← 有文件时显示
+ *   ├─────────────────────────────────────────┤
+ *   │  📎  输入你的需求...              [发送]  │
+ *   └─────────────────────────────────────────┘
+ *
+ * V5.2 changes:
+ *   - Removed left file panel, full-width chat
+ *   - Multi-file upload, no limit on file count
+ *   - Uploaded files shown as compact chips above input
+ *   - 3 template shortcuts centered above input
+ *   - Font sizes scaled up to match wider layout
  */
 import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload, X, FileSpreadsheet, Sparkles, Send,
-  Download, Loader2, Copy, Check, BarChart2,
-  RefreshCw, ChevronRight, Paperclip,
+  Download, Loader2, Copy, Check, BarChart2, Paperclip,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
-import { useAtlas, SYSTEM_TEMPLATES, type UploadedFile } from "@/contexts/AtlasContext";
+import { useAtlas, type UploadedFile } from "@/contexts/AtlasContext";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
+
+// ── Three pinned templates ────────────────────────────────────────────────────
+
+const PINNED_TEMPLATES = [
+  { id: "daily-report",     icon: "📋", name: "经营日报",   prompt: "生成今日经营日报，包含总销售额GMV、订单数量、退款金额和退款率、客单价、平台占比，并标注异常数据" },
+  { id: "store-sales",      icon: "🏪", name: "门店排行",   prompt: "帮我汇总所有门店的销售数据，按门店分组，显示销售额、订单数量、客单价，并标注排名" },
+  { id: "platform-compare", icon: "📊", name: "平台对比",   prompt: "对比各平台的销售数据，生成平台销售对比报表，包含销售额、占比、环比变化" },
+];
+
+// ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function MainWorkspace() {
   const {
@@ -38,6 +60,7 @@ export default function MainWorkspace() {
 
   const readyFiles = uploadedFiles.filter(f => f.status === "ready");
   const hasFiles = readyFiles.length > 0;
+  const hasAnyFiles = uploadedFiles.length > 0;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -46,16 +69,18 @@ export default function MainWorkspace() {
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 140) + "px";
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 160) + "px";
     }
   }, [input]);
+
+  // ── File processing ──────────────────────────────────────────────────────────
 
   const processFile = useCallback(async (file: File) => {
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (!["xlsx", "xls", "csv"].includes(ext || "")) {
-      toast.error(`不支持 .${ext} 格式`); return;
+      toast.error(`不支持 .${ext} 格式，请上传 Excel 或 CSV`); return;
     }
-    if (file.size > 50 * 1024 * 1024) { toast.error("文件超过 50MB"); return; }
+    if (file.size > 50 * 1024 * 1024) { toast.error(`${file.name} 超过 50MB 限制`); return; }
 
     const tempId = nanoid();
     addUploadedFile({ id: tempId, name: file.name, size: file.size, status: "uploading", uploadedAt: new Date() });
@@ -78,7 +103,6 @@ export default function MainWorkspace() {
           file_size_kb: Math.round(file.size / 1024),
         },
       });
-      addMessage({ role: "assistant", content: result.ai_analysis });
       addHistory({
         id: result.session_id,
         title: result.filename,
@@ -88,12 +112,17 @@ export default function MainWorkspace() {
         row_count: result.df_info.row_count,
         col_count: result.df_info.col_count,
       });
-      toast.success(`${file.name} 解析成功，共 ${result.df_info.row_count.toLocaleString()} 行`);
+      // Only show AI analysis message for first file
+      if (uploadedFiles.filter(f => f.status === "ready").length === 0) {
+        addMessage({ role: "assistant", content: result.ai_analysis });
+      } else {
+        toast.success(`${file.name} 解析完成 · ${result.df_info.row_count.toLocaleString()} 行`);
+      }
     } catch (err: any) {
       updateUploadedFile(tempId, { status: "error" });
-      toast.error(`上传失败：${err.message}`);
+      toast.error(`${file.name} 上传失败：${err.message}`);
     }
-  }, [addUploadedFile, updateUploadedFile, addMessage, addHistory]);
+  }, [addUploadedFile, updateUploadedFile, addMessage, addHistory, uploadedFiles]);
 
   const handleFiles = useCallback((files: FileList | File[]) => {
     Array.from(files).forEach(processFile);
@@ -105,6 +134,8 @@ export default function MainWorkspace() {
     e.preventDefault(); setIsDragging(false);
     handleFiles(e.dataTransfer.files);
   };
+
+  // ── Send message ─────────────────────────────────────────────────────────────
 
   const handleSend = useCallback(async (text?: string) => {
     const msg = (text || input).trim();
@@ -166,9 +197,12 @@ export default function MainWorkspace() {
     toast.success("开始下载");
   };
 
+  // ── Render ────────────────────────────────────────────────────────────────────
+
   return (
     <div
-      className="flex h-full overflow-hidden relative"
+      className="flex flex-col h-full overflow-hidden relative"
+      style={{ background: "var(--atlas-bg)" }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -178,134 +212,49 @@ export default function MainWorkspace() {
         className="hidden" onChange={e => e.target.files && handleFiles(e.target.files)}
       />
 
-      {/* ── LEFT PANEL — always visible ── */}
+      {/* ── Chat header ── */}
       <div
-        className="flex flex-col overflow-hidden flex-shrink-0"
-        style={{
-          width: 280,
-          background: "var(--atlas-surface)",
-          borderRight: "1px solid var(--atlas-border)",
-        }}
+        className="px-6 py-3 flex items-center gap-2.5 flex-shrink-0"
+        style={{ borderBottom: "1px solid var(--atlas-border)" }}
       >
-        {/* Panel header */}
-        <div
-          className="px-4 py-2.5 flex items-center justify-between flex-shrink-0"
-          style={{ borderBottom: "1px solid var(--atlas-border)" }}
-        >
-          <span className="text-xs font-semibold uppercase tracking-wider"
-            style={{ color: "var(--atlas-text-2)", letterSpacing: "0.08em" }}>
-            数据文件
+        <div className="w-6 h-6 rounded-md flex items-center justify-center"
+          style={{ background: "rgba(91,140,255,0.12)" }}>
+          <Sparkles size={13} style={{ color: "var(--atlas-accent)" }} />
+        </div>
+        <span className="text-sm font-semibold" style={{ color: "var(--atlas-text)" }}>ATLAS AI</span>
+        {hasAnyFiles && (
+          <span className="text-xs px-2 py-0.5 rounded-full"
+            style={{ background: "rgba(91,140,255,0.1)", color: "var(--atlas-accent)" }}>
+            {uploadedFiles.filter(f => f.status === "ready").length} 个文件就绪
           </span>
-          {uploadedFiles.length > 0 && (
-            <button
-              onClick={() => { clearFiles(); clearMessages(); }}
-              className="flex items-center gap-1 text-xs transition-colors"
-              style={{ color: "var(--atlas-text-3)" }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)"}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)"}
-            >
-              <RefreshCw size={10} /> 清空
-            </button>
-          )}
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          {/* Upload zone */}
-          <div
-            className="rounded-xl p-4 text-center cursor-pointer transition-all"
-            style={{
-              background: isDragging ? "rgba(91,140,255,0.06)" : "var(--atlas-elevated)",
-              border: isDragging ? "1.5px dashed rgba(91,140,255,0.5)" : "1.5px dashed rgba(91,140,255,0.22)",
-            }}
-            onClick={() => fileInputRef.current?.click()}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.45)";
-              (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.04)";
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.22)";
-              (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
-            }}
+        )}
+        <div className="flex-1" />
+        {isProcessing && (
+          <div className="flex items-center gap-1.5">
+            <Loader2 size={12} className="animate-spin" style={{ color: "var(--atlas-accent)" }} />
+            <span className="text-xs" style={{ color: "var(--atlas-text-2)", fontFamily: "'JetBrains Mono', monospace" }}>
+              生成中...
+            </span>
+          </div>
+        )}
+        {hasAnyFiles && (
+          <button
+            onClick={() => { clearFiles(); clearMessages(); }}
+            className="text-xs transition-colors"
+            style={{ color: "var(--atlas-text-3)" }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)"}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)"}
           >
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <Upload size={13} style={{ color: "var(--atlas-accent)" }} />
-              <span className="text-xs font-semibold" style={{ color: "var(--atlas-text)" }}>
-                {uploadedFiles.length > 0 ? "继续上传文件" : "上传数据文件"}
-              </span>
-            </div>
-            <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>
-              Excel / CSV · 拖拽或点击 · 最大 50MB
-            </p>
-          </div>
-
-          {/* Uploaded files */}
-          <AnimatePresence>
-            {uploadedFiles.map(f => (
-              <FileCard key={f.id} file={f} onRemove={() => removeUploadedFile(f.id)} />
-            ))}
-          </AnimatePresence>
-
-          {/* Templates section */}
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider mb-2"
-              style={{ color: "var(--atlas-text-3)", fontSize: "10px", letterSpacing: "0.08em" }}>
-              推荐模板
-            </p>
-            <div className="space-y-1">
-              {SYSTEM_TEMPLATES.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => setInput(t.prompt)}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all group"
-                  style={{ background: "transparent", border: "1px solid transparent" }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
-                    (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border)";
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.background = "transparent";
-                    (e.currentTarget as HTMLElement).style.borderColor = "transparent";
-                  }}
-                >
-                  <span className="text-sm flex-shrink-0">{t.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate" style={{ color: "var(--atlas-text-2)" }}>{t.name}</p>
-                    <p className="text-xs truncate" style={{ color: "var(--atlas-text-3)" }}>{t.description}</p>
-                  </div>
-                  <ChevronRight size={11} className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{ color: "var(--atlas-accent)" }} />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+            清空会话
+          </button>
+        )}
       </div>
 
-      {/* ── RIGHT PANEL — AI Chat, always visible ── */}
-      <div className="flex-1 flex flex-col overflow-hidden" style={{ background: "var(--atlas-bg)" }}>
-        {/* Chat header */}
-        <div className="px-5 py-2.5 flex items-center gap-2 flex-shrink-0"
-          style={{ borderBottom: "1px solid var(--atlas-border)" }}>
-          <div className="w-5 h-5 rounded-md flex items-center justify-center"
-            style={{ background: "rgba(91,140,255,0.12)" }}>
-            <Sparkles size={11} style={{ color: "var(--atlas-accent)" }} />
-          </div>
-          <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>ATLAS AI</span>
-          <div className="flex-1" />
-          {isProcessing && (
-            <div className="flex items-center gap-1.5">
-              <Loader2 size={11} className="animate-spin" style={{ color: "var(--atlas-accent)" }} />
-              <span className="text-xs" style={{ color: "var(--atlas-text-2)", fontFamily: "'JetBrains Mono', monospace" }}>
-                生成中...
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+      {/* ── Messages area ── */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-6 py-6 space-y-5">
           {messages.length === 0 ? (
-            <EmptyChat hasFiles={hasFiles} onTemplate={t => { setInput(t); handleSend(t); }} />
+            <EmptyState hasFiles={hasFiles} />
           ) : (
             messages.map(msg => (
               <MessageBubble key={msg.id} message={msg} onDownload={handleDownload} />
@@ -313,16 +262,81 @@ export default function MainWorkspace() {
           )}
           <div ref={messagesEndRef} />
         </div>
+      </div>
 
-        {/* Input area */}
-        <div className="px-4 pb-4 pt-3 flex-shrink-0" style={{ borderTop: "1px solid var(--atlas-border)" }}>
-          {hasFiles && messages.length > 0 && messages.length < 6 && (
-            <div className="flex gap-2 mb-3 flex-wrap">
-              {["生成经营日报", "门店销售汇总", "平台对比分析", "商品排行榜"].map(p => (
-                <button key={p} onClick={() => handleSend(p)} className="atlas-chip">{p}</button>
+      {/* ── Bottom area ── */}
+      <div className="flex-shrink-0" style={{ borderTop: "1px solid var(--atlas-border)" }}>
+        <div className="max-w-3xl mx-auto px-6 pt-3 pb-4">
+
+          {/* Template shortcuts — centered, shown when few messages */}
+          {messages.length < 4 && (
+            <div className="flex items-center justify-center gap-2 mb-3">
+              {PINNED_TEMPLATES.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => handleSend(t.prompt)}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm transition-all"
+                  style={{
+                    background: "var(--atlas-elevated)",
+                    border: "1px solid var(--atlas-border)",
+                    color: "var(--atlas-text-2)",
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.35)";
+                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-text)";
+                    (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.06)";
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border)";
+                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+                    (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
+                  }}
+                >
+                  <span>{t.icon}</span>
+                  <span className="font-medium">{t.name}</span>
+                </button>
               ))}
             </div>
           )}
+
+          {/* Uploaded files chips */}
+          <AnimatePresence>
+            {hasAnyFiles && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="flex flex-wrap gap-1.5 mb-2"
+              >
+                {uploadedFiles.map(f => (
+                  <FileChip key={f.id} file={f} onRemove={() => removeUploadedFile(f.id)} />
+                ))}
+                {/* Add more files button */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs transition-all"
+                  style={{
+                    background: "transparent",
+                    border: "1px dashed rgba(91,140,255,0.3)",
+                    color: "var(--atlas-text-3)",
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.6)";
+                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.3)";
+                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+                  }}
+                >
+                  <Upload size={10} />
+                  继续添加
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Input box */}
           <div
             className="rounded-xl overflow-hidden"
             style={{
@@ -330,7 +344,7 @@ export default function MainWorkspace() {
               border: "1px solid var(--atlas-border-2)",
               transition: "border-color 0.15s ease",
             }}
-            onFocusCapture={e => (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.35)"}
+            onFocusCapture={e => (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.4)"}
             onBlurCapture={e => (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border-2)"}
           >
             <textarea
@@ -338,23 +352,44 @@ export default function MainWorkspace() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={hasFiles ? "描述报表需求，例如：帮我汇总14家门店销售..." : "上传文件后开始对话..."}
+              placeholder={hasFiles
+                ? "描述报表需求，例如：帮我汇总14家门店的销售数据..."
+                : "上传 Excel 或 CSV 文件后开始对话..."}
               disabled={isGenerating}
               rows={1}
-              className="w-full bg-transparent outline-none resize-none text-sm px-4 pt-3 pb-1"
-              style={{ color: "var(--atlas-text)", minHeight: 36, maxHeight: 140, fontFamily: "inherit" }}
+              className="w-full bg-transparent outline-none resize-none px-4 pt-3.5 pb-1"
+              style={{
+                color: "var(--atlas-text)",
+                fontSize: "15px",
+                lineHeight: "1.6",
+                minHeight: 44,
+                maxHeight: 160,
+                fontFamily: "inherit",
+              }}
             />
-            <div className="flex items-center justify-between px-3 pb-2.5 pt-1">
-              <div className="flex items-center gap-1">
+            <div className="flex items-center justify-between px-3 pb-3 pt-1">
+              <div className="flex items-center gap-2">
+                {/* Upload button */}
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-7 h-7 rounded-md flex items-center justify-center transition-colors"
-                  style={{ color: "var(--atlas-text-3)" }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)"}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)"}
-                  title="上传文件"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+                  style={{
+                    background: "var(--atlas-surface)",
+                    border: "1px solid var(--atlas-border)",
+                    color: "var(--atlas-text-2)",
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.4)";
+                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border)";
+                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+                  }}
+                  title="上传文件（支持多选）"
                 >
                   <Paperclip size={13} />
+                  上传文件
                 </button>
                 <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>
                   Enter 发送 · Shift+Enter 换行
@@ -363,7 +398,7 @@ export default function MainWorkspace() {
               <button
                 onClick={() => handleSend()}
                 disabled={!input.trim() || !hasFiles || isGenerating}
-                className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all"
                 style={{
                   background: input.trim() && hasFiles && !isGenerating
                     ? "var(--atlas-accent)"
@@ -371,9 +406,14 @@ export default function MainWorkspace() {
                   color: input.trim() && hasFiles && !isGenerating
                     ? "#fff"
                     : "var(--atlas-text-3)",
+                  transition: "all 0.15s ease",
                 }}
               >
-                {isGenerating ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                {isGenerating
+                  ? <Loader2 size={14} className="animate-spin" />
+                  : <Send size={14} />
+                }
+                {isGenerating ? "生成中" : "发送"}
               </button>
             </div>
           </div>
@@ -387,18 +427,19 @@ export default function MainWorkspace() {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none"
             style={{
-              background: "rgba(10,12,16,0.85)",
+              background: "rgba(10,12,16,0.88)",
               border: "2px dashed var(--atlas-accent)",
-              borderRadius: "var(--atlas-radius)",
             }}
           >
             <div className="text-center">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
                 style={{ background: "rgba(91,140,255,0.15)", border: "1px solid rgba(91,140,255,0.3)" }}>
-                <Upload size={24} style={{ color: "var(--atlas-accent)" }} />
+                <Upload size={28} style={{ color: "var(--atlas-accent)" }} />
               </div>
-              <p className="text-base font-semibold" style={{ color: "var(--atlas-text)" }}>松开以上传文件</p>
-              <p className="text-sm mt-1" style={{ color: "var(--atlas-text-2)" }}>支持 Excel / CSV</p>
+              <p className="text-lg font-semibold" style={{ color: "var(--atlas-text)" }}>松开以上传文件</p>
+              <p className="text-sm mt-1" style={{ color: "var(--atlas-text-2)" }}>
+                支持同时上传多个 Excel / CSV 文件
+              </p>
             </div>
           </motion.div>
         )}
@@ -407,57 +448,62 @@ export default function MainWorkspace() {
   );
 }
 
-// ── FileCard ──────────────────────────────────────────────────────────────────
+// ── FileChip — compact file tag above input ───────────────────────────────────
 
-function FileCard({ file, onRemove }: { file: UploadedFile; onRemove: () => void }) {
-  const sizeStr = file.size > 1024 * 1024
-    ? `${(file.size / 1024 / 1024).toFixed(1)} MB`
-    : `${Math.round(file.size / 1024)} KB`;
-
+function FileChip({ file, onRemove }: { file: UploadedFile; onRemove: () => void }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -4 }}
-      className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg"
-      style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}
-    >
-      <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0"
-        style={{ background: "rgba(91,140,255,0.1)" }}>
-        {file.status === "uploading"
-          ? <Loader2 size={13} className="animate-spin" style={{ color: "var(--atlas-accent)" }} />
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs"
+      style={{
+        background: file.status === "ready"
+          ? "rgba(52,211,153,0.08)"
           : file.status === "error"
-          ? <X size={13} style={{ color: "var(--atlas-danger)" }} />
-          : <FileSpreadsheet size={13} style={{ color: "var(--atlas-accent)" }} />
-        }
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium truncate" style={{ color: "var(--atlas-text)" }}>{file.name}</p>
-        <p className="text-xs" style={{ color: "var(--atlas-text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
-          {file.status === "uploading" ? "上传中..."
-            : file.status === "error" ? "上传失败"
-            : `${file.dfInfo?.row_count?.toLocaleString() || "—"} 行 · ${sizeStr}`}
-        </p>
-      </div>
-      {file.status === "ready" && (
-        <span className="text-xs px-1.5 py-0.5 rounded flex-shrink-0"
-          style={{
-            background: "rgba(52,211,153,0.1)",
-            color: "var(--atlas-success)",
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: "10px",
-          }}>
-          ✓ 就绪
+          ? "rgba(248,113,113,0.08)"
+          : "rgba(91,140,255,0.08)",
+        border: `1px solid ${
+          file.status === "ready"
+            ? "rgba(52,211,153,0.2)"
+            : file.status === "error"
+            ? "rgba(248,113,113,0.2)"
+            : "rgba(91,140,255,0.2)"
+        }`,
+      }}
+    >
+      {file.status === "uploading" ? (
+        <Loader2 size={10} className="animate-spin flex-shrink-0" style={{ color: "var(--atlas-accent)" }} />
+      ) : file.status === "error" ? (
+        <X size={10} className="flex-shrink-0" style={{ color: "var(--atlas-danger)" }} />
+      ) : (
+        <FileSpreadsheet size={10} className="flex-shrink-0" style={{ color: "var(--atlas-success)" }} />
+      )}
+      <span
+        className="max-w-[140px] truncate font-medium"
+        style={{
+          color: file.status === "ready"
+            ? "var(--atlas-success)"
+            : file.status === "error"
+            ? "var(--atlas-danger)"
+            : "var(--atlas-accent)",
+        }}
+      >
+        {file.name}
+      </span>
+      {file.status === "ready" && file.dfInfo && (
+        <span style={{ color: "var(--atlas-text-3)" }}>
+          {file.dfInfo.row_count.toLocaleString()}行
         </span>
       )}
       <button
         onClick={onRemove}
-        className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-colors"
+        className="flex-shrink-0 transition-colors ml-0.5"
         style={{ color: "var(--atlas-text-3)" }}
         onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-danger)"}
         onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)"}
       >
-        <X size={11} />
+        <X size={10} />
       </button>
     </motion.div>
   );
@@ -483,23 +529,31 @@ function MessageBubble({
   if (message.role === "user") {
     return (
       <motion.div initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="flex justify-end">
-        <div className="max-w-[80%] px-4 py-2.5 rounded-xl"
-          style={{ background: "rgba(91,140,255,0.12)", border: "1px solid rgba(91,140,255,0.2)" }}>
-          <p className="text-sm leading-relaxed" style={{ color: "var(--atlas-text)" }}>{message.content}</p>
+        <div
+          className="max-w-[70%] px-5 py-3 rounded-2xl"
+          style={{ background: "rgba(91,140,255,0.12)", border: "1px solid rgba(91,140,255,0.2)" }}
+        >
+          <p style={{ color: "var(--atlas-text)", fontSize: "15px", lineHeight: "1.65" }}>
+            {message.content}
+          </p>
         </div>
       </motion.div>
     );
   }
 
   return (
-    <motion.div initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} className="flex gap-2.5">
-      <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
-        style={{ background: "rgba(91,140,255,0.12)", border: "1px solid rgba(91,140,255,0.2)" }}>
-        <Sparkles size={11} style={{ color: "var(--atlas-accent)" }} />
+    <motion.div initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} className="flex gap-3">
+      <div
+        className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+        style={{ background: "rgba(91,140,255,0.12)", border: "1px solid rgba(91,140,255,0.2)" }}
+      >
+        <Sparkles size={13} style={{ color: "var(--atlas-accent)" }} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="px-4 py-3 rounded-xl"
-          style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
+        <div
+          className="px-5 py-4 rounded-2xl"
+          style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}
+        >
           {message.isStreaming && !message.content ? (
             <div className="flex items-center gap-1.5 py-0.5">
               {[0, 1, 2].map(i => (
@@ -507,30 +561,39 @@ function MessageBubble({
               ))}
             </div>
           ) : (
-            <div className="atlas-prose"><Streamdown>{message.content}</Streamdown></div>
+            <div className="atlas-prose" style={{ fontSize: "15px", lineHeight: "1.7" }}>
+              <Streamdown>{message.content}</Streamdown>
+            </div>
           )}
         </div>
+
         {message.report_id && message.report_filename && (
-          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-2">
+          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-2.5">
             <button
               onClick={() => onDownload(message.report_id!, message.report_filename!)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
-              style={{ background: "rgba(91,140,255,0.1)", border: "1px solid rgba(91,140,255,0.25)", color: "var(--atlas-accent)" }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all"
+              style={{
+                background: "rgba(91,140,255,0.1)",
+                border: "1px solid rgba(91,140,255,0.25)",
+                color: "var(--atlas-accent)",
+                fontSize: "14px",
+              }}
               onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.18)"}
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.1)"}
             >
-              <Download size={13} />
+              <Download size={14} />
               下载 {message.report_filename}
             </button>
           </motion.div>
         )}
+
         {message.content && !message.isStreaming && (
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1 mt-1.5 text-xs transition-colors"
+            className="flex items-center gap-1 mt-2 text-xs transition-colors"
             style={{ color: copied ? "var(--atlas-success)" : "var(--atlas-text-3)" }}
           >
-            {copied ? <Check size={10} /> : <Copy size={10} />}
+            {copied ? <Check size={11} /> : <Copy size={11} />}
             {copied ? "已复制" : "复制"}
           </button>
         )}
@@ -539,19 +602,21 @@ function MessageBubble({
   );
 }
 
-// ── EmptyChat ─────────────────────────────────────────────────────────────────
+// ── EmptyState ────────────────────────────────────────────────────────────────
 
-function EmptyChat({ hasFiles, onTemplate }: { hasFiles: boolean; onTemplate: (t: string) => void }) {
+function EmptyState({ hasFiles }: { hasFiles: boolean }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full py-12 gap-5">
+    <div className="flex flex-col items-center justify-center py-20 gap-5">
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.3 }}
       >
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
-          style={{ background: "rgba(91,140,255,0.08)", border: "1px solid rgba(91,140,255,0.15)" }}>
-          <BarChart2 size={20} style={{ color: "var(--atlas-accent)" }} />
+        <div
+          className="w-14 h-14 rounded-2xl flex items-center justify-center"
+          style={{ background: "rgba(91,140,255,0.08)", border: "1px solid rgba(91,140,255,0.15)" }}
+        >
+          <BarChart2 size={24} style={{ color: "var(--atlas-accent)" }} />
         </div>
       </motion.div>
 
@@ -561,50 +626,18 @@ function EmptyChat({ hasFiles, onTemplate }: { hasFiles: boolean; onTemplate: (t
         transition={{ delay: 0.1 }}
         className="text-center"
       >
-        {/* Slogan — compact, not full-screen */}
-        <h3 className="text-base font-semibold mb-1" style={{ color: "var(--atlas-text)" }}>
-          {hasFiles
-            ? "文件已就绪，开始对话"
-            : "把数据拖进来，剩下的交给 ATLAS"}
+        <h3
+          className="font-semibold mb-2"
+          style={{ color: "var(--atlas-text)", fontSize: "17px" }}
+        >
+          {hasFiles ? "文件已就绪，开始对话" : "把数据拖进来，剩下的交给 ATLAS"}
         </h3>
-        <p className="text-sm" style={{ color: "var(--atlas-text-2)" }}>
+        <p style={{ color: "var(--atlas-text-2)", fontSize: "14px" }}>
           {hasFiles
-            ? "AI 已分析数据结构，告诉我你需要什么报表"
-            : "上传 Excel 或 CSV，一句话生成专业报表"}
+            ? "AI 已分析数据结构，点击上方模板或直接描述需求"
+            : "上传 Excel 或 CSV，支持同时上传多个文件"}
         </p>
       </motion.div>
-
-      {hasFiles && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="grid grid-cols-2 gap-2 w-full max-w-sm"
-        >
-          {SYSTEM_TEMPLATES.slice(0, 4).map((t, i) => (
-            <motion.button
-              key={t.id}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 + i * 0.05 }}
-              onClick={() => onTemplate(t.prompt)}
-              className="flex items-center gap-2 p-3 rounded-xl text-left transition-all"
-              style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.3)";
-                (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.04)";
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border)";
-                (e.currentTarget as HTMLElement).style.background = "var(--atlas-surface)";
-              }}
-            >
-              <span className="text-lg">{t.icon}</span>
-              <span className="text-xs font-medium" style={{ color: "var(--atlas-text-2)" }}>{t.name}</span>
-            </motion.button>
-          ))}
-        </motion.div>
-      )}
     </div>
   );
 }
