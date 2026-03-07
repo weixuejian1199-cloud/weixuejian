@@ -160,12 +160,6 @@ export default function MainWorkspace() {
     const msg = (text || input).trim();
     if (!msg || isGenerating) return;
 
-    // If no files, allow general chat (no file required for basic questions)
-    if (!hasFiles && !isQuickAction) {
-      toast.error("请先拖入数据文件，再开始分析");
-      return;
-    }
-
     setInput("");
     setIsGenerating(true);
     setPendingActions([]); // Clear pending actions when user sends
@@ -177,15 +171,15 @@ export default function MainWorkspace() {
     const sessionIds = readyFiles.map(f => f.sessionId).filter(Boolean) as string[];
     const primarySessionId = sessionIds[0];
 
-    if (!primarySessionId) {
-      updateLastMessage("文件尚未就绪，请稍后重试");
-      setIsGenerating(false);
-      return;
-    }
-
     // Detect if user wants a report/table generated
-    // NOTE: 「分析」「建议」「看看」等模糊词不触发报表生成，走对话路径让 AI 给选项
-    const isReport = /生成|报表|汇总|统计|导出|excel|xlsx|日报|排行|对比|工资条|工资单|薪资|薪酬|分红明细|考勤表|出勤表|迟到|旷工|早退|财务报表|销售报表|绩效表|奖金表|扣款|个税|实发|提取表格|整理表格|做表|做个表|帮我做|帮我生成|帮我整理|帮我提取|帮我汇总/i.test(msg);
+    // IMPORTANT: Analysis words like 「分析」「汇总」「统计」「可视化」 do NOT trigger report generation
+    // They go through chat pathway so AI can provide insights first
+    // isReport: only trigger report generation when user explicitly asks to CREATE/GENERATE
+    // Analysis/tutorial questions like 「怎么算工资条」「工资条需要什么资料」go through chat path
+    // isReport: only trigger report generation when user explicitly asks to CREATE/GENERATE
+    // Analysis/tutorial questions like 「怎么算工资条」「工资条需要什么资料」go through chat path
+    // Queries like 「报表在哪里」「历史报表」 also go through chat path
+    const isReport = /生成报表|导出表格|excel表|xlsx表|日报生成|(帮我|(帮我)?生成|(帮我)?制作|(帮我)?做一份|(帮我)?做个|(帮我)?输出|(帮我)?整理成|(帮我)?提取).{0,8}(工资条|工资单|薪资表|薪酬表|分红明细|考勤表|出勤表|财务报表|销售报表|绩效表|奖金表|扣款表|个税表|实发明细|表格)|排名表|对比表/i.test(msg);
 
     // Helper: parse 【①】方向名 format from AI reply into action buttons
     const parseInlineOptions = (text: string): SuggestedAction[] => {
@@ -203,7 +197,7 @@ export default function MainWorkspace() {
     };
 
     try {
-      if (isReport) {
+      if (isReport && primarySessionId) {
         setIsProcessing(true);
         updateLastMessage("好的，马上为您生成...");
 
@@ -385,10 +379,10 @@ export default function MainWorkspace() {
         <div className={
           messages.length === 0
             ? "h-full flex items-center justify-center px-6"
-            : "max-w-2xl mx-auto px-5 py-5 space-y-4"
+            : "w-full max-w-4xl mx-auto px-6 py-5 space-y-4"
         }>
           {messages.length === 0 ? (
-            <EmptyState onUpload={() => fileInputRef.current?.click()} />
+            <EmptyState onUpload={() => fileInputRef.current?.click()} onQuickAsk={(q) => handleSend(q)} />
           ) : (
             messages.map((msg, idx) => {
               const isLastAssistant =
@@ -411,7 +405,7 @@ export default function MainWorkspace() {
 
       {/* Bottom input area */}
       <div className="flex-shrink-0" style={{ borderTop: "1px solid var(--atlas-border)" }}>
-        <div className="max-w-2xl mx-auto px-5 pt-3 pb-4">
+        <div className="w-full max-w-4xl mx-auto px-6 pt-3 pb-4">
 
           {/* Input box */}
           <div
@@ -432,7 +426,7 @@ export default function MainWorkspace() {
               placeholder={
                 hasFiles
                   ? "描述你的需求，例如：帮我提取姓名和工资，生成汇总表..."
-                  : "把数据拖进来，或点击上传文件..."
+                  : "直接提问，或拖入 Excel/CSV 文件开始分析..."
               }
               disabled={isGenerating}
               rows={1}
@@ -801,79 +795,114 @@ function MessageBubble({
 
 // -- EmptyState ------------------------------------------------------------------
 
-function EmptyState({ onUpload }: { onUpload: () => void }) {
+function EmptyState({ onUpload, onQuickAsk }: { onUpload: () => void; onQuickAsk: (q: string) => void }) {
+  const quickQuestions = [
+    { icon: "💰", label: "怎么算工资条？", q: "怎么算工资条？需要提供什么资料？" },
+    { icon: "📅", label: "怎么做考勤汇总？", q: "怎么做考勤汇总？需要什么数据？" },
+    { icon: "🏪", label: "多店铺数据怎么汇总？", q: "我有多家店铺的数据，怎么汇总在一起？" },
+    { icon: "📊", label: "历史报表在哪里？", q: "我之前生成的报表在哪里查看和下载？" },
+    { icon: "🔍", label: "能帮我分析什么？", q: "ATLAS 能帮我分析哪些类型的数据？" },
+    { icon: "💸", label: "怎么算分红？", q: "怎么计算分红明细？需要提供什么数据？" },
+  ];
+
   return (
-    <div className="flex flex-col items-center justify-center gap-8 w-full max-w-md mx-auto text-center">
+    <div className="flex flex-col items-center justify-center gap-6 w-full max-w-2xl mx-auto text-center">
       {/* Logo */}
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.3 }}
-        className="flex flex-col items-center gap-4"
+        className="flex flex-col items-center gap-3"
       >
         <div
-          className="w-16 h-16 rounded-2xl flex items-center justify-center"
+          className="w-14 h-14 rounded-2xl flex items-center justify-center"
           style={{
             background: "rgba(91,140,255,0.08)",
             border: "1px solid rgba(91,140,255,0.15)",
           }}
         >
-          <BarChart2 size={28} style={{ color: "var(--atlas-accent)" }} />
+          <BarChart2 size={24} style={{ color: "var(--atlas-accent)" }} />
         </div>
         <div>
           <h3
-            className="font-semibold mb-2"
-            style={{ color: "var(--atlas-text)", fontSize: "18px", letterSpacing: "-0.3px" }}
+            className="font-semibold mb-1"
+            style={{ color: "var(--atlas-text)", fontSize: "17px", letterSpacing: "-0.3px" }}
           >
-            把数据拖进来，剩下的交给 ATLAS
+            你好，我是 ATLAS
           </h3>
           <p style={{ color: "var(--atlas-text-2)", fontSize: "13px", lineHeight: "1.6" }}>
-            支持 Excel / CSV，可同时拖入多个文件
+            行政 · 财务 · 数据分析 三合一智能助手
           </p>
+        </div>
+      </motion.div>
+
+      {/* Quick questions */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="w-full"
+      >
+        <p className="text-xs mb-3" style={{ color: "var(--atlas-text-3)" }}>直接提问，或上传文件开始分析</p>
+        <div className="grid grid-cols-2 gap-2">
+          {quickQuestions.map((q, i) => (
+            <motion.button
+              key={i}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 + i * 0.04 }}
+              onClick={() => onQuickAsk(q.q)}
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition-all"
+              style={{
+                background: "var(--atlas-surface)",
+                border: "1px solid var(--atlas-border)",
+                color: "var(--atlas-text-2)",
+                fontSize: "13px",
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.4)";
+                (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
+                (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.05)";
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border)";
+                (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+                (e.currentTarget as HTMLElement).style.background = "var(--atlas-surface)";
+              }}
+            >
+              <span style={{ fontSize: "15px" }}>{q.icon}</span>
+              <span>{q.label}</span>
+            </motion.button>
+          ))}
         </div>
       </motion.div>
 
       {/* Drop zone */}
       <motion.button
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        transition={{ delay: 0.3 }}
         onClick={onUpload}
-        className="w-full max-w-xs rounded-2xl py-8 flex flex-col items-center gap-3 transition-all"
+        className="w-full rounded-xl py-5 flex items-center justify-center gap-3 transition-all"
         style={{
-          border: "2px dashed rgba(91,140,255,0.25)",
-          background: "rgba(91,140,255,0.03)",
+          border: "2px dashed rgba(91,140,255,0.2)",
+          background: "rgba(91,140,255,0.02)",
           color: "var(--atlas-text-3)",
         }}
         onMouseEnter={e => {
-          (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.5)";
-          (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.06)";
+          (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.45)";
+          (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.05)";
           (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
         }}
         onMouseLeave={e => {
-          (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.25)";
-          (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.03)";
+          (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.2)";
+          (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.02)";
           (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
         }}
       >
-        <Upload size={24} />
-        <span className="text-sm font-medium">点击上传，或直接拖文件进来</span>
+        <Upload size={18} />
+        <span className="text-sm">拖入 Excel / CSV 文件，或点击上传（支持多文件）</span>
       </motion.button>
-
-      {/* Steps */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="flex items-center gap-3 text-xs"
-        style={{ color: "var(--atlas-text-3)" }}
-      >
-        <span style={{ color: "#5B8CFF" }}>① 拖入文件</span>
-        <span>→</span>
-        <span style={{ color: "#A78BFA" }}>② ATLAS 主动问你</span>
-        <span>→</span>
-        <span style={{ color: "#34D399" }}>③ 一键交付</span>
-      </motion.div>
     </div>
   );
 }
