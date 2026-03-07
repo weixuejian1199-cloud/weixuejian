@@ -368,6 +368,40 @@ export function registerAtlasRoutes(app: Express) {
 
       // Build field alias context for intelligent matching
       const allFieldNames = dfInfo.fields.map((f: FieldInfo) => f.name);
+
+      // Compute real statistics for numeric fields to give AI actual numbers
+      const numericStats = dfInfo.fields
+        .filter((f: FieldInfo) => f.type === 'numeric')
+        .map((f: FieldInfo) => {
+          const vals = data.map(row => Number(row[f.name])).filter(v => !isNaN(v) && v !== 0);
+          if (vals.length === 0) return null;
+          const sum = vals.reduce((a, b) => a + b, 0);
+          const avg = sum / vals.length;
+          const max = Math.max(...vals);
+          const min = Math.min(...vals);
+          const sorted = [...vals].sort((a, b) => b - a);
+          const zeros = data.filter(row => !row[f.name] || Number(row[f.name]) === 0).length;
+          // Detect outliers: values > avg * 3
+          const outliers = vals.filter(v => v > avg * 3).length;
+          return { name: f.name, sum: Math.round(sum), avg: Math.round(avg), max, min, zeros, outliers, count: vals.length, top3: sorted.slice(0, 3) };
+        })
+        .filter(Boolean);
+
+      // Detect categorical fields for grouping analysis
+      const categoricalFields = dfInfo.fields
+        .filter((f: FieldInfo) => f.type === 'text' && f.unique_count > 1 && f.unique_count <= 20)
+        .map((f: FieldInfo) => ({ name: f.name, uniqueCount: f.unique_count, samples: f.sample.slice(0, 5) }));
+
+      const statsContext = numericStats.length > 0 ? `
+真实统计数据（已计算）：
+${numericStats.map(s => `- ${s!.name}: 总和=${s!.sum.toLocaleString()}, 均値=${s!.avg.toLocaleString()}, 最高=${s!.max.toLocaleString()}, 最低=${s!.min.toLocaleString()}, 零値或空白=${s!.zeros}个, 异常高値(>3倍均値)=${s!.outliers}个`).join('\n')}
+` : '';
+
+      const categoryContext = categoricalFields.length > 0 ? `
+分组字段（可用于分组分析）：
+${categoricalFields.map(c => `- ${c.name}: ${c.uniqueCount}个不同分组, 示例: ${c.samples.join('/')}`).join('\n')}
+` : '';
+
       const fieldAliasContext = `
 字段智能匹配（重要）：
 - 用户说的词可能和实际字段名不完全一样，你需要智能匹配
@@ -376,22 +410,38 @@ export function registerAtlasRoutes(app: Express) {
 - 当前可用字段：${allFieldNames.join('、')}
 - 如果找不到精确匹配，选最相近的字段并告知用户
 `;
-        const systemPrompt = `你是 ATLAS，一个懂数据的朋友，不是冷冰冰的工具。和用户自然对话，像朋友一样交流。
+
+      const systemPrompt = `你是 ATLAS，一个懂数据的朋友，不是冷冰冰的工具。和用户自然对话，像朋友一样交流。
 
 当前数据：${filename}（${dfInfo.row_count} 行 × ${dfInfo.col_count} 列）
 字段：
 ${fieldSummary}
 数据样例（前10行）：
 ${sampleRows}
-${fieldAliasContext}
+${statsContext}${categoryContext}${fieldAliasContext}
 对话原则：
 1. 语气自然、轻松，可以用「好的」「没问题」「稍等」等口语
 2. 用户说「谢谢」「不错」等，正常回应，像朋友一样
-3. 如果用户要生成表格/报表/汇总/分析，直接告诉他「好的，马上为你生成」，不要让他去找按钮
+3. 如果用户明确要生成表格/报表/工资条/分红表，直接告诉他「好的，马上为你生成」
 4. 如果用户说「再细化」「换个格式」「加上XXX」，理解为对上一次结果的修改需求
-5. 用户说「查XX前N名」「找XX最高的」等，智能匹配字段，直接给出分析结果（从数据样例中计算）
-6. 回答简洁，不要废话，最多3-4句话
+5. 用户说「查XX前N名」「找XX最高的」等，智能匹配字段，直接给出分析结果（从上面的真实统计数据中计算）
+6. 回答简洁，不要废话，最多4-6句话
 7. 遇到数据问题可以直接给出数字分析结果，不要说「需要生成报表才能看到」
+
+「分析」模式（最重要）：
+当用户说「综合分析」「分析一下」「看看数据」「全面分析」「结合数据分析」「给点建议」等模糊意图时，绝对不要直接生成报表！必须：
+1. 用上面的真实统计数据，给出具体的数据洞察（不要空话，要有真实数字）：
+   - 数据概览（总行数、关键字段、总金额等）
+   - 关键发现（分布、差异、异常值等）
+   - 需要关注的点（零値用户、异常高値等）
+2. 提出 3-5 个具体分析方向，每个方向用「【数字】方向名」格式，例如：
+   【①】团队业绩排名
+   【②】个人分红分析
+   【③】异常用户排查
+   【④】自定义分析
+3. 说「请选择一个方向，我马上为你生成」
+前端会自动把「【①】方向名」格式的文字转换为可点击的按鈕。
+
 使用中文，语气友好专业。`;
 
       const openai = createLLM();

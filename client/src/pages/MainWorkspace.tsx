@@ -184,7 +184,23 @@ export default function MainWorkspace() {
     }
 
     // Detect if user wants a report/table generated
-    const isReport = /生成|报表|汇总|统计|分析|导出|excel|xlsx|日报|排行|对比|工资条|工资单|薪资|薪酬|分红|明细|合规|考勤|出勤|迟到|旷工|早退|财务|销售|绩效|奖金|扣款|个税|实发|提取|整理|做表|做个表|帮我做|帮我生成|帮我整理|帮我提取|帮我汇总/i.test(msg);
+    // NOTE: 「分析」「建议」「看看」等模糊词不触发报表生成，走对话路径让 AI 给选项
+    const isReport = /生成|报表|汇总|统计|导出|excel|xlsx|日报|排行|对比|工资条|工资单|薪资|薪酬|分红明细|考勤表|出勤表|迟到|旷工|早退|财务报表|销售报表|绩效表|奖金表|扣款|个税|实发|提取表格|整理表格|做表|做个表|帮我做|帮我生成|帮我整理|帮我提取|帮我汇总/i.test(msg);
+
+    // Helper: parse 【①】方向名 format from AI reply into action buttons
+    const parseInlineOptions = (text: string): SuggestedAction[] => {
+      const matches = Array.from(text.matchAll(/【([①②③④⑤⑥⑦⑧⑨⑩\d])】\s*([^\n【]+)/g));
+      if (matches.length === 0) return FOLLOWUP_ACTIONS;
+      const icons = ['📊', '📈', '🔍', '⚡', '🎯', '📋', '💡', '🔢'];
+      return [
+        ...matches.map((m, i) => ({
+          label: m[2].trim(),
+          prompt: m[2].trim(),
+          icon: icons[i % icons.length],
+        })),
+        { label: '自定义需求', prompt: '', icon: '✏️' },
+      ];
+    };
 
     try {
       if (isReport) {
@@ -239,9 +255,11 @@ export default function MainWorkspace() {
             updateLastMessage(accumulated);
           },
           onDone: (fullText) => {
-            updateLastMessage(fullText || accumulated, {
+            const finalText = fullText || accumulated;
+            const parsedActions = parseInlineOptions(finalText);
+            updateLastMessage(finalText, {
               // @ts-ignore
-              suggestedActions: FOLLOWUP_ACTIONS,
+              suggestedActions: parsedActions,
             });
           },
           onError: (err) => {
