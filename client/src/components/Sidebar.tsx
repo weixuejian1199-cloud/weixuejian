@@ -19,8 +19,8 @@ import { toast } from "sonner";
 const NAV_MAIN: { id: NavItem; icon: typeof Home; label: string }[] = [
   { id: "home",      icon: Home,            label: "工作台" },
   { id: "dashboard", icon: LayoutDashboard, label: "数据中枢" },
-  { id: "templates", icon: LayoutTemplate,  label: "模板库" },
   { id: "hr",        icon: Users,           label: "HR 中心" },
+  { id: "templates", icon: LayoutTemplate,  label: "模板库" },
   { id: "search",    icon: Search,          label: "搜索" },
   { id: "library",   icon: Archive,         label: "库" },
 ];

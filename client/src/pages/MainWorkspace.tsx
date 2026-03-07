@@ -331,36 +331,7 @@ export default function MainWorkspace() {
       <div className="flex-shrink-0" style={{ borderTop: "1px solid var(--atlas-border)" }}>
         <div className="max-w-3xl mx-auto px-6 pt-3 pb-4">
 
-          {/* Template shortcuts — centered, shown when few messages */}
-          {messages.length < 4 && (
-            <div className="flex items-center justify-center gap-2 mb-3">
-              {PINNED_TEMPLATES.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => handleSend(t.prompt)}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm transition-all"
-                  style={{
-                    background: "var(--atlas-elevated)",
-                    border: "1px solid var(--atlas-border)",
-                    color: "var(--atlas-text-2)",
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.35)";
-                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-text)";
-                    (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.06)";
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border)";
-                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
-                    (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
-                  }}
-                >
-                  <span>{t.icon}</span>
-                  <span className="font-medium">{t.name}</span>
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Template shortcuts removed — users upload files first then describe needs */}
 
           {/* Uploaded files chips */}
           <AnimatePresence>
@@ -720,23 +691,7 @@ function EmptyState({ hasFiles }: { hasFiles: boolean }) {
         ))}
       </motion.div>
 
-      {/* Capability tags */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
-        className="flex flex-wrap justify-center gap-2">
-        {[
-          { label: "📊 销售报表", color: "#5B8CFF" },
-          { label: "💰 财务分析", color: "#FBBF24" },
-          { label: "👥 工资条", color: "#34D399" },
-          { label: "📅 考勤汇总", color: "#5B8CFF" },
-          { label: "📦 库存盘点", color: "#A78BFA" },
-          { label: "📱 多平台对比", color: "#FF6B35" },
-        ].map(tag => (
-          <span key={tag.label} className="text-xs px-2.5 py-1 rounded-full"
-            style={{ background: `${tag.color}12`, color: tag.color, border: `1px solid ${tag.color}25` }}>
-            {tag.label}
-          </span>
-        ))}
-      </motion.div>
+
     </div>
   );
 }
