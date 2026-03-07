@@ -1,8 +1,49 @@
+/**
+ * ATLAS V3.0 — Global Design System
+ * Philosophy: Dark / Minimal / Structured / Calm
+ * Inspired by Manus, Linear, Vercel
+ * Colors: #0F1115 bg · #181B21 surface · #1E2128 elevated · #5B8CFF accent
+ * Typography: Inter (UI) + JetBrains Mono (code/data)
+ */
+
 @import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
+/* ── ATLAS Design Tokens ─────────────────────────────────────── */
+:root {
+  /* Backgrounds */
+  --atlas-bg:       #0F1115;
+  --atlas-surface:  #181B21;
+  --atlas-elevated: #1E2128;
+  --atlas-border:   rgba(255,255,255,0.07);
+  --atlas-border-2: rgba(255,255,255,0.12);
+
+  /* Text */
+  --atlas-text:   #F0F2F5;
+  --atlas-text-2: #8B92A0;
+  --atlas-text-3: #4A5260;
+
+  /* Accent: Science Blue */
+  --atlas-accent:     #5B8CFF;
+  --atlas-accent-dim: rgba(91,140,255,0.1);
+  --atlas-accent-2:   #7BA3FF;
+
+  /* Semantic */
+  --atlas-success: #34D399;
+  --atlas-warning: #FBBF24;
+  --atlas-danger:  #F87171;
+
+  /* Layout */
+  --atlas-topbar-h:  48px;
+  --atlas-sidebar-w: 220px;
+  --atlas-radius:    10px;
+  --atlas-radius-sm: 6px;
+  --atlas-radius-lg: 14px;
+}
+
+/* ── Tailwind Theme Override ─────────────────────────────────── */
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -27,11 +68,6 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -42,116 +78,286 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-:root {
-  --primary: var(--color-blue-700);
-  --primary-foreground: var(--color-blue-50);
-  --sidebar-primary: var(--color-blue-600);
-  --sidebar-primary-foreground: var(--color-blue-50);
-  --chart-1: var(--color-blue-300);
-  --chart-2: var(--color-blue-500);
-  --chart-3: var(--color-blue-600);
-  --chart-4: var(--color-blue-700);
-  --chart-5: var(--color-blue-800);
-  --radius: 0.65rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.235 0.015 65);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.235 0.015 65);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.235 0.015 65);
-  --secondary: oklch(0.98 0.001 286.375);
-  --secondary-foreground: oklch(0.4 0.015 65);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.141 0.005 285.823);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.623 0.214 259.815);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.235 0.015 65);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.623 0.214 259.815);
-}
-
 .dark {
-  --primary: var(--color-blue-700);
-  --primary-foreground: var(--color-blue-50);
-  --sidebar-primary: var(--color-blue-500);
-  --sidebar-primary-foreground: var(--color-blue-50);
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.85 0.005 65);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.85 0.005 65);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.85 0.005 65);
-  --secondary: oklch(0.24 0.006 286.033);
-  --secondary-foreground: oklch(0.7 0.005 65);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground:  oklch(0.92 0.005 65);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.488 0.243 264.376);
-  --chart-1: var(--color-blue-300);
-  --chart-2: var(--color-blue-500);
-  --chart-3: var(--color-blue-600);
-  --chart-4: var(--color-blue-700);
-  --chart-5: var(--color-blue-800);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.85 0.005 65);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground:  oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.488 0.243 264.376);
+  --radius: 0.65rem;
+  --background:          oklch(0.12 0.008 240);
+  --foreground:          oklch(0.93 0.005 240);
+  --card:                oklch(0.16 0.008 240);
+  --card-foreground:     oklch(0.93 0.005 240);
+  --popover:             oklch(0.16 0.008 240);
+  --popover-foreground:  oklch(0.93 0.005 240);
+  --primary:             oklch(0.62 0.18 255);
+  --primary-foreground:  oklch(0.99 0 0);
+  --secondary:           oklch(0.20 0.008 240);
+  --secondary-foreground:oklch(0.75 0.01 240);
+  --muted:               oklch(0.20 0.008 240);
+  --muted-foreground:    oklch(0.55 0.01 240);
+  --accent:              oklch(0.20 0.008 240);
+  --accent-foreground:   oklch(0.93 0.005 240);
+  --destructive:         oklch(0.65 0.22 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border:              oklch(1 0 0 / 8%);
+  --input:               oklch(1 0 0 / 10%);
+  --ring:                oklch(0.62 0.18 255);
+  --sidebar:             oklch(0.16 0.008 240);
+  --sidebar-foreground:  oklch(0.93 0.005 240);
+  --sidebar-primary:     oklch(0.62 0.18 255);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent:      oklch(0.20 0.008 240);
+  --sidebar-accent-foreground: oklch(0.93 0.005 240);
+  --sidebar-border:      oklch(1 0 0 / 8%);
+  --sidebar-ring:        oklch(0.62 0.18 255);
 }
 
+/* ── Base Resets ─────────────────────────────────────────────── */
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    box-sizing: border-box;
   }
+
+  html, body, #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    background: var(--atlas-bg);
+    color: var(--atlas-text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+
   button:not(:disabled),
-  [role="button"]:not([aria-disabled="true"]),
-  [type="button"]:not(:disabled),
-  [type="submit"]:not(:disabled),
-  [type="reset"]:not(:disabled),
-  a[href],
-  select:not(:disabled),
-  input[type="checkbox"]:not(:disabled),
-  input[type="radio"]:not(:disabled) {
-    @apply cursor-pointer;
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.18);
   }
 }
 
+/* ── Layout Components ───────────────────────────────────────── */
 @layer components {
-  /**
-   * Custom container utility that centers content and adds responsive padding.
-   *
-   * This overrides Tailwind's default container behavior to:
-   * - Auto-center content (mx-auto)
-   * - Add responsive horizontal padding
-   * - Set max-width for large screens
-   *
-   * Usage: <div className="container">...</div>
-   *
-   * For custom widths, use max-w-* utilities directly:
-   * <div className="max-w-6xl mx-auto px-4">...</div>
-   */
+  /* Top navigation bar */
+  .atlas-topbar {
+    height: var(--atlas-topbar-h);
+    background: var(--atlas-surface);
+    border-bottom: 1px solid var(--atlas-border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 8px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 40;
+  }
+
+  /* Left sidebar */
+  .atlas-sidebar {
+    width: var(--atlas-sidebar-w);
+    background: var(--atlas-surface);
+    border-right: 1px solid var(--atlas-border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  /* Sidebar nav item */
+  .atlas-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: var(--atlas-radius-sm);
+    color: var(--atlas-text-2);
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.15s ease;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+  }
+  .atlas-nav-item:hover {
+    background: rgba(255,255,255,0.05);
+    color: var(--atlas-text);
+  }
+
+  /* Divider */
+  .atlas-divider {
+    height: 1px;
+    background: var(--atlas-border);
+    margin: 4px 0;
+  }
+
+  /* Upload zone */
+  .atlas-upload-zone {
+    border: 1.5px dashed rgba(91,140,255,0.3);
+    border-radius: var(--atlas-radius);
+    background: rgba(91,140,255,0.03);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .atlas-upload-zone:hover {
+    border-color: rgba(91,140,255,0.6);
+    background: rgba(91,140,255,0.06);
+  }
+
+  /* Chat input container */
+  .atlas-chat-input {
+    background: var(--atlas-elevated);
+    border: 1px solid var(--atlas-border-2);
+    border-radius: var(--atlas-radius);
+    transition: border-color 0.15s ease;
+  }
+  .atlas-chat-input:focus-within {
+    border-color: rgba(91,140,255,0.4);
+  }
+
+  /* Message bubbles */
+  .atlas-msg-user {
+    background: rgba(91,140,255,0.12);
+    border: 1px solid rgba(91,140,255,0.2);
+    border-radius: var(--atlas-radius);
+    padding: 10px 14px;
+  }
+
+  .atlas-msg-ai {
+    background: var(--atlas-surface);
+    border: 1px solid var(--atlas-border);
+    border-radius: var(--atlas-radius);
+    padding: 12px 14px;
+    max-width: 100%;
+  }
+
+  /* Primary button */
+  .atlas-btn-primary {
+    background: var(--atlas-accent);
+    color: #fff;
+    border-radius: var(--atlas-radius-sm);
+    font-weight: 500;
+    transition: all 0.15s ease;
+    border: none;
+    cursor: pointer;
+  }
+  .atlas-btn-primary:hover {
+    background: var(--atlas-accent-2);
+    transform: translateY(-1px);
+  }
+
+  /* Quick prompt chips */
+  .atlas-chip {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    background: var(--atlas-elevated);
+    border: 1px solid var(--atlas-border);
+    color: var(--atlas-text-2);
+    transition: all 0.15s ease;
+    cursor: pointer;
+  }
+  .atlas-chip:hover {
+    border-color: var(--atlas-accent);
+    color: var(--atlas-accent);
+    background: rgba(91,140,255,0.08);
+  }
+
+  /* Thinking animation dots */
+  .atlas-thinking-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--atlas-accent);
+    animation: atlas-bounce 1.2s ease-in-out infinite;
+  }
+
+  /* Prose styles for AI messages */
+  .atlas-prose {
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: var(--atlas-text);
+  }
+  .atlas-prose p { margin: 0 0 8px; }
+  .atlas-prose p:last-child { margin-bottom: 0; }
+  .atlas-prose strong { color: var(--atlas-text); font-weight: 600; }
+  .atlas-prose code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: rgba(255,255,255,0.07);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--atlas-accent-2);
+  }
+  .atlas-prose pre {
+    background: var(--atlas-elevated);
+    border: 1px solid var(--atlas-border);
+    border-radius: var(--atlas-radius-sm);
+    padding: 12px;
+    overflow-x: auto;
+    margin: 8px 0;
+  }
+  .atlas-prose pre code {
+    background: none;
+    padding: 0;
+    font-size: 12px;
+    color: var(--atlas-text-2);
+  }
+  .atlas-prose ul, .atlas-prose ol {
+    padding-left: 18px;
+    margin: 4px 0 8px;
+  }
+  .atlas-prose li { margin: 2px 0; }
+  .atlas-prose h1, .atlas-prose h2, .atlas-prose h3 {
+    color: var(--atlas-text);
+    font-weight: 600;
+    margin: 12px 0 6px;
+  }
+  .atlas-prose h1 { font-size: 16px; }
+  .atlas-prose h2 { font-size: 14px; }
+  .atlas-prose h3 { font-size: 13px; }
+  .atlas-prose table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin: 8px 0;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .atlas-prose th {
+    background: var(--atlas-elevated);
+    color: var(--atlas-text-2);
+    font-weight: 600;
+    padding: 6px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--atlas-border);
+  }
+  .atlas-prose td {
+    padding: 5px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    color: var(--atlas-text);
+  }
+  .atlas-prose tr:last-child td { border-bottom: none; }
+
+  /* Container */
   .container {
     width: 100%;
     margin-left: auto;
     margin-right: auto;
-    padding-left: 1rem; /* 16px - mobile padding */
+    padding-left: 1rem;
     padding-right: 1rem;
   }
 
@@ -159,19 +365,23 @@
     min-height: 0;
     min-width: 0;
   }
-
-  @media (min-width: 640px) {
-    .container {
-      padding-left: 1.5rem; /* 24px - tablet padding */
-      padding-right: 1.5rem;
-    }
-  }
-
-  @media (min-width: 1024px) {
-    .container {
-      padding-left: 2rem; /* 32px - desktop padding */
-      padding-right: 2rem;
-      max-width: 1280px; /* Standard content width */
-    }
-  }
 }
+
+/* ── Animations ──────────────────────────────────────────────── */
+@keyframes atlas-bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes atlas-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes atlas-slide-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.atlas-fade-in { animation: atlas-fade-in 0.3s ease forwards; }
+.atlas-slide-in { animation: atlas-slide-in 0.25s ease forwards; }
