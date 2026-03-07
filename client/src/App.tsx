@@ -20,7 +20,6 @@ import LibraryPage from "./pages/LibraryPage";
 
 function AppContent() {
   const { activeNav, theme, showLoginModal } = useAtlas();
-
   const renderPage = () => {
     switch (activeNav) {
       case "dashboard":  return <DashboardPage />;
@@ -33,6 +32,7 @@ function AppContent() {
     }
   };
 
+  // make sure to consider if you need authentication for certain routes
   return (
     <div
       className={`flex flex-col h-screen overflow-hidden ${theme}`}
