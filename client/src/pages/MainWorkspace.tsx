@@ -288,6 +288,42 @@ export default function MainWorkspace() {
             toast.error("对话失败，请重试");
             setInput(msg);
           },
+          onTelegramTask: (taskId, pendingMsg) => {
+            // Show pending message immediately
+            updateLastMessage(pendingMsg, { isStreaming: false });
+            // Start polling for task completion (every 10s, max 20 times = 200s)
+            let attempts = 0;
+            const maxAttempts = 20;
+            const pollInterval = setInterval(async () => {
+              attempts++;
+              try {
+                const r = await fetch(`/api/atlas/task/${taskId}/status`, { credentials: "include" });
+                if (!r.ok) return;
+                const data = await r.json() as { status: string; reply?: string; output_files?: Array<{ name: string; fileUrl: string }> };
+                if (data.status === "completed" && data.reply) {
+                  clearInterval(pollInterval);
+                  const parsedActions = parseInlineOptions(data.reply);
+                  let finalMsg = data.reply;
+                  if (data.output_files && data.output_files.length > 0) {
+                    finalMsg += "\n\n📄 **输出文件**\n" + data.output_files.map(f => `- [${f.name}](${f.fileUrl})`).join("\n");
+                  }
+                  updateLastMessage(finalMsg, { suggestedActions: parsedActions } as any);
+                  toast.success("任务已完成！");
+                  setIsGenerating(false);
+                } else if (data.status === "error") {
+                  clearInterval(pollInterval);
+                  updateLastMessage(`处理失败，请重试。`);
+                  setIsGenerating(false);
+                } else if (attempts >= maxAttempts) {
+                  clearInterval(pollInterval);
+                  updateLastMessage(pendingMsg + "\n\n⏰ 处理时间较长，请稍后刷新页面查看结果。");
+                  setIsGenerating(false);
+                }
+              } catch (e) {
+                console.warn("[Poll] task status error:", e);
+              }
+            }, 10_000);
+          },
         });
       }
     } catch (err: any) {

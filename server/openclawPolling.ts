@@ -264,12 +264,46 @@ export async function notifyTelegramNewTask(task: {
   });
 }
 
-// ── Register routes ────────────────────────────────────────────────────────────
+// ─// ── GET /api/atlas/task/:taskId/status ────────────────────────────────
+// Frontend polls this to check if Telegram task has been completed
+
+async function getTaskStatus(req: Request, res: Response) {
+  const { taskId } = req.params;
+  if (!taskId) { res.status(400).json({ error: "taskId required" }); return; }
+
+  try {
+    const db = await getDb();
+    if (!db) { res.status(503).json({ error: "Database not available" }); return; }
+
+    const [task] = await db
+      .select()
+      .from(openclawTasks)
+      .where(eq(openclawTasks.id, taskId))
+      .limit(1);
+
+    if (!task) { res.status(404).json({ error: "Task not found" }); return; }
+
+    res.json({
+      task_id: task.id,
+      status: task.status,
+      reply: task.reply ?? null,
+      output_files: (task.outputFiles as Array<{ name: string; fileKey: string; fileUrl: string; mimeType: string }>) ?? [],
+      created_at: task.createdAt.toISOString(),
+      completed_at: task.completedAt?.toISOString() ?? null,
+    });
+  } catch (err) {
+    console.error("[Atlas] getTaskStatus error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+// ── Register routes ────────────────────────────────────────────────
 
 export function registerOpenClawPollingRoutes(app: Express) {
   app.get("/api/openclaw/tasks/pending", getPendingTasks);
   app.post("/api/openclaw/tasks/result", submitTaskResult);
-  console.log("[OpenClaw] Polling routes registered: GET /api/openclaw/tasks/pending, POST /api/openclaw/tasks/result");
+  app.get("/api/atlas/task/:taskId/status", getTaskStatus);
+  console.log("[OpenClaw] Polling routes registered: GET /api/openclaw/tasks/pending, POST /api/openclaw/tasks/result, GET /api/atlas/task/:taskId/status");
 
   // Start Telegram background poller (every 30 seconds)
   if (ENV.telegramBotToken && ENV.telegramChatId) {

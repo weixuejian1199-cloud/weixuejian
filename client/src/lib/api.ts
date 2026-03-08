@@ -79,6 +79,7 @@ export interface ChatStreamOptions {
   onChunk: (chunk: string) => void;
   onDone: (fullText: string) => void;
   onError: (err: Error) => void;
+  onTelegramTask?: (taskId: string, message: string) => void; // Called when task is routed to Telegram
 }
 
 export async function chatStream(opts: ChatStreamOptions): Promise<void> {
@@ -98,6 +99,22 @@ export async function chatStream(opts: ChatStreamOptions): Promise<void> {
       let msg = `HTTP ${res.status}`;
       try { const err = await res.json(); msg = err.error || msg; } catch {}
       throw new Error(msg);
+    }
+
+    // Check if response is a Telegram async task (JSON, not streaming)
+    const contentType = res.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json")) {
+      const json = await res.json() as { type?: string; task_id?: string; message?: string };
+      if (json.type === "telegram_task" && json.task_id) {
+        if (opts.onTelegramTask) {
+          opts.onTelegramTask(json.task_id, json.message ?? "");
+        } else {
+          onDone(json.message ?? "任务已提交，等待处理...");
+        }
+        return;
+      }
+      // Other JSON error
+      throw new Error((json as any).error || "Unknown error");
     }
 
     const reader = res.body?.getReader();

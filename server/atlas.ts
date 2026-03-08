@@ -817,11 +817,11 @@ ${dataTable}
 
       const totalRows = data.length;
 
-      // ── Dual-channel routing ─────────────────────────────────────────────
-      // If OpenClaw (小虾米) is configured, route through it.
-      // Otherwise fall back to Qwen3-Max streaming.
-      if (isOpenClawEnabled()) {
-        console.log("[Atlas] Routing to OpenClaw via Telegram async task");
+      // ── Telegram async task routing ────────────────────────────────────────
+      // If Telegram is configured, ALL tasks are pushed to Telegram for human/AI processing.
+      // No dependency on OpenClaw API Key.
+      if (ENV.telegramBotToken && ENV.telegramChatId) {
+        console.log("[Atlas] Routing to Telegram async task");
         try {
           // Get presigned S3 URLs for all session files
           const sessionDataKeys = allSessionIds.map(id => `atlas-data/${id}-data.json`);
@@ -844,7 +844,7 @@ ${dataTable}
               fileNames: fileNames as any,
               status: "pending",
             });
-            console.log(`[Atlas] Created OpenClaw task ${taskId}`);
+            console.log(`[Atlas] Created Telegram task ${taskId}`);
           }
 
           // 2. Push task to Telegram (fire-and-forget)
@@ -857,20 +857,16 @@ ${dataTable}
             externalUserId: String(userId),
           }).catch(e => console.warn("[Atlas] Telegram notify failed:", e));
 
-          // 3. Immediately return a streaming response indicating the task is queued
-          res.setHeader("Content-Type", "text/plain; charset=utf-8");
-          res.setHeader("Transfer-Encoding", "chunked");
-          const queuedMsg =
-            `✅ 任务已提交，正在处理中...\n\n` +
-            `📋 **任务 ID**：\`${taskId}\`\n` +
-            `📁 **文件**：${fileNames.join("、") || "无附件"}\n` +
-            `💬 **需求**：${message.slice(0, 100)}${message.length > 100 ? "..." : ""}\n\n` +
-            `⏳ 处理完成后结果将自动推送到对话中。通常需要 1-5 分钟，请稍候。`;
-          res.write(queuedMsg);
-          res.end();
+          // 3. Return JSON response with task_id so frontend can poll
+          res.setHeader("Content-Type", "application/json");
+          res.json({
+            type: "telegram_task",
+            task_id: taskId,
+            message: `✅ 任务已提交，正在处理中...\n\n📋 任务 ID：${taskId}\n📁 文件：${fileNames.join("、") || "无附件"}\n💬 需求：${message.slice(0, 100)}${message.length > 100 ? "..." : ""}\n\n⏳ 处理完成后结果将自动显示，通常需要 1-5 分钟，请稍候。`,
+          });
           return;
-        } catch (openClawErr: any) {
-          console.error("[Atlas] OpenClaw task creation failed, falling back to Qwen:", openClawErr.message);
+        } catch (telegramErr: any) {
+          console.error("[Atlas] Telegram task creation failed, falling back to Qwen:", telegramErr.message);
           // Fall through to Qwen on error
         }
       }
