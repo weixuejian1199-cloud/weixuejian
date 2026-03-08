@@ -71,6 +71,20 @@
       "when": 1772948927122,
       "tag": "0009_panoramic_true_believers",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1772954284983,
+      "tag": "0010_wild_dark_beast",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1772954443528,
+      "tag": "0011_material_firebrand",
+      "breakpoints": true
     }
   ]
 }

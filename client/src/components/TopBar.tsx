@@ -4,11 +4,12 @@
  * - Mobile: hamburger menu to toggle sidebar
  * - Desktop: breadcrumb + status + user avatar
  */
-import { useState, useEffect } from "react";
-import { Plus, Loader2, Menu, Bell, HelpCircle, ChevronRight } from "lucide-react";
-import { useAtlas } from "@/contexts/AtlasContext";
+import { useState, useEffect, useRef } from "react";
+import { Plus, Loader2, Menu, Bell, HelpCircle, ChevronRight, LogOut, Settings, ChevronDown } from "lucide-react";
+import { useAtlas, type NavItem } from "@/contexts/AtlasContext";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 
 const SECTION_NAMES: Record<string, string> = {
   home:      "工作台",
@@ -17,6 +18,173 @@ const SECTION_NAMES: Record<string, string> = {
   history:   "历史记录",
   settings:  "设置",
 };
+
+// ── UserMenu Component ──────────────────────────────────────────────────────
+function UserMenu({
+  user,
+  setActiveNav,
+  setShowLoginModal,
+}: {
+  user: { name: string; email?: string } | null;
+  setActiveNav: (nav: NavItem) => void;
+  setShowLoginModal: (v: boolean) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const logoutMut = trpc.auth.logout.useMutation({
+    onSuccess: () => {
+      toast.success("已退出登录");
+      setOpen(false);
+      window.location.reload();
+    },
+    onError: () => toast.error("退出失败，请重试"),
+  });
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    if (open) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  if (!user) {
+    return (
+      <button
+        onClick={() => setShowLoginModal(true)}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+        style={{
+          background: "rgba(91,140,255,0.1)",
+          border: "1px solid rgba(91,140,255,0.2)",
+          color: "var(--atlas-accent)",
+        }}
+        onMouseEnter={e => (e.currentTarget.style.background = "rgba(91,140,255,0.18)")}
+        onMouseLeave={e => (e.currentTarget.style.background = "rgba(91,140,255,0.1)")}
+      >
+        登录
+      </button>
+    );
+  }
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all"
+        style={{
+          background: open ? "var(--atlas-elevated)" : "transparent",
+          border: "1px solid " + (open ? "var(--atlas-border-2)" : "transparent"),
+        }}
+        onMouseEnter={e => {
+          (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
+          (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border)";
+        }}
+        onMouseLeave={e => {
+          if (!open) {
+            (e.currentTarget as HTMLElement).style.background = "transparent";
+            (e.currentTarget as HTMLElement).style.borderColor = "transparent";
+          }
+        }}
+      >
+        {/* Avatar circle */}
+        <div
+          className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+          style={{
+            background: "linear-gradient(135deg, #5B8CFF 0%, #7B5FFF 100%)",
+            color: "#fff",
+          }}
+        >
+          {user.name[0].toUpperCase()}
+        </div>
+        {/* Name (hidden on mobile) */}
+        <span
+          className="hidden sm:block text-xs font-medium max-w-[80px] truncate"
+          style={{ color: "var(--atlas-text)" }}
+        >
+          {user.name}
+        </span>
+        <ChevronDown
+          size={11}
+          className="hidden sm:block transition-transform"
+          style={{
+            color: "var(--atlas-text-3)",
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+          }}
+        />
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-1.5 rounded-xl overflow-hidden"
+          style={{
+            background: "var(--atlas-elevated)",
+            border: "1px solid var(--atlas-border)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+            minWidth: "160px",
+            zIndex: 100,
+          }}
+        >
+          {/* User info */}
+          <div
+            className="px-3 py-2.5"
+            style={{ borderBottom: "1px solid var(--atlas-border)" }}
+          >
+            <p className="text-xs font-semibold truncate" style={{ color: "var(--atlas-text)" }}>
+              {user.name}
+            </p>
+            {user.email && (
+              <p className="text-xs truncate mt-0.5" style={{ color: "var(--atlas-text-3)" }}>
+                {user.email}
+              </p>
+            )}
+            <div
+              className="flex items-center gap-1 mt-1.5"
+            >
+              <div
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: "var(--atlas-success)" }}
+              />
+              <span className="text-xs" style={{ color: "var(--atlas-success)", fontSize: "10px" }}>
+                已登录
+              </span>
+            </div>
+          </div>
+          {/* Menu items */}
+          <div className="py-1">
+            <button
+              onClick={() => { setActiveNav("settings"); setOpen(false); }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-xs transition-all"
+              style={{ color: "var(--atlas-text-2)" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "var(--atlas-surface)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+            >
+              <Settings size={12} />
+              账号设置
+            </button>
+            <button
+              onClick={() => logoutMut.mutate()}
+              disabled={logoutMut.isPending}
+              className="flex items-center gap-2 w-full px-3 py-2 text-xs transition-all"
+              style={{ color: "#F87171" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "rgba(248,113,113,0.08)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+            >
+              {logoutMut.isPending ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
+                <LogOut size={12} />
+              )}
+              退出登录
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function TopBar() {
   const {
@@ -195,38 +363,8 @@ export default function TopBar() {
         {/* Divider */}
         <div className="w-px h-4 mx-1 hidden sm:block" style={{ background: "var(--atlas-border)" }} />
 
-        {/* User Avatar */}
-        {user ? (
-          <button
-            onClick={() => setActiveNav("settings")}
-            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-all"
-            style={{
-              background: "linear-gradient(135deg, #5B8CFF 0%, #7B5FFF 100%)",
-              color: "#fff",
-            }}
-            title={user.name}
-          >
-            {user.name[0].toUpperCase()}
-          </button>
-        ) : (
-          <button
-            onClick={() => setShowLoginModal(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
-            style={{
-              background: "rgba(91,140,255,0.1)",
-              border: "1px solid rgba(91,140,255,0.2)",
-              color: "var(--atlas-accent)",
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.18)";
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.1)";
-            }}
-          >
-            登录
-          </button>
-        )}
+        {/* User Avatar / Login */}
+        <UserMenu user={user} setActiveNav={setActiveNav} setShowLoginModal={setShowLoginModal} />
       </div>
     </header>
   );

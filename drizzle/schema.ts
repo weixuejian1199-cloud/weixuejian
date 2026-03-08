@@ -79,7 +79,7 @@ export const reports = mysqlTable("reports", {
   prompt:     text("prompt"),
   status:     mysqlEnum("status", ["generating", "completed", "failed"])
                 .default("generating").notNull(),
-  // Auto-expire after 24 hours
+  // Auto-expire after 7 days
   expiresAt:  timestamp("expiresAt").notNull(),
   createdAt:  timestamp("createdAt").defaultNow().notNull(),
   updatedAt:  timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -173,7 +173,7 @@ export const hrPayslipRecords = mysqlTable("hr_payslip_records", {
   reportFileUrl:  text("reportFileUrl"),
   emailStatus:    varchar("emailStatus", { length: 20 }),  // null | 'sending' | 'done' | 'partial'
   emailSentCount: int("emailSentCount").default(0),
-  expiresAt:      timestamp("expiresAt").notNull(),          // 1h expiry for sensitive data
+  expiresAt:      timestamp("expiresAt").notNull(),  // Auto-expire after 7 days
   status:         mysqlEnum("status", ["generating", "ready", "error"]).default("generating").notNull(),
   createdAt:      timestamp("createdAt").defaultNow().notNull(),
   updatedAt:      timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

@@ -194,7 +194,7 @@ export const appRouter = router({
           filename: `${input.title}_${id}.xlsx`,
           prompt: input.prompt,
           status: "generating",
-          expiresAt: in24Hours(),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
         });
         return { id };
       }),

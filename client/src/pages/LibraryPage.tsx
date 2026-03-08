@@ -155,7 +155,7 @@ function SessionsTab({ query }: { query: string }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1.5 opacity-30 group-hover:opacity-100 transition-opacity">
             <button
               onClick={() => {
                 setActiveTaskId(session.id);
@@ -244,16 +244,7 @@ function ReportsTab({
       return bT - aT;
     });
 
-  const getExpiry = (createdAt: Date | null) => {
-    if (!createdAt) return null;
-    const remaining = new Date(createdAt).getTime() + 86_400_000 - Date.now();
-    if (remaining <= 0) return { label: "已过期", color: "#F87171", urgent: true };
-    const h = Math.floor(remaining / 3_600_000);
-    const m = Math.floor((remaining % 3_600_000) / 60_000);
-    if (h < 1) return { label: `${m}分钟后过期`, color: "#F87171", urgent: true };
-    if (h < 6) return { label: `${h}小时后过期`, color: "#FBBF24", urgent: true };
-    return { label: `${h}小时后过期`, color: "var(--atlas-text-3)", urgent: false };
-  };
+  // Reports are now stored permanently, no expiry display needed
 
   if (isLoading) {
     return (
@@ -292,7 +283,6 @@ function ReportsTab({
     <div className="space-y-2 mt-4">
       {filtered.map((report, i) => {
         const ok = report.status === "completed";
-        const exp = ok ? getExpiry(report.createdAt) : null;
         return (
           <motion.div
             key={report.id}
@@ -343,20 +333,7 @@ function ReportsTab({
                       : `${report.fileSizeKb} KB`}
                   </span>
                 )}
-                {exp && (
-                  <span
-                    className="text-xs px-1.5 py-0.5 rounded-md"
-                    style={{
-                      color: exp.color,
-                      background: exp.urgent ? exp.color + "18" : "transparent",
-                      border: exp.urgent ? "1px solid " + exp.color + "40" : "none",
-                      fontFamily: "'JetBrains Mono', monospace",
-                      fontSize: "10px",
-                    }}
-                  >
-                    {exp.label}
-                  </span>
-                )}
+
               </div>
             </div>
 
@@ -377,7 +354,7 @@ function ReportsTab({
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1.5 opacity-30 group-hover:opacity-100 transition-opacity">
               {ok && (
                 <button
                   onClick={() => {

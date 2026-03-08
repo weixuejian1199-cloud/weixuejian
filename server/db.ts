@@ -175,7 +175,7 @@ export async function getReport(id: string) {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select().from(reports)
-    .where(and(eq(reports.id, id), gt(reports.expiresAt, new Date())))
+    .where(eq(reports.id, id))
     .limit(1);
   return result[0];
 }
@@ -184,7 +184,7 @@ export async function getUserReports(userId: number) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(reports)
-    .where(and(eq(reports.userId, userId), gt(reports.expiresAt, new Date())))
+    .where(eq(reports.userId, userId))
     .orderBy(reports.createdAt);
 }
 
@@ -194,7 +194,7 @@ export async function deleteReport(id: string) {
   await db.delete(reports).where(eq(reports.id, id));
 }
 
-/** Delete expired reports and return their S3 keys for cleanup */
+/** Delete expired reports (expiresAt <= now) and return their S3 keys for cleanup */
 export async function deleteExpiredReports() {
   const db = await getDb();
   if (!db) return [];

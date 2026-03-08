@@ -206,7 +206,7 @@ ${sampleRows}
     fileSizeKb: Math.ceil(excelBuffer.length / 1024),
     prompt: requirement,
     status: "completed",
-    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
   });
 
   return { reportId, reportUrl, title: reportData.title || safeTitle, insights: reportData.insights || "" };

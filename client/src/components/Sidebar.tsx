@@ -395,9 +395,14 @@ export default function Sidebar() {
                       }}
                       onMouseEnter={e => {
                         if (!isActive) (e.currentTarget as HTMLElement).style.background = "var(--atlas-nav-hover-bg)";
+                        const bar = (e.currentTarget as HTMLElement).querySelector<HTMLElement>("[data-action-bar]");
+                        if (bar) bar.style.opacity = "1";
                       }}
                       onMouseLeave={e => {
                         if (!isActive) (e.currentTarget as HTMLElement).style.background = "transparent";
+                        const bar = (e.currentTarget as HTMLElement).querySelector<HTMLElement>("[data-action-bar]");
+                        // Keep visible if dropdown menu is open
+                        if (bar && !menuOpen) bar.style.opacity = "0";
                       }}
                     >
                       {/* Main click area */}
@@ -434,10 +439,16 @@ export default function Sidebar() {
                         </div>
                       </button>
 
-                      {/* Action buttons — visible on hover */}
+                      {/* Action buttons — visible on hover or when menu is open */}
                       <div
-                        className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                        style={{ background: "var(--atlas-surface)", borderRadius: 6, padding: "2px" }}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 transition-opacity"
+                        style={{
+                          background: "var(--atlas-surface)",
+                          borderRadius: 6,
+                          padding: "2px",
+                          opacity: menuOpen ? 1 : 0,
+                        }}
+                        data-action-bar
                       >
                         {/* Rerun */}
                         <button

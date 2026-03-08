@@ -491,7 +491,7 @@ export function registerHrRoutes(app: Express) {
         fileSizeKb: Math.ceil(buffer.length / 1024),
         employeeCount: data.length,
         fieldMap: fieldMap as any,
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1h
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
         status: "ready",
       });
 

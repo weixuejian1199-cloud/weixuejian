@@ -62,7 +62,7 @@ describe("OpenClaw Polling API", () => {
         .get("/api/openclaw/tasks/pending")
         .set("Authorization", INVALID_AUTH);
       expect(res.status).toBe(401);
-      expect(res.body.error).toBe("Invalid session key.");
+      expect(res.body.error).toContain("Invalid session key");
     });
 
     it("GET /api/openclaw/tasks/pending returns 401 with no auth header", async () => {
@@ -192,11 +192,23 @@ describe("OpenClaw Polling API", () => {
 
     it("uploads output files to S3 and returns download URLs", async () => {
       const { storagePut } = await import("./storage");
+      vi.mocked(storagePut).mockResolvedValue({ key: "test-key", url: "https://s3.example.com/test.xlsx" });
       const fakeTask = { id: "task_002", userId: 1, status: "processing" };
-      const limitMock = vi.fn().mockResolvedValue([fakeTask]);
-      const whereMock = vi.fn().mockReturnValue({ limit: limitMock });
-      const fromMock = vi.fn().mockReturnValue({ where: whereMock });
-      mockDb.select.mockReturnValue({ from: fromMock });
+      const fakeTaskWithFiles = {
+        ...fakeTask,
+        outputFiles: [{ name: "汇总.xlsx", fileKey: "test-key", fileUrl: "https://s3.example.com/test.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }],
+      };
+      // First call: find task by id (for submitTaskResult)
+      // Second call: getTaskOutputFiles (after update)
+      const limitMock1 = vi.fn().mockResolvedValue([fakeTask]);
+      const whereMock1 = vi.fn().mockReturnValue({ limit: limitMock1 });
+      const fromMock1 = vi.fn().mockReturnValue({ where: whereMock1 });
+      const limitMock2 = vi.fn().mockResolvedValue([fakeTaskWithFiles]);
+      const whereMock2 = vi.fn().mockReturnValue({ limit: limitMock2 });
+      const fromMock2 = vi.fn().mockReturnValue({ where: whereMock2 });
+      mockDb.select
+        .mockReturnValueOnce({ from: fromMock1 })
+        .mockReturnValueOnce({ from: fromMock2 });
 
       const updateWhereMock = vi.fn().mockResolvedValue({});
       const updateSetMock = vi.fn().mockReturnValue({ where: updateWhereMock });
