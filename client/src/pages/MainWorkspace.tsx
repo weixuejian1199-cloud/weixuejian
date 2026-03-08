@@ -51,6 +51,7 @@ export default function MainWorkspace() {
   const [input, setInput] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [activeFileMenu, setActiveFileMenu] = useState<string | null>(null);
   // Store suggested actions from last upload (per-session)
   const [pendingActions, setPendingActions] = useState<SuggestedAction[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -391,12 +392,13 @@ export default function MainWorkspace() {
         <span className="text-sm font-semibold" style={{ color: "var(--atlas-text)" }}>ATLAS AI</span>
 
         {hasAnyFiles && (
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap" style={{ position: "relative" }}>
             {uploadedFiles.map(f => (
               <span
                 key={f.id}
                 className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full group/chip"
                 style={{
+                  position: "relative",
                   background: f.status === "ready" ? "rgba(52,211,153,0.1)" : "rgba(91,140,255,0.1)",
                   color: f.status === "ready" ? "var(--atlas-success)" : "var(--atlas-accent)",
                   border: `1px solid ${f.status === "ready" ? "rgba(52,211,153,0.2)" : "rgba(91,140,255,0.2)"}`,
@@ -412,17 +414,76 @@ export default function MainWorkspace() {
                 )}
                 {f.status !== "uploading" && (
                   <button
-                    onClick={e => { e.stopPropagation(); removeUploadedFile(f.id); }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      setActiveFileMenu(prev => prev === f.id ? null : f.id);
+                    }}
                     className="ml-0.5 rounded-full flex items-center justify-center opacity-0 group-hover/chip:opacity-100 transition-opacity hover:bg-black/20"
-                    style={{ width: 12, height: 12, flexShrink: 0 }}
-                    title={`删除 ${f.name}`}
+                    style={{ width: 14, height: 14, flexShrink: 0, fontSize: "11px", lineHeight: 1 }}
+                    title="文件操作"
                   >
-                    <X size={8} />
+                    ⋮
                   </button>
+                )}
+                {/* Dropdown menu - rendered inside the chip so it stays anchored */}
+                {activeFileMenu === f.id && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 6px)",
+                      left: 0,
+                      zIndex: 9999,
+                      background: "var(--atlas-surface)",
+                      border: "1px solid var(--atlas-border-2)",
+                      borderRadius: 8,
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+                      minWidth: 120,
+                      padding: "4px 0",
+                    }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <button
+                      className="w-full text-left px-3 py-1.5 text-xs transition-colors"
+                      style={{ color: "var(--atlas-text-2)", display: "block" }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
+                      onClick={() => {
+                        const newName = prompt("重命名文件", f.name);
+                        if (newName && newName.trim() && newName !== f.name) {
+                          updateUploadedFile(f.id, { name: newName.trim() });
+                          toast.success("已重命名");
+                        }
+                        setActiveFileMenu(null);
+                      }}
+                    >
+                      重命名
+                    </button>
+                    <div style={{ height: 1, background: "var(--atlas-border)", margin: "2px 0" }} />
+                    <button
+                      className="w-full text-left px-3 py-1.5 text-xs transition-colors"
+                      style={{ color: "#f87171", display: "block" }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(248,113,113,0.08)"}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
+                      onClick={() => {
+                        removeUploadedFile(f.id);
+                        setActiveFileMenu(null);
+                      }}
+                    >
+                      删除
+                    </button>
+                  </div>
                 )}
               </span>
             ))}
           </div>
+        )}
+        {/* Backdrop to close menu on outside click */}
+        {activeFileMenu && (
+          <div
+            style={{ position: "fixed", inset: 0, zIndex: 9998 }}
+            onClick={() => setActiveFileMenu(null)}
+          />
         )}
 
         <div className="flex-1" />

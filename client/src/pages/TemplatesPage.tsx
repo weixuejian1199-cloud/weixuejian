@@ -8,7 +8,7 @@ import {
   LayoutTemplate, Plus, Search, Sparkles,
   FileSpreadsheet, TrendingUp, BarChart2, PieChart, Table2,
   Users, Package, DollarSign, X, Loader2, ChevronRight,
-  Pencil, Trash2, Pin, Check, Eye,
+  Pencil, Trash2, Pin, Check, Eye, Download,
 } from "lucide-react";
 import { useAtlas } from "@/contexts/AtlasContext";
 import { toast } from "sonner";
@@ -35,6 +35,8 @@ interface Template {
   fields?: TemplateField[];
   sampleRows?: string[][];
   useCases?: string[];
+  downloadUrl?: string;  // 演示文件下载链接
+  downloadName?: string; // 下载文件名
 }
 
 const ICON_MAP: Record<string, typeof FileSpreadsheet> = {
@@ -47,6 +49,8 @@ const BUILTIN_TEMPLATES: Template[] = [
     id: "hr1", title: "工资条生成", category: "HR", desc: "批量生成员工工资条，自动计算个税和社保", iconName: "Users", color: "#34D399",
     prompt: "请生成工资条，包含：员工姓名、基本工资、绩效奖金、各项扣款、应发工资、个税计算、实发工资，按人生成独立工资条",
     pinned: true, custom: false, usageCount: 0,
+    downloadUrl: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663411580888/XiOhktoteDAgWqsI.xlsx?Expires=1804472168&Signature=vAS9vO~3xADVduR1PXlYXULAYSjBcyQ-YWP6osAXy1AUhwoWprIJ3FlDJx-ViqONM3GacGL5c9nbuMyDdKR8KYPJfi9Q0RlbZUpHLkJkSkdrNCYqxi4snUiYFLbcnCFb~hF0-OKdkdMEb63smoZVGSA~rFjr8KpQK7aItvbMGIw924yO8-ccR8H-XPreX3O9Em-8LohU9N~RkKVSfNs8bwNAOxJXreiXT49889GsPlLNsQ0m-TdqavMlfWkB2VK8nosFJODQNb0MRfQT6Zi9mK1BuFgvaoEF8LY1b2YCIdzV2nQV~zto9Dc5v4PvXFni8p18SznhKrXbwSyX0KwXQA__&Key-Pair-Id=K2HSFNDJXOU9YS",
+    downloadName: "工资条演示模板.xlsx",
     fields: [
       { name: "员工姓名", type: "文本", example: "张三" },
       { name: "基本工资", type: "数字", example: "8000" },
@@ -66,6 +70,8 @@ const BUILTIN_TEMPLATES: Template[] = [
     id: "hr2", title: "考勤汇总报表", category: "HR", desc: "按月汇总出勤、迟到、旷工、加班数据", iconName: "Table2", color: "#5B8CFF",
     prompt: "请生成考勤汇总报表，包含：员工姓名、部门、出勤天数、迟到次数、早退次数、旷工天数、加班时长、异常明细",
     pinned: true, custom: false, usageCount: 0,
+    downloadUrl: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663411580888/WAiVaykjwgoyCutR.xlsx?Expires=1804472168&Signature=kkRPS7Jf4qMIXg5afrE77cMXp19xqEBf9IgLxWpouZyJk8DPD1soIL98C0tf2DG~S~HzbIxF2y~p1WXJQJYNVPsmo0dotE~H2rwJpRBHf0VFyjb-ds8NtXHAFCqssgH0g9cqLnr46EC6fraiHl-NQs68W-OJGpu5nYc7om9gi4E-cU2YuOoodz5klVHo0kxZkxtKAIOChJvtRMHOJd~8C1YDTWBP5AbvLl45OsMimY0JhJkr56qKwNY4noYzqE-e2h-U5ILps8gUVQIT9HyeOVlRLaGh92HMOGXw0GmpZxoNG1F9SdU6A2Z78OT9gapHNWalPKQTdSPPSr6IPRkTDA__&Key-Pair-Id=K2HSFNDJXOU9YS",
+    downloadName: "考勤记录演示模板.xlsx",
     fields: [
       { name: "员工姓名", type: "文本", example: "张三" },
       { name: "部门", type: "文本", example: "销售部" },
@@ -121,7 +127,9 @@ const BUILTIN_TEMPLATES: Template[] = [
   {
     id: "t1", title: "销售汇总报表", category: "销售", desc: "按时间、品类、渠道汇总销售额、订单量、客单价", iconName: "TrendingUp", color: "#5B8CFF",
     prompt: "请生成销售汇总报表，包含：总销售额、订单数、客单价、按日期趋势、按品类分布、环比增长率",
-    pinned: true, custom: false, usageCount: 128,
+    pinned: false, custom: false, usageCount: 312,
+    downloadUrl: "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663411580888/szWmQXnatvESufvz.xlsx?Expires=1804472168&Signature=a7aPEufibwq~5cx54pMS5Ubc-7bWPxjgoVTr6WUad68qrRb6ddiqzxg7MFqnYryK78q1JlyzzDeZP1NT1hInMy0nM7cc0nkvxiDdPVsUQWadBOLjRgvVdCjBx4oCvuGLp2KUzXqzQr9rD3G0sRLBplZRHr3ty9xtrhxuqgCdqBpo6uBcicIdH-nr-jO6EyNgO8fbTUbaUdDry-Uv9CoMbCzmGFApPLMUUHiFqX~PBs-JVxVrHjmu70Ph9n6QTLciLwUz6YSYxWIb838qlKf9Wmay8rBSH1KiHeGL~ovvkngCp5odz7ROiTyOT95KqQFjuwk1cPuoz25uMVlCrOiJ6g__&Key-Pair-Id=K2HSFNDJXOU9YS",
+    downloadName: "销售数据演示模板.xlsx",
     fields: [
       { name: "日期", type: "日期", example: "2026-03-01" },
       { name: "销售额", type: "数字", example: "12580" },
@@ -439,6 +447,20 @@ export default function TemplatesPage() {
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)"}>
               <Eye size={11} /> 预览
             </button>
+            {t.downloadUrl && (
+              <a
+                href={t.downloadUrl}
+                download={t.downloadName || "演示模板.xlsx"}
+                className="flex items-center gap-1 text-xs font-medium"
+                style={{ color: "var(--atlas-text-3)" }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)"}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)"}
+                onClick={e => e.stopPropagation()}
+                title="下载演示文件"
+              >
+                <Download size={11} /> 示例
+              </a>
+            )}
             <button onClick={() => useTemplate(t)}
               className="flex items-center gap-1 text-xs font-medium"
               style={{ color: "var(--atlas-accent)" }}
@@ -552,11 +574,25 @@ export default function TemplatesPage() {
               </div>
               {/* Footer */}
               <div className="px-5 py-4 flex items-center justify-between flex-shrink-0" style={{ borderTop: "1px solid var(--atlas-border)" }}>
-                <button onClick={() => setPreviewTemplate(null)}
-                  className="px-4 py-2 rounded-lg text-sm"
-                  style={{ color: "var(--atlas-text-3)", background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}>
-                  关闭
-                </button>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setPreviewTemplate(null)}
+                    className="px-4 py-2 rounded-lg text-sm"
+                    style={{ color: "var(--atlas-text-3)", background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}>
+                    关闭
+                  </button>
+                  {previewTemplate.downloadUrl && (
+                    <a
+                      href={previewTemplate.downloadUrl}
+                      download={previewTemplate.downloadName || "演示模板.xlsx"}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm"
+                      style={{ color: "var(--atlas-text-2)", background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <Download size={12} />
+                      下载演示文件
+                    </a>
+                  )}
+                </div>
                 <button onClick={() => { useTemplate(previewTemplate); setPreviewTemplate(null); }}
                   className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium"
                   style={{ background: "var(--atlas-accent)", color: "#fff" }}>

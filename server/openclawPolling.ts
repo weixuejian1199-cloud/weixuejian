@@ -297,7 +297,7 @@ async function getTaskStatus(req: Request, res: Response) {
   }
 }
 
-// ── Register routes ────────────────────────────────────────────────
+// -- Register routes --
 
 export function registerOpenClawPollingRoutes(app: Express) {
   app.get("/api/openclaw/tasks/pending", getPendingTasks);
