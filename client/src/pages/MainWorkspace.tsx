@@ -168,6 +168,40 @@ export default function MainWorkspace() {
     handleFiles(e.dataTransfer.files);
   };
 
+  // Helper: strip <suggestions> block from text and parse into SuggestedAction[]
+  const parseSuggestions = useCallback((text: string): { cleanText: string; suggestions: SuggestedAction[] } => {
+    const match = text.match(/<suggestions>\s*([\s\S]*?)\s*<\/suggestions>/);
+    if (!match) return { cleanText: text, suggestions: [] };
+    const cleanText = text.replace(/<suggestions>[\s\S]*?<\/suggestions>/, "").trimEnd();
+    try {
+      const arr: string[] = JSON.parse(match[1].trim());
+      const icons = ["\u{1F4AC}", "\u{1F4CA}", "\u{1F50D}", "\u{1F4DD}", "\u26A1", "\u{1F4CB}"];
+      const suggestions: SuggestedAction[] = arr.slice(0, 3).map((label, i) => ({
+        icon: icons[i % icons.length],
+        label,
+        prompt: label,
+      }));
+      return { cleanText, suggestions };
+    } catch {
+      return { cleanText, suggestions: [] };
+    }
+  }, []);
+
+  // Helper: parse 【①】方向名 format from AI reply into action buttons
+  const parseInlineOptions = useCallback((text: string): SuggestedAction[] => {
+    const matches = Array.from(text.matchAll(/【([①②③④⑤⑥⑦⑧⑨⑩\d])】\s*([^\n【]+)/g));
+    if (matches.length === 0) return FOLLOWUP_ACTIONS;
+    const icons = ['📊', '📈', '🔍', '⚡', '🎯', '📋', '💡', '🔢'];
+    return [
+      ...matches.map((m, i) => ({
+        label: m[2].trim(),
+        prompt: m[2].trim(),
+        icon: icons[i % icons.length],
+      })),
+      { label: '自定义需求', prompt: '', icon: '✏️' },
+    ];
+  }, []);
+
   // -- Send message (supports quick action click)
   const handleSend = useCallback(async (text?: string, isQuickAction = false) => {
     const msg = (text || input).trim();
@@ -204,40 +238,6 @@ export default function MainWorkspace() {
     // Analysis/tutorial questions like 「怎么算工资条」「工资条需要什么资料」go through chat path
     // Queries like 「报表在哪里」「历史报表」 also go through chat path
     const isReport = /生成报表|导出表格|excel表|xlsx表|日报生成|(帮我|(帮我)?生成|(帮我)?制作|(帮我)?做一份|(帮我)?做个|(帮我)?输出|(帮我)?整理成|(帮我)?提取).{0,8}(工资条|工资单|薪资表|薪酬表|分红明细|考勤表|出勤表|财务报表|销售报表|绩效表|奖金表|扣款表|个税表|实发明细|表格)|排名表|对比表/i.test(msg);
-
-  // Helper: strip <suggestions> block from text and parse into SuggestedAction[]
-  const parseSuggestions = (text: string): { cleanText: string; suggestions: SuggestedAction[] } => {
-    const match = text.match(/<suggestions>\s*([\s\S]*?)\s*<\/suggestions>/);
-    if (!match) return { cleanText: text, suggestions: [] };
-    const cleanText = text.replace(/<suggestions>[\s\S]*?<\/suggestions>/, "").trimEnd();
-    try {
-      const arr: string[] = JSON.parse(match[1].trim());
-      const icons = ["\u{1F4AC}", "\u{1F4CA}", "\u{1F50D}", "\u{1F4DD}", "\u26A1", "\u{1F4CB}"];
-      const suggestions: SuggestedAction[] = arr.slice(0, 3).map((label, i) => ({
-        icon: icons[i % icons.length],
-        label,
-        prompt: label,
-      }));
-      return { cleanText, suggestions };
-    } catch {
-      return { cleanText, suggestions: [] };
-    }
-  };
-
-  // Helper: parse 【①】方向名 format from AI reply into action buttons
-  const parseInlineOptions = (text: string): SuggestedAction[] => {
-      const matches = Array.from(text.matchAll(/【([①②③④⑤⑥⑦⑧⑨⑩\d])】\s*([^\n【]+)/g));
-      if (matches.length === 0) return FOLLOWUP_ACTIONS;
-      const icons = ['📊', '📈', '🔍', '⚡', '🎯', '📋', '💡', '🔢'];
-      return [
-        ...matches.map((m, i) => ({
-          label: m[2].trim(),
-          prompt: m[2].trim(),
-          icon: icons[i % icons.length],
-        })),
-        { label: '自定义需求', prompt: '', icon: '✏️' },
-      ];
-    };
 
     // Create new AbortController for this request
     const abortController = new AbortController();
@@ -362,7 +362,7 @@ export default function MainWorkspace() {
       setIsGenerating(false);
       setIsProcessing(false);
     }
-  }, [input, isGenerating, hasFiles, readyFiles, messages, addMessage, updateLastMessage, setIsProcessing, addReport]);
+  }, [input, isGenerating, hasFiles, readyFiles, messages, addMessage, updateLastMessage, setIsProcessing, addReport, parseSuggestions, parseInlineOptions]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
@@ -442,74 +442,20 @@ export default function MainWorkspace() {
                     onClick={e => {
                       e.stopPropagation();
                       e.preventDefault();
-                      setActiveFileMenu(prev => prev === f.id ? null : f.id);
+                      removeUploadedFile(f.id);
                     }}
                     className="ml-0.5 rounded-full flex items-center justify-center opacity-0 group-hover/chip:opacity-100 transition-opacity hover:bg-black/20"
-                    style={{ width: 14, height: 14, flexShrink: 0, fontSize: "11px", lineHeight: 1 }}
-                    title="文件操作"
+                    style={{ width: 14, height: 14, flexShrink: 0, fontSize: "11px", lineHeight: 1, color: "currentColor" }}
+                    title="删除文件"
                   >
-                    ⋮
+                    <X size={9} />
                   </button>
-                )}
-                {/* Dropdown menu - rendered inside the chip so it stays anchored */}
-                {activeFileMenu === f.id && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "calc(100% + 6px)",
-                      left: 0,
-                      zIndex: 9999,
-                      background: "var(--atlas-surface)",
-                      border: "1px solid var(--atlas-border-2)",
-                      borderRadius: 8,
-                      boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-                      minWidth: 120,
-                      padding: "4px 0",
-                    }}
-                    onClick={e => e.stopPropagation()}
-                  >
-                    <button
-                      className="w-full text-left px-3 py-1.5 text-xs transition-colors"
-                      style={{ color: "var(--atlas-text-2)", display: "block" }}
-                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"}
-                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
-                      onClick={() => {
-                        const newName = prompt("重命名文件", f.name);
-                        if (newName && newName.trim() && newName !== f.name) {
-                          updateUploadedFile(f.id, { name: newName.trim() });
-                          toast.success("已重命名");
-                        }
-                        setActiveFileMenu(null);
-                      }}
-                    >
-                      重命名
-                    </button>
-                    <div style={{ height: 1, background: "var(--atlas-border)", margin: "2px 0" }} />
-                    <button
-                      className="w-full text-left px-3 py-1.5 text-xs transition-colors"
-                      style={{ color: "#f87171", display: "block" }}
-                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(248,113,113,0.08)"}
-                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
-                      onClick={() => {
-                        removeUploadedFile(f.id);
-                        setActiveFileMenu(null);
-                      }}
-                    >
-                      删除
-                    </button>
-                  </div>
                 )}
               </span>
             ))}
           </div>
         )}
-        {/* Backdrop to close menu on outside click */}
-        {activeFileMenu && (
-          <div
-            style={{ position: "fixed", inset: 0, zIndex: 9998 }}
-            onClick={() => setActiveFileMenu(null)}
-          />
-        )}
+
 
         <div className="flex-1" />
 
