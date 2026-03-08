@@ -1,0 +1,22 @@
+{
+  "query": "\nSELECT status, COUNT(*) as count\nFROM openclaw_tasks\nWHERE createdAt >= DATE_SUB(NOW(), INTERVAL 1 DAY)\nGROUP BY status;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute \nSELECT status, COUNT(*) as count\nFROM openclaw_tasks\nWHERE createdAt >= DATE_SUB(NOW(), INTERVAL 1 DAY)\nGROUP BY status;\n",
+  "rows": [
+    {
+      "status": "processing",
+      "count": "10"
+    },
+    {
+      "status": "pending",
+      "count": "4"
+    },
+    {
+      "status": "completed",
+      "count": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "status\tcount\nprocessing\t10\npending\t4\ncompleted\t1\n",
+  "stderr": "",
+  "execution_time_ms": 59
+}

@@ -55,6 +55,7 @@ export default function MainWorkspace() {
   const [activeFileMenu, setActiveFileMenu] = useState<string | null>(null);
   // Store suggested actions from last upload (per-session)
   const [pendingActions, setPendingActions] = useState<SuggestedAction[]>([]);
+  const [showMorePanel, setShowMorePanel] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -644,6 +645,168 @@ export default function MainWorkspace() {
         </div>
       </div>
 
+      {/* Quick action pills — always visible below input */}
+      {!isGenerating && messages.length === 0 && (
+        <div className="flex-shrink-0 pb-3">
+          <div className="w-full max-w-4xl mx-auto px-6">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+              {[
+                { icon: "📊", label: "生成汇总报表", q: "帮我把上传的数据汇总生成报表" },
+                { icon: "🏪", label: "多门店数据合并", q: "我有多家门店的数据，帮我合并汇总到一张表" },
+                { icon: "💰", label: "生成工资条", q: "帮我生成工资条" },
+                { icon: "📈", label: "销售数据分析", q: "帮我分析销售数据，找出趋势和排名" },
+                { icon: "💸", label: "计算分红", q: "帮我计算分红明细" },
+                { icon: "📅", label: "考勤汇总", q: "帮我汇总考勤数据" },
+              ].map((pill, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    setInput(pill.q);
+                    setTimeout(() => textareaRef.current?.focus(), 50);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs whitespace-nowrap flex-shrink-0 transition-all"
+                  style={{
+                    background: "var(--atlas-elevated)",
+                    border: "1px solid var(--atlas-border)",
+                    color: "var(--atlas-text-2)",
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.4)";
+                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
+                    (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.06)";
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border)";
+                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+                    (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
+                  }}
+                >
+                  <span style={{ fontSize: "12px" }}>{pill.icon}</span>
+                  <span>{pill.label}</span>
+                </button>
+              ))}
+
+              {/* 更多 button */}
+              <button
+                onClick={() => setShowMorePanel(v => !v)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs whitespace-nowrap flex-shrink-0 transition-all"
+                style={{
+                  background: showMorePanel ? "rgba(91,140,255,0.1)" : "var(--atlas-elevated)",
+                  border: `1px solid ${showMorePanel ? "rgba(91,140,255,0.4)" : "var(--atlas-border)"}`,
+                  color: showMorePanel ? "var(--atlas-accent)" : "var(--atlas-text-2)",
+                }}
+              >
+                <span>更多</span>
+                <span style={{ fontSize: "10px", opacity: 0.7 }}>{showMorePanel ? "▲" : "▼"}</span>
+              </button>
+            </div>
+
+            {/* More panel */}
+            <AnimatePresence>
+              {showMorePanel && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.18 }}
+                  className="mt-3"
+                >
+                  <div
+                    className="rounded-2xl p-4"
+                    style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}
+                  >
+                    {[
+                      {
+                        category: "📊 报表生成",
+                        items: [
+                          { label: "生成销售汇总报表", q: "帮我生成销售汇总报表，包含各维度统计" },
+                          { label: "多门店对比表", q: "帮我生成多门店数据对比表" },
+                          { label: "月度/季度趋势报表", q: "帮我生成月度趋势报表，展示数据变化" },
+                          { label: "自定义格式报表", q: "帮我按自定义格式生成报表" },
+                        ],
+                      },
+                      {
+                        category: "💰 HR 薪资",
+                        items: [
+                          { label: "生成工资条", q: "帮我生成工资条，每人一张" },
+                          { label: "计算绩效奖金", q: "帮我根据数据计算绩效奖金" },
+                          { label: "计算分红明细", q: "帮我计算分红明细" },
+                          { label: "统计出勤与工资", q: "帮我统计出勤天数并计算对应工资" },
+                        ],
+                      },
+                      {
+                        category: "📅 考勤管理",
+                        items: [
+                          { label: "汇总考勤数据", q: "帮我汇总考勤数据" },
+                          { label: "统计迟到/早退/缺勤", q: "帮我统计迟到、早退、缺勤情况" },
+                          { label: "生成月度考勤报告", q: "帮我生成月度考勤报告" },
+                        ],
+                      },
+                      {
+                        category: "🔍 数据分析",
+                        items: [
+                          { label: "找出排名前10", q: "帮我找出数据中排名前10的记录" },
+                          { label: "分析数据异常", q: "帮我找出数据中的异常值、负值或重复记录" },
+                          { label: "按时间段对比", q: "帮我对比不同时间段的数据变化" },
+                          { label: "计算同比/环比", q: "帮我计算数据的同比和环比增长率" },
+                        ],
+                      },
+                      {
+                        category: "📁 文件处理",
+                        items: [
+                          { label: "合并多个 Excel", q: "帮我把多个 Excel 文件合并成一张表" },
+                          { label: "按条件拆分表格", q: "帮我按某个字段把表格拆分成多个分组" },
+                          { label: "清洗数据", q: "帮我清洗数据，去除重复行和空值" },
+                        ],
+                      },
+                    ].map((group, gi) => (
+                      <div key={gi} className={gi > 0 ? "mt-4" : ""}>
+                        <div
+                          className="text-xs font-medium mb-2"
+                          style={{ color: "var(--atlas-text-2)" }}
+                        >
+                          {group.category}
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {group.items.map((item, ii) => (
+                            <button
+                              key={ii}
+                              onClick={() => {
+                                setInput(item.q);
+                                setShowMorePanel(false);
+                                setTimeout(() => textareaRef.current?.focus(), 50);
+                              }}
+                              className="px-3 py-1.5 rounded-lg text-xs transition-all"
+                              style={{
+                                background: "var(--atlas-elevated)",
+                                border: "1px solid var(--atlas-border)",
+                                color: "var(--atlas-text-2)",
+                              }}
+                              onMouseEnter={e => {
+                                (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.4)";
+                                (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
+                                (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.06)";
+                              }}
+                              onMouseLeave={e => {
+                                (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border)";
+                                (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+                                (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
+                              }}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
+
       {/* Drag overlay */}
       <AnimatePresence>
         {isDragging && (
@@ -1121,6 +1284,43 @@ function EmptyState({ onUpload, onQuickAsk }: { onUpload: () => void; onQuickAsk
           >
             行政 · 财务 · 数据分析 三合一智能助手
           </p>
+        </div>
+
+        {/* 三步流程引导 */}
+        <div className="flex items-center gap-0 mt-1">
+          {[
+            { icon: "📁", label: "上传文件" },
+            { icon: "💬", label: "说需求" },
+            { icon: "📊", label: "下载报表" },
+          ].map((step, i) => (
+            <div key={i} className="flex items-center">
+              <div
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+                style={{
+                  background: i === 0 ? "rgba(91,140,255,0.12)" : i === 1 ? "rgba(91,140,255,0.08)" : "rgba(91,140,255,0.06)",
+                  border: `1px solid rgba(91,140,255,${i === 0 ? "0.28" : i === 1 ? "0.20" : "0.14"})`,
+                }}
+              >
+                <span style={{ fontSize: "13px" }}>{step.icon}</span>
+                <span
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    color: i === 0 ? "var(--atlas-accent)" : i === 1 ? "rgba(91,140,255,0.85)" : "rgba(91,140,255,0.65)",
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  {step.label}
+                </span>
+              </div>
+              {i < 2 && (
+                <ChevronRight
+                  size={13}
+                  style={{ color: "rgba(91,140,255,0.35)", margin: "0 2px", flexShrink: 0 }}
+                />
+              )}
+            </div>
+          ))}
         </div>
       </motion.div>
 

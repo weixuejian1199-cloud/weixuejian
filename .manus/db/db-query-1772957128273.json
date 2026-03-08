@@ -1,0 +1,44 @@
+{
+  "query": "\n-- 今日任务状态统计\nSELECT status, COUNT(*) as count\nFROM openclaw_tasks\nWHERE createdAt >= DATE_SUB(NOW(), INTERVAL 1 DAY)\nGROUP BY status;\n\n-- 今日失败任务详情\nSELECT t.id, t.errorMsg, LEFT(t.message, 100) as msg, t.createdAt, u.username\nFROM openclaw_tasks t\nLEFT JOIN users u ON t.userId = u.id\nWHERE t.status = 'failed' AND t.createdAt >= DATE_SUB(NOW(), INTERVAL 1 DAY)\nORDER BY t.createdAt DESC;\n\n-- 卡在 processing 超过30分钟的任务\nSELECT t.id, LEFT(t.message, 80) as msg, t.createdAt, u.username\nFROM openclaw_tasks t\nLEFT JOIN users u ON t.userId = u.id\nWHERE t.status = 'processing' \n  AND t.createdAt < DATE_SUB(NOW(), INTERVAL 30 MINUTE)\nORDER BY t.createdAt DESC;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute \n-- 今日任务状态统计\nSELECT status, COUNT(*) as count\nFROM openclaw_tasks\nWHERE createdAt >= DATE_SUB(NOW(), INTERVAL 1 DAY)\nGROUP BY status;\n\n-- 今日失败任务详情\nSELECT t.id, t.errorMsg, LEFT(t.message, 100) as msg, t.createdAt, u.username\nFROM openclaw_tasks t\nLEFT JOIN users u ON t.userId = u.id\nWHERE t.status = 'failed' AND t.createdAt >= DATE_SUB(NOW(), INTERVAL 1 DAY)\nORDER BY t.createdAt DESC;\n\n-- 卡在 processing 超过30分钟的任务\nSELECT t.id, LEFT(t.message, 80) as msg, t.createdAt, u.username\nFROM openclaw_tasks t\nLEFT JOIN users u ON t.userId = u.id\nWHERE t.status = 'processing' \n  AND t.createdAt < DATE_SUB(NOW(), INTERVAL 30 MINUTE)\nORDER BY t.createdAt DESC;\n",
+  "rows": [
+    {
+      "status": "completed",
+      "count": "1"
+    },
+    {
+      "status": "pending",
+      "count": "4"
+    },
+    {
+      "status": "processing",
+      "count": "10"
+    },
+    {
+      "status": "JO1nDQo5qlAXMWVjpLYsq",
+      "count": "⚫️全团奖的标准 "
+    }
+  ],
+  "messages": [
+    "id\tmsg\tcreatedAt\tusername",
+    "MaAliBI3FqN9nQDIofcE-\t处理进度\t2026-03-08 03:48:22\t六月的猫",
+    "I4DPCjdjvNkBlQfTiTFRW\t你参考我这表格里的各个等级价格，以及公司利润。假设我这边一个产品34卖49元，你帮我测算团长、钻石、联创、出单奖1、出单奖2，以及公司利润\t2026-03-08 03:08:22\t六月的猫",
+    "aOxIzEHgsRqgESnLcQgRg\t帮我汇总销售数据，显示总销售额、订单数和关键指标\t2026-03-08 02:42:27\t123",
+    "2Bc7lWFEs8T4GSVBC4E5s\t什么进度\t2026-03-08 02:39:18\t六月的猫",
+    "RHcIthlRPjII9ENGFx6Dz\t帮我生成数据汇总表，包含关键指标和统计\t2026-03-08 02:27:45\t123",
+    "duGWa5wPkvfQ6dWJB_IUe\t根据数据绘制三张可视化图表\t2026-03-08 02:24:36\t六月的猫",
+    "自营业绩 6000",
+    "或",
+    "个人团队业绩 60000+自营业绩 3000",
+    "⚫️全团福利比例",
+    "6万     0.6%",
+    "16万   1.2%",
+    "2\t2026-03-08 02:11:06\t六月的猫",
+    "-HoeyFnHhkNLj-PXYa00c\t帮我生成数据汇总表，包含关键指标和统计\t2026-03-08 01:58:01\tRUSIN-派收订单",
+    "dgiFNHNn6WN8YWUHP0l4O\t我想生成另一份报表\t2026-03-08 01:56:16\t甲霸盈盈",
+    "g85-v-auKFAT5l_z-66SV\t帮我生成数据汇总表，包含关键指标和统计\t2026-03-08 01:54:51\t123"
+  ],
+  "stdout": "status\tcount\ncompleted\t1\npending\t4\nprocessing\t10\nid\tmsg\tcreatedAt\tusername\nMaAliBI3FqN9nQDIofcE-\t处理进度\t2026-03-08 03:48:22\t六月的猫\nI4DPCjdjvNkBlQfTiTFRW\t你参考我这表格里的各个等级价格，以及公司利润。假设我这边一个产品34卖49元，你帮我测算团长、钻石、联创、出单奖1、出单奖2，以及公司利润\t2026-03-08 03:08:22\t六月的猫\naOxIzEHgsRqgESnLcQgRg\t帮我汇总销售数据，显示总销售额、订单数和关键指标\t2026-03-08 02:42:27\t123\n2Bc7lWFEs8T4GSVBC4E5s\t什么进度\t2026-03-08 02:39:18\t六月的猫\nRHcIthlRPjII9ENGFx6Dz\t帮我生成数据汇总表，包含关键指标和统计\t2026-03-08 02:27:45\t123\nduGWa5wPkvfQ6dWJB_IUe\t根据数据绘制三张可视化图表\t2026-03-08 02:24:36\t六月的猫\nJO1nDQo5qlAXMWVjpLYsq\t⚫️全团奖的标准 \n自营业绩 6000\n或\n个人团队业绩 60000+自营业绩 3000\n\n⚫️全团福利比例\n\n6万     0.6%\n16万   1.2%\n2\t2026-03-08 02:11:06\t六月的猫\n-HoeyFnHhkNLj-PXYa00c\t帮我生成数据汇总表，包含关键指标和统计\t2026-03-08 01:58:01\tRUSIN-派收订单\ndgiFNHNn6WN8YWUHP0l4O\t我想生成另一份报表\t2026-03-08 01:56:16\t甲霸盈盈\ng85-v-auKFAT5l_z-66SV\t帮我生成数据汇总表，包含关键指标和统计\t2026-03-08 01:54:51\t123\n",
+  "stderr": "",
+  "execution_time_ms": 78
+}

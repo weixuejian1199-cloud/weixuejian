@@ -1,0 +1,14 @@
+{
+  "query": "\n-- 今日报告生成情况\nSELECT r.status, COUNT(*) as count\nFROM reports r\nWHERE r.createdAt >= DATE_SUB(NOW(), INTERVAL 1 DAY)\nGROUP BY r.status;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute \n-- 今日报告生成情况\nSELECT r.status, COUNT(*) as count\nFROM reports r\nWHERE r.createdAt >= DATE_SUB(NOW(), INTERVAL 1 DAY)\nGROUP BY r.status;\n",
+  "rows": [
+    {
+      "status": "completed",
+      "count": "8"
+    }
+  ],
+  "messages": [],
+  "stdout": "status\tcount\ncompleted\t8\n",
+  "stderr": "",
+  "execution_time_ms": 54
+}

@@ -1,0 +1,131 @@
+{
+  "query": "\nSELECT \n  id, username, name, email, role, plan, loginMethod,\n  createdAt, lastSignedIn\nFROM users\nORDER BY createdAt DESC\nLIMIT 20;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute \nSELECT \n  id, username, name, email, role, plan, loginMethod,\n  createdAt, lastSignedIn\nFROM users\nORDER BY createdAt DESC\nLIMIT 20;\n",
+  "rows": [
+    {
+      "id": "2309",
+      "username": "魏七七",
+      "name": "魏七七",
+      "email": "NULL",
+      "role": "user",
+      "plan": "free",
+      "loginMethod": "password",
+      "createdAt": "2026-03-08 06:18:20",
+      "lastSignedIn": "2026-03-08 06:18:20"
+    },
+    {
+      "id": "2308",
+      "username": "江贤惠",
+      "name": "小江",
+      "email": "NULL",
+      "role": "user",
+      "plan": "free",
+      "loginMethod": "password",
+      "createdAt": "2026-03-08 02:08:26",
+      "lastSignedIn": "2026-03-08 02:08:27"
+    },
+    {
+      "id": "2307",
+      "username": "但但但",
+      "name": "蛋",
+      "email": "NULL",
+      "role": "user",
+      "plan": "free",
+      "loginMethod": "password",
+      "createdAt": "2026-03-08 01:57:30",
+      "lastSignedIn": "2026-03-08 01:57:31"
+    },
+    {
+      "id": "2306",
+      "username": "RUSIN-派收订单",
+      "name": "RUSIN-派收订单",
+      "email": "NULL",
+      "role": "user",
+      "plan": "free",
+      "loginMethod": "password",
+      "createdAt": "2026-03-08 01:55:23",
+      "lastSignedIn": "2026-03-08 01:55:23"
+    },
+    {
+      "id": "2305",
+      "username": "小蟹同学",
+      "name": "小蟹同学",
+      "email": "NULL",
+      "role": "user",
+      "plan": "free",
+      "loginMethod": "password",
+      "createdAt": "2026-03-08 01:45:40",
+      "lastSignedIn": "2026-03-08 01:45:41"
+    },
+    {
+      "id": "2304",
+      "username": "甲霸盈盈",
+      "name": "甲霸盈盈",
+      "email": "NULL",
+      "role": "user",
+      "plan": "free",
+      "loginMethod": "password",
+      "createdAt": "2026-03-08 01:45:34",
+      "lastSignedIn": "2026-03-08 01:45:35"
+    },
+    {
+      "id": "2303",
+      "username": "小晨rusin",
+      "name": "小晨",
+      "email": "NULL",
+      "role": "user",
+      "plan": "free",
+      "loginMethod": "password",
+      "createdAt": "2026-03-08 01:44:36",
+      "lastSignedIn": "2026-03-08 01:44:36"
+    },
+    {
+      "id": "2302",
+      "username": "weixuejian",
+      "name": "david",
+      "email": "NULL",
+      "role": "user",
+      "plan": "free",
+      "loginMethod": "password",
+      "createdAt": "2026-03-08 01:42:32",
+      "lastSignedIn": "2026-03-08 01:42:33"
+    },
+    {
+      "id": "2301",
+      "username": "123",
+      "name": "123",
+      "email": "NULL",
+      "role": "user",
+      "plan": "free",
+      "loginMethod": "password",
+      "createdAt": "2026-03-08 01:42:11",
+      "lastSignedIn": "2026-03-08 01:42:12"
+    },
+    {
+      "id": "2300",
+      "username": "六月的猫",
+      "name": "六月的猫",
+      "email": "NULL",
+      "role": "user",
+      "plan": "free",
+      "loginMethod": "password",
+      "createdAt": "2026-03-08 01:41:53",
+      "lastSignedIn": "2026-03-08 01:41:54"
+    },
+    {
+      "id": "1",
+      "username": "NULL",
+      "name": "huangzhen5203",
+      "email": "huangzhen5203@gmail.com",
+      "role": "admin",
+      "plan": "free",
+      "loginMethod": "email",
+      "createdAt": "2026-03-07 16:18:31",
+      "lastSignedIn": "2026-03-08 01:35:31"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tusername\tname\temail\trole\tplan\tloginMethod\tcreatedAt\tlastSignedIn\n2309\t魏七七\t魏七七\tNULL\tuser\tfree\tpassword\t2026-03-08 06:18:20\t2026-03-08 06:18:20\n2308\t江贤惠\t小江\tNULL\tuser\tfree\tpassword\t2026-03-08 02:08:26\t2026-03-08 02:08:27\n2307\t但但但\t蛋\tNULL\tuser\tfree\tpassword\t2026-03-08 01:57:30\t2026-03-08 01:57:31\n2306\tRUSIN-派收订单\tRUSIN-派收订单\tNULL\tuser\tfree\tpassword\t2026-03-08 01:55:23\t2026-03-08 01:55:23\n2305\t小蟹同学\t小蟹同学\tNULL\tuser\tfree\tpassword\t2026-03-08 01:45:40\t2026-03-08 01:45:41\n2304\t甲霸盈盈\t甲霸盈盈\tNULL\tuser\tfree\tpassword\t2026-03-08 01:45:34\t2026-03-08 01:45:35\n2303\t小晨rusin\t小晨\tNULL\tuser\tfree\tpassword\t2026-03-08 01:44:36\t2026-03-08 01:44:36\n2302\tweixuejian\tdavid\tNULL\tuser\tfree\tpassword\t2026-03-08 01:42:32\t2026-03-08 01:42:33\n2301\t123\t123\tNULL\tuser\tfree\tpassword\t2026-03-08 01:42:11\t2026-03-08 01:42:12\n2300\t六月的猫\t六月的猫\tNULL\tuser\tfree\tpassword\t2026-03-08 01:41:53\t2026-03-08 01:41:54\n1\tNULL\thuangzhen5203\thuangzhen5203@gmail.com\tadmin\tfree\temail\t2026-03-07 16:18:31\t2026-03-08 01:35:31\n",
+  "stderr": "",
+  "execution_time_ms": 58
+}

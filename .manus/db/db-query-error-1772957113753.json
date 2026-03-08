@@ -1,0 +1,8 @@
+{
+  "query": "\nSELECT \n  t.id, t.userId, t.status, t.errorMessage, t.createdAt,\n  u.username\nFROM openclaw_tasks t\nLEFT JOIN users u ON t.userId = u.id\nWHERE t.createdAt >= DATE_SUB(NOW(), INTERVAL 1 DAY)\nORDER BY t.createdAt DESC\nLIMIT 30;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute \nSELECT \n  t.id, t.userId, t.status, t.errorMessage, t.createdAt,\n  u.username\nFROM openclaw_tasks t\nLEFT JOIN users u ON t.userId = u.id\nWHERE t.createdAt >= DATE_SUB(NOW(), INTERVAL 1 DAY)\nORDER BY t.createdAt DESC\nLIMIT 30;\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 2: Unknown column 't.errormessage' in 'field list'"
+  ]
+}

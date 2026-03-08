@@ -272,22 +272,38 @@ function ProfileSection() {
         </div>
         <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>修改后自动保存</p>
       </div>
-      <div className="p-5 rounded-xl" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
-        <div className="flex items-center gap-2 mb-3">
+      <div className="p-5 rounded-xl space-y-4" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
+        <div className="flex items-center gap-2">
           <Shield size={13} style={{ color: "var(--atlas-text-2)" }} />
           <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>账号安全</span>
         </div>
-        {[{ label: "修改密码", desc: "点击修改登录密码", action: () => setShowChangePwd(true) }, { label: "两步验证", desc: "未启用", action: () => toast.info("功能开发中") }, { label: "登录记录", desc: "查看最近登录", action: () => toast.info("功能开发中") }].map((item, i) => (
-          <button key={item.label} className="w-full flex items-center justify-between py-2.5 group"
-            style={{ borderTop: i > 0 ? "1px solid var(--atlas-border)" : "none" }}
-            onClick={item.action}>
-            <div className="text-left">
-              <p className="text-sm" style={{ color: "var(--atlas-text)" }}>{item.label}</p>
-              <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{item.desc}</p>
-            </div>
-            <ChevronRight size={14} style={{ color: "var(--atlas-text-3)" }} />
+        {/* 修改密码 - 明显按钮样式 */}
+        <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: "rgba(91,140,255,0.08)", border: "1px solid rgba(91,140,255,0.2)" }}>
+          <div>
+            <p className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>登录密码</p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--atlas-text-3)" }}>定期修改密码可提升账号安全性</p>
+          </div>
+          <button
+            onClick={() => setShowChangePwd(true)}
+            className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all hover:opacity-90 active:scale-95"
+            style={{ background: "var(--atlas-accent)", color: "white", flexShrink: 0 }}
+          >
+            修改密码
           </button>
-        ))}
+        </div>
+        {/* 其他安全项 - 展示但标注即将推出 */}
+        <div className="space-y-0 rounded-lg overflow-hidden" style={{ border: "1px solid var(--atlas-border)" }}>
+          {[{ label: "两步验证", desc: "登录时额外验证身份" }, { label: "登录记录", desc: "查看最近登录设备和时间" }].map((item, i) => (
+            <div key={item.label} className="flex items-center justify-between px-4 py-3"
+              style={{ borderTop: i > 0 ? "1px solid var(--atlas-border)" : "none", opacity: 0.5 }}>
+              <div>
+                <p className="text-sm" style={{ color: "var(--atlas-text)" }}>{item.label}</p>
+                <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{item.desc}</p>
+              </div>
+              <span className="text-xs px-2 py-0.5 rounded" style={{ background: "rgba(255,255,255,0.06)", color: "var(--atlas-text-3)" }}>即将推出</span>
+            </div>
+          ))}
+        </div>
       </div>
       <ChangePasswordDialog open={showChangePwd} onClose={() => setShowChangePwd(false)} />
     </div>
