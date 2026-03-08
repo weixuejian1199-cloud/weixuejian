@@ -317,15 +317,15 @@ export default function MainWorkspace() {
           onTelegramTask: (taskId, pendingMsg) => {
             // Show pending message immediately
             updateLastMessage(pendingMsg, { isStreaming: false });
-            // Start polling for task completion (every 10s, max 20 times = 200s)
+            // Start polling for task completion (every 10s, max 60 times = 600s / 10 min)
             let attempts = 0;
-            const maxAttempts = 20;
+            const maxAttempts = 60;
             const pollInterval = setInterval(async () => {
               attempts++;
               try {
                 const r = await fetch(`/api/atlas/task/${taskId}/status`, { credentials: "include" });
                 if (!r.ok) return;
-                const data = await r.json() as { status: string; reply?: string; output_files?: Array<{ name: string; fileUrl: string }> };
+                const data = await r.json() as { status: string; reply?: string; error_msg?: string; output_files?: Array<{ name: string; fileUrl: string }> };
                 if (data.status === "completed" && data.reply) {
                   clearInterval(pollInterval);
                   const parsedActions = parseInlineOptions(data.reply);
@@ -336,13 +336,16 @@ export default function MainWorkspace() {
                   updateLastMessage(finalMsg, { suggestedActions: parsedActions } as any);
                   toast.success("任务已完成！");
                   setIsGenerating(false);
-                } else if (data.status === "error") {
+                } else if (data.status === "failed" || data.status === "error") {
                   clearInterval(pollInterval);
-                  updateLastMessage(`处理失败，请重试。`);
+                  const errDetail = data.error_msg || "处理失败，请重试";
+                  updateLastMessage(`❌ ${errDetail}\n\n请重新发送消息，或上传文件后再试。`);
+                  toast.error(errDetail);
                   setIsGenerating(false);
                 } else if (attempts >= maxAttempts) {
                   clearInterval(pollInterval);
-                  updateLastMessage(pendingMsg + "\n\n⏰ 处理时间较长，请稍后刷新页面查看结果。");
+                  updateLastMessage(pendingMsg + "\n\n⏰ 任务超时（10分钟无响应），请重新发送消息重试。");
+                  toast.error("任务超时，请重试");
                   setIsGenerating(false);
                 }
               } catch (e) {

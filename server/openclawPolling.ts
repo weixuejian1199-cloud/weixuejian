@@ -200,6 +200,49 @@ async function saveTaskResult(
 
 let telegramOffset = 0;
 
+// ── Task timeout checker ──────────────────────────────────────────────────────
+// Marks tasks stuck in 'processing' for >10 minutes as 'failed'
+
+const TASK_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+
+async function checkStuckTasks() {
+  try {
+    const db = await getDb();
+    if (!db) return;
+
+    const cutoff = new Date(Date.now() - TASK_TIMEOUT_MS);
+
+    // Find tasks stuck in 'processing' longer than TASK_TIMEOUT_MS
+    const stuckTasks = await db
+      .select()
+      .from(openclawTasks)
+      .where(eq(openclawTasks.status, "processing"));
+
+    const timedOut = stuckTasks.filter(
+      (t: OpenclawTask) => t.pickedUpAt && t.pickedUpAt < cutoff
+    );
+
+    if (timedOut.length === 0) return;
+
+    console.warn(`[OpenClaw] Found ${timedOut.length} stuck task(s), marking as failed`);
+
+    for (const task of timedOut) {
+      await db
+        .update(openclawTasks)
+        .set({
+          status: "failed",
+          errorMsg: `任务超时（10分钟无响应），请重新发送消息重试`,
+          completedAt: new Date(),
+        })
+        .where(eq(openclawTasks.id, task.id));
+
+      console.warn(`[OpenClaw] Task ${task.id} timed out (picked up at ${task.pickedUpAt?.toISOString()})`);
+    }
+  } catch (err) {
+    console.error("[OpenClaw] checkStuckTasks error:", err);
+  }
+}
+
 async function pollTelegramReplies() {
   if (!ENV.telegramBotToken || !ENV.telegramChatId) return;
 
@@ -292,6 +335,7 @@ async function getTaskStatus(req: Request, res: Response) {
       task_id: task.id,
       status: task.status,
       reply: task.reply ?? null,
+      error_msg: task.errorMsg ?? null,
       output_files: (task.outputFiles as Array<{ name: string; fileKey: string; fileUrl: string; mimeType: string }>) ?? [],
       created_at: task.createdAt.toISOString(),
       completed_at: task.completedAt?.toISOString() ?? null,
@@ -315,4 +359,10 @@ export function registerOpenClawPollingRoutes(app: Express) {
     setInterval(pollTelegramReplies, 30_000);
     console.log("[Telegram] Background poller started (30s interval)");
   }
+
+  // Start stuck task checker (every 2 minutes)
+  setInterval(checkStuckTasks, 2 * 60 * 1000);
+  // Also run immediately on startup to clean up any tasks stuck from previous run
+  checkStuckTasks();
+  console.log("[OpenClaw] Stuck task checker started (2min interval)");
 }

@@ -391,3 +391,12 @@
 - [x] Bug 1：无文件时输入框被禁用（排查为视觉引导问题，代码层没有禁用）
 - [x] Bug 2：文件删除改为直接显示 X 按钮，修复 parseSuggestions 闭包问题（移到 useCallback 外部）
 - [x] Bug 3：AI 变笨变啰嗦（suggestions 改为可选，强调正文质量优先）
+
+## V12.19 P0 修复：errorMsg + Worker 根因排查
+
+- [x] 数据库 openclaw_tasks 表加 errorMsg 字段（已存在）
+- [x] 任务失败时写入 errorMsg（超时自动标记 failed + errorMsg）
+- [x] 前端任务失败时显示错误原因（❌ + errorMsg + 重试提示）
+- [x] 排查 Worker 卡住根因：无超时机制，任务卡在 processing
+- [x] 修复：加 checkStuckTasks（每2分钟，超10分钟自动标记 failed）
+- [x] 修复：前端轮询从 20 次增加到 60 次（200s→600s 对齐10分钟超时）
