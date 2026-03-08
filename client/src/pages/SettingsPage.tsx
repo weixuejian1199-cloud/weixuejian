@@ -21,7 +21,69 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
 
-// ── Countdown Component ─────────────────────────────────────────────────────
+// ── ChangePasswordDialog ───────────────────────────────────────────────────────────────
+
+function ChangePasswordDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [oldPwd, setOldPwd] = useState("");
+  const [newPwd, setNewPwd] = useState("");
+  const [confirmPwd, setConfirmPwd] = useState("");
+  const [showOld, setShowOld] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+
+  const changePwd = trpc.auth.changePassword.useMutation({
+    onSuccess: () => {
+      toast.success("密码修改成功");
+      setOldPwd(""); setNewPwd(""); setConfirmPwd("");
+      onClose();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const handleSubmit = () => {
+    if (newPwd !== confirmPwd) { toast.error("两次输入的新密码不一致"); return; }
+    if (newPwd.length < 6) { toast.error("新密码至少6位"); return; }
+    changePwd.mutate({ oldPassword: oldPwd, newPassword: newPwd });
+  };
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose}>
+      <div className="w-full max-w-sm mx-4 p-6 rounded-2xl" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-2 mb-5">
+          <Lock size={15} style={{ color: "var(--atlas-accent)" }} />
+          <h3 className="text-base font-semibold" style={{ color: "var(--atlas-text)" }}>修改密码</h3>
+        </div>
+        <div className="space-y-3">
+          {[{ label: "旧密码", val: oldPwd, set: setOldPwd, show: showOld, toggle: () => setShowOld(v => !v) },
+            { label: "新密码", val: newPwd, set: setNewPwd, show: showNew, toggle: () => setShowNew(v => !v) },
+            { label: "确认新密码", val: confirmPwd, set: setConfirmPwd, show: showNew, toggle: () => setShowNew(v => !v) },
+          ].map(({ label, val, set, show, toggle }) => (
+            <div key={label}>
+              <label className="text-xs mb-1 block" style={{ color: "var(--atlas-text-2)" }}>{label}</label>
+              <div className="relative">
+                <input type={show ? "text" : "password"} value={val} onChange={e => set(e.target.value)}
+                  className="w-full px-3 py-2 pr-9 rounded-lg text-sm outline-none"
+                  style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)", color: "var(--atlas-text)" }}
+                  placeholder={label} />
+                <button type="button" onClick={toggle} className="absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--atlas-text-3)" }}>
+                  {show ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2 mt-5">
+          <button onClick={onClose} className="flex-1 py-2 rounded-lg text-sm" style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-2)" }}>取消</button>
+          <button onClick={handleSubmit} disabled={changePwd.isPending} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: "var(--atlas-accent)", color: "#fff", opacity: changePwd.isPending ? 0.7 : 1 }}>
+            {changePwd.isPending ? "修改中..." : "确认修改"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Countdown Component ───────────────────────────────────────────────────────────────
 
 function NextRunCountdown({ nextRunAt }: { nextRunAt: Date | null | undefined }) {
   const [remaining, setRemaining] = useState("");
@@ -170,6 +232,7 @@ function ProfileSection() {
   const [name, setName] = useState(user?.name || "管理员");
   const [email, setEmail] = useState(user?.email || "admin@example.com");
   const [saved, setSaved] = useState(false);
+  const [showChangePwd, setShowChangePwd] = useState(false);
 
   const handleSave = useCallback(() => {
     setSaved(true);
@@ -214,10 +277,10 @@ function ProfileSection() {
           <Shield size={13} style={{ color: "var(--atlas-text-2)" }} />
           <span className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>账号安全</span>
         </div>
-        {[{ label: "修改密码", desc: "上次修改：30天前" }, { label: "两步验证", desc: "未启用" }, { label: "登录记录", desc: "查看最近登录" }].map((item, i) => (
+        {[{ label: "修改密码", desc: "点击修改登录密码", action: () => setShowChangePwd(true) }, { label: "两步验证", desc: "未启用", action: () => toast.info("功能开发中") }, { label: "登录记录", desc: "查看最近登录", action: () => toast.info("功能开发中") }].map((item, i) => (
           <button key={item.label} className="w-full flex items-center justify-between py-2.5 group"
             style={{ borderTop: i > 0 ? "1px solid var(--atlas-border)" : "none" }}
-            onClick={() => toast.info("功能开发中")}>
+            onClick={item.action}>
             <div className="text-left">
               <p className="text-sm" style={{ color: "var(--atlas-text)" }}>{item.label}</p>
               <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{item.desc}</p>
@@ -226,6 +289,7 @@ function ProfileSection() {
           </button>
         ))}
       </div>
+      <ChangePasswordDialog open={showChangePwd} onClose={() => setShowChangePwd(false)} />
     </div>
   );
 }

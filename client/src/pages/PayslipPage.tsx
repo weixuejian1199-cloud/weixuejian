@@ -96,14 +96,38 @@ export default function PayslipPage({ onBack }: { onBack?: () => void }) {
       const data: UploadResult = await res.json();
       setUploadResult(data);
       setFieldMap(data.fieldMap);
-      setStep("mapping");
-      toast.success(`已识别 ${data.employeeCount} 名员工，请确认字段映射`);
+      // 直接进入生成阶段，跳过字段确认
+      toast.success(`已识别 ${data.employeeCount} 名员工，正在生成工资条...`);
+      // 直接调用生成接口
+      setGenerating(true);
+      try {
+        const genRes = await fetch("/api/hr/payslip/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ id: data.id, fieldMap: data.fieldMap, period }),
+        });
+        if (!genRes.ok) {
+          const err = await genRes.json();
+          // 生成失败时跳到 mapping 步骤让用户手动调整
+          setStep("mapping");
+          throw new Error(err.error || "生成失败，请手动确认字段映射后重试");
+        }
+        const genData: GenerateResult = await genRes.json();
+        setGenerateResult(genData);
+        setStep("preview");
+        toast.success(`工资条已生成，共 ${genData.employeeCount} 人`);
+      } catch (genErr: any) {
+        toast.error(genErr.message || "生成失败，请重试");
+      } finally {
+        setGenerating(false);
+      }
     } catch (e: any) {
       toast.error(e.message || "上传失败，请重试");
     } finally {
       setUploading(false);
     }
-  }, []);
+  }, [period]);
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -221,10 +245,13 @@ export default function PayslipPage({ onBack }: { onBack?: () => void }) {
               >
                 <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
                   onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
-                {uploading ? (
+                {(uploading || generating) ? (
                   <div className="flex flex-col items-center gap-3">
                     <Loader2 size={40} className="animate-spin" style={{ color: "#34D399" }} />
-                    <p className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>正在上传并识别字段...</p>
+                    <p className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>
+                      {generating ? "正在计算个税并生成工资条..." : "正在上传并识别字段..."}
+                    </p>
+                    <p className="text-xs" style={{ color: "var(--atlas-text-muted)" }}>请稍候，AI 正在自动处理</p>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-3">

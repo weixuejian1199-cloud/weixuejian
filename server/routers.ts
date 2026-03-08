@@ -12,7 +12,7 @@ import {
   createScheduledTask, updateScheduledTask, getUserScheduledTasks, deleteScheduledTask,
   ensureInviteCode, redeemInviteCode, getInviteStats, getUserCredits,
   createReportFeedback, getReportFeedback, updateReportFeedback, getSimilarExamples,
-  getUserByUsername, createUser,
+  getUserByUsername, createUser, updateUserPassword, getUserById,
   createMessageFeedback, getMessageFeedbacks,
 } from "./db";
 import { storageDelete } from "./storage";
@@ -70,6 +70,21 @@ export const appRouter = router({
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
+
+    changePassword: protectedProcedure
+      .input(z.object({
+        oldPassword: z.string().min(1, "请输入旧密码"),
+        newPassword: z.string().min(6, "新密码至少6位").max(128),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const user = await getUserById(ctx.user.id);
+        if (!user?.passwordHash) throw new TRPCError({ code: "BAD_REQUEST", message: "该账号不支持密码修改" });
+        const valid = await verifyPassword(input.oldPassword, user.passwordHash);
+        if (!valid) throw new TRPCError({ code: "UNAUTHORIZED", message: "旧密码错误" });
+        const newHash = await hashPassword(input.newPassword);
+        await updateUserPassword(ctx.user.id, newHash);
+        return { success: true };
+      }),
   }),
 
   // ── Sessions ──────────────────────────────────────────────────────────────────

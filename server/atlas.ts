@@ -1095,12 +1095,31 @@ ${sampleRows}
         res.status(404).json({ error: "Report not found or expired" });
         return;
       }
-      // Get fresh presigned URL from S3
+      // Proxy download: fetch from S3 with server-side token, stream to browser
+      // This avoids redirecting to a private S3 URL that requires auth
       const { url } = await storageGet(report.fileKey);
-      res.redirect(url);
+      const s3Response = await fetch(url);
+      if (!s3Response.ok) {
+        res.status(502).json({ error: "Failed to fetch file from storage" });
+        return;
+      }
+      // Determine filename for Content-Disposition
+      const filename = report.title
+        ? `${report.title.replace(/[/\\?%*:|"<>]/g, '-')}.xlsx`
+        : `report-${reportId}.xlsx`;
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+      // Stream the file body to the client
+      const { Readable } = await import("stream");
+      if (s3Response.body) {
+        Readable.fromWeb(s3Response.body as any).pipe(res);
+      } else {
+        const buffer = await s3Response.arrayBuffer();
+        res.send(Buffer.from(buffer));
+      }
     } catch (err: any) {
       console.error("[Atlas] Download error:", err);
-      res.status(500).json({ error: err.message });
+      if (!res.headersSent) res.status(500).json({ error: err.message });
     }
   });
 }

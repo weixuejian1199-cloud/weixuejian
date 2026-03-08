@@ -595,9 +595,16 @@ export function registerHrRoutes(app: Express) {
       const record = await getHrPayslip(req.params.id);
       if (!record?.reportFileKey) { res.status(404).json({ error: "报表不存在或已过期" }); return; }
       const { url } = await storageGet(record.reportFileKey);
-      res.redirect(url);
+      const s3Res = await fetch(url);
+      if (!s3Res.ok) { res.status(502).json({ error: "文件获取失败" }); return; }
+      const filename = `工资条-${record.id}.xlsx`;
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+      const { Readable } = await import("stream");
+      if (s3Res.body) { Readable.fromWeb(s3Res.body as any).pipe(res); }
+      else { res.send(Buffer.from(await s3Res.arrayBuffer())); }
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      if (!res.headersSent) res.status(500).json({ error: err.message });
     }
   });
 
@@ -713,9 +720,16 @@ export function registerHrRoutes(app: Express) {
       const record = await getHrAttendance(req.params.id);
       if (!record?.reportFileKey) { res.status(404).json({ error: "报表不存在" }); return; }
       const { url } = await storageGet(record.reportFileKey);
-      res.redirect(url);
+      const s3Res = await fetch(url);
+      if (!s3Res.ok) { res.status(502).json({ error: "文件获取失败" }); return; }
+      const filename = `考勤汇总-${record.id}.xlsx`;
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+      const { Readable } = await import("stream");
+      if (s3Res.body) { Readable.fromWeb(s3Res.body as any).pipe(res); }
+      else { res.send(Buffer.from(await s3Res.arrayBuffer())); }
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      if (!res.headersSent) res.status(500).json({ error: err.message });
     }
   });
 }

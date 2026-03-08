@@ -120,6 +120,12 @@ export async function createUser(data: { username: string; passwordHash: string;
   return created!;
 }
 
+export async function updateUserPassword(userId: number, passwordHash: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+}
+
 // ── Sessions ──────────────────────────────────────────────────────────────────
 
 export async function createSession(data: InsertSession) {

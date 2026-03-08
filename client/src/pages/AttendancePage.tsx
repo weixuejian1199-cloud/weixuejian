@@ -111,14 +111,45 @@ export default function AttendancePage({ onBack }: { onBack?: () => void }) {
       const data: UploadResult = await res.json();
       setUploadResult(data);
       setFieldMap(data.fieldMap);
-      setStep("mapping");
-      toast.success(`已上传 ${data.rowCount} 条打卡记录，请确认字段映射`);
+      // 直接进入分析阶段，跳过字段确认
+      toast.success(`已识别 ${data.rowCount} 条打卡记录，正在分析...`);
+      setAnalyzing(true);
+      try {
+        const [startH, startM] = workStart.split(":").map(Number);
+        const [endH, endM] = workEnd.split(":").map(Number);
+        const analyzeRes = await fetch("/api/hr/attendance/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            id: data.id,
+            fieldMap: data.fieldMap,
+            period,
+            workStartHour: startH + startM / 60,
+            workEndHour: endH + endM / 60,
+          }),
+        });
+        if (!analyzeRes.ok) {
+          const err = await analyzeRes.json();
+          // 分析失败时跳到 mapping 步骤让用户手动调整
+          setStep("mapping");
+          throw new Error(err.error || "分析失败，请手动确认字段映射后重试");
+        }
+        const analyzeData: AnalyzeResult = await analyzeRes.json();
+        setAnalyzeResult(analyzeData);
+        setStep("result");
+        toast.success("考勤分析完成！");
+      } catch (analyzeErr: any) {
+        toast.error(analyzeErr.message || "分析失败，请重试");
+      } finally {
+        setAnalyzing(false);
+      }
     } catch (e: any) {
       toast.error(e.message || "上传失败");
     } finally {
       setUploading(false);
     }
-  }, []);
+  }, [period, workStart, workEnd]);
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -246,10 +277,13 @@ export default function AttendancePage({ onBack }: { onBack?: () => void }) {
               >
                 <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
                   onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
-                {uploading ? (
+                {(uploading || analyzing) ? (
                   <div className="flex flex-col items-center gap-3">
                     <Loader2 size={40} className="animate-spin" style={{ color: "#5B8CFF" }} />
-                    <p className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>正在上传并识别字段...</p>
+                    <p className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>
+                      {analyzing ? "正在分析考勤数据..." : "正在上传并识别字段..."}
+                    </p>
+                    <p className="text-xs" style={{ color: "var(--atlas-text-muted)" }}>请稍候，AI 正在自动处理</p>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-3">
