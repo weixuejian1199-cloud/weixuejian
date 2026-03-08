@@ -587,9 +587,9 @@ export function registerAtlasRoutes(app: Express) {
         `- ${f.name}: ${f.type}类型, ${dfInfo.row_count}行, ${f.null_count}个空值, 示例值: ${f.sample.slice(0, 3).join(", ")}`
       ).join("\n");
 
-      // Pass data rows to AI (up to 200 rows for speed; stats cover the full dataset)
-      // Real statistics (sum/avg/max/min/top5) are computed from ALL rows below, so 200 rows is enough for structure
-      const maxRows = Math.min(data.length, 200);
+      // Pass data rows to AI (up to 50 rows for speed; stats cover the full dataset)
+      // Real statistics (sum/avg/max/min/top5) are computed from ALL rows below, so 50 rows is enough for structure
+      const maxRows = Math.min(data.length, 50);
       const allDataRows = data.slice(0, maxRows);
       // Format as compact CSV-like for token efficiency
       const headers = dfInfo.fields.map((f: FieldInfo) => f.name);

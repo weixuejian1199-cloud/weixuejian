@@ -348,6 +348,6 @@
 ## V12.14 速度优化 + 7天数据保留
 
 - [x] 报告保留期改为7天（expiresAt = now + 7d），替代永久存储
-- [x] 对话框数据汇总速度优化：dataTable 行数从 500 → 200，history 从 6 → 4 条，节省约 9,800 tokens
+- [x] 对话框数据汇总速度优化：dataTable 行数从 500 → 50，history 从 6 → 4 条，节省约 18,000 tokens
 - [x] 统计数据（sum/avg/max/top5）改为基于全量 data 计算，保证准确性
 - [x] 侧边栏任务卡片操作按钮：改为 JS 状态控制 opacity，菜单打开时始终保持可见
