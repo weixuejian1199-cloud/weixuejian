@@ -85,6 +85,20 @@ export const appRouter = router({
         await updateUserPassword(ctx.user.id, newHash);
         return { success: true };
       }),
+
+    /** Reset password by username only — no old password required (test-phase convenience) */
+    resetPassword: publicProcedure
+      .input(z.object({
+        username: z.string().min(1, "请输入用户名"),
+        newPassword: z.string().min(6, "新密码至少6位").max(128),
+      }))
+      .mutation(async ({ input }) => {
+        const user = await getUserByUsername(input.username);
+        if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "该用户名不存在" });
+        const newHash = await hashPassword(input.newPassword);
+        await updateUserPassword(user.id, newHash);
+        return { success: true };
+      }),
   }),
 
   // ── Sessions ──────────────────────────────────────────────────────────────────

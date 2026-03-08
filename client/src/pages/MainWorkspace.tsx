@@ -205,8 +205,27 @@ export default function MainWorkspace() {
     // Queries like 「报表在哪里」「历史报表」 also go through chat path
     const isReport = /生成报表|导出表格|excel表|xlsx表|日报生成|(帮我|(帮我)?生成|(帮我)?制作|(帮我)?做一份|(帮我)?做个|(帮我)?输出|(帮我)?整理成|(帮我)?提取).{0,8}(工资条|工资单|薪资表|薪酬表|分红明细|考勤表|出勤表|财务报表|销售报表|绩效表|奖金表|扣款表|个税表|实发明细|表格)|排名表|对比表/i.test(msg);
 
-    // Helper: parse 【①】方向名 format from AI reply into action buttons
-    const parseInlineOptions = (text: string): SuggestedAction[] => {
+  // Helper: strip <suggestions> block from text and parse into SuggestedAction[]
+  const parseSuggestions = (text: string): { cleanText: string; suggestions: SuggestedAction[] } => {
+    const match = text.match(/<suggestions>\s*([\s\S]*?)\s*<\/suggestions>/);
+    if (!match) return { cleanText: text, suggestions: [] };
+    const cleanText = text.replace(/<suggestions>[\s\S]*?<\/suggestions>/, "").trimEnd();
+    try {
+      const arr: string[] = JSON.parse(match[1].trim());
+      const icons = ["\u{1F4AC}", "\u{1F4CA}", "\u{1F50D}", "\u{1F4DD}", "\u26A1", "\u{1F4CB}"];
+      const suggestions: SuggestedAction[] = arr.slice(0, 3).map((label, i) => ({
+        icon: icons[i % icons.length],
+        label,
+        prompt: label,
+      }));
+      return { cleanText, suggestions };
+    } catch {
+      return { cleanText, suggestions: [] };
+    }
+  };
+
+  // Helper: parse 【①】方向名 format from AI reply into action buttons
+  const parseInlineOptions = (text: string): SuggestedAction[] => {
       const matches = Array.from(text.matchAll(/【([①②③④⑤⑥⑦⑧⑨⑩\d])】\s*([^\n【]+)/g));
       if (matches.length === 0) return FOLLOWUP_ACTIONS;
       const icons = ['📊', '📈', '🔍', '⚡', '🎯', '📋', '💡', '🔢'];
@@ -275,12 +294,16 @@ export default function MainWorkspace() {
           signal: abortController.signal,
           onChunk: (chunk) => {
             accumulated += chunk;
-            updateLastMessage(accumulated);
+            // Strip <suggestions> block from visible text during streaming
+            const visibleText = accumulated.replace(/<suggestions>[\s\S]*?<\/suggestions>/, "").replace(/<suggestions>[\s\S]*$/, "");
+            updateLastMessage(visibleText);
           },
           onDone: (fullText) => {
             const finalText = fullText || accumulated;
-            const parsedActions = parseInlineOptions(finalText);
-            updateLastMessage(finalText, {
+            // First try to extract <suggestions> block
+            const { cleanText, suggestions } = parseSuggestions(finalText);
+            const parsedActions = suggestions.length > 0 ? suggestions : parseInlineOptions(cleanText);
+            updateLastMessage(cleanText, {
               // @ts-ignore
               suggestedActions: parsedActions,
             });
@@ -841,6 +864,79 @@ export default function MainWorkspace() {
   );
 }
 
+// -- TaskCompleteBar ----------------------------------------------------------
+// Shown when a report is generated: ✅ task done + ⭐ star rating
+
+function TaskCompleteBar({ reportId, messagePreview }: { reportId: string; messagePreview: string }) {
+  const [starRating, setStarRating] = useState<number | null>(null);
+  const [hoverStar, setHoverStar] = useState<number | null>(null);
+  const submitFeedback = trpc.messageFeedback.submit.useMutation();
+
+  const handleStar = (star: number) => {
+    if (starRating !== null) return;
+    setStarRating(star);
+    submitFeedback.mutate({
+      rating: star >= 3 ? 1 : -1,
+      messagePreview: `[Report:${reportId}] ${messagePreview}`,
+      comment: `星级评分: ${star}/5`,
+      context: "report-complete",
+    });
+  };
+
+  return (
+    <div
+      className="flex items-center justify-between px-4 py-2.5 rounded-xl"
+      style={{
+        background: "rgba(52,211,153,0.06)",
+        border: "1px solid rgba(52,211,153,0.18)",
+      }}
+    >
+      {/* Left: task complete */}
+      <div className="flex items-center gap-2">
+        <div
+          className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: "rgba(52,211,153,0.15)", border: "1px solid rgba(52,211,153,0.3)" }}
+        >
+          <Check size={11} style={{ color: "var(--atlas-success)" }} />
+        </div>
+        <span className="text-sm font-medium" style={{ color: "var(--atlas-success)" }}>任务已完成</span>
+      </div>
+
+      {/* Right: star rating */}
+      <div className="flex items-center gap-2">
+        {starRating === null ? (
+          <>
+            <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>这个结果怎么样？</span>
+            <div className="flex items-center gap-0.5">
+              {[1, 2, 3, 4, 5].map(star => (
+                <button
+                  key={star}
+                  onClick={() => handleStar(star)}
+                  onMouseEnter={() => setHoverStar(star)}
+                  onMouseLeave={() => setHoverStar(null)}
+                  className="transition-transform hover:scale-110"
+                  style={{ color: (hoverStar ?? 0) >= star ? "#f59e0b" : "rgba(255,255,255,0.2)", fontSize: "16px" }}
+                >
+                  ★
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-0.5">
+              {[1, 2, 3, 4, 5].map(star => (
+                <span key={star} style={{ color: starRating >= star ? "#f59e0b" : "rgba(255,255,255,0.2)", fontSize: "14px" }}>★</span>
+              ))}
+            </div>
+            <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>已记录</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // -- MessageFeedbackButtons ----------------------------------------------------
 
 function MessageFeedbackButtons({ messagePreview }: { messagePreview: string }) {
@@ -1152,14 +1248,20 @@ function MessageBubble({
           </motion.div>
         )}
 
-        {/* Download button */}
+        {/* Download button + Task Complete Rating */}
         {message.report_id && message.report_filename && (
           <motion.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="mt-2"
+            className="mt-2 space-y-2"
           >
+            {/* Task complete bar */}
+            <TaskCompleteBar
+              reportId={message.report_id}
+              messagePreview={message.content.slice(0, 500)}
+            />
+            {/* Download button */}
             <button
               onClick={() => onDownload(message.report_id!, message.report_filename!)}
               className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all text-sm"
@@ -1236,15 +1338,6 @@ function MessageBubble({
 // -- EmptyState ------------------------------------------------------------------
 
 function EmptyState({ onUpload, onQuickAsk }: { onUpload: () => void; onQuickAsk: (q: string) => void }) {
-  const quickQuestions = [
-    { icon: "💰", label: "怎么算工资条？", q: "怎么算工资条？需要提供什么资料？" },
-    { icon: "📅", label: "怎么做考勤汇总？", q: "怎么做考勤汇总？需要什么数据？" },
-    { icon: "🏪", label: "多店铺数据怎么汇总？", q: "我有多家店铺的数据，怎么汇总在一起？" },
-    { icon: "📊", label: "历史报表在哪里？", q: "我之前生成的报表在哪里查看和下载？" },
-    { icon: "🔍", label: "能帮我分析什么？", q: "ATLAS 能帮我分析哪些类型的数据？" },
-    { icon: "💸", label: "怎么算分红？", q: "怎么计算分红明细？需要提供什么数据？" },
-  ];
-
   return (
     <div className="flex flex-col items-center justify-center gap-8 w-full max-w-2xl mx-auto text-center">
       {/* Brand — primary visual focus */}
@@ -1286,111 +1379,81 @@ function EmptyState({ onUpload, onQuickAsk }: { onUpload: () => void; onQuickAsk
           </p>
         </div>
 
-        {/* 三步流程引导 */}
-        <div className="flex items-center gap-0 mt-1">
-          {[
-            { icon: "📁", label: "上传文件" },
-            { icon: "💬", label: "说需求" },
-            { icon: "📊", label: "下载报表" },
-          ].map((step, i) => (
-            <div key={i} className="flex items-center">
-              <div
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-                style={{
-                  background: i === 0 ? "rgba(91,140,255,0.12)" : i === 1 ? "rgba(91,140,255,0.08)" : "rgba(91,140,255,0.06)",
-                  border: `1px solid rgba(91,140,255,${i === 0 ? "0.28" : i === 1 ? "0.20" : "0.14"})`,
-                }}
-              >
-                <span style={{ fontSize: "13px" }}>{step.icon}</span>
-                <span
+      </motion.div>
+
+      {/* AI Welcome Bubble */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.18, duration: 0.35 }}
+        className="w-full flex gap-2.5"
+      >
+        {/* Avatar */}
+        <div
+          className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+          style={{
+            background: "rgba(91,140,255,0.12)",
+            border: "1px solid rgba(91,140,255,0.2)",
+          }}
+        >
+          <Sparkles size={12} style={{ color: "var(--atlas-accent)" }} />
+        </div>
+
+        <div
+          className="flex-1 px-4 py-3.5 rounded-2xl text-left"
+          style={{
+            background: "var(--atlas-surface)",
+            border: "1px solid var(--atlas-border)",
+          }}
+        >
+          <p style={{ color: "var(--atlas-text)", fontSize: "14px", lineHeight: "1.75" }}>
+            我是 ATLAS，专注行政、财务与数据分析的智能助手。
+          </p>
+          <p style={{ color: "var(--atlas-text-2)", fontSize: "14px", lineHeight: "1.75", marginTop: "6px" }}>
+            上传你的 Excel 或 CSV 文件，用一句话告诉我需求——比如「生成工资条」「汇总各店销售」「做考勤统计」。
+          </p>
+          <p style={{ color: "var(--atlas-text-2)", fontSize: "14px", lineHeight: "1.75", marginTop: "6px" }}>
+            我来处理数据、生成报表，你直接下载。
+          </p>
+
+          {/* 三步引导 */}
+          <div className="flex items-center gap-0 mt-4">
+            {[
+              { icon: "📁", label: "上传文件" },
+              { icon: "💬", label: "说需求" },
+              { icon: "📊", label: "下载报表" },
+            ].map((step, i) => (
+              <div key={i} className="flex items-center">
+                <div
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
                   style={{
-                    fontSize: "12px",
-                    fontWeight: 500,
-                    color: i === 0 ? "var(--atlas-accent)" : i === 1 ? "rgba(91,140,255,0.85)" : "rgba(91,140,255,0.65)",
-                    letterSpacing: "0.02em",
+                    background: i === 0 ? "rgba(91,140,255,0.12)" : i === 1 ? "rgba(91,140,255,0.08)" : "rgba(91,140,255,0.06)",
+                    border: `1px solid rgba(91,140,255,${i === 0 ? "0.28" : i === 1 ? "0.20" : "0.14"})`,
                   }}
                 >
-                  {step.label}
-                </span>
+                  <span style={{ fontSize: "13px" }}>{step.icon}</span>
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 500,
+                      color: i === 0 ? "var(--atlas-accent)" : i === 1 ? "rgba(91,140,255,0.85)" : "rgba(91,140,255,0.65)",
+                      letterSpacing: "0.02em",
+                    }}
+                  >
+                    {step.label}
+                  </span>
+                </div>
+                {i < 2 && (
+                  <ChevronRight
+                    size={13}
+                    style={{ color: "rgba(91,140,255,0.35)", margin: "0 2px", flexShrink: 0 }}
+                  />
+                )}
               </div>
-              {i < 2 && (
-                <ChevronRight
-                  size={13}
-                  style={{ color: "rgba(91,140,255,0.35)", margin: "0 2px", flexShrink: 0 }}
-                />
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </motion.div>
-
-      {/* Quick questions — smaller, secondary */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-        className="w-full"
-      >
-        <p className="text-xs mb-2.5" style={{ color: "var(--atlas-text-3)", letterSpacing: "0.02em" }}>直接提问，或上传文件开始分析</p>
-        <div className="grid grid-cols-3 gap-1.5">
-          {quickQuestions.map((q, i) => (
-            <motion.button
-              key={i}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 + i * 0.03 }}
-              onClick={() => onQuickAsk(q.q)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-left transition-all"
-              style={{
-                background: "var(--atlas-elevated)",
-                border: "1px solid var(--atlas-border)",
-                color: "var(--atlas-text-3)",
-                fontSize: "11.5px",
-              }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.35)";
-                (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
-                (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.04)";
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border)";
-                (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
-                (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
-              }}
-            >
-              <span style={{ fontSize: "13px", flexShrink: 0 }}>{q.icon}</span>
-              <span className="truncate">{q.label}</span>
-            </motion.button>
-          ))}
-        </div>
-      </motion.div>
-
-      {/* Drop zone */}
-      <motion.button
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        onClick={onUpload}
-        className="w-full rounded-xl py-5 flex items-center justify-center gap-3 transition-all"
-        style={{
-          border: "2px dashed rgba(91,140,255,0.2)",
-          background: "rgba(91,140,255,0.02)",
-          color: "var(--atlas-text-3)",
-        }}
-        onMouseEnter={e => {
-          (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.45)";
-          (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.05)";
-          (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
-        }}
-        onMouseLeave={e => {
-          (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.2)";
-          (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.02)";
-          (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
-        }}
-      >
-        <Upload size={18} />
-        <span className="text-sm">拖入 Excel / CSV 文件，或点击上传（支持多文件）</span>
-      </motion.button>
     </div>
   );
 }
