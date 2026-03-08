@@ -5,7 +5,7 @@
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 
-export type NavItem = "home" | "dashboard" | "templates" | "settings" | "search" | "library" | "invite" | "hr";
+export type NavItem = "home" | "dashboard" | "templates" | "settings" | "search" | "library" | "invite" | "hr" | "im";
 export type Theme = "dark" | "light";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -246,7 +246,11 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
   const [activeNav, setActiveNav] = useState<NavItem>("home");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTaskId, setActiveTaskIdState] = useState<string | null>(() => localStorage.getItem("atlas_active_task"));
-  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("atlas_theme") as Theme) || "dark");
+  const [theme, setTheme] = useState<Theme>(() => {
+    // 默认浅色：只有用户明确选择过深色才保留深色
+    const stored = localStorage.getItem("atlas_theme") as Theme | null;
+    return stored === "dark" ? "dark" : "light";
+  });
   const [user, setUser] = useState<User | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [tasks, setTasks] = useState<Task[]>(() => {

@@ -37,56 +37,11 @@
   --color-sidebar-border: var(--sidebar-border);
 }
 
-/* ── Dark Theme (default) ─────────────────────────────────────── */
+/* ── Light Theme (default) ────────────────────────────────────── */
 :root,
-.dark {
+.light {
   --radius: 0.5rem;
 
-  /* Shadcn compat */
-  --background: oklch(0.12 0.008 260);
-  --foreground: oklch(0.92 0.005 260);
-  --card: oklch(0.16 0.008 260);
-  --card-foreground: oklch(0.92 0.005 260);
-  --popover: oklch(0.16 0.008 260);
-  --popover-foreground: oklch(0.92 0.005 260);
-  --primary: oklch(0.62 0.18 255);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.20 0.008 260);
-  --secondary-foreground: oklch(0.75 0.01 260);
-  --muted: oklch(0.20 0.008 260);
-  --muted-foreground: oklch(0.55 0.01 260);
-  --accent: oklch(0.20 0.008 260);
-  --accent-foreground: oklch(0.92 0.005 260);
-  --destructive: oklch(0.65 0.22 25);
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 10%);
-  --ring: oklch(0.62 0.18 255);
-  --sidebar: oklch(0.155 0.008 260);
-  --sidebar-foreground: oklch(0.92 0.005 260);
-  --sidebar-border: oklch(1 0 0 / 8%);
-
-  /* ATLAS custom tokens */
-  --atlas-bg:          #0F1115;
-  --atlas-surface:     #181B21;
-  --atlas-elevated:    #1E2128;
-  --atlas-card:        #22262F;
-  --atlas-border:      rgba(255,255,255,0.07);
-  --atlas-border-2:    rgba(255,255,255,0.12);
-  --atlas-text:        #E8EAF0;
-  --atlas-text-2:      #9BA3B4;
-  --atlas-text-3:      #5C6478;
-  --atlas-accent:      #5B8CFF;
-  --atlas-accent-2:    #7B5FFF;
-  --atlas-success:     #34D399;
-  --atlas-warning:     #FBBF24;
-  --atlas-danger:      #F87171;
-  --atlas-sidebar-w:   240px;
-  --atlas-topbar-h:    48px;
-  --atlas-radius:      8px;
-}
-
-/* ── Light Theme ──────────────────────────────────────────────── */
-.light {
   /* Shadcn compat */
   --background: oklch(1 0 0);
   --foreground: oklch(0.15 0.01 260);
@@ -125,6 +80,54 @@
   --atlas-success:     #10B981;
   --atlas-warning:     #F59E0B;
   --atlas-danger:      #EF4444;
+  --atlas-sidebar-w:   240px;
+  --atlas-topbar-h:    48px;
+  --atlas-radius:      8px;
+}
+
+/* ── Dark Theme ────────────────────────────────────────────────── */
+.dark {
+  /* Shadcn compat */
+  --background: oklch(0.12 0.008 260);
+  --foreground: oklch(0.92 0.005 260);
+  --card: oklch(0.16 0.008 260);
+  --card-foreground: oklch(0.92 0.005 260);
+  --popover: oklch(0.16 0.008 260);
+  --popover-foreground: oklch(0.92 0.005 260);
+  --primary: oklch(0.62 0.18 255);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.20 0.008 260);
+  --secondary-foreground: oklch(0.75 0.01 260);
+  --muted: oklch(0.20 0.008 260);
+  --muted-foreground: oklch(0.55 0.01 260);
+  --accent: oklch(0.20 0.008 260);
+  --accent-foreground: oklch(0.92 0.005 260);
+  --destructive: oklch(0.65 0.22 25);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 10%);
+  --ring: oklch(0.62 0.18 255);
+  --sidebar: oklch(0.155 0.008 260);
+  --sidebar-foreground: oklch(0.92 0.005 260);
+  --sidebar-border: oklch(1 0 0 / 8%);
+
+  /* ATLAS custom tokens — dark */
+  --atlas-bg:          #0F1115;
+  --atlas-surface:     #181B21;
+  --atlas-elevated:    #1E2128;
+  --atlas-card:        #22262F;
+  --atlas-border:      rgba(255,255,255,0.07);
+  --atlas-border-2:    rgba(255,255,255,0.12);
+  --atlas-text:        #E8EAF0;
+  --atlas-text-2:      #9BA3B4;
+  --atlas-text-3:      #5C6478;
+  --atlas-accent:      #5B8CFF;
+  --atlas-accent-2:    #7B5FFF;
+  --atlas-success:     #34D399;
+  --atlas-warning:     #FBBF24;
+  --atlas-danger:      #F87171;
+  --atlas-sidebar-w:   240px;
+  --atlas-topbar-h:    48px;
+  --atlas-radius:      8px;
 }
 
 /* ── Base ─────────────────────────────────────────────────────── */

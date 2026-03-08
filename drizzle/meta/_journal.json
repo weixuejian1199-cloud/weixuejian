@@ -85,6 +85,13 @@
       "when": 1772954443528,
       "tag": "0011_material_firebrand",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1772977055026,
+      "tag": "0012_tan_the_hunter",
+      "breakpoints": true
     }
   ]
 }

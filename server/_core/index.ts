@@ -9,6 +9,7 @@ import { registerHrRoutes } from "../hr";
 import { registerOpenClawPollingRoutes } from "../openclawPolling";
 import adminApiRouter from "../adminApi";
 import { startScheduler } from "../scheduler";
+import { createImWsServer } from "../im/wsServer";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -69,6 +70,9 @@ async function startServer() {
   if (port !== preferredPort) {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
+
+  // IM WebSocket server
+  createImWsServer(server);
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);

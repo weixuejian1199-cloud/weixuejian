@@ -11,13 +11,14 @@ import {
   CheckCircle2, Clock, AlertCircle, Archive,
   LogIn, LogOut, Loader2, PanelLeftClose, PanelLeftOpen,
   Gift, RefreshCw, Download, Timer, MoreHorizontal,
-  Star, Share2, Trash2, User, Users,
+  Star, Share2, Trash2, User, Users, MessageSquare,
 } from "lucide-react";
 import { useAtlas, type NavItem } from "@/contexts/AtlasContext";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 const NAV_MAIN: { id: NavItem; icon: typeof Home; label: string }[] = [
+  { id: "im",        icon: MessageSquare,   label: "消息" },
   { id: "home",      icon: Home,            label: "工作台" },
   { id: "dashboard", icon: LayoutDashboard, label: "数据中枢" },
   { id: "hr",        icon: Users,           label: "HR 中心" },

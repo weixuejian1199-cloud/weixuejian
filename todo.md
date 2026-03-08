@@ -407,3 +407,90 @@
 - [x] 实现双通道路由：有Key走OpenClaw SSE流式，无Key走千问（自动降级）
 - [x] 添加 callOpenClawStream 函数（SSE代理，将输出文件存到S3）
 - [x] env.ts 支持 OPENCLAW_API_URL 和 OPENCLAW_ENDPOINT 双变量名
+
+## V12.21 紧急修复：千问 API Key
+
+- [x] 发现 DASHSCOPE_API_KEY 未配置（环境变量为空，导致两个 AI 通道都不通）
+- [x] 配置阿里百炼套餐专属 Key（sk-sp-de13f1c47cec44c48c42a4ed182c7a01）
+- [x] 配置套餐专属 Base URL（coding.dashscope.aliyuncs.com/v1）
+- [x] 验证 qwen3-max-2026-01-23 模型可正常调用（3 tests passed）
+
+## V13.0 OpenClaw WebSocket 聊天渠道（即时通讯集成）
+
+### 后端
+- [ ] 数据库新增 chat_sessions 表（id/userId/title/createdAt/updatedAt）
+- [ ] 数据库新增 chat_messages 表（id/sessionId/role/content/createdAt）
+- [ ] pnpm db:push 迁移数据库
+- [ ] WebSocket 服务端（/ws/chat）：用户认证（JWT）、消息收发、会话管理
+- [ ] WebSocket 服务端：OpenClaw 插件专用连接通道（Bearer Token 鉴权）
+- [ ] tRPC 路由：chat.getSessions（获取会话列表）
+- [ ] tRPC 路由：chat.getMessages（获取历史消息）
+- [ ] tRPC 路由：chat.createSession（新建会话）
+- [ ] tRPC 路由：chat.deleteSession（删除会话）
+
+### 前端
+- [ ] 新建 Chat.tsx 聊天页面（侧栏会话列表 + 消息区 + 输入框）
+- [ ] 接入 WebSocket，支持实时收发消息
+- [ ] 支持流式显示（OpenClaw 逐字推送）
+- [ ] 历史会话切换
+- [ ] 侧栏添加「AI 助手」导航入口
+- [ ] App.tsx 注册 /chat 路由
+
+### OpenClaw 插件
+- [ ] 新建 openclaw-atlas-channel 插件目录
+- [ ] 实现 ChannelPlugin 接口（参考飞书插件）
+- [ ] 通过 WebSocket 连接 ATLAS（Bearer Token 鉴权）
+- [ ] 收消息：监听 ATLAS 推送的用户消息
+- [ ] 发消息：把 OpenClaw 回复推给 ATLAS
+- [ ] openclaw.plugin.json manifest 文件
+- [ ] 打包为 npm 包（可本地安装）
+- [ ] 输出安装说明文档
+
+## V13.0 企业 IM 一期（AI 助手 + 1v1 私聊）
+
+### 数据库
+- [ ] 新增 im_conversations 表（id/type/createdAt）
+- [ ] 新增 im_participants 表（conversationId/userId）
+- [ ] 新增 im_messages 表（id/conversationId/senderId/content/type/createdAt）
+- [ ] pnpm db:push 迁移数据库
+
+### 后端 WebSocket
+- [ ] server/im/wsServer.ts：WebSocket 服务端，JWT 鉴权，管理在线用户连接
+- [ ] 支持消息类型：text / file / ai_reply
+- [ ] AI 助手频道：senderId=0 表示 AI，消息转发给千问处理后推回
+- [ ] OpenClaw 插件专用连接通道（Bearer Token = OPENCLAW_SESSION_KEY）
+- [ ] 注册到 Express server
+
+### 后端 tRPC 路由
+- [ ] im.getContacts：获取用户通讯录（所有注册用户）
+- [ ] im.getConversations：获取我的会话列表（含最后一条消息）
+- [ ] im.getMessages：获取指定会话的历史消息（分页）
+- [ ] im.createConversation：创建 1v1 会话
+- [ ] im.getOrCreateAiConversation：获取或创建与 AI 助手的会话
+
+### 前端
+- [ ] client/src/pages/IM.tsx：主页面（左侧联系人/会话列表 + 右侧消息区）
+- [ ] 左侧：AI 助手置顶 + 联系人列表（头像/名字/最后消息预览）
+- [ ] 右侧：消息气泡（自己右对齐/对方左对齐）+ 输入框 + 发送按钮
+- [ ] WebSocket 实时收发消息
+- [ ] AI 助手对话支持流式输出（逐字显示）
+- [ ] 侧栏添加「消息」导航入口
+- [ ] App.tsx 注册 /im 路由
+
+### OpenClaw 插件
+- [ ] 新建 /home/ubuntu/openclaw-atlas-plugin/ 目录
+- [ ] index.ts：实现 ChannelPlugin 接口
+- [ ] WebSocket 连接 ATLAS wss://atlascore.cn/ws/im/openclaw
+- [ ] 收消息：监听用户发给 AI 助手的消息
+- [ ] 发消息：把 OpenClaw 回复推给 ATLAS
+- [ ] openclaw.plugin.json manifest
+- [ ] package.json（可本地 npm install 安装）
+- [ ] README.md 安装说明
+
+## V13.1 IM 入口位置调整
+- [x] 将侧边栏「消息」导航入口移到「工作台」上方（最顶部）
+
+## V13.2 主题调整
+- [x] 将默认主题改为浅色模式（light），更新 ThemeProvider defaultTheme 和 index.css CSS 变量
+- [x] 修复 AtlasContext 主题初始化：旧用户 localStorage 中的深色偏好不再覆盖默认浅色
+- [x] 修复 sonner.tsx 使用 AtlasContext 主题而不是 next-themes

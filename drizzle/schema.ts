@@ -270,3 +270,55 @@ export const adminApiKeys = mysqlTable("admin_api_keys", {
 });
 export type AdminApiKey = typeof adminApiKeys.$inferSelect;
 export type InsertAdminApiKey = typeof adminApiKeys.$inferInsert;
+
+// ── IM: Conversations ─────────────────────────────────────────────────────────
+// A conversation is either a 1v1 direct message or an AI assistant chat
+
+export const imConversations = mysqlTable("im_conversations", {
+  id:        varchar("id", { length: 64 }).primaryKey(),
+  /** 'direct' = 1v1 between two users, 'ai' = user with AI assistant */
+  type:      mysqlEnum("type", ["direct", "ai"]).notNull(),
+  /** Last message preview for conversation list */
+  lastMessage: text("lastMessage"),
+  lastMessageAt: timestamp("lastMessageAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ImConversation = typeof imConversations.$inferSelect;
+export type InsertImConversation = typeof imConversations.$inferInsert;
+
+// ── IM: Participants ───────────────────────────────────────────────────────────
+// Maps users to conversations (many-to-many)
+
+export const imParticipants = mysqlTable("im_participants", {
+  id:             int("id").autoincrement().primaryKey(),
+  conversationId: varchar("conversationId", { length: 64 }).notNull(),
+  userId:         int("userId").notNull(),
+  /** Unread message count for this user in this conversation */
+  unreadCount:    int("unreadCount").default(0).notNull(),
+  createdAt:      timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ImParticipant = typeof imParticipants.$inferSelect;
+export type InsertImParticipant = typeof imParticipants.$inferInsert;
+
+// ── IM: Messages ──────────────────────────────────────────────────────────────
+// Individual messages within a conversation
+
+export const imMessages = mysqlTable("im_messages", {
+  id:             varchar("id", { length: 64 }).primaryKey(),
+  conversationId: varchar("conversationId", { length: 64 }).notNull(),
+  /** 0 = AI assistant, positive int = user id */
+  senderId:       int("senderId").notNull(),
+  senderName:     varchar("senderName", { length: 128 }),
+  /** Message type: text, file, ai_thinking */
+  type:           mysqlEnum("type", ["text", "file", "ai_thinking"]).default("text").notNull(),
+  content:        text("content").notNull(),
+  /** For file messages: JSON { name, url, size } */
+  fileInfo:       json("fileInfo"),
+  createdAt:      timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ImMessage = typeof imMessages.$inferSelect;
+export type InsertImMessage = typeof imMessages.$inferInsert;

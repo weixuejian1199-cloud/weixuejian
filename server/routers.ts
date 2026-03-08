@@ -15,6 +15,7 @@ import {
   getUserByUsername, createUser, updateUserPassword, getUserById,
   createMessageFeedback, getMessageFeedbacks,
 } from "./db";
+import { users } from "../drizzle/schema";
 import { storageDelete } from "./storage";
 import { hashPassword, verifyPassword, createSessionToken } from "./_core/auth";
 
@@ -502,6 +503,37 @@ export const appRouter = router({
     getCredits: protectedProcedure.query(async ({ ctx }) => {
       const credits = await getUserCredits(ctx.user.id);
       return { credits };
+    }),
+  }),
+
+  // ── IM ──────────────────────────────────────────────────────────────────────
+
+  im: router({
+    /** Get a short-lived WebSocket auth token (the user's session JWT) */
+    getWsToken: protectedProcedure.query(async ({ ctx }) => {
+      const token = await createSessionToken({ userId: ctx.user.id, username: ctx.user.username ?? "" });
+      return { token };
+    }),
+
+    /** Get all users for the contacts list */
+    getContacts: protectedProcedure.query(async ({ ctx }) => {
+      const { drizzle } = await import("drizzle-orm/mysql2");
+      const db = drizzle(process.env.DATABASE_URL!);
+      const allUsers = await db
+        .select({
+          id: users.id,
+          name: users.name,
+          username: users.username,
+          role: users.role,
+        })
+        .from(users)
+        .orderBy(users.name);
+      return allUsers
+        .filter(u => u.id !== ctx.user.id)
+        .map(u => ({
+          ...u,
+          displayName: u.name || u.username || `用户${u.id}`,
+        }));
     }),
   }),
 

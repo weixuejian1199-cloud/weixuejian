@@ -22,6 +22,7 @@ import SearchPage from "./pages/SearchPage";
 import LibraryPage from "./pages/LibraryPage";
 import InvitePage from "./pages/InvitePage";
 import HRCenterPage from "./pages/HRCenterPage";
+import IMPage from "./pages/IMPage";
 
 function AppContent() {
   const { activeNav, theme, showLoginModal, setUser } = useAtlas();
@@ -50,6 +51,7 @@ function AppContent() {
       case "library":    return <LibraryPage />;
       case "invite":     return <InvitePage />;
       case "hr":         return <HRCenterPage />;
+      case "im":         return <IMPage />;
       case "home":
       default:           return <MainWorkspace />;
     }
