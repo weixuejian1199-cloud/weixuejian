@@ -177,6 +177,17 @@ export default function MainWorkspace() {
     addMessage({ role: "user", content: msg });
     addMessage({ role: "assistant", content: "", isStreaming: true });
 
+    // Auto-generate task title from first user message
+    if (activeTaskId) {
+      const currentTask = tasks.find(t => t.id === activeTaskId);
+      const isFirstMessage = currentTask?.messages.filter(m => m.role === "user").length === 0;
+      if (isFirstMessage && (currentTask?.title === "新建任务" || !currentTask?.title)) {
+        // Generate a concise title: take first 20 chars of message, strip punctuation at end
+        const autoTitle = msg.replace(/[，。！？,.!?]+$/, "").slice(0, 20) + (msg.length > 20 ? "..." : "");
+        updateTask(activeTaskId, { title: autoTitle });
+      }
+    }
+
     // Use all ready session IDs (multi-file support)
     const sessionIds = readyFiles.map(f => f.sessionId).filter(Boolean) as string[];
     const primarySessionId = sessionIds[0];
