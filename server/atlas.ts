@@ -818,7 +818,7 @@ ${dataTable}
       // ── Telegram async task routing ────────────────────────────────────────
       // If Telegram is configured, ALL tasks are pushed to Telegram for human/AI processing.
       // No dependency on OpenClaw API Key.
-      if (ENV.telegramBotToken && ENV.telegramChatId) {
+      if (false /* DISABLED: tasks now go directly to AI */ && ENV.telegramBotToken && ENV.telegramChatId) {
         console.log("[Atlas] Routing to Telegram async task");
         try {
           // Get presigned S3 URLs for all session files
@@ -833,7 +833,7 @@ ${dataTable}
           // 1. Insert task record into DB (status = pending)
           const db = await getDb();
           if (db) {
-            await db.insert(openclawTasks).values({
+            await db!.insert(openclawTasks).values({
               id: taskId,
               userId: numericUserId,
               externalUserId: String(userId),

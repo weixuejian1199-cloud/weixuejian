@@ -319,3 +319,9 @@
 - [x] POST /api/admin/notify — 推送系统通知
 - [x] 新反馈写入时自动推送到 OpenClaw Webhook（预留 OPENCLAW_WEBHOOK_URL 配置）
 - [x] 生成 OPENCLAW_API_DOC.md 对接文档
+
+## V12.10 紧急修复：任务卡 pending（用户等 2 小时无结果）
+
+- [x] 找到 Telegram 路由判断（atlas.ts 第 821 行），改为 if (false && ...) 禁用
+- [x] 修复 TypeScript 编译错误（db 非空断言）
+- [x] 重启服务器应用修改，所有任务现在直接走 AI 流式处理
