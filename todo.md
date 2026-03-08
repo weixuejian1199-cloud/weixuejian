@@ -275,3 +275,47 @@
 - [x] 模板预览弹窗底部添加「下载演示文件」按钮
 - [x] 文件标签 X 删除按钮改为 ⋮ 下拉菜单（重命名 / 删除），修复点击跳动问题
 - [x] 修复 openclawPolling.ts 中 Unicode 装饰线字符导致的 esbuild 编译错误
+
+## V12.5 管理后台
+
+- [ ] 后端：adminRouter - 用户列表、禁用/启用、提权为管理员
+- [ ] 后端：adminRouter - 报表列表（所有用户）、删除报表
+- [ ] 后端：adminRouter - 系统统计（用户总数、报表总数、会话总数）
+- [ ] 前端：AdminPage 管理后台页面（用户管理 + 报表管理 + 系统概览三个 Tab）
+- [ ] 前端：侧栏添加「管理后台」入口（仅 admin 角色可见）
+- [ ] 前端：App.tsx 注册 admin 路由
+
+## V12.6 Bug修复 + 反馈界面 + 问题分析
+
+- [ ] 修复任务菜单向上弹出 → 改为向下弹出
+- [ ] 修复删除任务只 toast 不真实删除的问题
+- [ ] AI 回复消息底部加 👍/👎 反馈按钮，点击后可补充描述提交
+- [ ] 侧栏底部加「反馈建议」入口
+- [ ] 分析今天用户问题，优化 AI 系统提示词（奖金计算规则、引导上传文件）
+
+## V12.7 交付体验优化
+
+- [ ] 修改 AI 系统提示词：直接给结果，一句话确认需求，不做长篇分析
+- [ ] 消息渲染支持内联交互式表格（排名高亮、列排序）
+- [ ] 消息底部操作栏：自动显示「导出 Excel」「导出 PDF」「我要调整」按钮
+- [ ] 用户无文件时 AI 只问一句「请上传 Excel」不做其他分析
+
+## V12.8 直接给表格（核心体验升级）
+
+- [ ] AI 提示词：有文件+有需求 → 输出 ATLAS_TABLE JSON 格式数据
+- [ ] AI 提示词：无文件 → 只说「请上传 Excel」；无需求 → 只问「你想看什么？」
+- [ ] 前端：识别 ATLAS_TABLE JSON，渲染成内联可视化表格（带排序、高亮第一名）
+- [ ] 前端：表格下方自动出现「导出 Excel」「导出 PDF」「调整一下」三个按钮
+
+## V12.9 OpenClaw 后台接入
+
+- [x] schema 添加 admin_api_keys 表，迁移数据库
+- [x] 生成管理员 API Key 并写入数据库
+- [x] GET /api/admin/users — 查用户列表（分页）
+- [x] GET /api/admin/tasks — 查任务列表（分页）
+- [x] GET /api/admin/feedback — 查反馈列表（分页）
+- [x] GET /api/admin/stats — 查系统统计
+- [x] PATCH /api/admin/users/:id/role — 修改用户角色
+- [x] POST /api/admin/notify — 推送系统通知
+- [x] 新反馈写入时自动推送到 OpenClaw Webhook（预留 OPENCLAW_WEBHOOK_URL 配置）
+- [x] 生成 OPENCLAW_API_DOC.md 对接文档

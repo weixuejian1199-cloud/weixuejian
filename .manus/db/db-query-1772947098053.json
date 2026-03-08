@@ -1,0 +1,170 @@
+{
+  "query": "\nSELECT s.id, s.originalName, s.filename, s.createdAt, u.username, u.name\nFROM sessions s\nLEFT JOIN users u ON s.userId = u.id\nWHERE DATE(s.createdAt) = '2026-03-08'\nORDER BY s.createdAt DESC\nLIMIT 20;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute \nSELECT s.id, s.originalName, s.filename, s.createdAt, u.username, u.name\nFROM sessions s\nLEFT JOIN users u ON s.userId = u.id\nWHERE DATE(s.createdAt) = '2026-03-08'\nORDER BY s.createdAt DESC\nLIMIT 20;\n",
+  "rows": [
+    {
+      "id": "noxre4pCI5Lwp9DdlRvRy",
+      "originalName": "采购计划明细 3.8 .xlsx",
+      "filename": "atlas-uploads/noxre4pCI5Lwp9DdlRvRy-1772943973038.xlsx",
+      "createdAt": "2026-03-08 04:26:13",
+      "username": "NULL",
+      "name": "NULL"
+    },
+    {
+      "id": "lUxw_POqZWFr5dlwKex1d",
+      "originalName": "采购计划明细 3.8 .xlsx",
+      "filename": "atlas-uploads/lUxw_POqZWFr5dlwKex1d-1772943968503.xlsx",
+      "createdAt": "2026-03-08 04:26:08",
+      "username": "NULL",
+      "name": "NULL"
+    },
+    {
+      "id": "lvIfbDmGcHEW7hh3WA1t_",
+      "originalName": "成本表.xlsx",
+      "filename": "atlas-uploads/lvIfbDmGcHEW7hh3WA1t_-1772939221571.xlsx",
+      "createdAt": "2026-03-08 03:07:01",
+      "username": "六月的猫",
+      "name": "六月的猫"
+    },
+    {
+      "id": "M-QuvcUehLl1fsSQpJ8wE",
+      "originalName": "2026年成本总表格1月.xlsx",
+      "filename": "atlas-uploads/M-QuvcUehLl1fsSQpJ8wE-1772938948359.xlsx",
+      "createdAt": "2026-03-08 03:02:29",
+      "username": "六月的猫",
+      "name": "六月的猫"
+    },
+    {
+      "id": "jsEsQ2DkAHy6YlDpI3M36",
+      "originalName": "UMI482号仓_20260304-20260218_结算明细导出.xlsx",
+      "filename": "atlas-uploads/jsEsQ2DkAHy6YlDpI3M36-1772938805694.xlsx",
+      "createdAt": "2026-03-08 03:00:05",
+      "username": "123",
+      "name": "123"
+    },
+    {
+      "id": "EGqimScHOdwzzVWDdaC0S",
+      "originalName": "2.10-B248Z(1).xlsx",
+      "filename": "atlas-uploads/EGqimScHOdwzzVWDdaC0S-1772937733716.xlsx",
+      "createdAt": "2026-03-08 02:42:13",
+      "username": "123",
+      "name": "123"
+    },
+    {
+      "id": "gMxjLZ1Tuat7jR-kpCjem",
+      "originalName": "2.11-B248Z(1).xlsx",
+      "filename": "atlas-uploads/gMxjLZ1Tuat7jR-kpCjem-1772937733551.xlsx",
+      "createdAt": "2026-03-08 02:42:13",
+      "username": "123",
+      "name": "123"
+    },
+    {
+      "id": "93Agze2LsqUXuQ5QVENLb",
+      "originalName": "2.9-小红团B248Z-沙棘.xlsx",
+      "filename": "atlas-uploads/93Agze2LsqUXuQ5QVENLb-1772937733529.xlsx",
+      "createdAt": "2026-03-08 02:42:13",
+      "username": "123",
+      "name": "123"
+    },
+    {
+      "id": "sDnfCAvKvVNyYFj5sg1mn",
+      "originalName": "葡萄酒售后.xlsx",
+      "filename": "atlas-uploads/sDnfCAvKvVNyYFj5sg1mn-1772936955553.xlsx",
+      "createdAt": "2026-03-08 02:29:16",
+      "username": "NULL",
+      "name": "NULL"
+    },
+    {
+      "id": "BeXEFlhyfxPxpjUTeuCVm",
+      "originalName": "月度汇总_20260201_20260228.xlsx",
+      "filename": "atlas-uploads/BeXEFlhyfxPxpjUTeuCVm-1772936925174.xlsx",
+      "createdAt": "2026-03-08 02:28:45",
+      "username": "六月的猫",
+      "name": "六月的猫"
+    },
+    {
+      "id": "ji706YdBkdlW-MMJdQdYI",
+      "originalName": "小红团平台10月销售收入.xlsx",
+      "filename": "atlas-uploads/ji706YdBkdlW-MMJdQdYI-1772936848734.xlsx",
+      "createdAt": "2026-03-08 02:27:29",
+      "username": "123",
+      "name": "123"
+    },
+    {
+      "id": "_bGO8Q8EGzHtqPPdaopdp",
+      "originalName": "小红团平台10月销售收入.xlsx",
+      "filename": "atlas-uploads/_bGO8Q8EGzHtqPPdaopdp-1772936812056.xlsx",
+      "createdAt": "2026-03-08 02:26:52",
+      "username": "123",
+      "name": "123"
+    },
+    {
+      "id": "i6iKdh3IKWw3Wq_tdfGEm",
+      "originalName": "最新2026年1月返点汇总 (2).xlsx",
+      "filename": "atlas-uploads/i6iKdh3IKWw3Wq_tdfGEm-1772936664375.xlsx",
+      "createdAt": "2026-03-08 02:24:24",
+      "username": "六月的猫",
+      "name": "六月的猫"
+    },
+    {
+      "id": "ukjQmwdc0s9vNeKA7edps",
+      "originalName": "最新2026年1月返点汇总 (2).xlsx",
+      "filename": "atlas-uploads/ukjQmwdc0s9vNeKA7edps-1772935545865.xlsx",
+      "createdAt": "2026-03-08 02:05:46",
+      "username": "六月的猫",
+      "name": "六月的猫"
+    },
+    {
+      "id": "h0rr6mHgnQsS02O4rEWfe",
+      "originalName": "2026年2月总工资表（最终-工资+绩效）(1).xlsx",
+      "filename": "atlas-uploads/h0rr6mHgnQsS02O4rEWfe-1772935367944.xlsx",
+      "createdAt": "2026-03-08 02:02:48",
+      "username": "weixuejian",
+      "name": "david"
+    },
+    {
+      "id": "Fug3eHAP4sIp92UY2kiVr",
+      "originalName": "自营盘点表.xlsx",
+      "filename": "atlas-uploads/Fug3eHAP4sIp92UY2kiVr-1772935067770.xlsx",
+      "createdAt": "2026-03-08 01:57:48",
+      "username": "RUSIN-派收订单",
+      "name": "RUSIN-派收订单"
+    },
+    {
+      "id": "r4T2ukJHxaimKfyAiU6dh",
+      "originalName": "自营盘点表.xlsx",
+      "filename": "atlas-uploads/r4T2ukJHxaimKfyAiU6dh-1772935038552.xlsx",
+      "createdAt": "2026-03-08 01:57:18",
+      "username": "RUSIN-派收订单",
+      "name": "RUSIN-派收订单"
+    },
+    {
+      "id": "ixaC2nReIwDQSE8kErsp5",
+      "originalName": "自营盘点表.xlsx",
+      "filename": "atlas-uploads/ixaC2nReIwDQSE8kErsp5-1772934950405.xlsx",
+      "createdAt": "2026-03-08 01:55:50",
+      "username": "RUSIN-派收订单",
+      "name": "RUSIN-派收订单"
+    },
+    {
+      "id": "e8EpPTU4MPlXrVvtE-J7k",
+      "originalName": "工作簿2.xlsx",
+      "filename": "atlas-uploads/e8EpPTU4MPlXrVvtE-J7k-1772934884085.xlsx",
+      "createdAt": "2026-03-08 01:54:44",
+      "username": "甲霸盈盈",
+      "name": "甲霸盈盈"
+    },
+    {
+      "id": "4PXbuqYXZ30dzzMCKFtLk",
+      "originalName": "7+渠道10月份账单.xlsx",
+      "filename": "atlas-uploads/4PXbuqYXZ30dzzMCKFtLk-1772934877153.xlsx",
+      "createdAt": "2026-03-08 01:54:38",
+      "username": "123",
+      "name": "123"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\toriginalName\tfilename\tcreatedAt\tusername\tname\nnoxre4pCI5Lwp9DdlRvRy\t采购计划明细 3.8 .xlsx\tatlas-uploads/noxre4pCI5Lwp9DdlRvRy-1772943973038.xlsx\t2026-03-08 04:26:13\tNULL\tNULL\nlUxw_POqZWFr5dlwKex1d\t采购计划明细 3.8 .xlsx\tatlas-uploads/lUxw_POqZWFr5dlwKex1d-1772943968503.xlsx\t2026-03-08 04:26:08\tNULL\tNULL\nlvIfbDmGcHEW7hh3WA1t_\t成本表.xlsx\tatlas-uploads/lvIfbDmGcHEW7hh3WA1t_-1772939221571.xlsx\t2026-03-08 03:07:01\t六月的猫\t六月的猫\nM-QuvcUehLl1fsSQpJ8wE\t2026年成本总表格1月.xlsx\tatlas-uploads/M-QuvcUehLl1fsSQpJ8wE-1772938948359.xlsx\t2026-03-08 03:02:29\t六月的猫\t六月的猫\njsEsQ2DkAHy6YlDpI3M36\tUMI482号仓_20260304-20260218_结算明细导出.xlsx\tatlas-uploads/jsEsQ2DkAHy6YlDpI3M36-1772938805694.xlsx\t2026-03-08 03:00:05\t123\t123\nEGqimScHOdwzzVWDdaC0S\t2.10-B248Z(1).xlsx\tatlas-uploads/EGqimScHOdwzzVWDdaC0S-1772937733716.xlsx\t2026-03-08 02:42:13\t123\t123\ngMxjLZ1Tuat7jR-kpCjem\t2.11-B248Z(1).xlsx\tatlas-uploads/gMxjLZ1Tuat7jR-kpCjem-1772937733551.xlsx\t2026-03-08 02:42:13\t123\t123\n93Agze2LsqUXuQ5QVENLb\t2.9-小红团B248Z-沙棘.xlsx\tatlas-uploads/93Agze2LsqUXuQ5QVENLb-1772937733529.xlsx\t2026-03-08 02:42:13\t123\t123\nsDnfCAvKvVNyYFj5sg1mn\t葡萄酒售后.xlsx\tatlas-uploads/sDnfCAvKvVNyYFj5sg1mn-1772936955553.xlsx\t2026-03-08 02:29:16\tNULL\tNULL\nBeXEFlhyfxPxpjUTeuCVm\t月度汇总_20260201_20260228.xlsx\tatlas-uploads/BeXEFlhyfxPxpjUTeuCVm-1772936925174.xlsx\t2026-03-08 02:28:45\t六月的猫\t六月的猫\nji706YdBkdlW-MMJdQdYI\t小红团平台10月销售收入.xlsx\tatlas-uploads/ji706YdBkdlW-MMJdQdYI-1772936848734.xlsx\t2026-03-08 02:27:29\t123\t123\n_bGO8Q8EGzHtqPPdaopdp\t小红团平台10月销售收入.xlsx\tatlas-uploads/_bGO8Q8EGzHtqPPdaopdp-1772936812056.xlsx\t2026-03-08 02:26:52\t123\t123\ni6iKdh3IKWw3Wq_tdfGEm\t最新2026年1月返点汇总 (2).xlsx\tatlas-uploads/i6iKdh3IKWw3Wq_tdfGEm-1772936664375.xlsx\t2026-03-08 02:24:24\t六月的猫\t六月的猫\nukjQmwdc0s9vNeKA7edps\t最新2026年1月返点汇总 (2).xlsx\tatlas-uploads/ukjQmwdc0s9vNeKA7edps-1772935545865.xlsx\t2026-03-08 02:05:46\t六月的猫\t六月的猫\nh0rr6mHgnQsS02O4rEWfe\t2026年2月总工资表（最终-工资+绩效）(1).xlsx\tatlas-uploads/h0rr6mHgnQsS02O4rEWfe-1772935367944.xlsx\t2026-03-08 02:02:48\tweixuejian\tdavid\nFug3eHAP4sIp92UY2kiVr\t自营盘点表.xlsx\tatlas-uploads/Fug3eHAP4sIp92UY2kiVr-1772935067770.xlsx\t2026-03-08 01:57:48\tRUSIN-派收订单\tRUSIN-派收订单\nr4T2ukJHxaimKfyAiU6dh\t自营盘点表.xlsx\tatlas-uploads/r4T2ukJHxaimKfyAiU6dh-1772935038552.xlsx\t2026-03-08 01:57:18\tRUSIN-派收订单\tRUSIN-派收订单\nixaC2nReIwDQSE8kErsp5\t自营盘点表.xlsx\tatlas-uploads/ixaC2nReIwDQSE8kErsp5-1772934950405.xlsx\t2026-03-08 01:55:50\tRUSIN-派收订单\tRUSIN-派收订单\ne8EpPTU4MPlXrVvtE-J7k\t工作簿2.xlsx\tatlas-uploads/e8EpPTU4MPlXrVvtE-J7k-1772934884085.xlsx\t2026-03-08 01:54:44\t甲霸盈盈\t甲霸盈盈\n4PXbuqYXZ30dzzMCKFtLk\t7+渠道10月份账单.xlsx\tatlas-uploads/4PXbuqYXZ30dzzMCKFtLk-1772934877153.xlsx\t2026-03-08 01:54:38\t123\t123\n",
+  "stderr": "",
+  "execution_time_ms": 120
+}

@@ -1,7 +1,7 @@
 import { and, eq, gt, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, sessions, reports, scheduledTasks, reportFeedback } from "../drizzle/schema";
-import type { InsertSession, InsertReport, InsertScheduledTask, InsertReportFeedback } from "../drizzle/schema";
+import { InsertUser, users, sessions, reports, scheduledTasks, reportFeedback, messageFeedback } from "../drizzle/schema";
+import type { InsertSession, InsertReport, InsertScheduledTask, InsertReportFeedback, InsertMessageFeedback } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -484,4 +484,20 @@ export async function deleteHrAttendance(id: string) {
   const db = await getDb();
   if (!db) return;
   await db.delete(hrAttendanceSessions).where(eq(hrAttendanceSessions.id, id));
+}
+
+// ── Message Feedback ──────────────────────────────────────────────────────────
+
+export async function createMessageFeedback(data: InsertMessageFeedback) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(messageFeedback).values(data);
+}
+
+export async function getMessageFeedbacks(limit = 200) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(messageFeedback)
+    .orderBy(messageFeedback.createdAt)
+    .limit(limit);
 }

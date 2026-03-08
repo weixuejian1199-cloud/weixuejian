@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
+import { adminRouter } from "./routers/admin";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
   createSession, updateSession, getSession, getUserSessions, deleteSession,
@@ -12,6 +13,7 @@ import {
   ensureInviteCode, redeemInviteCode, getInviteStats, getUserCredits,
   createReportFeedback, getReportFeedback, updateReportFeedback, getSimilarExamples,
   getUserByUsername, createUser,
+  createMessageFeedback, getMessageFeedbacks,
 } from "./db";
 import { storageDelete } from "./storage";
 import { hashPassword, verifyPassword, createSessionToken } from "./_core/auth";
@@ -23,6 +25,7 @@ function in24Hours() {
 
 export const appRouter = router({
   system: systemRouter,
+  admin: adminRouter,
 
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
@@ -392,6 +395,53 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         return getReportFeedback(input.reportId, ctx.user.id);
       }),
+  }),
+
+  // ── Message Feedback (👍/👎) ───────────────────────────────────────────────────────────────────────────────────────
+
+  messageFeedback: router({
+    /** Submit 👍/👎 rating for an AI message */
+    submit: publicProcedure
+      .input(z.object({
+        rating: z.number().int().refine(v => v === 1 || v === -1),
+        messagePreview: z.string().max(500).optional(),
+        comment: z.string().max(500).optional(),
+        context: z.string().max(128).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const feedbackId = nanoid();
+        await createMessageFeedback({
+          id: feedbackId,
+          userId: (ctx as any).user?.id ?? null,
+          rating: input.rating,
+          messagePreview: input.messagePreview ?? null,
+          comment: input.comment ?? null,
+          context: input.context ?? null,
+        });
+        // Push to OpenClaw Webhook if configured (only push negative feedback to avoid noise)
+        const webhookUrl = process.env.OPENCLAW_WEBHOOK_URL;
+        if (webhookUrl && input.rating === -1) {
+          fetch(webhookUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              event: "user_feedback",
+              feedbackId,
+              rating: input.rating,
+              messagePreview: input.messagePreview,
+              comment: input.comment,
+              userId: (ctx as any).user?.id ?? null,
+              timestamp: new Date().toISOString(),
+            }),
+          }).catch(e => console.warn("[Webhook] Failed to push feedback:", e));
+        }
+        return { ok: true };
+      }),
+    /** List all message feedbacks (admin only) */
+    list: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      return getMessageFeedbacks(200);
+    }),
   }),
 
   // ── Invite & Credits ───────────────────────────────────────────────────────────────────────────────────────

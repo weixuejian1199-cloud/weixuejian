@@ -1,0 +1,116 @@
+{
+  "query": "\nSELECT id, message, status, createdAt, userId\nFROM openclaw_tasks\nWHERE DATE(createdAt) >= '2026-03-07'\nORDER BY createdAt DESC\nLIMIT 50;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute \nSELECT id, message, status, createdAt, userId\nFROM openclaw_tasks\nWHERE DATE(createdAt) >= '2026-03-07'\nORDER BY createdAt DESC\nLIMIT 50;\n",
+  "rows": [
+    {
+      "id": "j3uNgb7Nr6Kr0n48wkFcN",
+      "message": "我想要知道我一共采购了多少金额 并帮我算出客单价前10的产品清单 以及核对采购数量，还有他的基础单位换算",
+      "status": "pending",
+      "createdAt": "2026-03-08 04:27:56",
+      "userId": "0"
+    },
+    {
+      "id": "MaAliBI3FqN9nQDIofcE-",
+      "message": "处理进度",
+      "status": "pending",
+      "createdAt": "2026-03-08 03:48:22",
+      "userId": "2300"
+    },
+    {
+      "id": "I4DPCjdjvNkBlQfTiTFRW",
+      "message": "你参考我这表格里的各个等级价格，以及公司利润。假设我这边一个产品34卖49元，你帮我测算团长、钻石、联创、出单奖1、出单奖2，以及公司利润",
+      "status": "pending",
+      "createdAt": "2026-03-08 03:08:22",
+      "userId": "2300"
+    },
+    {
+      "id": "aOxIzEHgsRqgESnLcQgRg",
+      "message": "帮我汇总销售数据，显示总销售额、订单数和关键指标",
+      "status": "pending",
+      "createdAt": "2026-03-08 02:42:27",
+      "userId": "2301"
+    },
+    {
+      "id": "2Bc7lWFEs8T4GSVBC4E5s",
+      "message": "什么进度",
+      "status": "pending",
+      "createdAt": "2026-03-08 02:39:18",
+      "userId": "2300"
+    },
+    {
+      "id": "kXjhKFJ_A9yvWVLucdC11",
+      "message": "帮我汇总考勤数据，统计出勤天数、迟到次数和早退记录",
+      "status": "pending",
+      "createdAt": "2026-03-08 02:29:02",
+      "userId": "2300"
+    },
+    {
+      "id": "RHcIthlRPjII9ENGFx6Dz",
+      "message": "帮我生成数据汇总表，包含关键指标和统计",
+      "status": "pending",
+      "createdAt": "2026-03-08 02:27:45",
+      "userId": "2301"
+    },
+    {
+      "id": "q8ni4tsyjHai5Dk45HgPB",
+      "message": "我想生成另一份报表",
+      "status": "pending",
+      "createdAt": "2026-03-08 02:25:39",
+      "userId": "2300"
+    },
+    {
+      "id": "duGWa5wPkvfQ6dWJB_IUe",
+      "message": "根据数据绘制三张可视化图表",
+      "status": "pending",
+      "createdAt": "2026-03-08 02:24:36",
+      "userId": "2300"
+    },
+    {
+      "id": "-HoeyFnHhkNLj-PXYa00c",
+      "message": "帮我生成数据汇总表，包含关键指标和统计",
+      "status": "pending",
+      "createdAt": "2026-03-08 01:58:01",
+      "userId": "2306"
+    },
+    {
+      "id": "dgiFNHNn6WN8YWUHP0l4O",
+      "message": "我想生成另一份报表",
+      "status": "pending",
+      "createdAt": "2026-03-08 01:56:16",
+      "userId": "2304"
+    },
+    {
+      "id": "CtkjIg84SR-WCDdY7hcPC",
+      "message": "帮我汇总考勤数据，统计出勤天数、迟到次数和早退记录",
+      "status": "completed",
+      "createdAt": "2026-03-08 01:55:08",
+      "userId": "2304"
+    },
+    {
+      "id": "g85-v-auKFAT5l_z-66SV",
+      "message": "帮我生成数据汇总表，包含关键指标和统计",
+      "status": "pending",
+      "createdAt": "2026-03-08 01:54:51",
+      "userId": "2301"
+    }
+  ],
+  "messages": [
+    "JO1nDQo5qlAXMWVjpLYsq\t⚫️全团奖的标准 ",
+    "自营业绩 6000",
+    "或",
+    "个人团队业绩 60000+自营业绩 3000",
+    "⚫️全团福利比例",
+    "6万     0.6%",
+    "16万   1.2%",
+    "20万   1.8%",
+    "50万    2.1%",
+    "100万   2.2%",
+    "300万   2.6%",
+    "500万   2.8%",
+    "返点规则：计算系数0.85*总团队业绩*总团队业绩比例-计算系数0.85*平级业绩*平级业绩比例",
+    "帮我计算哪些用户有达标，且应该发放奖金对应是多少\tpending\t2026-03-08 02:11:06\t2300"
+  ],
+  "stdout": "id\tmessage\tstatus\tcreatedAt\tuserId\nj3uNgb7Nr6Kr0n48wkFcN\t我想要知道我一共采购了多少金额 并帮我算出客单价前10的产品清单 以及核对采购数量，还有他的基础单位换算\tpending\t2026-03-08 04:27:56\t0\nMaAliBI3FqN9nQDIofcE-\t处理进度\tpending\t2026-03-08 03:48:22\t2300\nI4DPCjdjvNkBlQfTiTFRW\t你参考我这表格里的各个等级价格，以及公司利润。假设我这边一个产品34卖49元，你帮我测算团长、钻石、联创、出单奖1、出单奖2，以及公司利润\tpending\t2026-03-08 03:08:22\t2300\naOxIzEHgsRqgESnLcQgRg\t帮我汇总销售数据，显示总销售额、订单数和关键指标\tpending\t2026-03-08 02:42:27\t2301\n2Bc7lWFEs8T4GSVBC4E5s\t什么进度\tpending\t2026-03-08 02:39:18\t2300\nkXjhKFJ_A9yvWVLucdC11\t帮我汇总考勤数据，统计出勤天数、迟到次数和早退记录\tpending\t2026-03-08 02:29:02\t2300\nRHcIthlRPjII9ENGFx6Dz\t帮我生成数据汇总表，包含关键指标和统计\tpending\t2026-03-08 02:27:45\t2301\nq8ni4tsyjHai5Dk45HgPB\t我想生成另一份报表\tpending\t2026-03-08 02:25:39\t2300\nduGWa5wPkvfQ6dWJB_IUe\t根据数据绘制三张可视化图表\tpending\t2026-03-08 02:24:36\t2300\nJO1nDQo5qlAXMWVjpLYsq\t⚫️全团奖的标准 \n自营业绩 6000\n或\n个人团队业绩 60000+自营业绩 3000\n\n⚫️全团福利比例\n\n6万     0.6%\n16万   1.2%\n20万   1.8%\n50万    2.1%\n100万   2.2%\n300万   2.6%\n500万   2.8%\n\n返点规则：计算系数0.85*总团队业绩*总团队业绩比例-计算系数0.85*平级业绩*平级业绩比例\n\n帮我计算哪些用户有达标，且应该发放奖金对应是多少\tpending\t2026-03-08 02:11:06\t2300\n-HoeyFnHhkNLj-PXYa00c\t帮我生成数据汇总表，包含关键指标和统计\tpending\t2026-03-08 01:58:01\t2306\ndgiFNHNn6WN8YWUHP0l4O\t我想生成另一份报表\tpending\t2026-03-08 01:56:16\t2304\nCtkjIg84SR-WCDdY7hcPC\t帮我汇总考勤数据，统计出勤天数、迟到次数和早退记录\tcompleted\t2026-03-08 01:55:08\t2304\ng85-v-auKFAT5l_z-66SV\t帮我生成数据汇总表，包含关键指标和统计\tpending\t2026-03-08 01:54:51\t2301\n",
+  "stderr": "",
+  "execution_time_ms": 59
+}

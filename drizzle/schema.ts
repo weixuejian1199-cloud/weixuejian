@@ -238,3 +238,35 @@ export const openclawTasks = mysqlTable("openclaw_tasks", {
 
 export type OpenclawTask = typeof openclawTasks.$inferSelect;
 export type InsertOpenclawTask = typeof openclawTasks.$inferInsert;
+
+// ── Message Feedback ───────────────────────────────────────────────────────────────────────────────────────
+// Users rate individual AI messages (👍/👎) with optional comment
+export const messageFeedback = mysqlTable("message_feedback", {
+  id:        varchar("id", { length: 64 }).primaryKey(),
+  userId:    int("userId"),
+  /** The message content being rated (first 500 chars for reference) */
+  messagePreview: varchar("messagePreview", { length: 500 }),
+  /** 1 = thumbs up, -1 = thumbs down */
+  rating:    int("rating").notNull(),
+  /** Optional user comment */
+  comment:   text("comment"),
+  /** Page/context where feedback was given */
+  context:   varchar("context", { length: 128 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MessageFeedback = typeof messageFeedback.$inferSelect;
+export type InsertMessageFeedback = typeof messageFeedback.$inferInsert;
+
+// ── Admin API Keys ─────────────────────────────────────────────────────────────
+// API keys for external systems (e.g. OpenClaw) to access admin REST endpoints
+export const adminApiKeys = mysqlTable("admin_api_keys", {
+  id:         int("id").autoincrement().primaryKey(),
+  name:       varchar("name", { length: 128 }).notNull(),
+  keyHash:    varchar("keyHash", { length: 128 }).notNull().unique(),
+  keyPrefix:  varchar("keyPrefix", { length: 20 }).notNull(),
+  isActive:   int("isActive").default(1).notNull(),
+  lastUsedAt: timestamp("lastUsedAt"),
+  createdAt:  timestamp("createdAt").defaultNow().notNull(),
+});
+export type AdminApiKey = typeof adminApiKeys.$inferSelect;
+export type InsertAdminApiKey = typeof adminApiKeys.$inferInsert;

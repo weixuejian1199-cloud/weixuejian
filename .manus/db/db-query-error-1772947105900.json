@@ -1,0 +1,8 @@
+{
+  "query": "\nSELECT id, user_message, status, created_at, user_id\nFROM openclaw_tasks\nORDER BY created_at DESC\nLIMIT 30;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute \nSELECT id, user_message, status, created_at, user_id\nFROM openclaw_tasks\nORDER BY created_at DESC\nLIMIT 30;\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 2: Unknown column 'user_message' in 'field list'"
+  ]
+}

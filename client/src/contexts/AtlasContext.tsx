@@ -85,6 +85,7 @@ export interface Task {
   col_count?: number;
   report_id?: string;
   report_filename?: string;
+  backendSessionId?: string; // server-side session id for deletion
   // Per-task session data
   messages: Message[];
   uploadedFiles: UploadedFile[];
@@ -160,6 +161,7 @@ interface AtlasContextType {
   tasks: Task[];
   addTask: (t: Task) => void;
   updateTask: (id: string, updates: Partial<Omit<Task, "messages" | "uploadedFiles">>) => void;
+  deleteTask: (id: string) => void;
   createNewTask: () => string; // returns new task id
 
   // Current task's files (scoped to activeTaskId)
@@ -359,10 +361,13 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
     setTasks(prev => [t, ...prev]);
   }, []);
 
-  const updateTask = useCallback((id: string, updates: Partial<Omit<Task, "messages" | "uploadedFiles">>) => {
+   const updateTask = useCallback((id: string, updates: Partial<Omit<Task, "messages" | "uploadedFiles">>) => {
     setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
   }, []);
-
+  const deleteTask = useCallback((id: string) => {
+    setTasks(prev => prev.filter(t => t.id !== id));
+    setActiveTaskIdState(prev => prev === id ? null : prev);
+  }, []);
   // ── Per-task files (scoped to activeTaskId) ──────────────────────────────
 
   // Get current task (memoized by activeTaskId)
@@ -520,7 +525,7 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
       theme, toggleTheme, setTheme,
       user, setUser,
       showLoginModal, setShowLoginModal,
-      tasks, addTask, updateTask, createNewTask,
+      tasks, addTask, updateTask, deleteTask, createNewTask,
       uploadedFiles, addUploadedFile, updateUploadedFile, removeUploadedFile, clearFiles,
       messages, addMessage, updateLastMessage, clearMessages,
       isProcessing, setIsProcessing,

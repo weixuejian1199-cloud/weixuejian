@@ -16,6 +16,7 @@ import {
   ChevronRight, Square,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
+import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTableRenderer";
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
 import { uploadFile, chatStream, generateReport, getDownloadUrl, type SuggestedAction } from "@/lib/api";
 import { trpc } from "@/lib/trpc";
@@ -677,6 +678,104 @@ export default function MainWorkspace() {
   );
 }
 
+// -- MessageFeedbackButtons ----------------------------------------------------
+
+function MessageFeedbackButtons({ messagePreview }: { messagePreview: string }) {
+  const [voted, setVoted] = useState<1 | -1 | null>(null);
+  const [showComment, setShowComment] = useState(false);
+  const [comment, setComment] = useState("");
+  const submitFeedback = trpc.messageFeedback.submit.useMutation();
+
+  const handleVote = (rating: 1 | -1) => {
+    if (voted !== null) return;
+    setVoted(rating);
+    submitFeedback.mutate({
+      rating,
+      messagePreview,
+      context: "main-workspace",
+    });
+    if (rating === -1) setShowComment(true);
+  };
+
+  const handleSubmitComment = () => {
+    if (!comment.trim()) { setShowComment(false); return; }
+    submitFeedback.mutate({
+      rating: -1,
+      messagePreview,
+      comment: comment.trim(),
+      context: "main-workspace",
+    });
+    setShowComment(false);
+    setComment("");
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        onClick={() => handleVote(1)}
+        disabled={voted !== null}
+        className="flex items-center gap-0.5 text-xs transition-colors px-1 py-0.5 rounded"
+        style={{
+          color: voted === 1 ? "var(--atlas-success)" : "var(--atlas-text-3)",
+          opacity: voted !== null && voted !== 1 ? 0.3 : 1,
+        }}
+        title="有用"
+      >
+        👍
+      </button>
+      <button
+        onClick={() => handleVote(-1)}
+        disabled={voted !== null}
+        className="flex items-center gap-0.5 text-xs transition-colors px-1 py-0.5 rounded"
+        style={{
+          color: voted === -1 ? "#ef4444" : "var(--atlas-text-3)",
+          opacity: voted !== null && voted !== -1 ? 0.3 : 1,
+        }}
+        title="有问题"
+      >
+        👎
+      </button>
+      {showComment && (
+        <div className="flex items-center gap-1 ml-1">
+          <input
+            autoFocus
+            value={comment}
+            onChange={e => setComment(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleSubmitComment()}
+            placeholder="说说哪里不对？"
+            className="text-xs px-2 py-0.5 rounded outline-none"
+            style={{
+              background: "var(--atlas-elevated)",
+              border: "1px solid var(--atlas-border)",
+              color: "var(--atlas-text)",
+              width: "140px",
+            }}
+          />
+          <button
+            onClick={handleSubmitComment}
+            className="text-xs px-1.5 py-0.5 rounded"
+            style={{ background: "var(--atlas-accent)", color: "#fff" }}
+          >
+            发
+          </button>
+          <button
+            onClick={() => setShowComment(false)}
+            className="text-xs"
+            style={{ color: "var(--atlas-text-3)" }}
+          >
+            取消
+          </button>
+        </div>
+      )}
+      {voted !== null && !showComment && (
+        <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>
+          {voted === 1 ? "已记录" : "已反馈"}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // -- MessageBubble ---------------------------------------------------------------
 
 function MessageBubble({
@@ -760,14 +859,36 @@ function MessageBubble({
                 />
               ))}
             </div>
-          ) : (
-            <div
-              className="atlas-prose"
-              style={{ fontSize: "14px", lineHeight: "1.7" }}
-            >
-              <Streamdown>{message.content}</Streamdown>
-            </div>
-          )}
+          ) : (() => {
+            const { segments } = parseAtlasTableBlocks(message.content || "");
+            const hasAtlasTable = segments.some(s => s.type === "table");
+            if (!hasAtlasTable) {
+              return (
+                <div className="atlas-prose" style={{ fontSize: "14px", lineHeight: "1.7" }}>
+                  <Streamdown>{message.content}</Streamdown>
+                </div>
+              );
+            }
+            return (
+              <div>
+                {segments.map((seg, idx) =>
+                  seg.type === "text" ? (
+                    seg.content.trim() ? (
+                      <div key={idx} className="atlas-prose" style={{ fontSize: "14px", lineHeight: "1.7" }}>
+                        <Streamdown>{seg.content}</Streamdown>
+                      </div>
+                    ) : null
+                  ) : (
+                    <AtlasTableRenderer
+                      key={idx}
+                      rawJson={seg.content}
+                      onAdjust={onQuickAction}
+                    />
+                  )
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Table preview (if report has sheets) */}
@@ -893,16 +1014,19 @@ function MessageBubble({
           </motion.div>
         )}
 
-        {/* Copy button */}
+        {/* Copy + Feedback buttons */}
         {message.content && !message.isStreaming && (
-          <button
-            onClick={handleCopy}
-            className="flex items-center gap-1 mt-1.5 text-xs transition-colors"
-            style={{ color: copied ? "var(--atlas-success)" : "var(--atlas-text-3)" }}
-          >
-            {copied ? <Check size={10} /> : <Copy size={10} />}
-            {copied ? "已复制" : "复制"}
-          </button>
+          <div className="flex items-center gap-3 mt-1.5">
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1 text-xs transition-colors"
+              style={{ color: copied ? "var(--atlas-success)" : "var(--atlas-text-3)" }}
+            >
+              {copied ? <Check size={10} /> : <Copy size={10} />}
+              {copied ? "已复制" : "复制"}
+            </button>
+            <MessageFeedbackButtons messagePreview={message.content.slice(0, 500)} />
+          </div>
         )}
 
         {/* Suggested action buttons */}

@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO admin_api_keys (name, keyHash, keyPrefix, isActive, createdAt) VALUES ('OpenClaw Admin Key', '9f4b651bd15fe4d63eb76eebee0cb6bf9adaf490b8d1b002586517df8d0d0283', 'atlas_admin_338403', 1, NOW());",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute INSERT INTO admin_api_keys (name, keyHash, keyPrefix, isActive, createdAt) VALUES ('OpenClaw Admin Key', '9f4b651bd15fe4d63eb76eebee0cb6bf9adaf490b8d1b002586517df8d0d0283', 'atlas_admin_338403', 1, NOW());",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 122
+}

@@ -40,7 +40,7 @@ export default function Sidebar() {
     activeTaskId, setActiveTaskId,
     tasks,
     user, setUser, setShowLoginModal,
-    createNewTask,
+    createNewTask, deleteTask,
   } = useAtlas();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -74,6 +74,20 @@ export default function Sidebar() {
     createNewTask();
     setActiveNav("home");
     if (!sidebarOpen) setSidebarOpen(true);
+  };
+
+  const deleteSessionMut = trpc.session.delete.useMutation();
+
+  const handleDeleteTask = (taskId: string, backendSessionId?: string) => {
+    // Remove from local state immediately
+    deleteTask(taskId);
+    toast.success("任务已删除");
+    // Also delete from backend if we have a session id
+    if (backendSessionId) {
+      deleteSessionMut.mutate({ id: backendSessionId }, {
+        onError: () => { /* silent fail - local state already updated */ }
+      });
+    }
   };
 
   const logoutMut = trpc.auth.logout.useMutation({
@@ -512,11 +526,11 @@ export default function Sidebar() {
                           <AnimatePresence>
                             {menuOpen && (
                               <motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                                initial={{ opacity: 0, scale: 0.95, y: 4 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                                exit={{ opacity: 0, scale: 0.95, y: 4 }}
                                 transition={{ duration: 0.1 }}
-                                className="absolute right-0 bottom-6 z-50 py-1 rounded-lg shadow-xl min-w-[120px]"
+                             className="absolute right-0 top-6 z-50 py-1 rounded-lg shadow-xl min-w-[120px]"
                                 style={{
                                   background: "var(--atlas-elevated)",
                                   border: "1px solid var(--atlas-border)",
@@ -526,7 +540,7 @@ export default function Sidebar() {
                                 {[
                                   { icon: Star, label: "收藏", color: "#FBBF24", action: () => toast.success("已收藏") },
                                   { icon: Share2, label: "共享链接", color: "var(--atlas-accent)", action: () => toast.success("链接已复制") },
-                                  { icon: Trash2, label: "删除任务", color: "#F87171", action: () => toast.success("任务已删除"), danger: true },
+                                  { icon: Trash2, label: "删除任务", color: "#F87171", action: () => handleDeleteTask(task.id, task.backendSessionId), danger: true },
                                 ].map(({ icon: Icon, label, color, action, danger }) => (
                                   <button
                                     key={label}

@@ -7,6 +7,7 @@ import { registerChatRoutes } from "./chat";
 import { registerAtlasRoutes } from "../atlas";
 import { registerHrRoutes } from "../hr";
 import { registerOpenClawPollingRoutes } from "../openclawPolling";
+import adminApiRouter from "../adminApi";
 import { startScheduler } from "../scheduler";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -45,6 +46,8 @@ async function startServer() {
   registerHrRoutes(app);
   // OpenClaw polling endpoints
   registerOpenClawPollingRoutes(app);
+  // Admin REST API (for OpenClaw and external systems)
+  app.use("/api/admin", adminApiRouter);
   // tRPC API
   app.use(
     "/api/trpc",
