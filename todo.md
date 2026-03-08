@@ -400,3 +400,10 @@
 - [x] 排查 Worker 卡住根因：无超时机制，任务卡在 processing
 - [x] 修复：加 checkStuckTasks（每2分钟，超10分钟自动标记 failed）
 - [x] 修复：前端轮询从 20 次增加到 60 次（200s→600s 对齐10分钟超时）
+
+## V12.20 OpenClaw 集成
+
+- [x] 配置 OPENCLAW_API_KEY 和 OPENCLAW_API_URL 环境变量
+- [x] 实现双通道路由：有Key走OpenClaw SSE流式，无Key走千问（自动降级）
+- [x] 添加 callOpenClawStream 函数（SSE代理，将输出文件存到S3）
+- [x] env.ts 支持 OPENCLAW_API_URL 和 OPENCLAW_ENDPOINT 双变量名

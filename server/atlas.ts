@@ -26,7 +26,7 @@ import { createPatchedFetch } from "./_core/patchedFetch";
 import { storagePut, storageGet } from "./storage";
 import { getSession, createSession, updateSession, createReport, updateReport, getReport, getSimilarExamples, getUserReports, getDb } from "./db";
 import { authenticateRequest } from "./_core/auth";
-import { isOpenClawEnabled, callOpenClaw, getPresignedUrlsForSessions } from "./openclaw";
+import { isOpenClawEnabled, callOpenClaw, callOpenClawStream, getPresignedUrlsForSessions } from "./openclaw";
 import { notifyTelegramNewTask } from "./openclawPolling";
 import { openclawTasks } from "../drizzle/schema";
 
@@ -899,7 +899,35 @@ ${dataTable}
         }
       }
 
-      // ── Qwen3-Max / Kimi-K2.5 streaming (default channel) ───────────────
+      // ── OpenClaw SSE streaming (if configured) ──────────────────────────
+      if (isOpenClawEnabled()) {
+        console.log("[Atlas] Routing to OpenClaw SSE channel");
+        try {
+          // Get presigned S3 URLs for all session files
+          const sessionDataKeys = allSessionIds.map(id => `atlas-data/${id}-data.json`);
+          const fileUrls = await getPresignedUrlsForSessions(sessionDataKeys);
+          const fileNames = validSessions.map(s => s!.originalName);
+          const userId = String((req as any).userId ?? "anonymous");
+
+          await callOpenClawStream(
+            {
+              message,
+              file_urls: fileUrls,
+              file_names: fileNames,
+              user_id: userId,
+              source: "atlas",
+            },
+            res,
+            userId
+          );
+          return;
+        } catch (openClawErr: any) {
+          console.error("[Atlas] OpenClaw SSE failed, falling back to Qwen:", openClawErr.message);
+          // Fall through to Qwen on error
+        }
+      }
+
+      // ── Qwen3-Max / Kimi-K2.5 streaming (default / fallback channel) ────
       const openai = createLLM(totalRows);
 
       // Build message history
