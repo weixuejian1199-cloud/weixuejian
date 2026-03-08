@@ -69,15 +69,20 @@ interface ScheduledTaskItem { id: string; name: string; template: string; schedu
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
 
+// 所有用户可见
 const NAV_ITEMS = [
   { id: "profile",      label: "账户",     icon: User },
   { id: "appearance",   label: "个性化",   icon: Moon },
-  { id: "apikeys",      label: "API Key",  icon: Key },
-  { id: "ai-engine",    label: "AI 引擎",  icon: Server },
-  { id: "platforms",    label: "平台授权", icon: Link2 },
   { id: "email",        label: "邮箱",     icon: Mail },
   { id: "integrations", label: "集成",     icon: Zap },
   { id: "schedule",     label: "定时任务", icon: Clock },
+];
+
+// 仅管理员可见
+const ADMIN_NAV_ITEMS = [
+  { id: "apikeys",      label: "API Key",  icon: Key },
+  { id: "ai-engine",    label: "AI 引擎",  icon: Server },
+  { id: "platforms",    label: "平台授权", icon: Link2 },
 ];
 
 // ── Shared ────────────────────────────────────────────────────────────────────
@@ -825,7 +830,7 @@ function AiEngineSection() {
         endpoint: openClawEndpoint.trim(),
       }));
       setChannelStatus(openClawKey.trim() ? "openclaw" : "qwen");
-      toast.success(openClawKey.trim() ? "OpenClaw Key 已保存，将使用小虾米 Agent" : "已清除 OpenClaw Key，将使用阿里百炼千问");
+      toast.success("配置已保存");
     } finally {
       setSaving(false);
     }
@@ -833,7 +838,7 @@ function AiEngineSection() {
 
   const handleVerify = async () => {
     if (!openClawKey.trim()) {
-      toast.error("请先输入 OpenClaw API Key");
+      toast.error("请先输入 API Key");
       return;
     }
     setVerifyStatus("verifying");
@@ -1272,20 +1277,26 @@ function ScheduleSection() {
 
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState("profile");
+  const { user } = useAtlas();
+  const isAdmin = user?.role === "admin";
 
   const renderSection = () => {
     switch (activeSection) {
       case "profile":      return <ProfileSection />;
       case "appearance":   return <AppearanceSection />;
-      case "apikeys":      return <ApiKeysSection />;
-      case "ai-engine":    return <AiEngineSection />;
-      case "platforms":    return <PlatformsSection />;
+      case "apikeys":      return isAdmin ? <ApiKeysSection /> : <ProfileSection />;
+      case "ai-engine":    return isAdmin ? <AiEngineSection /> : <ProfileSection />;
+      case "platforms":    return isAdmin ? <PlatformsSection /> : <ProfileSection />;
       case "email":        return <EmailSection />;
       case "integrations": return <IntegrationsSection />;
       case "schedule":     return <ScheduleSection />;
       default:             return <ProfileSection />;
     }
   };
+
+  const visibleNavItems = isAdmin
+    ? [...NAV_ITEMS, ...ADMIN_NAV_ITEMS]
+    : NAV_ITEMS;
 
   return (
     <div className="h-full flex overflow-hidden" style={{ background: "var(--atlas-bg)" }}>
@@ -1295,7 +1306,7 @@ export default function SettingsPage() {
         <p className="text-xs font-semibold uppercase tracking-wider px-3 mb-3"
           style={{ color: "var(--atlas-text-3)", fontSize: "10px", letterSpacing: "0.08em" }}>设置</p>
         <nav className="space-y-0.5">
-          {NAV_ITEMS.map(item => (
+          {visibleNavItems.map(item => (
             <button
               key={item.id}
               onClick={() => setActiveSection(item.id)}

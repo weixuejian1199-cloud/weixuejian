@@ -90,6 +90,36 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+export async function getUserById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getUserByUsername(username: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createUser(data: { username: string; passwordHash: string; name?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const inviteCode = generateInviteCode();
+  await db.insert(users).values({
+    username: data.username,
+    passwordHash: data.passwordHash,
+    name: data.name ?? data.username,
+    loginMethod: "password",
+    inviteCode,
+    lastSignedIn: new Date(),
+  });
+  const created = await getUserByUsername(data.username);
+  return created!;
+}
+
 // ── Sessions ──────────────────────────────────────────────────────────────────
 
 export async function createSession(data: InsertSession) {

@@ -24,16 +24,20 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { ENV } from "./_core/env";
 import { createPatchedFetch } from "./_core/patchedFetch";
 import { storagePut, storageGet } from "./storage";
-import { getSession, createSession, updateSession, createReport, updateReport, getReport, getSimilarExamples, getUserReports } from "./db";
-import { sdk } from "./_core/sdk";
+import { getSession, createSession, updateSession, createReport, updateReport, getReport, getSimilarExamples, getUserReports, getDb } from "./db";
+import { authenticateRequest } from "./_core/auth";
 import { isOpenClawEnabled, callOpenClaw, getPresignedUrlsForSessions } from "./openclaw";
+import { notifyTelegramNewTask } from "./openclawPolling";
+import { openclawTasks } from "../drizzle/schema";
 
 // Optional auth middleware: injects req.userId if session cookie is valid
 async function optionalAuth(req: Request, _res: Response, next: NextFunction) {
   try {
-    const user = await sdk.authenticateRequest(req);
-    (req as any).userId = user.id;
-    (req as any).atlasUser = user;
+    const user = await authenticateRequest(req);
+    if (user) {
+      (req as any).userId = user.id;
+      (req as any).atlasUser = user;
+    }
   } catch {
     // Not authenticated — proceed as anonymous (userId = 0)
   }
@@ -817,63 +821,56 @@ ${dataTable}
       // If OpenClaw (小虾米) is configured, route through it.
       // Otherwise fall back to Qwen3-Max streaming.
       if (isOpenClawEnabled()) {
-        console.log("[Atlas] Routing to OpenClaw (小虾米 Agent)");
+        console.log("[Atlas] Routing to OpenClaw via Telegram async task");
         try {
           // Get presigned S3 URLs for all session files
           const sessionDataKeys = allSessionIds.map(id => `atlas-data/${id}-data.json`);
           const fileUrls = await getPresignedUrlsForSessions(sessionDataKeys);
           const fileNames = validSessions.map(s => s!.originalName);
 
-          const userId = (req as any).userId ?? "anonymous";
-          const openClawResult = await callOpenClaw(
-            {
-              message,
-              file_urls: fileUrls,
-              file_names: fileNames,
-              user_id: userId,
-              source: "atlas",
-            },
-            userId
-          );
+          const userId = (req as any).userId ?? 0;
+          const numericUserId = typeof userId === 'number' ? userId : 0;
+          const taskId = nanoid();
 
-          // If OpenClaw returned output files, save them as reports
-          if (openClawResult.savedFiles.length > 0) {
-            for (const file of openClawResult.savedFiles) {
-              try {
-                await createReport({
-                  id: nanoid(),
-                  userId: typeof userId === 'number' ? userId : 0,
-                  sessionId: allSessionIds[0] ?? nanoid(),
-                  title: file.name.replace(/\.[^.]+$/, ""),
-                  filename: file.name,
-                  fileKey: file.key,
-                  fileUrl: file.url,
-                  prompt: message,
-                  status: "completed",
-                  expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-                });
-              } catch (dbErr) {
-                console.warn("[Atlas] Failed to save OpenClaw output report:", dbErr);
-              }
-            }
+          // 1. Insert task record into DB (status = pending)
+          const db = await getDb();
+          if (db) {
+            await db.insert(openclawTasks).values({
+              id: taskId,
+              userId: numericUserId,
+              externalUserId: String(userId),
+              message,
+              fileUrls: fileUrls as any,
+              fileNames: fileNames as any,
+              status: "pending",
+            });
+            console.log(`[Atlas] Created OpenClaw task ${taskId}`);
           }
 
-          // Stream the reply as plain text (simulate streaming for UI consistency)
+          // 2. Push task to Telegram (fire-and-forget)
+          notifyTelegramNewTask({
+            id: taskId,
+            message,
+            fileUrls,
+            fileNames,
+            userId: numericUserId,
+            externalUserId: String(userId),
+          }).catch(e => console.warn("[Atlas] Telegram notify failed:", e));
+
+          // 3. Immediately return a streaming response indicating the task is queued
           res.setHeader("Content-Type", "text/plain; charset=utf-8");
           res.setHeader("Transfer-Encoding", "chunked");
-          let replyText = openClawResult.reply;
-          // Append download links if output files were saved
-          if (openClawResult.savedFiles.length > 0) {
-            replyText += "\n\n📎 **生成的文件：**\n";
-            for (const file of openClawResult.savedFiles) {
-              replyText += `- [${file.name}](${file.url})\n`;
-            }
-          }
-          res.write(replyText);
+          const queuedMsg =
+            `✅ 任务已提交，正在处理中...\n\n` +
+            `📋 **任务 ID**：\`${taskId}\`\n` +
+            `📁 **文件**：${fileNames.join("、") || "无附件"}\n` +
+            `💬 **需求**：${message.slice(0, 100)}${message.length > 100 ? "..." : ""}\n\n` +
+            `⏳ 处理完成后结果将自动推送到对话中。通常需要 1-5 分钟，请稍候。`;
+          res.write(queuedMsg);
           res.end();
           return;
         } catch (openClawErr: any) {
-          console.error("[Atlas] OpenClaw failed, falling back to Qwen:", openClawErr.message);
+          console.error("[Atlas] OpenClaw task creation failed, falling back to Qwen:", openClawErr.message);
           // Fall through to Qwen on error
         }
       }

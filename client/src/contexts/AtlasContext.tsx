@@ -16,6 +16,7 @@ export interface User {
   email: string;
   avatar?: string;
   plan: "free" | "pro" | "enterprise";
+  role?: "user" | "admin";
 }
 
 export interface DataFrameInfo {

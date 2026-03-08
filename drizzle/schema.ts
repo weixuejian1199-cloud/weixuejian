@@ -14,8 +14,12 @@ export const users = mysqlTable("users", {
    * Use this for relations between tables.
    */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
+  /** Legacy OAuth identifier — kept for backward compat, nullable for new accounts */
+  openId: varchar("openId", { length: 64 }).unique(),
+  /** Username: phone number or email address used for login */
+  username: varchar("username", { length: 320 }).unique(),
+  /** bcrypt hashed password */
+  passwordHash: varchar("passwordHash", { length: 255 }),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
@@ -25,7 +29,7 @@ export const users = mysqlTable("users", {
   inviteCode: varchar("inviteCode", { length: 16 }).unique(),
   /** Invited by which user's inviteCode */
   invitedBy: varchar("invitedBy", { length: 16 }),
-  /** Credits balance, 500 awarded per successful invite */
+  /** Credits balance */
   credits: int("credits").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

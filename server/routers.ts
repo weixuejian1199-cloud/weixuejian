@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import { TRPCError } from "@trpc/server";
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -11,8 +11,10 @@ import {
   createScheduledTask, updateScheduledTask, getUserScheduledTasks, deleteScheduledTask,
   ensureInviteCode, redeemInviteCode, getInviteStats, getUserCredits,
   createReportFeedback, getReportFeedback, updateReportFeedback, getSimilarExamples,
+  getUserByUsername, createUser,
 } from "./db";
 import { storageDelete } from "./storage";
+import { hashPassword, verifyPassword, createSessionToken } from "./_core/auth";
 
 // Returns a Date 24 hours from now
 function in24Hours() {
@@ -24,6 +26,42 @@ export const appRouter = router({
 
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
+
+    register: publicProcedure
+      .input(z.object({
+        username: z.string().min(3, "用户名至少3位").max(64),
+        password: z.string().min(6, "密码至少6位").max(128),
+        name: z.string().max(64).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const existing = await getUserByUsername(input.username);
+        if (existing) throw new TRPCError({ code: "CONFLICT", message: "该用户名已被注册" });
+        const passwordHash = await hashPassword(input.password);
+        const user = await createUser({ username: input.username, passwordHash, name: input.name });
+        const token = await createSessionToken({ userId: user.id, username: user.username! });
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        return { success: true, user: { id: user.id, username: user.username, name: user.name, role: user.role } };
+      }),
+
+    login: publicProcedure
+      .input(z.object({
+        username: z.string().min(1, "请输入用户名"),
+        password: z.string().min(1, "请输入密码"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const user = await getUserByUsername(input.username);
+        if (!user || !user.passwordHash) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "用户名或密码错误" });
+        }
+        const valid = await verifyPassword(input.password, user.passwordHash);
+        if (!valid) throw new TRPCError({ code: "UNAUTHORIZED", message: "用户名或密码错误" });
+        const token = await createSessionToken({ userId: user.id, username: user.username! });
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        return { success: true, user: { id: user.id, username: user.username, name: user.name, role: user.role } };
+      }),
+
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });

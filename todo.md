@@ -235,3 +235,29 @@
 - [x] Bug 1：任务中文件标签添加 X 删除按钮（hover 显示，点击调用 removeUploadedFile）
 - [x] Bug 2：上传文件名乱码修复（后端 latin1→utf8 转换，自动识别中文文件名）
 - [x] Bug 3：数据中枢店铺排行/平台占比保持演示数据（用户确认无需改动）
+
+## V11.9 Telegram 集成 + 文件标签增强
+
+- [ ] 配置 TELEGRAM_BOT_TOKEN 和 TELEGRAM_CHAT_ID 环境变量
+- [ ] atlas.ts OpenClaw 路径改为异步：创建 openclaw_tasks 记录 + 调用 notifyTelegramNewTask
+- [ ] 彻底修复文件标签 X 删除按钮（当前仍无效）
+- [ ] 文件标签 hover 展开字段预览（显示列名、行数、数据类型）
+- [ ] 多文件拖拽排序（决定 AI 分析优先级）
+- [ ] 文件删除后若对话中已有分析，提示「该文件已移除，相关分析可能失效」
+
+## V12.0 HR 中心智能字段识别（严重 Bug）
+
+- [ ] 工资条页面：上传文件后 AI 自动识别字段（姓名/基本工资/绩效等），不再让用户手动填写
+- [ ] 考勤页面：上传文件后 AI 自动识别字段（姓名/日期/打卡时间等），不再让用户手动填写
+- [ ] 识别结果以卡片形式展示，用户可一键确认或微调后生成
+
+## V12.1 独立登录系统（最高优先级）
+
+- [x] 移除所有 Manus OAuth 依赖和字眼
+- [x] 后端：独立注册/登录接口（用户名+密码，bcrypt+JWT）
+- [x] 前端：独立注册/登录表单，移除所有 Manus 相关 UI
+- [x] 更新 useAuth hook 适配新登录系统
+- [x] 数据库：users 表添加 username/passwordHash 字段，迁移完成
+- [x] Sidebar：退出按钮调用真实 logout 接口
+- [x] 移除 LoginModal 中所有 Manus 字眼
+- [x] 全局移除前端界面 Manus/OpenClaw 字眼

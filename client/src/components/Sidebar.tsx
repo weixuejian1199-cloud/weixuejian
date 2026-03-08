@@ -14,6 +14,7 @@ import {
   Star, Share2, Trash2, User, Users,
 } from "lucide-react";
 import { useAtlas, type NavItem } from "@/contexts/AtlasContext";
+import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 const NAV_MAIN: { id: NavItem; icon: typeof Home; label: string }[] = [
@@ -75,9 +76,20 @@ export default function Sidebar() {
     if (!sidebarOpen) setSidebarOpen(true);
   };
 
+  const logoutMut = trpc.auth.logout.useMutation({
+    onSuccess: () => {
+      setUser(null);
+      toast.success("已退出登录");
+    },
+    onError: () => {
+      // Even if server call fails, clear local state
+      setUser(null);
+      toast.success("已退出登录");
+    },
+  });
+
   const handleLogout = () => {
-    setUser(null);
-    toast.success("已退出登录");
+    logoutMut.mutate();
   };
 
   const collapsed = !sidebarOpen;

@@ -171,7 +171,7 @@ async function generatePoster(inviteCode: string, inviteLink: string, credits: n
   // Bottom watermark
   ctx.fillStyle = "rgba(255,255,255,0.2)";
   ctx.font = "18px -apple-system, sans-serif";
-  ctx.fillText("atlasrepo-cryfqh5q.manus.space · 智能报表 · 一键生成", W / 2, H - 40);
+  ctx.fillText("ATLAS · 智能报表 · 一键生成", W / 2, H - 40);
 
   return canvas.toDataURL("image/png");
 }

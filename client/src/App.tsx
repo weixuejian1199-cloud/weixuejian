@@ -5,9 +5,11 @@
  * Nav: home / dashboard / templates / search / library / settings
  */
 import { AnimatePresence, motion } from "framer-motion";
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AtlasProvider, useAtlas } from "./contexts/AtlasContext";
+import { trpc } from "@/lib/trpc";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
@@ -22,7 +24,23 @@ import InvitePage from "./pages/InvitePage";
 import HRCenterPage from "./pages/HRCenterPage";
 
 function AppContent() {
-  const { activeNav, theme, showLoginModal } = useAtlas();
+  const { activeNav, theme, showLoginModal, setUser } = useAtlas();
+  // Sync server auth state into AtlasContext
+  const { data: meData } = trpc.auth.me.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  useEffect(() => {
+    if (!meData) { setUser(null); return; }
+    setUser({
+      id: String(meData.id),
+      name: meData.name ?? meData.username ?? "未命名用户",
+      email: meData.email ?? "",
+      avatar: undefined,
+      plan: (meData.plan as "free" | "pro" | "enterprise") ?? "free",
+      role: (meData.role as "user" | "admin") ?? "user",
+    });
+  }, [meData, setUser]);
   const renderPage = () => {
     switch (activeNav) {
       case "dashboard":  return <DashboardPage />;
