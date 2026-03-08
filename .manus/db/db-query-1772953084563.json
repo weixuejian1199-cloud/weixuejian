@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO openclaw_tasks (id, userId, externalUserId, message, fileUrls, fileNames, status, createdAt, updatedAt)\nVALUES (\n  'test_openclaw_001',\n  1,\n  'atlas_test_user',\n  '这是一个测试任务，请回复「OpenClaw 连接成功，轮询正常！」',\n  '[]',\n  '[]',\n  'pending',\n  NOW(),\n  NOW()\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute INSERT INTO openclaw_tasks (id, userId, externalUserId, message, fileUrls, fileNames, status, createdAt, updatedAt)\nVALUES (\n  'test_openclaw_001',\n  1,\n  'atlas_test_user',\n  '这是一个测试任务，请回复「OpenClaw 连接成功，轮询正常！」',\n  '[]',\n  '[]',\n  'pending',\n  NOW(),\n  NOW()\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 108
+}

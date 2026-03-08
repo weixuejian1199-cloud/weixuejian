@@ -25,10 +25,15 @@ import {
 } from "./telegramNotify";
 
 // ── Auth middleware ────────────────────────────────────────────────────────────
+// Supports two auth methods:
+//   1. Authorization: Bearer <key>  (header, recommended)
+//   2. ?key=<key>                   (query param, for tools that cannot set custom headers)
 
 function requireOpenClawAuth(req: Request, res: Response): boolean {
   const authHeader = req.headers["authorization"] ?? "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  const headerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  const queryToken = (req.query.key as string) ?? "";
+  const token = headerToken || queryToken;
   const expected = ENV.openClawSessionKey;
 
   if (!expected) {
@@ -36,7 +41,7 @@ function requireOpenClawAuth(req: Request, res: Response): boolean {
     return false;
   }
   if (token !== expected) {
-    res.status(401).json({ error: "Invalid session key." });
+    res.status(401).json({ error: "Invalid session key. Use Authorization: Bearer <key> header or ?key=<key> query param." });
     return false;
   }
   return true;

@@ -325,3 +325,9 @@
 - [x] 找到 Telegram 路由判断（atlas.ts 第 821 行），改为 if (false && ...) 禁用
 - [x] 修复 TypeScript 编译错误（db 非空断言）
 - [x] 重启服务器应用修改，所有任务现在直接走 AI 流式处理
+
+## V12.11 手机端白屏修复
+
+- [ ] 排查 iOS Safari 白屏原因（JS 兼容性 / 字体加载 / 渲染错误）
+- [ ] 添加 vite build target 兼容旧版 Safari
+- [ ] 添加 fallback 字体防止 Google Fonts 加载失败导致阻塞
