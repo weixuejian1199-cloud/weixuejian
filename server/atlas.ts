@@ -357,7 +357,18 @@ export function registerAtlasRoutes(app: Express) {
         return;
       }
 
-      const { originalname, buffer, mimetype } = req.file;
+      const { originalname: rawName, buffer, mimetype } = req.file;
+      // Fix: multer receives filename as latin1-encoded bytes on some browsers;
+      // re-interpret as utf-8 to restore Chinese characters correctly.
+      const originalname = (() => {
+        try {
+          const decoded = Buffer.from(rawName, 'latin1').toString('utf8');
+          // Heuristic: if decoded contains valid CJK characters, use it; otherwise keep original
+          return /[\u4e00-\u9fff\u3040-\u30ff]/.test(decoded) ? decoded : rawName;
+        } catch {
+          return rawName;
+        }
+      })();
       const ext = originalname.split(".").pop()?.toLowerCase() || "xlsx";
       const sessionId = nanoid();
       const fileKey = `atlas-uploads/${sessionId}-${Date.now()}.${ext}`;
@@ -421,10 +432,10 @@ export function registerAtlasRoutes(app: Express) {
 
 1. 用1句话自然打招呼，说明识别到了什么数据（文件名、行数、关键字段）
 2. 如果有数据质量问题（缺失值、异常值），简短提醒
-3. 根据字段类型，给出2-3个最相关的分析建议
-4. 结尾说「你想怎么处理？」
+3. 根据字段类型，主动问用户「你想做什么分析？」，并给出2-3个最相关的具体选项（如：销售排名、环比趋势、异常检测、汇总报表等），让用户直接选
+4. 最后补充一句：「如果你有报表模版，可以直接拖进来，我会按你的格式输出结果」
 
-格式要求：简洁、友好，不超过150字。不要用「你好我是ATLAS」这种机械语气。`,
+格式要求：简洁、友好，不超过180字。不要用「你好我是ATLAS」这种机械语气。用对话感强的语气，像一个懂业务的助手在问你。`,
           messages: [{
             role: "user",
             content: `文件名：${originalname}，共 ${dfInfo.row_count} 行 ${dfInfo.col_count} 列。字段：${fieldSummary}。${qualityIssues.length > 0 ? '数据质量：' + qualityIssues.join('；') : '数据质量良好'}。`,

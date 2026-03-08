@@ -355,11 +355,11 @@ export default function MainWorkspace() {
         <span className="text-sm font-semibold" style={{ color: "var(--atlas-text)" }}>ATLAS AI</span>
 
         {hasAnyFiles && (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {uploadedFiles.map(f => (
               <span
                 key={f.id}
-                className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+                className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full group/chip"
                 style={{
                   background: f.status === "ready" ? "rgba(52,211,153,0.1)" : "rgba(91,140,255,0.1)",
                   color: f.status === "ready" ? "var(--atlas-success)" : "var(--atlas-accent)",
@@ -373,6 +373,16 @@ export default function MainWorkspace() {
                 <span className="max-w-[100px] truncate">{f.name}</span>
                 {f.status === "ready" && f.dfInfo && (
                   <span style={{ opacity: 0.7 }}>{f.dfInfo.row_count.toLocaleString()}行</span>
+                )}
+                {f.status !== "uploading" && (
+                  <button
+                    onClick={e => { e.stopPropagation(); removeUploadedFile(f.id); }}
+                    className="ml-0.5 rounded-full flex items-center justify-center opacity-0 group-hover/chip:opacity-100 transition-opacity hover:bg-black/20"
+                    style={{ width: 12, height: 12, flexShrink: 0 }}
+                    title={`删除 ${f.name}`}
+                  >
+                    <X size={8} />
+                  </button>
                 )}
               </span>
             ))}

@@ -203,3 +203,35 @@
 - [x] 用户第一条消息发送后，根据消息内容自动生成简短标题（如「统计店铺销售额」）
 - [x] 标题实时更新到左侧任务列表，不再显示「新建任务」
 - [ ] 左侧任务列表支持双击标题进行重命名
+
+## V11.5 企业微信双向通信
+
+- [ ] 配置企业微信环境变量（WECOM_CORP_ID、WECOM_AGENT_ID、WECOM_SECRET）
+- [ ] 实现发消息：任务创建时推送任务详情到企业微信应用
+- [ ] 实现回调接收：用户在企业微信回复后自动更新任务结果
+- [ ] 测试端到端流程：ATLAS 发任务 → 企业微信收到 → 回复 → ATLAS 更新
+
+## V11.6 Telegram 双向通信
+
+- [ ] 配置 TELEGRAM_BOT_TOKEN 和 TELEGRAM_CHAT_ID 环境变量
+- [ ] 创建 telegramNotify.ts：发消息、轮询回复
+- [ ] openclawPolling.ts 集成：任务创建时推送到 Telegram
+- [ ] 定时轮询 Telegram 回复，自动更新任务结果
+
+## V11.6 Telegram 双向通信
+
+- [ ] 配置 TELEGRAM_BOT_TOKEN 和 TELEGRAM_CHAT_ID 环境变量
+- [ ] 创建 telegramNotify.ts：发消息、轮询回复
+- [ ] openclawPolling.ts 集成：任务创建时推送到 Telegram
+- [ ] 定时轮询 Telegram 回复，自动更新任务结果
+
+## V11.7 AI 上传引导优化
+
+- [ ] 修改 system prompt：AI 分析字段后主动问用户需要什么分析（销售排名/环比趋势/异常检测）
+- [ ] 修改 system prompt：AI 主动提示「如果有报表模版可以直接拖进来，我会按你的格式输出」
+
+## Bug 修复（V11.8）
+
+- [x] Bug 1：任务中文件标签添加 X 删除按钮（hover 显示，点击调用 removeUploadedFile）
+- [x] Bug 2：上传文件名乱码修复（后端 latin1→utf8 转换，自动识别中文文件名）
+- [x] Bug 3：数据中枢店铺排行/平台占比保持演示数据（用户确认无需改动）
