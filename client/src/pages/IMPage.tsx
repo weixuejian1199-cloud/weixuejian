@@ -251,8 +251,7 @@ export default function IMPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isAdminUser = user?.role === "admin";
 
-  // ── Bot state ──────────────────────────────────────────────────────────────
-  const [botList, setBotList] = useState<BotInfo[]>([]);
+   // ── Bot state ──────────────────────────────────────────────────────────
   const [activeBotId, setActiveBotId] = useState<string | null>(null);
   const [botMessages, setBotMessages] = useState<Record<string, BotMessage[]>>({});
   const [botInput, setBotInput] = useState("");
@@ -265,14 +264,12 @@ export default function IMPage() {
     retry: false,
   });
 
-  // ── 加载机器人列表 ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!isAdminUser) return;
-    fetch("/api/bots", { credentials: "include" })
-      .then(r => r.json())
-      .then((data: { bots: BotInfo[] }) => setBotList(data.bots || []))
-      .catch(() => {});
-  }, [isAdminUser]);
+  // ── 加载机器人列表（tRPC）──────────────────────────────────────────────────
+  const { data: botListData } = trpc.bots.list.useQuery(undefined, {
+    enabled: isAdminUser,
+    refetchOnWindowFocus: false,
+  });
+  const botList = (botListData as BotInfo[] | undefined) ?? [];
 
   // ── 机器人消息轮询 ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -281,11 +278,11 @@ export default function IMPage() {
       return;
     }
     // 首次加载历史消息
-    fetch(`/api/bots/${activeBotId}/messages`, { credentials: "include" })
+    fetch(`/api/trpc/bots.getMessages?batch=1&input=${encodeURIComponent(JSON.stringify({"0":{"json":{"botId":activeBotId}}}))}`, { credentials: "include" })
       .then(r => r.json())
-      .then((data: { messages: BotMessage[] }) => {
-        setBotMessages(prev => ({ ...prev, [activeBotId]: data.messages || [] }));
-        const msgs = data.messages || [];
+      .then((data: [{result: {data: {json: BotMessage[]}}}]) => {
+        const msgs = data?.[0]?.result?.data?.json || [];
+        setBotMessages(prev => ({ ...prev, [activeBotId]: msgs }));
         if (msgs.length > 0) botLastMsgRef.current[activeBotId] = msgs[msgs.length - 1].createdAt;
       })
       .catch(() => {});
@@ -293,18 +290,20 @@ export default function IMPage() {
     if (botPollRef.current) clearInterval(botPollRef.current);
     botPollRef.current = setInterval(() => {
       const after = botLastMsgRef.current[activeBotId];
-      const url = after ? `/api/bots/${activeBotId}/messages?after=${encodeURIComponent(after)}` : `/api/bots/${activeBotId}/messages`;
-      fetch(url, { credentials: "include" })
+      const sinceParam = after ? new Date(after).getTime() : undefined;
+      const input = JSON.stringify({"0":{"json":{"botId":activeBotId, ...(sinceParam ? {"since":sinceParam} : {})}}});
+      fetch(`/api/trpc/bots.getMessages?batch=1&input=${encodeURIComponent(input)}`, { credentials: "include" })
         .then(r => r.json())
-        .then((data: { messages: BotMessage[] }) => {
-          if (data.messages?.length > 0) {
+        .then((data: [{result: {data: {json: BotMessage[]}}}]) => {
+          const newMsgs = data?.[0]?.result?.data?.json || [];
+          if (newMsgs.length > 0) {
             setBotMessages(prev => {
               const existing = prev[activeBotId] || [];
               const existingIds = new Set(existing.map(m => m.id));
-              const newMsgs = data.messages.filter(m => !existingIds.has(m.id));
-              if (newMsgs.length === 0) return prev;
-              botLastMsgRef.current[activeBotId] = newMsgs[newMsgs.length - 1].createdAt;
-              return { ...prev, [activeBotId]: [...existing, ...newMsgs] };
+              const filtered = newMsgs.filter((m: BotMessage) => !existingIds.has(m.id));
+              if (filtered.length === 0) return prev;
+              botLastMsgRef.current[activeBotId] = filtered[filtered.length - 1].createdAt;
+              return { ...prev, [activeBotId]: [...existing, ...filtered] };
             });
           }
         })
@@ -400,6 +399,11 @@ export default function IMPage() {
       send({ type: "get_or_create_ai_conversation" });
     }
   }, [connected, conversations.length, send]);
+
+  // tRPC bot mutations
+  const sendBotMsg = trpc.bots.sendMessage.useMutation({
+    onError: () => toast.error("发送失败，请重试"),
+  });
 
   const handleSelectContact = useCallback(
     (contactId: number) => {
@@ -722,20 +726,14 @@ export default function IMPage() {
               };
               setBotMessages(prev => ({ ...prev, [botId]: [...(prev[botId] || []), localMsg] }));
               setBotInput("");
-              fetch(`/api/bots/${botId}/send`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-                body: JSON.stringify({ content: text }),
-              })
-                .then(r => r.json())
-                .then((data: { success: boolean; msgId: string }) => {
+              sendBotMsg.mutate({ botId, content: text }, {
+                onSuccess: (data) => {
                   setBotMessages(prev => ({
                     ...prev,
                     [botId]: (prev[botId] || []).map(m => m.id === localMsg.id ? { ...m, id: data.msgId } : m),
                   }));
-                })
-                .catch(() => toast.error("发送失败，请重试"));
+                },
+              });
             }}
           />
         ) : !activeConvId ? (

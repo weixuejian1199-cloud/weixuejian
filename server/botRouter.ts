@@ -10,6 +10,7 @@ import { getDb } from "./db";
 import { bots, botMessages } from "../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
 import crypto from "crypto";
+import { authenticateRequest } from "./_core/auth";
 
 const router = Router();
 
@@ -23,11 +24,16 @@ function generateId(): string {
 }
 
 // ── 鉴权中间件（Admin 才能管理机器人）────────────────────────────────────────
-function requireAdmin(req: Request, res: Response, next: Function) {
-  const user = (req as any).user;
-  if (!user) return res.status(401).json({ error: "未登录" });
-  if (user.role !== "admin") return res.status(403).json({ error: "需要管理员权限" });
-  next();
+async function requireAdmin(req: Request, res: Response, next: Function) {
+  try {
+    const user = await authenticateRequest(req);
+    if (!user) return res.status(401).json({ error: "未登录" });
+    if (user.role !== "admin") return res.status(403).json({ error: "需要管理员权限" });
+    (req as any).atlasUser = user;
+    next();
+  } catch (e) {
+    return res.status(401).json({ error: "未登录" });
+  }
 }
 
 // ── Bot Token 鉴权（外部服务调用）─────────────────────────────────────────────
@@ -67,7 +73,7 @@ router.post("/", requireAdmin, async (req: Request, res: Response) => {
 
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "数据库不可用" });
-    const user = (req as any).user;
+    const user = (req as any).atlasUser;
     const bot = {
       id: generateId(),
       name,
@@ -138,7 +144,7 @@ router.delete("/:id", requireAdmin, async (req: Request, res: Response) => {
 // GET /api/bots/:id/messages — 获取对话历史
 router.get("/:id/messages", async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = (req as any).atlasUser;
     if (!user) return res.status(401).json({ error: "未登录" });
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "数据库不可用" });
@@ -160,7 +166,7 @@ router.get("/:id/messages", async (req: Request, res: Response) => {
 // POST /api/bots/:id/send — 用户发消息给机器人
 router.post("/:id/send", async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
+    const user = (req as any).atlasUser;
     if (!user) return res.status(401).json({ error: "未登录" });
     const db = await getDb();
     if (!db) return res.status(503).json({ error: "数据库不可用" });

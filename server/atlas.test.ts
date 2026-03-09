@@ -43,6 +43,7 @@ function createTestContext(): TrpcContext {
       updatedAt: new Date(),
       lastSignedIn: new Date(),
     },
+    getEffectiveUserId: vi.fn().mockResolvedValue(1),
     req: {
       protocol: "https",
       headers: {},
@@ -151,7 +152,7 @@ describe("scheduledTask router", () => {
     const ctx = createTestContext();
     const caller = appRouter.createCaller(ctx);
 
-    const result = await caller.scheduledTask.create({
+    const result = await caller.scheduled.create({
       name: "每周经营周报",
       templatePrompt: "生成本周经营周报",
       templateName: "经营日报",
@@ -169,7 +170,7 @@ describe("scheduledTask router", () => {
     const ctx = createTestContext();
     const caller = appRouter.createCaller(ctx);
 
-    const result = await caller.scheduledTask.list();
+    const result = await caller.scheduled.list();
 
     expect(Array.isArray(result)).toBe(true);
     expect(db.getUserScheduledTasks).toHaveBeenCalledWith(1);
@@ -179,7 +180,7 @@ describe("scheduledTask router", () => {
     const ctx = createTestContext();
     const caller = appRouter.createCaller(ctx);
 
-    const result = await caller.scheduledTask.delete({ id: "task-123" });
+    const result = await caller.scheduled.delete({ id: "task-123" });
 
     expect(result).toEqual({ success: true });
     expect(db.deleteScheduledTask).toHaveBeenCalledWith("task-123");

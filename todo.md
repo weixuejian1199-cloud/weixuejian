@@ -326,6 +326,14 @@
 - [x] 修复 TypeScript 编译错误（db 非空断言）
 - [x] 重启服务器应用修改，所有任务现在直接走 AI 流式处理
 
+## V13.8 机器人管理 tRPC 迁移（已完成）
+
+- [x] server/routers/bots.ts — tRPC 路由（list/create/update/delete/regenerateToken/sendMessage/getMessages）
+- [x] server/botRouter.ts — 保留 /api/bots/:id/reply Express 接口（Token 鉴权，供外部服务回调）
+- [x] SettingsPage IntegrationsSection — 从 fetch 改为 tRPC
+- [x] IMPage — 机器人列表加载和发消息从 fetch 改为 tRPC
+- [x] atlas.test.ts — 修复 getEffectiveUserId mock 和路由名称
+
 ## V12.11 手机端白屏修复
 
 - [ ] 排查 iOS Safari 白屏原因（JS 兼容性 / 字体加载 / 渲染错误）

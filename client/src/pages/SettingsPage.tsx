@@ -1147,64 +1147,48 @@ interface BotItem {
 }
 
 function IntegrationsSection() {
-  const [bots, setBots] = useState<BotItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const utils = trpc.useUtils();
   const [showCreate, setShowCreate] = useState(false);
   const [newBotName, setNewBotName] = useState("");
   const [newBotDesc, setNewBotDesc] = useState("");
   const [newBotAvatar, setNewBotAvatar] = useState("🤖");
-  const [creating, setCreating] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [editWebhook, setEditWebhook] = useState<{ id: string; url: string } | null>(null);
-  const [savingWebhook, setSavingWebhook] = useState(false);
 
-  const fetchBots = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/bots", { credentials: "include" });
-      if (res.ok) {
-        const data = await res.json();
-        setBots(data.bots || []);
-      }
-    } catch (e) {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  };
+  // tRPC queries & mutations
+  const { data: botList = [], isLoading: loading } = trpc.bots.list.useQuery();
+  const createBot = trpc.bots.create.useMutation({
+    onSuccess: () => {
+      utils.bots.list.invalidate();
+      toast.success(`机器人「${newBotName}」创建成功`);
+      setNewBotName(""); setNewBotDesc(""); setNewBotAvatar("🤖");
+      setShowCreate(false);
+    },
+    onError: (e) => toast.error(e.message || "创建失败"),
+  });
+  const deleteBot = trpc.bots.delete.useMutation({
+    onSuccess: () => { utils.bots.list.invalidate(); toast.success("已删除"); },
+    onError: (e) => toast.error(e.message || "删除失败"),
+  });
+  const regenerateToken = trpc.bots.regenerateToken.useMutation({
+    onSuccess: () => { utils.bots.list.invalidate(); toast.success("Token 已更新"); },
+    onError: (e) => toast.error(e.message || "更新失败"),
+  });
+  const updateBot = trpc.bots.update.useMutation({
+    onSuccess: () => { utils.bots.list.invalidate(); toast.success("Webhook URL 已保存"); setEditWebhook(null); },
+    onError: (e) => toast.error(e.message || "保存失败"),
+  });
 
-  useEffect(() => { fetchBots(); }, []);
+  const bots = botList as BotItem[];
 
-  const handleCreate = async () => {
+  const handleCreate = () => {
     if (!newBotName.trim()) return;
-    setCreating(true);
-    try {
-      const res = await fetch("/api/bots", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ name: newBotName.trim(), description: newBotDesc.trim(), avatar: newBotAvatar }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success(`机器人「${newBotName}」创建成功`);
-        setNewBotName(""); setNewBotDesc(""); setNewBotAvatar("🤖");
-        setShowCreate(false);
-        fetchBots();
-      } else {
-        toast.error(data.error || "创建失败");
-      }
-    } finally {
-      setCreating(false);
-    }
+    createBot.mutate({ name: newBotName.trim(), description: newBotDesc.trim() || undefined, avatar: newBotAvatar });
   };
 
-  const handleDelete = async (id: string, name: string) => {
+  const handleDelete = (id: string, name: string) => {
     if (!confirm(`确定删除机器人「${name}」？此操作不可恢复。`)) return;
-    const res = await fetch(`/api/bots/${id}`, { method: "DELETE", credentials: "include" });
-    const data = await res.json();
-    if (data.success) { toast.success("已删除"); fetchBots(); }
-    else toast.error(data.error || "删除失败");
+    deleteBot.mutate({ id });
   };
 
   const handleCopyToken = (token: string) => {
@@ -1214,30 +1198,14 @@ function IntegrationsSection() {
     setTimeout(() => setCopiedToken(null), 2000);
   };
 
-  const handleRegenerateToken = async (id: string) => {
+  const handleRegenerateToken = (id: string) => {
     if (!confirm("重新生成 Token 后，旧 Token 立即失效，需要重新配置 OpenClaw。确定继续？")) return;
-    const res = await fetch(`/api/bots/${id}/regenerate-token`, { method: "POST", credentials: "include" });
-    const data = await res.json();
-    if (data.success) { toast.success("Token 已更新"); fetchBots(); }
-    else toast.error(data.error || "更新失败");
+    regenerateToken.mutate({ id });
   };
 
-  const handleSaveWebhook = async () => {
+  const handleSaveWebhook = () => {
     if (!editWebhook) return;
-    setSavingWebhook(true);
-    try {
-      const res = await fetch(`/api/bots/${editWebhook.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ webhookUrl: editWebhook.url }),
-      });
-      const data = await res.json();
-      if (data.success) { toast.success("Webhook URL 已保存"); setEditWebhook(null); fetchBots(); }
-      else toast.error(data.error || "保存失败");
-    } finally {
-      setSavingWebhook(false);
-    }
+    updateBot.mutate({ id: editWebhook.id, webhookUrl: editWebhook.url });
   };
 
   const AVATARS = ["🤖", "🦞", "🐙", "🦊", "🐬", "🦅", "⚡", "🔮"];
@@ -1311,8 +1279,8 @@ function IntegrationsSection() {
                       className="flex-1 px-2 py-1.5 rounded text-xs outline-none"
                       style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-accent)", color: "var(--atlas-text)" }}
                     />
-                    <button onClick={handleSaveWebhook} disabled={savingWebhook} className="px-3 py-1.5 rounded text-xs font-medium" style={{ background: "var(--atlas-accent)", color: "white" }}>
-                      {savingWebhook ? "保存中..." : "保存"}
+                    <button onClick={handleSaveWebhook} disabled={updateBot.isPending} className="px-3 py-1.5 rounded text-xs font-medium" style={{ background: "var(--atlas-accent)", color: "white" }}>
+                      {updateBot.isPending ? "保存中..." : "保存"}
                     </button>
                     <button onClick={() => setEditWebhook(null)} className="px-2 py-1.5 rounded text-xs" style={{ color: "var(--atlas-text-3)" }}>取消</button>
                   </div>
@@ -1352,8 +1320,8 @@ function IntegrationsSection() {
           <input value={newBotName} onChange={e => setNewBotName(e.target.value)} placeholder="机器人名称（必填）*" className="w-full px-3 py-2 rounded-lg text-sm outline-none" style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)", color: "var(--atlas-text)" }} />
           <input value={newBotDesc} onChange={e => setNewBotDesc(e.target.value)} placeholder="描述（可选）" className="w-full px-3 py-2 rounded-lg text-sm outline-none" style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)", color: "var(--atlas-text)" }} />
           <div className="flex gap-2">
-            <button onClick={handleCreate} disabled={creating || !newBotName.trim()} className="flex-1 py-2 rounded-lg text-sm font-medium transition-opacity" style={{ background: "var(--atlas-accent)", color: "white", opacity: creating || !newBotName.trim() ? 0.5 : 1 }}>
-              {creating ? "创建中..." : "创建机器人"}
+            <button onClick={handleCreate} disabled={createBot.isPending || !newBotName.trim()} className="flex-1 py-2 rounded-lg text-sm font-medium transition-opacity" style={{ background: "var(--atlas-accent)", color: "white", opacity: createBot.isPending || !newBotName.trim() ? 0.5 : 1 }}>
+              {createBot.isPending ? "创建中..." : "创建机器人"}
             </button>
             <button onClick={() => setShowCreate(false)} className="px-4 py-2 rounded-lg text-sm" style={{ color: "var(--atlas-text-3)" }}>取消</button>
           </div>

@@ -5,6 +5,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { adminRouter } from "./routers/admin";
+import { botsRouter } from "./routers/bots";
 import { publicProcedure, router } from "./_core/trpc";
 import {
   createSession, updateSession, getSession, getUserSessions, deleteSession,
@@ -27,6 +28,7 @@ function in24Hours() {
 export const appRouter = router({
   system: systemRouter,
   admin: adminRouter,
+  bots: botsRouter,
 
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
