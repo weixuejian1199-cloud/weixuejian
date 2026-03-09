@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload, X, FileSpreadsheet, Sparkles, Send,
   Download, Loader2, Copy, Check, BarChart2, Paperclip,
-  ChevronRight, Square,
+  ChevronRight, Square, ChevronDown,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTableRenderer";
@@ -212,7 +212,11 @@ export default function MainWorkspace() {
     setPendingActions([]); // Clear pending actions when user sends
 
     addMessage({ role: "user", content: msg });
-    addMessage({ role: "assistant", content: "", isStreaming: true });
+    // Determine thinking steps based on context
+    const steps = hasFiles
+      ? ["解析文件数据", "理解你的需求", "生成回复"]
+      : ["理解你的需求", "生成回复"];
+    addMessage({ role: "assistant", content: "", isStreaming: true, thinkingSteps: steps });
 
     // Auto-generate task title from first user message
     if (activeTaskId) {
@@ -296,7 +300,7 @@ export default function MainWorkspace() {
             accumulated += chunk;
             // Strip <suggestions> block from visible text during streaming
             const visibleText = accumulated.replace(/<suggestions>[\s\S]*?<\/suggestions>/, "").replace(/<suggestions>[\s\S]*$/, "");
-            updateLastMessage(visibleText);
+            updateLastMessage(visibleText, { isStreaming: true });
           },
           onDone: (fullText) => {
             const finalText = fullText || accumulated;
@@ -999,7 +1003,7 @@ function MessageBubble({
 }) {
   const [copied, setCopied] = useState(false);
   const [showTable, setShowTable] = useState(true);
-
+  const [showThinking, setShowThinking] = useState(false);
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
     setCopied(true);
@@ -1049,6 +1053,56 @@ function MessageBubble({
       </div>
 
       <div className="flex-1 min-w-0">
+        {/* 思考过程面板：有内容且有 thinkingSteps 时显示 */}
+        {message.thinkingSteps && message.thinkingSteps.length > 0 && message.content && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-2"
+          >
+            <button
+              onClick={() => setShowThinking(v => !v)}
+              className="flex items-center gap-1.5 text-xs transition-colors"
+              style={{ color: "var(--atlas-text-3)" }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)"}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)"}
+            >
+              <span style={{ fontWeight: 500 }}>思考过程</span>
+              <ChevronDown
+                size={12}
+                style={{
+                  transform: showThinking ? "rotate(180deg)" : "rotate(0deg)",
+                  transition: "transform 0.2s ease",
+                }}
+              />
+            </button>
+            <AnimatePresence>
+              {showThinking && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="mt-2 space-y-1.5">
+                    {message.thinkingSteps.map((step, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <div
+                          className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
+                          style={{ background: "var(--atlas-accent)", opacity: 0.5 }}
+                        />
+                        <span style={{ fontSize: "12px", color: "var(--atlas-text-3)", lineHeight: "1.6" }}>
+                          {step}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
         {/* Message bubble */}
         <div
           className="px-4 py-3 rounded-2xl"
@@ -1058,14 +1112,18 @@ function MessageBubble({
           }}
         >
           {message.isStreaming && !message.content ? (
-            <div className="flex items-center gap-1.5 py-0.5">
-              {[0, 1, 2].map(i => (
-                <div
-                  key={i}
-                  className="atlas-thinking-dot"
-                  style={{ animationDelay: `${i * 0.2}s` }}
-                />
-              ))}
+            /* 正在思考动画 */
+            <div className="flex items-center gap-2 py-0.5">
+              <div className="flex items-center gap-1">
+                {[0, 1, 2].map(i => (
+                  <div
+                    key={i}
+                    className="atlas-thinking-dot"
+                    style={{ animationDelay: `${i * 0.2}s` }}
+                  />
+                ))}
+              </div>
+              <span style={{ fontSize: "13px", color: "var(--atlas-text-3)" }}>ATLAS 正在思考…</span>
             </div>
           ) : (() => {
             const { segments } = parseAtlasTableBlocks(message.content || "");

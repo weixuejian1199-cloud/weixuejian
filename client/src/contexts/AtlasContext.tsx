@@ -63,6 +63,7 @@ export interface Message {
   report_filename?: string;
   download_url?: string;
   tableData?: TableSheet[];
+  thinkingSteps?: string[];  // Steps shown in "思考过程" panel
 }
 
 export interface ReportRecord {
@@ -433,7 +434,9 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
       if (t.id !== activeTaskId) return t;
       if (!t.messages.length) return t;
       const msgs = [...t.messages];
-      msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], content, isStreaming: false, ...extra };
+      // If extra explicitly sets isStreaming, use it; otherwise default to false
+      const isStreamingVal = extra && 'isStreaming' in extra ? extra.isStreaming : false;
+      msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], content, ...extra, isStreaming: isStreamingVal };
       return { ...t, messages: msgs };
     }));
   }, [activeTaskId]);

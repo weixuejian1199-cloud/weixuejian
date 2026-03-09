@@ -198,6 +198,19 @@
   }
   .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
 
+  /* Thinking dots bounce animation */
+  @keyframes thinking-bounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+    40% { transform: translateY(-4px); opacity: 1; }
+  }
+  .atlas-thinking-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--atlas-text-3);
+    animation: thinking-bounce 1.2s ease-in-out infinite;
+  }
+
   /* Number counter */
   @keyframes count-up {
     from { opacity: 0; transform: translateY(4px); }
