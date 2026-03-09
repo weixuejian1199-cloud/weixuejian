@@ -499,7 +499,7 @@
 ## V13.3 修复 OpenClaw WebSocket 连接
 - [x] 将后端 WebSocket 路径从 /ws/im 改为 /api/ws/im（绕过 Cloudflare 静态文件拦截）
 - [x] 更新 openclaw-atlas-plugin 插件连接 URL
-- [ ] 重新安装插件并验证连接成功（需要发布新版本到 atlascore.cn 后验证）
+- [x] 重新安装插件并验证连接成功（连接已成功，修复旧连接未关闭导致的重连循环）
 
 ## V13.4 修复线上深色主题问题
 - [x] 定位主题没有生效的根本原因（旧版本 localStorage 写入的 atlas_theme: dark 被读取）

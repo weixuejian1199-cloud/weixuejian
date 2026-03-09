@@ -609,6 +609,11 @@ export function createImWsServer(httpServer: Server): WebSocketServer {
     const client: AuthedClient = { ...authInfo, ws };
 
     if (client.isOpenClaw) {
+      // 如果已有旧连接，先优雅关闭它，避免重连循环
+      if (openClawClient && openClawClient.readyState === WebSocket.OPEN) {
+        console.log("[IM] Closing previous OpenClaw connection, accepting new one");
+        openClawClient.close(1000, "Replaced by new connection");
+      }
       openClawClient = ws;
       console.log("[IM] OpenClaw plugin connected");
 
