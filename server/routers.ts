@@ -545,6 +545,27 @@ export const appRouter = router({
       return { connected: isOpenClawConnected(), adminOnly: false };
     }),
 
+    /** Get OpenClaw IM conversation history — admin only */
+    getOpenClawMessages: publicProcedure.query(async ({ ctx }) => {
+      if (!ctx.user || ctx.user.role !== "admin") return [];
+      const { drizzle } = await import("drizzle-orm/mysql2");
+      const { desc, eq } = await import("drizzle-orm");
+      const { imMessages } = await import("../drizzle/schema");
+      const db = drizzle(process.env.DATABASE_URL!);
+      const rows = await db
+        .select()
+        .from(imMessages)
+        .where(eq(imMessages.conversationId, "openclaw-direct"))
+        .orderBy(desc(imMessages.createdAt))
+        .limit(100);
+      return rows.reverse().map(r => ({
+        id: r.id,
+        role: r.senderId === -1 ? "assistant" as const : "user" as const,
+        content: r.content,
+        createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+      }));
+    }),
+
     /** Get all users for the contacts list */
     getContacts: publicProcedure.query(async ({ ctx }) => {
       const { drizzle } = await import("drizzle-orm/mysql2");

@@ -71,7 +71,7 @@ function useImWebSocket(token: string | null, onOpenClawReply?: (msg: { id: stri
   useEffect(() => {
     if (!token) return;
 
-    const wsUrl = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/ws/im?token=${encodeURIComponent(token)}`;
+    const wsUrl = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/api/ws/im?token=${encodeURIComponent(token)}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -225,7 +225,9 @@ export default function IMPage() {
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [inputText, setInputText] = useState("");
   const [contactSearch, setContactSearch] = useState("");
+  // 小虾米对话记录：初始化时从数据库加载，新消息实时追加
   const [openClawMessages, setOpenClawMessages] = useState<Array<{id: string; role: "user" | "assistant"; content: string; createdAt: string}>>([]);
+  const [openClawHistoryLoaded, setOpenClawHistoryLoaded] = useState(false);
   const [openClawInput, setOpenClawInput] = useState("");
   const [openClawOnline, setOpenClawOnline] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -235,6 +237,20 @@ export default function IMPage() {
     refetchOnWindowFocus: false,
     retry: false,
   });
+
+  // 加载小虾米历史对话记录
+  const { data: openClawHistory } = trpc.im.getOpenClawMessages.useQuery(undefined, {
+    enabled: user?.role === "admin",
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+  // 历史记录加载完成后初始化（只初始化一次）
+  useEffect(() => {
+    if (openClawHistory && !openClawHistoryLoaded) {
+      setOpenClawMessages(openClawHistory);
+      setOpenClawHistoryLoaded(true);
+    }
+  }, [openClawHistory, openClawHistoryLoaded]);
 
   // Poll OpenClaw connection status (admin only, every 10s)
   const { data: openClawStatus } = trpc.im.getOpenClawStatus.useQuery(undefined, {

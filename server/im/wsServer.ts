@@ -670,16 +670,29 @@ async function handleMessage(client: AuthedClient, raw: string): Promise<void> {
 
     case "send_to_openclaw": {
       // Admin 在 IM 小虾米对话窗口发消息给小虾米
+      const ocMsgId = nanoid();
+      const ocTimestamp = new Date().toISOString();
+      // 持久化到数据库（使用特殊 conversationId "openclaw-direct"）
+      const ocDb = getDb();
+      await ocDb.insert(imMessages).values({
+        id: ocMsgId,
+        conversationId: "openclaw-direct",
+        senderId: client.userId,
+        senderName: client.userName,
+        type: "text",
+        content: msg.content,
+      }).catch(console.error);
       if (!openClawClient || openClawClient.readyState !== WebSocket.OPEN) {
-        send(client.ws, { type: "openclaw_im_reply", content: "⚠️ 小虾米当前未连接，消息无法送达。请先启动小虾米客户端。" });
+        send(client.ws, { type: "openclaw_im_reply", content: "⚠️ 小虾米当前未连接，消息已保存，小虾米上线后可查看。" });
         break;
       }
       openClawClient.send(JSON.stringify({
         type: "im_admin_message",
+        id: ocMsgId,
         fromUserId: client.userId,
         fromUserName: client.userName,
         content: msg.content,
-        timestamp: Date.now(),
+        timestamp: ocTimestamp,
       }));
       console.log(`[IM] Admin message sent to OpenClaw: ${msg.content.slice(0, 50)}`);
       break;
@@ -690,12 +703,24 @@ async function handleMessage(client: AuthedClient, raw: string): Promise<void> {
         send(client.ws, { type: "error", message: "Unauthorized" });
         break;
       }
+      // 持久化到数据库
+      const replyId = nanoid();
+      const replyTime = new Date().toISOString();
+      const replyDb = getDb();
+      await replyDb.insert(imMessages).values({
+        id: replyId,
+        conversationId: "openclaw-direct",
+        senderId: -1,
+        senderName: "OpenClaw",
+        type: "text",
+        content: msg.content,
+      }).catch(console.error);
       // 广播给所有 admin 用户
       const replyMsg = {
-        id: nanoid(),
+        id: replyId,
         role: "assistant" as const,
         content: msg.content,
-        createdAt: new Date().toISOString(),
+        createdAt: replyTime,
       };
       onlineUsers.forEach((oc) => {
         send(oc.ws, { type: "openclaw_im_reply", ...replyMsg });
