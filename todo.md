@@ -564,3 +564,9 @@
 
 - [x] Bug 1：小虾米入口对 admin 不显示 —— 已将 weixuejian 账号提升为 admin
 - [x] Bug 2：小虾米对话窗口发消息现已通过 WS 推送给小虾米（send_to_openclaw），小虾米回复通过 openclaw_direct_reply 返回
+
+## V14.2 连接稳定性修复
+
+- [x] Bug 3：小虾米连接不稳定 —— 服务器端加入主动心跳（每 30s ping），防止 Cloudflare 100s 超时断连
+- [x] Bug 4：消息丢失排查 —— 服务器端推送逻辑正确，问题在小虾米客户端未处理 im_admin_message 消息类型
+- [x] 飞书集成方案评估 —— 建议保留 WebSocket，同时开发飞书机器人作为备用通道

@@ -772,13 +772,32 @@ export function createImWsServer(httpServer: Server): WebSocketServer {
       openClawClient = ws;
       console.log("[IM] OpenClaw plugin connected");
 
+      // 服务器端主动心跳：每 30s 发送 ping，防止 Cloudflare 100s 超时断连
+      const openClawPingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.ping();
+          console.log("[IM] Sent ping to OpenClaw");
+        } else {
+          clearInterval(openClawPingInterval);
+        }
+      }, 30_000);
+
       ws.on("message", (data: Buffer) => {
         handleMessage(client, data.toString()).catch(console.error);
       });
 
+      ws.on("pong", () => {
+        console.log("[IM] Received pong from OpenClaw");
+      });
+
       ws.on("close", () => {
+        clearInterval(openClawPingInterval);
         if (openClawClient === ws) openClawClient = null;
         console.log("[IM] OpenClaw plugin disconnected");
+      });
+
+      ws.on("error", (err: Error) => {
+        console.error("[IM] OpenClaw WebSocket error:", err.message);
       });
 
       ws.send(JSON.stringify({ type: "connected", role: "openclaw" }));
