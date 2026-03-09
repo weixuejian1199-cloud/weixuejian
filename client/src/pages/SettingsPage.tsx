@@ -1134,33 +1134,148 @@ function AiEngineSection() {
 // ── Integrations ──────────────────────────────────────────────────────────────
 
 function IntegrationsSection() {
+  const ATLAS_TOKEN = "atlas_session_shrimp_20260308";
+  const ATLAS_SEND_URL = "https://atlascore.cn/api/openclaw/send";
+
+  const [webhookUrl, setWebhookUrl] = React.useState("");
+  const [webhookSaving, setWebhookSaving] = React.useState(false);
+  const [webhookConfigured, setWebhookConfigured] = React.useState(false);
+  const [copied, setCopied] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    fetch("/api/openclaw/config", { credentials: "include" })
+      .then(r => r.json())
+      .then((d: { webhookUrl?: string; configured?: boolean }) => {
+        if (d.webhookUrl) setWebhookUrl(d.webhookUrl);
+        setWebhookConfigured(d.configured ?? false);
+      })
+      .catch(() => {});
+  }, []);
+
+  const copyText = (text: string, key: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 2000);
+    });
+  };
+
+  const saveWebhook = async () => {
+    if (!webhookUrl.trim()) { toast.error("请填写 Webhook URL"); return; }
+    setWebhookSaving(true);
+    try {
+      const res = await fetch("/api/openclaw/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ webhookUrl: webhookUrl.trim() }),
+      });
+      const data = await res.json() as { success?: boolean; error?: string };
+      if (data.success) {
+        setWebhookConfigured(true);
+        toast.success("小虾米 Webhook URL 已保存，立即生效");
+      } else {
+        toast.error(data.error ?? "保存失败");
+      }
+    } catch {
+      toast.error("网络错误，请重试");
+    } finally {
+      setWebhookSaving(false);
+    }
+  };
+
   const integrations = [
-    { name: "飞书", icon: "🪶", color: "#3370FF", available: true, desc: "推送报表到飞书群/文档" },
-    { name: "钉钉", icon: "📌", color: "#1677FF", available: true, desc: "推送报表到钉钉群" },
-    { name: "企业微信", icon: "💬", color: "#07C160", available: true, desc: "推送报表到企业微信" },
-    { name: "Notion", icon: "📝", color: "#000000", available: false, desc: "同步报表到 Notion 数据库" },
-    { name: "Google Sheets", icon: "📊", color: "#34A853", available: false, desc: "同步数据到 Google 表格" },
-    { name: "Slack", icon: "💼", color: "#4A154B", available: false, desc: "推送报表到 Slack 频道" },
+    { name: "飞书", icon: "🪶", color: "#3370FF", desc: "推送报表到飞书群/文档" },
+    { name: "钉钉", icon: "📌", color: "#1677FF", desc: "推送报表到钉钉群" },
+    { name: "企业微信", icon: "💬", color: "#07C160", desc: "推送报表到企业微信" },
+    { name: "Notion", icon: "📝", color: "#000000", desc: "同步报表到 Notion 数据库" },
+    { name: "Google Sheets", icon: "📊", color: "#34A853", desc: "同步数据到 Google 表格" },
+    { name: "Slack", icon: "💼", color: "#4A154B", desc: "推送报表到 Slack 频道" },
   ];
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <SectionHeader icon={Zap} title="集成" desc="连接办公软件，自动推送报表和数据" />
-      <div className="grid grid-cols-2 gap-3">
-        {integrations.map(item => (
-          <div key={item.name} className="rounded-xl p-4 flex items-center gap-3"
-            style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)", opacity: item.available ? 1 : 0.6 }}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ background: `${item.color}15` }}>{item.icon}</div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>{item.name}</p>
-              <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{item.desc}</p>
+
+      {/* 小虾米机器人配置卡片 */}
+      <div className="rounded-xl p-5 space-y-4" style={{ background: "var(--atlas-surface)", border: "1px solid rgba(52,211,153,0.3)" }}>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ background: "rgba(52,211,153,0.1)" }}>🦐</div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold" style={{ color: "var(--atlas-text)" }}>小虾米 (OpenClaw Agent)</p>
+              <span className="px-2 py-0.5 rounded-full text-xs" style={{ background: webhookConfigured ? "rgba(52,211,153,0.15)" : "rgba(255,180,0,0.15)", color: webhookConfigured ? "#34D399" : "#F59E0B" }}>
+                {webhookConfigured ? "已配置" : "未配置"}
+              </span>
             </div>
-            <button onClick={() => toast.info(item.available ? "集成配置功能开发中" : "即将支持")}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium"
-              style={{ background: item.available ? "rgba(91,140,255,0.1)" : "var(--atlas-elevated)", color: item.available ? "var(--atlas-accent)" : "var(--atlas-text-3)", border: item.available ? "1px solid rgba(91,140,255,0.2)" : "1px solid var(--atlas-border)" }}>
-              {item.available ? "配置" : "即将"}
+            <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>ATLAS 机器人接口，类似飞书机器人</p>
+          </div>
+        </div>
+
+        {/* 第一步：小虾米工程师复制这两个信息到 OpenClaw */}
+        <div className="space-y-2">
+          <p className="text-xs font-medium" style={{ color: "var(--atlas-text-2)" }}>第一步：将以下信息提供给小虾米工程师，配置到 OpenClaw</p>
+          <div className="rounded-lg p-3 space-y-2" style={{ background: "var(--atlas-elevated)" }}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>ATLAS 接收消息接口（小虾米回复用）</p>
+                <p className="text-xs font-mono mt-0.5 truncate" style={{ color: "var(--atlas-text)" }}>POST {ATLAS_SEND_URL}</p>
+              </div>
+              <button onClick={() => copyText(ATLAS_SEND_URL, "endpoint")}
+                className="px-2.5 py-1 rounded-lg text-xs flex-shrink-0"
+                style={{ background: "rgba(91,140,255,0.1)", color: "var(--atlas-accent)", border: "1px solid rgba(91,140,255,0.2)" }}>
+                {copied === "endpoint" ? "✓ 已复制" : "复制"}
+              </button>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>Bearer Token（鉴权用）</p>
+                <p className="text-xs font-mono mt-0.5" style={{ color: "var(--atlas-text)" }}>{ATLAS_TOKEN}</p>
+              </div>
+              <button onClick={() => copyText(ATLAS_TOKEN, "token")}
+                className="px-2.5 py-1 rounded-lg text-xs flex-shrink-0"
+                style={{ background: "rgba(91,140,255,0.1)", color: "var(--atlas-accent)", border: "1px solid rgba(91,140,255,0.2)" }}>
+                {copied === "token" ? "✓ 已复制" : "复制"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 第二步：填写小虾米的 Webhook URL */}
+        <div className="space-y-2">
+          <p className="text-xs font-medium" style={{ color: "var(--atlas-text-2)" }}>第二步：填写小虾米的 Webhook URL（ATLAS 将用户消息推送到这里）</p>
+          <div className="flex gap-2">
+            <input
+              value={webhookUrl}
+              onChange={e => setWebhookUrl(e.target.value)}
+              placeholder="https://小虾米的Webhook地址/webhook/atlas"
+              className="flex-1 px-3 py-2 rounded-lg text-sm"
+              style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)", color: "var(--atlas-text)" }}
+            />
+            <button onClick={saveWebhook} disabled={webhookSaving}
+              className="px-4 py-2 rounded-lg text-sm font-medium flex-shrink-0"
+              style={{ background: "rgba(52,211,153,0.15)", color: "#34D399", border: "1px solid rgba(52,211,153,0.3)" }}>
+              {webhookSaving ? "保存中..." : "保存"}
             </button>
           </div>
-        ))}
+          <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>保存后立即生效，无需重启。小虾米 URL 变更时在此更新即可。</p>
+        </div>
+      </div>
+
+      {/* 其他集成（即将支持） */}
+      <div>
+        <p className="text-xs font-medium mb-3" style={{ color: "var(--atlas-text-3)" }}>即将支持</p>
+        <div className="grid grid-cols-2 gap-3">
+          {integrations.map(item => (
+            <div key={item.name} className="rounded-xl p-4 flex items-center gap-3" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)", opacity: 0.5 }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ background: `${item.color}15` }}>{item.icon}</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>{item.name}</p>
+                <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{item.desc}</p>
+              </div>
+              <span className="px-2.5 py-1 rounded-lg text-xs" style={{ background: "var(--atlas-elevated)", color: "var(--atlas-text-3)", border: "1px solid var(--atlas-border)" }}>即将</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -137,8 +137,9 @@ export function registerOpenClawIMRoutes(app: Express): void {
 
     const msgId = incomingMsgId ?? nanoid();
     const db = getDb();
+    const trimmedContent = content.trim();
 
-    // 幂等处理：如果该 msgId 已存在，直接返回成功（防止小虾米重试导致重复消息）
+    // 幂等处理 1：如果该 msgId 已存在，直接返回成功
     if (incomingMsgId) {
       const existing = await db
         .select({ id: imMessages.id })
@@ -150,6 +151,24 @@ export function registerOpenClawIMRoutes(app: Express): void {
         res.json({ success: true, msgId: incomingMsgId, duplicate: true });
         return;
       }
+    }
+
+    // 幂等处理 2：如果相同内容在 60 秒内已存在，跳过（防止小虾米未带 msgId 重试导致重复）
+    const sixtySecondsAgo = new Date(Date.now() - 60_000);
+    const contentDup = await db
+      .select({ id: imMessages.id, createdAt: imMessages.createdAt, content: imMessages.content })
+      .from(imMessages)
+      .where(eq(imMessages.conversationId, OPENCLAW_CONV_ID))
+      .orderBy(desc(imMessages.createdAt))
+      .limit(20);
+    const contentDuplicate = contentDup.find(row => {
+      const t = row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt as string);
+      return row.content === trimmedContent && t > sixtySecondsAgo;
+    });
+    if (contentDuplicate) {
+      console.log(`[OpenClaw] Duplicate content within 60s, skipping insert. Original msgId=${contentDuplicate.id}`);
+      res.json({ success: true, msgId: contentDuplicate.id, duplicate: true });
+      return;
     }
 
     await db.insert(imMessages).values({
