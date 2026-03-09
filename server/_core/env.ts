@@ -15,8 +15,6 @@ export const ENV = {
   telegramChatId: process.env.TELEGRAM_CHAT_ID ?? "",
   // OpenClaw polling session key — used to authenticate OpenClaw agent polling requests
   openClawSessionKey: process.env.OPENCLAW_SESSION_KEY ?? "",
-  // OpenClaw Webhook URL — ATLAS pushes admin messages here
-  openClawWebhookUrl: process.env.OPENCLAW_WEBHOOK_URL ?? "",
   // Alibaba DashScope (Qwen3-Max + Kimi-K2.5)
   dashScopeApiKey: process.env.DASHSCOPE_API_KEY ?? "",
   dashScopeBaseUrl: process.env.DASHSCOPE_BASE_URL ?? "https://dashscope.aliyuncs.com/compatible-mode/v1",
