@@ -118,6 +118,36 @@ export function pushAtlasMsgToOpenClaw(payload: {
   return true;
 }
 
+/**
+ * 向小虾米（OpenClaw）推送 Qwen AI 的回复（Level 1 监控）
+ * 供 atlas.ts /api/atlas/chat 路由在 AI 回复完成后调用
+ */
+export function pushQwenReplyToOpenClaw(payload: {
+  conversationId: string;
+  userId: number;
+  userName: string;
+  userMessage: string;
+  qwenReply: string;
+  model: string;
+  timestamp: number;
+}): boolean {
+  if (!openClawClient || openClawClient.readyState !== WebSocket.OPEN) {
+    return false;
+  }
+  openClawClient.send(JSON.stringify({
+    type: "atlas_qwen_reply",
+    ...payload,
+  }));
+  return true;
+}
+
+/**
+ * 获取 OpenClaw 小虾米当前连接状态
+ */
+export function isOpenClawConnected(): boolean {
+  return !!(openClawClient && openClawClient.readyState === WebSocket.OPEN);
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function send(ws: WebSocket, data: object): void {

@@ -23,6 +23,7 @@ import LibraryPage from "./pages/LibraryPage";
 import InvitePage from "./pages/InvitePage";
 import HRCenterPage from "./pages/HRCenterPage";
 import IMPage from "./pages/IMPage";
+import OpenClawMonitor from "./pages/OpenClawMonitor";
 
 function AppContent() {
   const { activeNav, theme, showLoginModal, setUser } = useAtlas();
@@ -52,6 +53,7 @@ function AppContent() {
       case "invite":     return <InvitePage />;
       case "hr":         return <HRCenterPage />;
       case "im":         return <IMPage />;
+      case "openclaw-monitor": return <OpenClawMonitor />;
       case "home":
       default:           return <MainWorkspace />;
     }

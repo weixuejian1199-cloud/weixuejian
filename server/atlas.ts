@@ -27,7 +27,7 @@ import { storagePut, storageGet } from "./storage";
 import { getSession, createSession, updateSession, createReport, updateReport, getReport, getSimilarExamples, getUserReports, getDb } from "./db";
 import { authenticateRequest } from "./_core/auth";
 import { isOpenClawEnabled, callOpenClaw, callOpenClawStream, getPresignedUrlsForSessions } from "./openclaw";
-import { pushAtlasMsgToOpenClaw } from "./im/wsServer";
+import { pushAtlasMsgToOpenClaw, pushQwenReplyToOpenClaw } from "./im/wsServer";
 import { notifyTelegramNewTask } from "./openclawPolling";
 import { openclawTasks, chatConversations, chatMessages, personalTemplates } from "../drizzle/schema";
 
@@ -630,9 +630,9 @@ export function registerAtlasRoutes(app: Express) {
           { role: "user", content: message },
         ];
         const result = streamText({ model: openai.chat(selectModel()), system: noDataSystemPrompt, messages: msgs });
-        // V13.9: Persist AI reply after streaming completes
-        if (db) {
-          Promise.resolve(result.text).then(async (fullText) => {
+        // V14.0: Persist + Push Qwen reply to OpenClaw (Level 1 监控)
+        Promise.resolve(result.text).then(async (fullText) => {
+          if (db) {
             try {
               const { eq, sql: drizzleSql } = await import("drizzle-orm");
               await db.insert(chatMessages).values({
@@ -642,8 +642,18 @@ export function registerAtlasRoutes(app: Express) {
                 .set({ messageCount: drizzleSql`${chatConversations.messageCount} + 1` })
                 .where(eq(chatConversations.id, convId));
             } catch (e) { console.warn("[Atlas] AI reply persist error:", e); }
-          }).catch(() => {});
-        }
+          }
+          // Push to OpenClaw for Level 1 monitoring
+          pushQwenReplyToOpenClaw({
+            conversationId: convId,
+            userId,
+            userName: atlasUser?.name || atlasUser?.username || `用户${userId}`,
+            userMessage: message,
+            qwenReply: fullText,
+            model: selectModel(),
+            timestamp: Date.now(),
+          });
+        }).catch(() => {});
         result.pipeTextStreamToResponse(res);
         return;
       }
@@ -1021,8 +1031,11 @@ ${dataTable}
       });
 
       // V13.9: Persist AI reply after streaming completes
-      if (db) {
-        Promise.resolve(result.text).then(async (fullText) => {
+      // V14.0: Push Qwen reply to OpenClaw (Level 1 监控)
+      const modelUsed = selectModel(totalRows);
+      Promise.resolve(result.text).then(async (fullText) => {
+        // 1. Persist to DB
+        if (db) {
           try {
             const { eq, sql: drizzleSql } = await import("drizzle-orm");
             await db.insert(chatMessages).values({
@@ -1032,8 +1045,21 @@ ${dataTable}
               .set({ messageCount: drizzleSql`${chatConversations.messageCount} + 1` })
               .where(eq(chatConversations.id, convId));
           } catch (e) { console.warn("[Atlas] AI reply persist error (with-file):", e); }
-        }).catch(() => {});
-      }
+        }
+        // 2. Push Qwen reply to OpenClaw for Level 1 monitoring
+        const pushed = pushQwenReplyToOpenClaw({
+          conversationId: convId,
+          userId,
+          userName: atlasUser?.name || atlasUser?.username || `用户${userId}`,
+          userMessage: message,
+          qwenReply: fullText,
+          model: modelUsed,
+          timestamp: Date.now(),
+        });
+        if (pushed) {
+          console.log(`[Atlas] Pushed Qwen reply to OpenClaw (Level 1), convId=${convId}, len=${fullText.length}`);
+        }
+      }).catch(() => {});
 
       result.pipeTextStreamToResponse(res);
     } catch (err: any) {

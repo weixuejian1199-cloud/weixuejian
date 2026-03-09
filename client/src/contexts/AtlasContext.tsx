@@ -5,7 +5,7 @@
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 
-export type NavItem = "home" | "dashboard" | "templates" | "settings" | "search" | "library" | "invite" | "hr" | "im";
+export type NavItem = "home" | "dashboard" | "templates" | "settings" | "search" | "library" | "invite" | "hr" | "im" | "openclaw-monitor";
 export type Theme = "dark" | "light";
 
 // ── Types ──────────────────────────────────────────────────────────────────

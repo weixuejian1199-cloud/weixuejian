@@ -11,7 +11,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, User, Send, Loader2, Circle, MessageSquare, Search, X } from "lucide-react";
+import { Bot, User, Send, Loader2, Circle, MessageSquare, Search, X, Zap, Shield } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAtlas } from "@/contexts/AtlasContext";
 import { Button } from "@/components/ui/button";
@@ -166,7 +166,23 @@ function useImWebSocket(token: string | null) {
 
 // ── Avatar ─────────────────────────────────────────────────────────────────────
 
-function Avatar({ name, isAi, size = 32 }: { name: string; isAi?: boolean; size?: number }) {
+function Avatar({ name, isAi, isOpenClaw, size = 32 }: { name: string; isAi?: boolean; isOpenClaw?: boolean; size?: number }) {
+  if (isOpenClaw) {
+    return (
+      <div
+        className="rounded-full flex items-center justify-center flex-shrink-0 flex-shrink-0"
+        style={{
+          width: size,
+          height: size,
+          background: "linear-gradient(135deg, #f97316 0%, #f59e0b 100%)",
+          color: "#fff",
+          boxShadow: "0 0 0 2px rgba(249,115,22,0.2)",
+        }}
+      >
+        <Zap size={size * 0.5} fill="currentColor" />
+      </div>
+    );
+  }
   if (isAi) {
     return (
       <div
@@ -191,11 +207,18 @@ function Avatar({ name, isAi, size = 32 }: { name: string; isAi?: boolean; size?
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
+// ── OpenClaw 小虾米 conversation state ───────────────────────────────────────
+// 小虾米对话使用特殊 conversationId "openclaw-direct"
+const OPENCLAW_CONV_ID = "openclaw-direct";
+
 export default function IMPage() {
   const { user } = useAtlas();
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [inputText, setInputText] = useState("");
   const [contactSearch, setContactSearch] = useState("");
+  const [openClawMessages, setOpenClawMessages] = useState<Array<{id: string; role: "user" | "assistant"; content: string; createdAt: string}>>([]);
+  const [openClawInput, setOpenClawInput] = useState("");
+  const [openClawOnline, setOpenClawOnline] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Fetch WS token
@@ -203,6 +226,17 @@ export default function IMPage() {
     refetchOnWindowFocus: false,
     retry: false,
   });
+
+  // Poll OpenClaw connection status (admin only, every 10s)
+  const { data: openClawStatus } = trpc.im.getOpenClawStatus.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+    refetchInterval: user?.role === "admin" ? 10000 : false,
+    enabled: user?.role === "admin",
+  });
+  // Sync openClawOnline state
+  useEffect(() => {
+    setOpenClawOnline(openClawStatus?.connected ?? false);
+  }, [openClawStatus]);
 
   const { connected, conversations, contacts, messages, streamingTokens, send } =
     useImWebSocket(tokenData?.token ?? null);
@@ -270,8 +304,9 @@ export default function IMPage() {
   };
 
   const activeConv = conversations.find(c => c.id === activeConvId);
-  const currentMessages = activeConvId ? (messages[activeConvId] ?? []) : [];
-  const streamingText = activeConvId ? (streamingTokens[activeConvId] ?? "") : "";
+  const isOpenClawActive = activeConvId === OPENCLAW_CONV_ID;
+  const currentMessages = (activeConvId && !isOpenClawActive) ? (messages[activeConvId] ?? []) : [];
+  const streamingText = (activeConvId && !isOpenClawActive) ? (streamingTokens[activeConvId] ?? "") : "";
   const myUserId = user ? parseInt(user.id) : -1;
 
   const filteredContacts = contacts.filter(c =>
@@ -355,6 +390,54 @@ export default function IMPage() {
             </div>
           </button>
         </div>
+
+        {/* OpenClaw 小虾米 System Contact — 仅 admin 可见 */}
+        {user?.role === "admin" && <div className="px-2 pt-1 flex-shrink-0">
+          <button
+            onClick={() => setActiveConvId(OPENCLAW_CONV_ID)}
+            className="w-full flex items-center gap-3 rounded-lg px-3 py-2 transition-all relative"
+            style={{
+              background:
+                activeConvId === OPENCLAW_CONV_ID ? "rgba(249,115,22,0.12)" : "transparent",
+              color: activeConvId === OPENCLAW_CONV_ID ? "#f97316" : "var(--atlas-text-2)",
+              border: activeConvId === OPENCLAW_CONV_ID ? "1px solid rgba(249,115,22,0.25)" : "1px solid transparent",
+            }}
+            onMouseEnter={e => {
+              if (activeConvId !== OPENCLAW_CONV_ID) {
+                (e.currentTarget as HTMLElement).style.background = "var(--atlas-nav-hover-bg)";
+              }
+            }}
+            onMouseLeave={e => {
+              if (activeConvId !== OPENCLAW_CONV_ID) {
+                (e.currentTarget as HTMLElement).style.background = "transparent";
+              }
+            }}
+          >
+            <Avatar name="小虾米" isOpenClaw size={28} />
+            <div className="flex-1 min-w-0 text-left">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-medium truncate" style={{ color: "var(--atlas-text)" }}>
+                  小虾米
+                </span>
+                <span
+                  className="text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0"
+                  style={{ background: "rgba(249,115,22,0.15)", color: "#f97316", fontSize: 10 }}
+                >
+                  监控
+                </span>
+              </div>
+              <div className="text-xs truncate" style={{ color: "var(--atlas-text-3)" }}>
+                {openClawOnline ? "✦ 已连接 · 正在监控" : "未连接 · 点击查看状态"}
+              </div>
+            </div>
+            {openClawOnline && (
+              <div
+                className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{ background: "#34D399" }}
+              />
+            )}
+          </button>
+        </div>}
 
         {/* Divider */}
         <div className="px-4 py-2 flex-shrink-0">
@@ -466,6 +549,24 @@ export default function IMPage() {
               选择一个联系人开始聊天
             </p>
           </div>
+        ) : isOpenClawActive ? (
+          // 小虾米对话面板
+          <OpenClawPanel
+            messages={openClawMessages}
+            inputText={openClawInput}
+            setInputText={setOpenClawInput}
+            isOnline={openClawOnline}
+            onSend={(text) => {
+              const msg = {
+                id: Date.now().toString(),
+                role: "user" as const,
+                content: text,
+                createdAt: new Date().toISOString(),
+              };
+              setOpenClawMessages(prev => [...prev, msg]);
+              setOpenClawInput("");
+            }}
+          />
         ) : (
           <>
             {/* Chat header */}
@@ -640,6 +741,189 @@ export default function IMPage() {
             </div>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── OpenClaw 小虾米对话面板 ─────────────────────────────────────────────────────
+
+interface OpenClawPanelProps {
+  messages: Array<{ id: string; role: "user" | "assistant"; content: string; createdAt: string }>;
+  inputText: string;
+  setInputText: (v: string) => void;
+  isOnline: boolean;
+  onSend: (text: string) => void;
+}
+
+function OpenClawPanel({ messages, inputText, setInputText, isOnline, onSend }: OpenClawPanelProps) {
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (inputText.trim()) onSend(inputText.trim());
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Header */}
+      <div
+        className="flex items-center gap-3 px-5 flex-shrink-0"
+        style={{
+          height: 52,
+          borderBottom: "1px solid var(--atlas-border)",
+          background: "var(--atlas-surface)",
+        }}
+      >
+        <Avatar name="小虾米" isOpenClaw size={30} />
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold" style={{ color: "var(--atlas-text)" }}>
+              小虾米
+            </span>
+            <span
+              className="text-xs px-1.5 py-0.5 rounded-full font-medium"
+              style={{ background: "rgba(249,115,22,0.15)", color: "#f97316", fontSize: 10 }}
+            >
+              质量监控
+            </span>
+          </div>
+          <div className="text-xs" style={{ color: "var(--atlas-text-3)" }}>
+            {isOnline ? "✦ 已连接 · 正在监控 Qwen 回复质量" : "未连接 · 需要在本地 Mac 启动小虾米客户端"}
+          </div>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full gap-4">
+            <Avatar name="小虾米" isOpenClaw size={56} />
+            <div className="text-center">
+              <p className="text-sm font-medium mb-1" style={{ color: "var(--atlas-text)" }}>
+                小虾米 · 智能质量监控
+              </p>
+              <p className="text-xs max-w-xs text-center" style={{ color: "var(--atlas-text-3)" }}>
+                小虾米会实时监控 Qwen 对用户数据的处理过程，发现误解或错误时主动介入纠正
+              </p>
+            </div>
+            <div
+              className="rounded-xl p-4 max-w-sm w-full"
+              style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}
+            >
+              <div className="text-xs font-medium mb-2" style={{ color: "var(--atlas-text-2)" }}>
+                监控能力
+              </div>
+              <div className="space-y-2">
+                {[
+                  { icon: "👁", text: "Level 1：被动监控，接收所有用户输入和 Qwen 输出" },
+                  { icon: "💬", text: "Level 2：异步介入，在 Qwen 回复后补充或纠正" },
+                  { icon: "⚡", text: "Level 3：实时接管，中断 Qwen 流式输出（规划中）" },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <span className="text-sm flex-shrink-0">{item.icon}</span>
+                    <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{item.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {!isOnline && (
+              <div
+                className="rounded-lg px-4 py-3 max-w-sm w-full"
+                style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.2)" }}
+              >
+                <p className="text-xs" style={{ color: "#f97316" }}>
+                  ⚠️ 小虾米未连接。请在本地 Mac 启动小虾米客户端，并配置 ATLAS 服务器地址。
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        <AnimatePresence initial={false}>
+          {messages.map(msg => (
+            <motion.div
+              key={msg.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.15 }}
+              className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
+            >
+              {msg.role === "assistant" && <Avatar name="小虾米" isOpenClaw size={30} />}
+              <div
+                className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                  msg.role === "user" ? "rounded-tr-sm" : "rounded-tl-sm"
+                }`}
+                style={{
+                  background: msg.role === "user" ? "var(--atlas-accent)" : "var(--atlas-elevated)",
+                  color: msg.role === "user" ? "#fff" : "var(--atlas-text)",
+                }}
+              >
+                <span style={{ whiteSpace: "pre-wrap" }}>{msg.content}</span>
+                <div
+                  className="text-xs mt-1 opacity-60"
+                  style={{ textAlign: msg.role === "user" ? "right" : "left" }}
+                >
+                  {new Date(msg.createdAt).toLocaleTimeString("zh-CN", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+
+        <div ref={endRef} />
+      </div>
+
+      {/* Input */}
+      <div
+        className="flex-shrink-0 px-4 py-3"
+        style={{ borderTop: "1px solid var(--atlas-border)", background: "var(--atlas-surface)" }}
+      >
+        <div
+          className="flex items-end gap-2 rounded-xl px-3 py-2"
+          style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}
+        >
+          <textarea
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={isOnline ? "给小虾米发消息..." : "小虾米未连接，暂时无法发送消息"}
+            disabled={!isOnline}
+            rows={1}
+            className="flex-1 resize-none bg-transparent outline-none text-sm py-1"
+            style={{
+              color: "var(--atlas-text)",
+              maxHeight: 120,
+              overflowY: "auto",
+              opacity: isOnline ? 1 : 0.5,
+            }}
+            onInput={e => {
+              const el = e.currentTarget;
+              el.style.height = "auto";
+              el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+            }}
+          />
+          <button
+            onClick={() => { if (inputText.trim()) onSend(inputText.trim()); }}
+            disabled={!inputText.trim() || !isOnline}
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all flex-shrink-0 mb-0.5"
+            style={{
+              background: inputText.trim() && isOnline ? "#f97316" : "var(--atlas-border)",
+              color: inputText.trim() && isOnline ? "#fff" : "var(--atlas-text-3)",
+            }}
+          >
+            <Send size={14} />
+          </button>
+        </div>
       </div>
     </div>
   );

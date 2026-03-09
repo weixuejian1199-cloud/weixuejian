@@ -11,7 +11,7 @@ import {
   CheckCircle2, Clock, AlertCircle, Archive,
   LogIn, LogOut, Loader2, PanelLeftClose, PanelLeftOpen,
   Gift, RefreshCw, Download, Timer, MoreHorizontal,
-  Star, Share2, Trash2, User, Users, MessageSquare,
+  Star, Share2, Trash2, User, Users, MessageSquare, Zap,
 } from "lucide-react";
 import { useAtlas, type NavItem } from "@/contexts/AtlasContext";
 import { trpc } from "@/lib/trpc";
@@ -313,6 +313,39 @@ export default function Sidebar() {
             <NavButton key={item.id} {...item} />
           ))}
         </nav>
+
+        {/* ── Admin: 小虾米监控入口 ── */}
+        {user?.role === "admin" && (
+          <nav className="px-2 pb-1 flex-shrink-0">
+            <button
+              onClick={() => setActiveNav("openclaw-monitor")}
+              className="w-full flex items-center rounded-lg transition-all duration-150"
+              style={{
+                gap: collapsed ? 0 : 9,
+                padding: collapsed ? "8px 0" : "6px 10px",
+                justifyContent: collapsed ? "center" : "flex-start",
+                background: activeNav === "openclaw-monitor" ? "rgba(249,115,22,0.12)" : "transparent",
+                color: activeNav === "openclaw-monitor" ? "#f97316" : "var(--atlas-text-2)",
+              }}
+              onMouseEnter={e => {
+                if (activeNav !== "openclaw-monitor") {
+                  (e.currentTarget as HTMLElement).style.background = "var(--atlas-nav-hover-bg)";
+                  (e.currentTarget as HTMLElement).style.color = "#f97316";
+                }
+              }}
+              onMouseLeave={e => {
+                if (activeNav !== "openclaw-monitor") {
+                  (e.currentTarget as HTMLElement).style.background = "transparent";
+                  (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+                }
+              }}
+              title="小虾米监控"
+            >
+              <Zap size={15} style={{ flexShrink: 0, opacity: activeNav === "openclaw-monitor" ? 1 : 0.7 }} />
+              {!collapsed && <span className="text-sm font-medium">小虾米监控</span>}
+            </button>
+          </nav>
+        )}
 
         {/* ── Divider ── */}
         <div className="mx-3 my-2 flex-shrink-0" style={{ height: 1, background: "var(--atlas-border)" }} />

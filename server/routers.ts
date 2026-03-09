@@ -536,6 +536,15 @@ export const appRouter = router({
       return { token };
     }),
 
+    /** Get OpenClaw (小虾米) connection status — admin only */
+    getOpenClawStatus: publicProcedure.query(async ({ ctx }) => {
+      if (!ctx.user || ctx.user.role !== "admin") {
+        return { connected: false, adminOnly: true };
+      }
+      const { isOpenClawConnected } = await import("./im/wsServer");
+      return { connected: isOpenClawConnected(), adminOnly: false };
+    }),
+
     /** Get all users for the contacts list */
     getContacts: publicProcedure.query(async ({ ctx }) => {
       const { drizzle } = await import("drizzle-orm/mysql2");
