@@ -80,6 +80,20 @@ interface WsMsgAtlasReply extends WsMsgBase {
   done?: boolean;
 }
 
+/** Admin 用户在 IM 小虾米对话窗口发消息给小虾米 */
+interface WsMsgSendToOpenClaw extends WsMsgBase {
+  type: "send_to_openclaw";
+  content: string;
+  fromUserId: number;
+  fromUserName: string;
+}
+
+/** 小虾米通过 IM 直接回复 admin 用户 */
+interface WsMsgOpenClawDirectReply extends WsMsgBase {
+  type: "openclaw_direct_reply";
+  content: string;
+}
+
 type WsMessage =
   | WsMsgPing
   | WsMsgSend
@@ -89,7 +103,9 @@ type WsMessage =
   | WsMsgCreateDirect
   | WsMsgGetAiConv
   | WsMsgOpenClawReply
-  | WsMsgAtlasReply;
+  | WsMsgAtlasReply
+  | WsMsgSendToOpenClaw
+  | WsMsgOpenClawDirectReply;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -652,6 +668,41 @@ async function handleMessage(client: AuthedClient, raw: string): Promise<void> {
       break;
     }
 
+    case "send_to_openclaw": {
+      // Admin 在 IM 小虾米对话窗口发消息给小虾米
+      if (!openClawClient || openClawClient.readyState !== WebSocket.OPEN) {
+        send(client.ws, { type: "openclaw_im_reply", content: "⚠️ 小虾米当前未连接，消息无法送达。请先启动小虾米客户端。" });
+        break;
+      }
+      openClawClient.send(JSON.stringify({
+        type: "im_admin_message",
+        fromUserId: client.userId,
+        fromUserName: client.userName,
+        content: msg.content,
+        timestamp: Date.now(),
+      }));
+      console.log(`[IM] Admin message sent to OpenClaw: ${msg.content.slice(0, 50)}`);
+      break;
+    }
+    case "openclaw_direct_reply": {
+      // 小虾米通过 IM 直接回复 admin 用户
+      if (!client.isOpenClaw) {
+        send(client.ws, { type: "error", message: "Unauthorized" });
+        break;
+      }
+      // 广播给所有 admin 用户
+      const replyMsg = {
+        id: nanoid(),
+        role: "assistant" as const,
+        content: msg.content,
+        createdAt: new Date().toISOString(),
+      };
+      onlineUsers.forEach((oc) => {
+        send(oc.ws, { type: "openclaw_im_reply", ...replyMsg });
+      });
+      console.log(`[IM] OpenClaw direct reply broadcast: ${msg.content.slice(0, 50)}`);
+      break;
+    }
     default:
       send(client.ws, { type: "error", message: "Unknown message type" });
   }

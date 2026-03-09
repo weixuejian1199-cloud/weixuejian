@@ -53,7 +53,7 @@ interface Contact {
 
 // ── WebSocket hook ─────────────────────────────────────────────────────────────
 
-function useImWebSocket(token: string | null) {
+function useImWebSocket(token: string | null, onOpenClawReply?: (msg: { id: string; role: "assistant"; content: string; createdAt: string }) => void) {
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [conversations, setConversations] = useState<IMConversation[]>([]);
@@ -145,6 +145,15 @@ function useImWebSocket(token: string | null) {
           case "conversation_created":
           case "ai_conversation_ready":
             ws.send(JSON.stringify({ type: "get_conversations" }));
+            break;
+          case "openclaw_im_reply":
+            // 小虾米通过 IM 直接回复 admin
+            onOpenClawReply?.({
+              id: msg.id ?? Date.now().toString(),
+              role: "assistant" as const,
+              content: msg.content,
+              createdAt: msg.createdAt ?? new Date().toISOString(),
+            });
             break;
           case "error":
             console.error("[IM WS]", msg.message);
@@ -238,8 +247,12 @@ export default function IMPage() {
     setOpenClawOnline(openClawStatus?.connected ?? false);
   }, [openClawStatus]);
 
+  const handleOpenClawReply = useCallback((msg: { id: string; role: "assistant"; content: string; createdAt: string }) => {
+    setOpenClawMessages(prev => [...prev, msg]);
+  }, []);
+
   const { connected, conversations, contacts, messages, streamingTokens, send } =
-    useImWebSocket(tokenData?.token ?? null);
+    useImWebSocket(tokenData?.token ?? null, handleOpenClawReply);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -557,14 +570,22 @@ export default function IMPage() {
             setInputText={setOpenClawInput}
             isOnline={openClawOnline}
             onSend={(text) => {
-              const msg = {
+              // 将消息加入本地显示
+              const localMsg = {
                 id: Date.now().toString(),
                 role: "user" as const,
                 content: text,
                 createdAt: new Date().toISOString(),
               };
-              setOpenClawMessages(prev => [...prev, msg]);
+              setOpenClawMessages(prev => [...prev, localMsg]);
               setOpenClawInput("");
+              // 通过 WS 推送给小虾米
+              send({
+                type: "send_to_openclaw",
+                content: text,
+                fromUserId: 0,
+                fromUserName: user?.name ?? "admin",
+              });
             }}
           />
         ) : (

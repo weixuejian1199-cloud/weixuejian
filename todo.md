@@ -559,3 +559,8 @@
 - [x] 侧栏添加「小虾米监控」导航入口（仅 admin 可见，橙色 Zap 图标）
 - [ ] 小虾米监控面板：可对每条对话打标记「有问题」并填写反馈
 - [ ] 保存 checkpoint 并发布
+
+## V14.1 Bug 修复
+
+- [x] Bug 1：小虾米入口对 admin 不显示 —— 已将 weixuejian 账号提升为 admin
+- [x] Bug 2：小虾米对话窗口发消息现已通过 WS 推送给小虾米（send_to_openclaw），小虾米回复通过 openclaw_direct_reply 返回
