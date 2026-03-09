@@ -247,8 +247,16 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTaskId, setActiveTaskIdState] = useState<string | null>(() => localStorage.getItem("atlas_active_task"));
   const [theme, setTheme] = useState<Theme>(() => {
-    // 默认浅色：只有用户明确选择过深色才保留深色
-    const stored = localStorage.getItem("atlas_theme") as Theme | null;
+    // V13.4 强制重置：清除旧版本写入的深色偏好，默认浅色
+    // 只有用户在新版本（v2+）里主动切换到深色才保留
+    const stored = localStorage.getItem("atlas_theme");
+    const version = localStorage.getItem("atlas_theme_version");
+    if (version !== "2") {
+      // 旧版本写入的主题偏好，全部重置为浅色
+      localStorage.removeItem("atlas_theme");
+      localStorage.setItem("atlas_theme_version", "2");
+      return "light";
+    }
     return stored === "dark" ? "dark" : "light";
   });
   const [user, setUser] = useState<User | null>(null);
