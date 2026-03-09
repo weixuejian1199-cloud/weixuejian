@@ -199,9 +199,9 @@ function QuickScheduleDialog({
   const [preset, setPreset] = useState(CRON_PRESETS[0]);
   const [email, setEmail] = useState("");
 
-  const createMut = trpc.scheduledTask.create.useMutation({
+  const createMut = trpc.scheduled.create.useMutation({
     onSuccess: () => {
-      utils.scheduledTask.list.invalidate();
+      utils.scheduled.list.invalidate();
       toast.success("定时任务已创建！前往设置页查看");
       onClose();
     },

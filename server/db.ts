@@ -507,3 +507,29 @@ export async function getMessageFeedbacks(limit = 200) {
     .orderBy(messageFeedback.createdAt)
     .limit(limit);
 }
+
+// ── Anonymous User ────────────────────────────────────────────────────────────
+
+/**
+ * Get or create an anonymous user by their anon cookie ID.
+ * Anonymous users have username = "anon_<anonId>", no password, loginMethod = "anon".
+ * This allows unauthenticated users to use the system without registering.
+ */
+export async function getOrCreateAnonUser(anonId: string): Promise<{ id: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const username = `anon_${anonId}`;
+  const existing = await getUserByUsername(username);
+  if (existing) return { id: existing.id };
+  const inviteCode = generateInviteCode();
+  await db.insert(users).values({
+    username,
+    passwordHash: "",
+    name: "访客",
+    loginMethod: "anon",
+    inviteCode,
+    lastSignedIn: new Date(),
+  });
+  const created = await getUserByUsername(username);
+  return { id: created!.id };
+}

@@ -494,3 +494,9 @@
 - [x] 将默认主题改为浅色模式（light），更新 ThemeProvider defaultTheme 和 index.css CSS 变量
 - [x] 修复 AtlasContext 主题初始化：旧用户 localStorage 中的深色偏好不再覆盖默认浅色
 - [x] 修复 sonner.tsx 使用 AtlasContext 主题而不是 next-themes
+- [ ] 去掉强制登录要求：所有用户无需登录即可使用全部功能，登录仅为可选（后期付费版单独处理）
+
+## V13.3 修复 OpenClaw WebSocket 连接
+- [x] 将后端 WebSocket 路径从 /ws/im 改为 /api/ws/im（绕过 Cloudflare 静态文件拦截）
+- [x] 更新 openclaw-atlas-plugin 插件连接 URL
+- [ ] 重新安装插件并验证连接成功（需要发布新版本到 atlascore.cn 后验证）

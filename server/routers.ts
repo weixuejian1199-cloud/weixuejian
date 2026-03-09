@@ -5,7 +5,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { adminRouter } from "./routers/admin";
-import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { publicProcedure, router } from "./_core/trpc";
 import {
   createSession, updateSession, getSession, getUserSessions, deleteSession,
   createReport, updateReport, getReport, getUserReports, deleteReport,
@@ -72,12 +72,13 @@ export const appRouter = router({
       return { success: true } as const;
     }),
 
-    changePassword: protectedProcedure
+    changePassword: publicProcedure
       .input(z.object({
         oldPassword: z.string().min(1, "请输入旧密码"),
         newPassword: z.string().min(6, "新密码至少6位").max(128),
       }))
       .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
         const user = await getUserById(ctx.user.id);
         if (!user?.passwordHash) throw new TRPCError({ code: "BAD_REQUEST", message: "该账号不支持密码修改" });
         const valid = await verifyPassword(input.oldPassword, user.passwordHash);
@@ -105,7 +106,7 @@ export const appRouter = router({
   // ── Sessions ──────────────────────────────────────────────────────────────────
 
   session: router({
-    create: protectedProcedure
+    create: publicProcedure
       .input(z.object({
         filename: z.string(),
         originalName: z.string(),
@@ -117,10 +118,11 @@ export const appRouter = router({
         dfInfo: z.any().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
+        const userId = await ctx.getEffectiveUserId();
         const id = nanoid();
         await createSession({
           id,
-          userId: ctx.user.id,
+          userId,
           filename: input.filename,
           originalName: input.originalName,
           fileKey: input.fileKey,
@@ -135,25 +137,28 @@ export const appRouter = router({
         return { id };
       }),
 
-    get: protectedProcedure
+    get: publicProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ ctx, input }) => {
+        const userId = await ctx.getEffectiveUserId();
         const session = await getSession(input.id);
-        if (!session || session.userId !== ctx.user.id) {
+        if (!session || session.userId !== userId) {
           throw new TRPCError({ code: "NOT_FOUND" });
         }
         return session;
       }),
 
-    list: protectedProcedure.query(async ({ ctx }) => {
-      return getUserSessions(ctx.user.id);
+    list: publicProcedure.query(async ({ ctx }) => {
+      const userId = await ctx.getEffectiveUserId();
+      return getUserSessions(userId);
     }),
 
-    delete: protectedProcedure
+    delete: publicProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
+        const userId = await ctx.getEffectiveUserId();
         const session = await getSession(input.id);
-        if (!session || session.userId !== ctx.user.id) {
+        if (!session || session.userId !== userId) {
           throw new TRPCError({ code: "NOT_FOUND" });
         }
         if (session.fileKey) {
@@ -165,19 +170,20 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    merge: protectedProcedure
+    merge: publicProcedure
       .input(z.object({ sessionIds: z.array(z.string()).min(2) }))
       .mutation(async ({ ctx, input }) => {
+        const userId = await ctx.getEffectiveUserId();
         for (const sid of input.sessionIds) {
           const s = await getSession(sid);
-          if (!s || s.userId !== ctx.user.id) {
+          if (!s || s.userId !== userId) {
             throw new TRPCError({ code: "NOT_FOUND", message: `Session ${sid} not found` });
           }
         }
         const id = nanoid();
         await createSession({
           id,
-          userId: ctx.user.id,
+          userId,
           filename: `merged_${id}`,
           originalName: `合并会话 (${input.sessionIds.length} 个文件)`,
           isMerged: 1,
@@ -194,32 +200,35 @@ export const appRouter = router({
   // ── Reports ───────────────────────────────────────────────────────────────────
 
   report: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
-      return getUserReports(ctx.user.id);
+    list: publicProcedure.query(async ({ ctx }) => {
+      const userId = await ctx.getEffectiveUserId();
+      return getUserReports(userId);
     }),
 
-    get: protectedProcedure
+    get: publicProcedure
       .input(z.object({ id: z.string() }))
       .query(async ({ ctx, input }) => {
+        const userId = await ctx.getEffectiveUserId();
         const report = await getReport(input.id);
-        if (!report || report.userId !== ctx.user.id) {
+        if (!report || report.userId !== userId) {
           throw new TRPCError({ code: "NOT_FOUND" });
         }
         return report;
       }),
 
-    create: protectedProcedure
+    create: publicProcedure
       .input(z.object({
         sessionId: z.string(),
         title: z.string(),
         prompt: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
+        const userId = await ctx.getEffectiveUserId();
         const id = nanoid();
         await createReport({
           id,
           sessionId: input.sessionId,
-          userId: ctx.user.id,
+          userId,
           title: input.title,
           filename: `${input.title}_${id}.xlsx`,
           prompt: input.prompt,
@@ -229,7 +238,7 @@ export const appRouter = router({
         return { id };
       }),
 
-    complete: protectedProcedure
+    complete: publicProcedure
       .input(z.object({
         id: z.string(),
         fileKey: z.string(),
@@ -237,8 +246,9 @@ export const appRouter = router({
         fileSizeKb: z.number().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
+        const userId = await ctx.getEffectiveUserId();
         const report = await getReport(input.id);
-        if (!report || report.userId !== ctx.user.id) {
+        if (!report || report.userId !== userId) {
           throw new TRPCError({ code: "NOT_FOUND" });
         }
         await updateReport(input.id, {
@@ -250,22 +260,24 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    fail: protectedProcedure
+    fail: publicProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
+        const userId = await ctx.getEffectiveUserId();
         const report = await getReport(input.id);
-        if (!report || report.userId !== ctx.user.id) {
+        if (!report || report.userId !== userId) {
           throw new TRPCError({ code: "NOT_FOUND" });
         }
         await updateReport(input.id, { status: "failed" });
         return { success: true };
       }),
 
-    delete: protectedProcedure
+    delete: publicProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
+        const userId = await ctx.getEffectiveUserId();
         const report = await getReport(input.id);
-        if (!report || report.userId !== ctx.user.id) {
+        if (!report || report.userId !== userId) {
           throw new TRPCError({ code: "NOT_FOUND" });
         }
         await deleteReport(input.id);
@@ -275,12 +287,13 @@ export const appRouter = router({
 
   // ── Scheduled Tasks ───────────────────────────────────────────────────────────
 
-  scheduledTask: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
-      return getUserScheduledTasks(ctx.user.id);
+  scheduled: router({
+    list: publicProcedure.query(async ({ ctx }) => {
+      const userId = await ctx.getEffectiveUserId();
+      return getUserScheduledTasks(userId);
     }),
 
-    create: protectedProcedure
+    create: publicProcedure
       .input(z.object({
         name: z.string(),
         templatePrompt: z.string(),
@@ -291,10 +304,11 @@ export const appRouter = router({
         lastSessionId: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
+        const userId = await ctx.getEffectiveUserId();
         const id = nanoid();
         await createScheduledTask({
           id,
-          userId: ctx.user.id,
+          userId,
           name: input.name,
           templatePrompt: input.templatePrompt,
           templateName: input.templateName,
@@ -308,7 +322,7 @@ export const appRouter = router({
         return { id };
       }),
 
-    update: protectedProcedure
+    update: publicProcedure
       .input(z.object({
         id: z.string(),
         name: z.string().optional(),
@@ -323,7 +337,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: protectedProcedure
+    delete: publicProcedure
       .input(z.object({ id: z.string() }))
       .mutation(async ({ ctx, input }) => {
         await deleteScheduledTask(input.id);
@@ -334,12 +348,13 @@ export const appRouter = router({
   // ── Stats / Dashboard ───────────────────────────────────────────────────────
 
   stats: router({
-    dashboard: protectedProcedure.query(async ({ ctx }) => {
+    dashboard: publicProcedure.query(async ({ ctx }) => {
+      const userId = await ctx.getEffectiveUserId();
       const [sessions, reports, tasks, credits] = await Promise.all([
-        getUserSessions(ctx.user.id),
-        getUserReports(ctx.user.id),
-        getUserScheduledTasks(ctx.user.id),
-        getUserCredits(ctx.user.id),
+        getUserSessions(userId),
+        getUserReports(userId),
+        getUserScheduledTasks(userId),
+        getUserCredits(userId),
       ]);
       const completedReports = reports.filter(r => r.status === "completed");
       const activeTasks = tasks.filter(t => t.status === "active");
@@ -381,15 +396,16 @@ export const appRouter = router({
 
   feedback: router({
     /** Submit or update rating for a report (1-5 stars) */
-    submit: protectedProcedure
+    submit: publicProcedure
       .input(z.object({
         reportId: z.string(),
         rating: z.number().int().min(1).max(5),
         comment: z.string().max(500).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
+        const userId = await ctx.getEffectiveUserId();
         const report = await getReport(input.reportId);
-        if (!report || report.userId !== ctx.user.id) {
+        if (!report || report.userId !== userId) {
           throw new TRPCError({ code: "NOT_FOUND", message: "报表不存在" });
         }
         const session = await getSession(report.sessionId);
@@ -397,7 +413,7 @@ export const appRouter = router({
         const columnSignature = dfInfo
           ? dfInfo.map(c => c.column ?? "").join(",")
           : "";
-        const existing = await getReportFeedback(input.reportId, ctx.user.id);
+        const existing = await getReportFeedback(input.reportId, userId);
         if (existing) {
           await updateReportFeedback(existing.id, {
             rating: input.rating,
@@ -409,7 +425,7 @@ export const appRouter = router({
           id: nanoid(),
           reportId: input.reportId,
           sessionId: report.sessionId,
-          userId: ctx.user.id,
+          userId,
           rating: input.rating,
           comment: input.comment ?? null,
           columnSignature,
@@ -420,14 +436,15 @@ export const appRouter = router({
       }),
 
     /** Get my feedback for a report */
-    getMine: protectedProcedure
+    getMine: publicProcedure
       .input(z.object({ reportId: z.string() }))
       .query(async ({ ctx, input }) => {
-        return getReportFeedback(input.reportId, ctx.user.id);
+        const userId = await ctx.getEffectiveUserId();
+        return getReportFeedback(input.reportId, userId);
       }),
   }),
 
-  // ── Message Feedback (👍/👎) ───────────────────────────────────────────────────────────────────────────────────────
+  // ── Message Feedback (👍/👎) ─────────────────────────────────────────────────
 
   messageFeedback: router({
     /** Submit 👍/👎 rating for an AI message */
@@ -468,27 +485,29 @@ export const appRouter = router({
         return { ok: true };
       }),
     /** List all message feedbacks (admin only) */
-    list: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    list: publicProcedure.query(async ({ ctx }) => {
+      if (!ctx.user || ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       return getMessageFeedbacks(200);
     }),
   }),
 
-  // ── Invite & Credits ───────────────────────────────────────────────────────────────────────────────────────
+  // ── Invite & Credits ─────────────────────────────────────────────────────────
 
   invite: router({
-    /** Get current user's invite code (generates one if not exists) */
-    getMyCode: protectedProcedure.query(async ({ ctx }) => {
+    /** Get current user's invite code — requires login */
+    getMyCode: publicProcedure.query(async ({ ctx }) => {
+      if (!ctx.user) return null;
       const code = await ensureInviteCode(ctx.user.id);
       const stats = await getInviteStats(ctx.user.id);
       const credits = await getUserCredits(ctx.user.id);
       return { code, ...stats, credits };
     }),
 
-    /** Redeem an invite code (called after user registers) */
-    redeem: protectedProcedure
+    /** Redeem an invite code — requires login */
+    redeem: publicProcedure
       .input(z.object({ code: z.string().min(1).max(16) }))
       .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "请先登录" });
         const success = await redeemInviteCode(ctx.user.id, input.code.toUpperCase());
         if (!success) {
           throw new TRPCError({
@@ -499,8 +518,9 @@ export const appRouter = router({
         return { success: true, creditsAwarded: 500 };
       }),
 
-     /** Get credits balance */
-    getCredits: protectedProcedure.query(async ({ ctx }) => {
+    /** Get credits balance */
+    getCredits: publicProcedure.query(async ({ ctx }) => {
+      if (!ctx.user) return { credits: 0 };
       const credits = await getUserCredits(ctx.user.id);
       return { credits };
     }),
@@ -509,14 +529,15 @@ export const appRouter = router({
   // ── IM ──────────────────────────────────────────────────────────────────────
 
   im: router({
-    /** Get a short-lived WebSocket auth token (the user's session JWT) */
-    getWsToken: protectedProcedure.query(async ({ ctx }) => {
+    /** Get a short-lived WebSocket auth token — requires login */
+    getWsToken: publicProcedure.query(async ({ ctx }) => {
+      if (!ctx.user) return { token: null };
       const token = await createSessionToken({ userId: ctx.user.id, username: ctx.user.username ?? "" });
       return { token };
     }),
 
     /** Get all users for the contacts list */
-    getContacts: protectedProcedure.query(async ({ ctx }) => {
+    getContacts: publicProcedure.query(async ({ ctx }) => {
       const { drizzle } = await import("drizzle-orm/mysql2");
       const db = drizzle(process.env.DATABASE_URL!);
       const allUsers = await db
@@ -528,8 +549,9 @@ export const appRouter = router({
         })
         .from(users)
         .orderBy(users.name);
+      const currentUserId = ctx.user?.id ?? 0;
       return allUsers
-        .filter(u => u.id !== ctx.user.id)
+        .filter(u => u.id !== currentUserId && !u.username?.startsWith("anon_"))
         .map(u => ({
           ...u,
           displayName: u.name || u.username || `用户${u.id}`,
@@ -541,13 +563,14 @@ export const appRouter = router({
 
   search: router({
     /** Global search across sessions and reports */
-    query: protectedProcedure
+    query: publicProcedure
       .input(z.object({ q: z.string().min(1).max(100) }))
       .query(async ({ ctx, input }) => {
+        const userId = await ctx.getEffectiveUserId();
         const q = input.q.toLowerCase().trim();
         const [sessions, reports] = await Promise.all([
-          getUserSessions(ctx.user.id),
-          getUserReports(ctx.user.id),
+          getUserSessions(userId),
+          getUserReports(userId),
         ]);
         const matchedSessions = sessions.filter(s =>
           s.filename?.toLowerCase().includes(q) ||
@@ -562,10 +585,11 @@ export const appRouter = router({
       }),
 
     /** Get recent sessions and reports for empty state */
-    recent: protectedProcedure.query(async ({ ctx }) => {
+    recent: publicProcedure.query(async ({ ctx }) => {
+      const userId = await ctx.getEffectiveUserId();
       const [sessions, reports] = await Promise.all([
-        getUserSessions(ctx.user.id),
-        getUserReports(ctx.user.id),
+        getUserSessions(userId),
+        getUserReports(userId),
       ]);
       return {
         sessions: sessions.slice(0, 5),

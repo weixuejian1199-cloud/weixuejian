@@ -1179,17 +1179,17 @@ const CRON_PRESETS = [
 
 function ScheduleSection() {
   const utils = trpc.useUtils();
-  const { data: tasks = [], isLoading } = trpc.scheduledTask.list.useQuery();
-  const createMut = trpc.scheduledTask.create.useMutation({
-    onSuccess: () => { utils.scheduledTask.list.invalidate(); toast.success("定时任务已创建"); setAdding(false); setNewName(""); setNewEmail(""); setNewSessionId(""); },
+  const { data: tasks = [], isLoading } = trpc.scheduled.list.useQuery();
+  const createMut = trpc.scheduled.create.useMutation({
+    onSuccess: () => { utils.scheduled.list.invalidate(); toast.success("定时任务已创建"); setAdding(false); setNewName(""); setNewEmail(""); setNewSessionId(""); },
     onError: (e) => toast.error(`创建失败：${e.message}`),
   });
-  const updateMut = trpc.scheduledTask.update.useMutation({
-    onSuccess: () => { utils.scheduledTask.list.invalidate(); toast.success("定时任务已更新"); },
+  const updateMut = trpc.scheduled.update.useMutation({
+    onSuccess: () => { utils.scheduled.list.invalidate(); toast.success("定时任务已更新"); },
     onError: (e) => toast.error(`更新失败：${e.message}`),
   });
-  const deleteMut = trpc.scheduledTask.delete.useMutation({
-    onSuccess: () => { utils.scheduledTask.list.invalidate(); toast.success("定时任务已删除"); },
+  const deleteMut = trpc.scheduled.delete.useMutation({
+    onSuccess: () => { utils.scheduled.list.invalidate(); toast.success("定时任务已删除"); },
     onError: (e) => toast.error(`删除失败：${e.message}`),
   });
 

@@ -595,7 +595,7 @@ async function authenticate(
 // ── Server Setup ──────────────────────────────────────────────────────────────
 
 export function createImWsServer(httpServer: Server): WebSocketServer {
-  const wss = new WebSocketServer({ server: httpServer, path: "/ws/im" });
+  const wss = new WebSocketServer({ server: httpServer, path: "/api/ws/im" });
 
   wss.on("connection", async (ws: WebSocket, req: IncomingMessage) => {
     const authInfo = await authenticate(req);
@@ -650,6 +650,6 @@ export function createImWsServer(httpServer: Server): WebSocketServer {
     );
   });
 
-  console.log("[IM] WebSocket server ready at /ws/im");
+  console.log("[IM] WebSocket server ready at /api/ws/im");
   return wss;
 }

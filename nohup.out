@@ -1,0 +1,15 @@
+│
+◇  Doctor warnings ────────────────────────────────────────────────────────╮
+│                                                                          │
+│  - channels.telegram.groupPolicy is "allowlist" but groupAllowFrom (and  │
+│    allowFrom) is empty — all group messages will be silently dropped.    │
+│    Add sender IDs to channels.telegram.groupAllowFrom or                 │
+│    channels.telegram.allowFrom, or set groupPolicy to "open".            │
+│                                                                          │
+├──────────────────────────────────────────────────────────────────────────╯
+Gateway service disabled.
+Start with: openclaw gateway install
+Start with: openclaw gateway
+Start with: systemctl --user start openclaw-gateway.service
+Start with: systemd user services are unavailable; install/enable systemd or run the gateway under your supervisor.
+Start with: If you're in a container, run the gateway in the foreground instead of `openclaw gateway`.
