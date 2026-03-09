@@ -1,0 +1,16 @@
+{
+  "query": "SELECT id, name, webhookUrl, enabled FROM bots;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute SELECT id, name, webhookUrl, enabled FROM bots;",
+  "rows": [
+    {
+      "id": "4ceb933306e285d2305efeb537f4ca92",
+      "name": "小虾米",
+      "webhookUrl": "https://liquefiable-oppositely-renda.ngrok-free.dev/hooks/agent",
+      "enabled": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\twebhookUrl\tenabled\n4ceb933306e285d2305efeb537f4ca92\t小虾米\thttps://liquefiable-oppositely-renda.ngrok-free.dev/hooks/agent\t1\n",
+  "stderr": "",
+  "execution_time_ms": 57
+}
