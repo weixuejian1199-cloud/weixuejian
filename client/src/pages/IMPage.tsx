@@ -436,7 +436,7 @@ export default function IMPage() {
 
   const activeConv = conversations.find(c => c.id === activeConvId);
   const isOpenClawActive = activeConvId === OPENCLAW_CONV_ID;
-  const isBotActive = activeBotId !== null && activeConvId === null;
+  const isBotActive = activeBotId !== null;
   const currentMessages = (activeConvId && !isOpenClawActive) ? (messages[activeConvId] ?? []) : [];
   const streamingText = (activeConvId && !isOpenClawActive) ? (streamingTokens[activeConvId] ?? "") : "";
   const myUserId = user ? parseInt(user.id) : -1;
@@ -487,6 +487,7 @@ export default function IMPage() {
         <div className="px-2 pt-2 flex-shrink-0">
           <button
             onClick={() => {
+              setActiveBotId(null);
               const aiConv = conversations.find(c => c.isAi);
               if (aiConv) {
                 setActiveConvId(aiConv.id);
@@ -526,7 +527,7 @@ export default function IMPage() {
         {/* OpenClaw 小虾米 System Contact — 仅 admin 可见 */}
         {user?.role === "admin" && <div className="px-2 pt-1 flex-shrink-0">
           <button
-            onClick={() => setActiveConvId(OPENCLAW_CONV_ID)}
+            onClick={() => { setActiveBotId(null); setActiveConvId(OPENCLAW_CONV_ID); }}
             className="w-full flex items-center gap-3 rounded-lg px-3 py-2 transition-all relative"
             style={{
               background:
@@ -652,6 +653,7 @@ export default function IMPage() {
               <button
                 key={contact.id}
                 onClick={() => {
+                  setActiveBotId(null);
                   if (existingConv) {
                     setActiveConvId(existingConv.id);
                   } else {

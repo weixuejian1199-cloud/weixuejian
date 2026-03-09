@@ -1,0 +1,70 @@
+{
+  "query": "SELECT id, username, name, role FROM users ORDER BY createdAt ASC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute SELECT id, username, name, role FROM users ORDER BY createdAt ASC LIMIT 10;",
+  "rows": [
+    {
+      "id": "1",
+      "username": "NULL",
+      "name": "huangzhen5203",
+      "role": "admin"
+    },
+    {
+      "id": "2300",
+      "username": "六月的猫",
+      "name": "六月的猫",
+      "role": "user"
+    },
+    {
+      "id": "2301",
+      "username": "123",
+      "name": "123",
+      "role": "user"
+    },
+    {
+      "id": "2302",
+      "username": "weixuejian",
+      "name": "david",
+      "role": "admin"
+    },
+    {
+      "id": "2303",
+      "username": "小晨rusin",
+      "name": "小晨",
+      "role": "user"
+    },
+    {
+      "id": "2304",
+      "username": "甲霸盈盈",
+      "name": "甲霸盈盈",
+      "role": "user"
+    },
+    {
+      "id": "2305",
+      "username": "小蟹同学",
+      "name": "小蟹同学",
+      "role": "user"
+    },
+    {
+      "id": "2306",
+      "username": "RUSIN-派收订单",
+      "name": "RUSIN-派收订单",
+      "role": "user"
+    },
+    {
+      "id": "2307",
+      "username": "但但但",
+      "name": "蛋",
+      "role": "user"
+    },
+    {
+      "id": "2308",
+      "username": "江贤惠",
+      "name": "小江",
+      "role": "user"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tusername\tname\trole\n1\tNULL\thuangzhen5203\tadmin\n2300\t六月的猫\t六月的猫\tuser\n2301\t123\t123\tuser\n2302\tweixuejian\tdavid\tadmin\n2303\t小晨rusin\t小晨\tuser\n2304\t甲霸盈盈\t甲霸盈盈\tuser\n2305\t小蟹同学\t小蟹同学\tuser\n2306\tRUSIN-派收订单\tRUSIN-派收订单\tuser\n2307\t但但但\t蛋\tuser\n2308\t江贤惠\t小江\tuser\n",
+  "stderr": "",
+  "execution_time_ms": 64
+}
