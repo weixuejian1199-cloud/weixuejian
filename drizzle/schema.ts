@@ -392,3 +392,44 @@ export const chatMessages = mysqlTable("chat_messages", {
 
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertChatMessage = typeof chatMessages.$inferInsert;
+
+// ── Bots (机器人系统) ──────────────────────────────────────────────────────────
+// Admin 创建的机器人，类似飞书机器人。每个机器人有唯一 Token，
+// 外部服务（如 OpenClaw）用此 Token 调用 ATLAS API 收发消息。
+export const bots = mysqlTable("bots", {
+  id:          varchar("id", { length: 64 }).primaryKey(),
+  /** 机器人名称，如"小虾米" */
+  name:        varchar("name", { length: 128 }).notNull(),
+  /** 机器人描述 */
+  description: text("description"),
+  /** 机器人头像 emoji 或 URL */
+  avatar:      varchar("avatar", { length: 255 }).default("🤖"),
+  /** 唯一 Token，外部服务用此鉴权调用 ATLAS API */
+  token:       varchar("token", { length: 128 }).unique().notNull(),
+  /** 外部服务的 Webhook URL，ATLAS 将用户消息推送到此地址 */
+  webhookUrl:  text("webhookUrl"),
+  /** 是否启用 */
+  enabled:     int("enabled").default(1).notNull(),
+  /** 创建者 userId */
+  createdBy:   int("createdBy").notNull(),
+  createdAt:   timestamp("createdAt").defaultNow().notNull(),
+  updatedAt:   timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type Bot = typeof bots.$inferSelect;
+export type InsertBot = typeof bots.$inferInsert;
+
+// ── Bot Messages (机器人消息) ──────────────────────────────────────────────────
+// 用户与机器人之间的消息记录
+export const botMessages = mysqlTable("bot_messages", {
+  id:        varchar("id", { length: 64 }).primaryKey(),
+  botId:     varchar("botId", { length: 64 }).notNull(),
+  userId:    int("userId").notNull(),
+  /** 'user' = 用户发的，'bot' = 机器人回复的 */
+  role:      mysqlEnum("role", ["user", "bot"]).notNull(),
+  content:   text("content").notNull(),
+  /** 外部消息ID，用于幂等去重 */
+  externalId: varchar("externalId", { length: 128 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type BotMessage = typeof botMessages.$inferSelect;
+export type InsertBotMessage = typeof botMessages.$inferInsert;

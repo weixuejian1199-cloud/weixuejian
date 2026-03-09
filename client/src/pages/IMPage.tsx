@@ -51,6 +51,24 @@ interface Contact {
   displayName: string;
 }
 
+// ── Bot types ─────────────────────────────────────────────────────────────────
+
+interface BotInfo {
+  id: string;
+  name: string;
+  description: string | null;
+  avatar: string | null;
+  enabled: number;
+  webhookUrl: string | null;
+}
+
+interface BotMessage {
+  id: string;
+  role: "user" | "bot";
+  content: string;
+  createdAt: string;
+}
+
 // ── WebSocket hook ─────────────────────────────────────────────────────────────
 
 function useImWebSocket(token: string | null, onOpenClawReply?: (msg: { id: string; role: "assistant"; content: string; createdAt: string }) => void) {
@@ -231,6 +249,15 @@ export default function IMPage() {
   const [openClawInput, setOpenClawInput] = useState("");
   const [openClawOnline, setOpenClawOnline] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isAdminUser = user?.role === "admin";
+
+  // ── Bot state ──────────────────────────────────────────────────────────────
+  const [botList, setBotList] = useState<BotInfo[]>([]);
+  const [activeBotId, setActiveBotId] = useState<string | null>(null);
+  const [botMessages, setBotMessages] = useState<Record<string, BotMessage[]>>({});
+  const [botInput, setBotInput] = useState("");
+  const botPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const botLastMsgRef = useRef<Record<string, string>>({});
 
   // Fetch WS token
   const { data: tokenData } = trpc.im.getWsToken.useQuery(undefined, {
@@ -238,9 +265,56 @@ export default function IMPage() {
     retry: false,
   });
 
+  // ── 加载机器人列表 ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isAdminUser) return;
+    fetch("/api/bots", { credentials: "include" })
+      .then(r => r.json())
+      .then((data: { bots: BotInfo[] }) => setBotList(data.bots || []))
+      .catch(() => {});
+  }, [isAdminUser]);
+
+  // ── 机器人消息轮询 ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!activeBotId) {
+      if (botPollRef.current) clearInterval(botPollRef.current);
+      return;
+    }
+    // 首次加载历史消息
+    fetch(`/api/bots/${activeBotId}/messages`, { credentials: "include" })
+      .then(r => r.json())
+      .then((data: { messages: BotMessage[] }) => {
+        setBotMessages(prev => ({ ...prev, [activeBotId]: data.messages || [] }));
+        const msgs = data.messages || [];
+        if (msgs.length > 0) botLastMsgRef.current[activeBotId] = msgs[msgs.length - 1].createdAt;
+      })
+      .catch(() => {});
+    // 每 3s 轮询新消息
+    if (botPollRef.current) clearInterval(botPollRef.current);
+    botPollRef.current = setInterval(() => {
+      const after = botLastMsgRef.current[activeBotId];
+      const url = after ? `/api/bots/${activeBotId}/messages?after=${encodeURIComponent(after)}` : `/api/bots/${activeBotId}/messages`;
+      fetch(url, { credentials: "include" })
+        .then(r => r.json())
+        .then((data: { messages: BotMessage[] }) => {
+          if (data.messages?.length > 0) {
+            setBotMessages(prev => {
+              const existing = prev[activeBotId] || [];
+              const existingIds = new Set(existing.map(m => m.id));
+              const newMsgs = data.messages.filter(m => !existingIds.has(m.id));
+              if (newMsgs.length === 0) return prev;
+              botLastMsgRef.current[activeBotId] = newMsgs[newMsgs.length - 1].createdAt;
+              return { ...prev, [activeBotId]: [...existing, ...newMsgs] };
+            });
+          }
+        })
+        .catch(() => {});
+    }, 3000);
+    return () => { if (botPollRef.current) clearInterval(botPollRef.current); };
+  }, [activeBotId]);
+
   // ── HTTP 轮询：加载小虾米历史消息 + 每 3s 增量拉取新消息 ──────────────────
   const lastMsgTimeRef = useRef<string | null>(null);
-  const isAdminUser = user?.role === "admin";
 
   // 初始加载历史消息
   useEffect(() => {
@@ -358,6 +432,7 @@ export default function IMPage() {
 
   const activeConv = conversations.find(c => c.id === activeConvId);
   const isOpenClawActive = activeConvId === OPENCLAW_CONV_ID;
+  const isBotActive = activeBotId !== null && activeConvId === null;
   const currentMessages = (activeConvId && !isOpenClawActive) ? (messages[activeConvId] ?? []) : [];
   const streamingText = (activeConvId && !isOpenClawActive) ? (streamingTokens[activeConvId] ?? "") : "";
   const myUserId = user ? parseInt(user.id) : -1;
@@ -492,6 +567,42 @@ export default function IMPage() {
           </button>
         </div>}
 
+        {/* 机器人列表 — 仅 admin 可见 */}
+        {isAdminUser && botList.length > 0 && (
+          <div className="px-2 pt-1 flex-shrink-0">
+            <div className="px-3 py-1">
+              <span className="text-xs font-medium" style={{ color: "var(--atlas-text-3)" }}>机器人</span>
+            </div>
+            {botList.filter(b => b.enabled).map(bot => (
+              <button
+                key={bot.id}
+                onClick={() => { setActiveBotId(bot.id); setActiveConvId(null); }}
+                className="w-full flex items-center gap-3 rounded-lg px-3 py-2 transition-all"
+                style={{
+                  background: activeBotId === bot.id ? "rgba(91,140,255,0.12)" : "transparent",
+                  border: activeBotId === bot.id ? "1px solid rgba(91,140,255,0.25)" : "1px solid transparent",
+                }}
+                onMouseEnter={e => {
+                  if (activeBotId !== bot.id) (e.currentTarget as HTMLElement).style.background = "var(--atlas-nav-hover-bg)";
+                }}
+                onMouseLeave={e => {
+                  if (activeBotId !== bot.id) (e.currentTarget as HTMLElement).style.background = "transparent";
+                }}
+              >
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center text-base flex-shrink-0" style={{ background: "rgba(91,140,255,0.1)" }}>
+                  {bot.avatar || "🤖"}
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <div className="text-sm font-medium truncate" style={{ color: "var(--atlas-text)" }}>{bot.name}</div>
+                  <div className="text-xs truncate" style={{ color: "var(--atlas-text-3)" }}>
+                    {bot.webhookUrl ? "✓ 已配置" : "⚠ 未配置 Webhook"}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Divider */}
         <div className="px-4 py-2 flex-shrink-0">
           <div className="text-xs font-medium" style={{ color: "var(--atlas-text-3)" }}>
@@ -594,7 +705,40 @@ export default function IMPage() {
 
       {/* ── Right Panel ── */}
       <div className="flex flex-col flex-1 overflow-hidden">
-        {!activeConvId ? (
+        {isBotActive && activeBotId ? (
+          // 机器人对话面板
+          <BotChatPanel
+            bot={botList.find(b => b.id === activeBotId)!}
+            messages={botMessages[activeBotId] || []}
+            inputText={botInput}
+            setInputText={setBotInput}
+            onSend={(text) => {
+              const botId = activeBotId;
+              const localMsg: BotMessage = {
+                id: `local-${Date.now()}`,
+                role: "user",
+                content: text,
+                createdAt: new Date().toISOString(),
+              };
+              setBotMessages(prev => ({ ...prev, [botId]: [...(prev[botId] || []), localMsg] }));
+              setBotInput("");
+              fetch(`/api/bots/${botId}/send`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ content: text }),
+              })
+                .then(r => r.json())
+                .then((data: { success: boolean; msgId: string }) => {
+                  setBotMessages(prev => ({
+                    ...prev,
+                    [botId]: (prev[botId] || []).map(m => m.id === localMsg.id ? { ...m, id: data.msgId } : m),
+                  }));
+                })
+                .catch(() => toast.error("发送失败，请重试"));
+            }}
+          />
+        ) : !activeConvId ? (
           // Empty state
           <div className="flex-1 flex flex-col items-center justify-center gap-3">
             <MessageSquare size={40} style={{ color: "var(--atlas-text-3)", opacity: 0.4 }} />
@@ -992,6 +1136,128 @@ function OpenClawPanel({ messages, inputText, setInputText, isOnline, onSend }: 
               background: inputText.trim() ? "#f97316" : "var(--atlas-border)",
               color: inputText.trim() ? "#fff" : "var(--atlas-text-3)",
             }}
+          >
+            <Send size={14} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── BotChatPanel ─────────────────────────────────────────────────────────────
+
+interface BotChatPanelProps {
+  bot: BotInfo;
+  messages: BotMessage[];
+  inputText: string;
+  setInputText: (v: string) => void;
+  onSend: (text: string) => void;
+}
+
+function BotChatPanel({ bot, messages, inputText, setInputText, onSend }: BotChatPanelProps) {
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (inputText.trim()) onSend(inputText.trim());
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Header */}
+      <div
+        className="flex items-center gap-3 px-5 flex-shrink-0"
+        style={{ height: 52, borderBottom: "1px solid var(--atlas-border)", background: "var(--atlas-surface)" }}
+      >
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center text-lg" style={{ background: "rgba(91,140,255,0.12)" }}>
+          {bot?.avatar || "🤖"}
+        </div>
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold" style={{ color: "var(--atlas-text)" }}>{bot?.name}</span>
+            <span className="text-xs px-1.5 py-0.5 rounded-full font-medium" style={{ background: "rgba(91,140,255,0.12)", color: "var(--atlas-accent)", fontSize: 10 }}>
+              机器人
+            </span>
+          </div>
+          <div className="text-xs" style={{ color: "var(--atlas-text-3)" }}>
+            {bot?.webhookUrl ? "✓ Webhook 已配置 · 消息可正常收发" : "⚠ 未配置 Webhook URL · 请在设置→集成中配置"}
+          </div>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full gap-4">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl" style={{ background: "rgba(91,140,255,0.1)" }}>
+              {bot?.avatar || "🤖"}
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-medium mb-1" style={{ color: "var(--atlas-text)" }}>{bot?.name}</p>
+              <p className="text-xs max-w-xs" style={{ color: "var(--atlas-text-3)" }}>
+                {bot?.description || "发送消息开始对话"}
+              </p>
+            </div>
+          </div>
+        )}
+        {messages.map(msg => {
+          const isUser = msg.role === "user";
+          return (
+            <motion.div
+              key={msg.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}
+            >
+              {!isUser && (
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base flex-shrink-0" style={{ background: "rgba(91,140,255,0.12)" }}>
+                  {bot?.avatar || "🤖"}
+                </div>
+              )}
+              <div
+                className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${isUser ? "rounded-tr-sm" : "rounded-tl-sm"}`}
+                style={{ background: isUser ? "var(--atlas-accent)" : "var(--atlas-elevated)", color: isUser ? "#fff" : "var(--atlas-text)" }}
+              >
+                <span style={{ whiteSpace: "pre-wrap" }}>{msg.content}</span>
+                <div className="text-xs mt-1 opacity-60" style={{ textAlign: isUser ? "right" : "left" }}>
+                  {new Date(msg.createdAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
+        <div ref={endRef} />
+      </div>
+
+      {/* Input */}
+      <div className="flex-shrink-0 px-4 py-3" style={{ borderTop: "1px solid var(--atlas-border)", background: "var(--atlas-surface)" }}>
+        <div className="flex items-end gap-2 rounded-xl px-3 py-2" style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}>
+          <textarea
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={`给 ${bot?.name || "机器人"} 发消息...`}
+            rows={1}
+            className="flex-1 resize-none bg-transparent outline-none text-sm py-1"
+            style={{ color: "var(--atlas-text)", maxHeight: 120, overflowY: "auto" }}
+            onInput={e => {
+              const el = e.currentTarget;
+              el.style.height = "auto";
+              el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+            }}
+          />
+          <button
+            onClick={() => { if (inputText.trim()) onSend(inputText.trim()); }}
+            disabled={!inputText.trim()}
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all flex-shrink-0 mb-0.5"
+            style={{ background: inputText.trim() ? "var(--atlas-accent)" : "var(--atlas-border)", color: inputText.trim() ? "#fff" : "var(--atlas-text-3)" }}
           >
             <Send size={14} />
           </button>

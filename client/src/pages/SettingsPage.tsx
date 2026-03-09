@@ -1133,35 +1133,237 @@ function AiEngineSection() {
 
 // ── Integrations ──────────────────────────────────────────────────────────────
 
+// ── Bot type ──────────────────────────────────────────────────────────────────
+interface BotItem {
+  id: string;
+  name: string;
+  description: string | null;
+  avatar: string | null;
+  token: string;
+  webhookUrl: string | null;
+  enabled: number;
+  createdBy: number;
+  createdAt: Date | string;
+}
+
 function IntegrationsSection() {
-  const integrations = [
-    { name: "飞书", icon: "🪶", color: "#3370FF", available: true, desc: "推送报表到飞书群/文档" },
-    { name: "钉钉", icon: "📌", color: "#1677FF", available: true, desc: "推送报表到钉钉群" },
-    { name: "企业微信", icon: "💬", color: "#07C160", available: true, desc: "推送报表到企业微信" },
-    { name: "Notion", icon: "📝", color: "#000000", available: false, desc: "同步报表到 Notion 数据库" },
-    { name: "Google Sheets", icon: "📊", color: "#34A853", available: false, desc: "同步数据到 Google 表格" },
-    { name: "Slack", icon: "💼", color: "#4A154B", available: false, desc: "推送报表到 Slack 频道" },
-  ];
+  const [bots, setBots] = useState<BotItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newBotName, setNewBotName] = useState("");
+  const [newBotDesc, setNewBotDesc] = useState("");
+  const [newBotAvatar, setNewBotAvatar] = useState("🤖");
+  const [creating, setCreating] = useState(false);
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [editWebhook, setEditWebhook] = useState<{ id: string; url: string } | null>(null);
+  const [savingWebhook, setSavingWebhook] = useState(false);
+
+  const fetchBots = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/bots", { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setBots(data.bots || []);
+      }
+    } catch (e) {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchBots(); }, []);
+
+  const handleCreate = async () => {
+    if (!newBotName.trim()) return;
+    setCreating(true);
+    try {
+      const res = await fetch("/api/bots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: newBotName.trim(), description: newBotDesc.trim(), avatar: newBotAvatar }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`机器人「${newBotName}」创建成功`);
+        setNewBotName(""); setNewBotDesc(""); setNewBotAvatar("🤖");
+        setShowCreate(false);
+        fetchBots();
+      } else {
+        toast.error(data.error || "创建失败");
+      }
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`确定删除机器人「${name}」？此操作不可恢复。`)) return;
+    const res = await fetch(`/api/bots/${id}`, { method: "DELETE", credentials: "include" });
+    const data = await res.json();
+    if (data.success) { toast.success("已删除"); fetchBots(); }
+    else toast.error(data.error || "删除失败");
+  };
+
+  const handleCopyToken = (token: string) => {
+    navigator.clipboard.writeText(token);
+    setCopiedToken(token);
+    toast.success("Token 已复制");
+    setTimeout(() => setCopiedToken(null), 2000);
+  };
+
+  const handleRegenerateToken = async (id: string) => {
+    if (!confirm("重新生成 Token 后，旧 Token 立即失效，需要重新配置 OpenClaw。确定继续？")) return;
+    const res = await fetch(`/api/bots/${id}/regenerate-token`, { method: "POST", credentials: "include" });
+    const data = await res.json();
+    if (data.success) { toast.success("Token 已更新"); fetchBots(); }
+    else toast.error(data.error || "更新失败");
+  };
+
+  const handleSaveWebhook = async () => {
+    if (!editWebhook) return;
+    setSavingWebhook(true);
+    try {
+      const res = await fetch(`/api/bots/${editWebhook.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ webhookUrl: editWebhook.url }),
+      });
+      const data = await res.json();
+      if (data.success) { toast.success("Webhook URL 已保存"); setEditWebhook(null); fetchBots(); }
+      else toast.error(data.error || "保存失败");
+    } finally {
+      setSavingWebhook(false);
+    }
+  };
+
+  const AVATARS = ["🤖", "🦞", "🐙", "🦊", "🐬", "🦅", "⚡", "🔮"];
+
   return (
     <div className="space-y-4">
-      <SectionHeader icon={Zap} title="集成" desc="连接办公软件，自动推送报表和数据" />
-      <div className="grid grid-cols-2 gap-3">
-        {integrations.map(item => (
-          <div key={item.name} className="rounded-xl p-4 flex items-center gap-3"
-            style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)", opacity: item.available ? 1 : 0.6 }}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ background: `${item.color}15` }}>{item.icon}</div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium" style={{ color: "var(--atlas-text)" }}>{item.name}</p>
-              <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{item.desc}</p>
+      <SectionHeader icon={Zap} title="集成 · 机器人" desc="创建机器人，对接 OpenClaw 等外部 AI 服务" />
+
+      {/* 机器人列表 */}
+      {loading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--atlas-text-3)" }} />
+        </div>
+      ) : bots.length === 0 ? (
+        <div className="rounded-xl p-6 text-center" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
+          <p className="text-sm" style={{ color: "var(--atlas-text-3)" }}>还没有机器人，点击下方按钮创建第一个</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {bots.map(bot => (
+            <div key={bot.id} className="rounded-xl p-4 space-y-3" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}>
+              {/* 机器人头部 */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ background: "rgba(91,140,255,0.1)" }}>{bot.avatar || "🤖"}</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold" style={{ color: "var(--atlas-text)" }}>{bot.name}</p>
+                  <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>{bot.description || "无描述"}</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="px-2 py-0.5 rounded-full text-xs" style={{ background: bot.enabled ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)", color: bot.enabled ? "#22c55e" : "#ef4444" }}>
+                    {bot.enabled ? "启用" : "禁用"}
+                  </span>
+                  <button onClick={() => handleDelete(bot.id, bot.name)} className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" style={{ color: "var(--atlas-text-3)" }} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Token */}
+              <div className="rounded-lg p-3 space-y-2" style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium" style={{ color: "var(--atlas-text-2)" }}>API Token（给 OpenClaw 配置）</span>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => handleCopyToken(bot.token)} className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors" style={{ background: "rgba(91,140,255,0.1)", color: "var(--atlas-accent)" }}>
+                      {copiedToken === bot.token ? <CheckCheck className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                      {copiedToken === bot.token ? "已复制" : "复制"}
+                    </button>
+                    <button onClick={() => handleRegenerateToken(bot.id)} className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors" style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444" }}>
+                      <RefreshCw className="w-3 h-3" />
+                      重新生成
+                    </button>
+                  </div>
+                </div>
+                <code className="block text-xs break-all" style={{ color: "var(--atlas-text-2)", fontFamily: "monospace" }}>{bot.token}</code>
+              </div>
+
+              {/* Webhook URL */}
+              <div className="rounded-lg p-3 space-y-2" style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium" style={{ color: "var(--atlas-text-2)" }}>Webhook URL（OpenClaw 接收消息的地址）</span>
+                  {bot.webhookUrl && (
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>已配置</span>
+                  )}
+                </div>
+                {editWebhook?.id === bot.id ? (
+                  <div className="flex gap-2">
+                    <input
+                      value={editWebhook.url}
+                      onChange={e => setEditWebhook({ id: bot.id, url: e.target.value })}
+                      placeholder="https://your-openclaw-server/webhook"
+                      className="flex-1 px-2 py-1.5 rounded text-xs outline-none"
+                      style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-accent)", color: "var(--atlas-text)" }}
+                    />
+                    <button onClick={handleSaveWebhook} disabled={savingWebhook} className="px-3 py-1.5 rounded text-xs font-medium" style={{ background: "var(--atlas-accent)", color: "white" }}>
+                      {savingWebhook ? "保存中..." : "保存"}
+                    </button>
+                    <button onClick={() => setEditWebhook(null)} className="px-2 py-1.5 rounded text-xs" style={{ color: "var(--atlas-text-3)" }}>取消</button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="flex-1 text-xs truncate" style={{ color: bot.webhookUrl ? "var(--atlas-text-2)" : "var(--atlas-text-3)" }}>
+                      {bot.webhookUrl || "未配置，点击右侧按钮填写"}
+                    </span>
+                    <button onClick={() => setEditWebhook({ id: bot.id, url: bot.webhookUrl || "" })} className="px-2 py-1 rounded text-xs" style={{ background: "rgba(91,140,255,0.1)", color: "var(--atlas-accent)" }}>编辑</button>
+                  </div>
+                )}
+              </div>
+
+              {/* 接口地址提示 */}
+              <div className="rounded-lg p-3" style={{ background: "rgba(91,140,255,0.05)", border: "1px solid rgba(91,140,255,0.15)" }}>
+                <p className="text-xs mb-1" style={{ color: "var(--atlas-text-2)" }}>OpenClaw 回复接口（小虾米调用此接口发消息给用户）：</p>
+                <code className="text-xs" style={{ color: "var(--atlas-accent)", fontFamily: "monospace" }}>POST https://atlascore.cn/api/bots/{bot.id}/reply</code>
+              </div>
             </div>
-            <button onClick={() => toast.info(item.available ? "集成配置功能开发中" : "即将支持")}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium"
-              style={{ background: item.available ? "rgba(91,140,255,0.1)" : "var(--atlas-elevated)", color: item.available ? "var(--atlas-accent)" : "var(--atlas-text-3)", border: item.available ? "1px solid rgba(91,140,255,0.2)" : "1px solid var(--atlas-border)" }}>
-              {item.available ? "配置" : "即将"}
-            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 创建机器人 */}
+      {showCreate ? (
+        <div className="rounded-xl p-4 space-y-3" style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-accent)", boxShadow: "0 0 0 1px rgba(91,140,255,0.2)" }}>
+          <p className="text-sm font-semibold" style={{ color: "var(--atlas-text)" }}>创建新机器人</p>
+          <div className="flex gap-2 flex-wrap">
+            {AVATARS.map(a => (
+              <button key={a} onClick={() => setNewBotAvatar(a)}
+                className="w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all"
+                style={{ background: newBotAvatar === a ? "rgba(91,140,255,0.2)" : "var(--atlas-elevated)", border: newBotAvatar === a ? "2px solid var(--atlas-accent)" : "2px solid transparent" }}>
+                {a}
+              </button>
+            ))}
           </div>
-        ))}
-      </div>
+          <input value={newBotName} onChange={e => setNewBotName(e.target.value)} placeholder="机器人名称（必填）*" className="w-full px-3 py-2 rounded-lg text-sm outline-none" style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)", color: "var(--atlas-text)" }} />
+          <input value={newBotDesc} onChange={e => setNewBotDesc(e.target.value)} placeholder="描述（可选）" className="w-full px-3 py-2 rounded-lg text-sm outline-none" style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)", color: "var(--atlas-text)" }} />
+          <div className="flex gap-2">
+            <button onClick={handleCreate} disabled={creating || !newBotName.trim()} className="flex-1 py-2 rounded-lg text-sm font-medium transition-opacity" style={{ background: "var(--atlas-accent)", color: "white", opacity: creating || !newBotName.trim() ? 0.5 : 1 }}>
+              {creating ? "创建中..." : "创建机器人"}
+            </button>
+            <button onClick={() => setShowCreate(false)} className="px-4 py-2 rounded-lg text-sm" style={{ color: "var(--atlas-text-3)" }}>取消</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setShowCreate(true)} className="w-full py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-medium transition-all hover:opacity-80" style={{ background: "rgba(91,140,255,0.08)", border: "1px dashed rgba(91,140,255,0.3)", color: "var(--atlas-accent)" }}>
+          <Plus className="w-4 h-4" />
+          添加机器人
+        </button>
+      )}
     </div>
   );
 }

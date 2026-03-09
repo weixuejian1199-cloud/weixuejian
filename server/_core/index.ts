@@ -9,6 +9,7 @@ import { registerHrRoutes } from "../hr";
 import { registerOpenClawPollingRoutes } from "../openclawPolling";
 import { registerOpenClawIMRoutes } from "../openclawIM";
 import adminApiRouter from "../adminApi";
+import botRouter from "../botRouter";
 import { startScheduler } from "../scheduler";
 import { createImWsServer } from "../im/wsServer";
 import { appRouter } from "../routers";
@@ -52,6 +53,8 @@ async function startServer() {
   registerOpenClawIMRoutes(app);
   // Admin REST API (for OpenClaw and external systems)
   app.use("/api/admin", adminApiRouter);
+  // Bot management API (飞书机器人模式)
+  app.use("/api/bots", botRouter);
   // tRPC API
   app.use(
     "/api/trpc",

@@ -99,6 +99,13 @@
       "when": 1773035410327,
       "tag": "0013_remarkable_power_man",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1773059372292,
+      "tag": "0014_talented_jack_murdock",
+      "breakpoints": true
     }
   ]
 }
