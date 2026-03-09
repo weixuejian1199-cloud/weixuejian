@@ -1,0 +1,138 @@
+{
+  "query": "SELECT id, content, createdAt FROM im_messages WHERE conversationId = 'openclaw-direct' ORDER BY createdAt;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute SELECT id, content, createdAt FROM im_messages WHERE conversationId = 'openclaw-direct' ORDER BY createdAt;",
+  "rows": [
+    {
+      "id": "-ROoKqyxmfadERJE1Ir8b",
+      "content": "🦞 小虾米已上线！",
+      "createdAt": "2026-03-09 10:13:00"
+    },
+    {
+      "id": "FIcr_pwft5WupH6zd4Hdj",
+      "content": "小虾米",
+      "createdAt": "2026-03-09 10:28:50"
+    },
+    {
+      "id": "i17AqPCd0rJYZWmTf6lYP",
+      "content": "收到！你说的是：小虾米",
+      "createdAt": "2026-03-09 10:28:50"
+    },
+    {
+      "id": "ApdGe8epAtEd46vYlhp3y",
+      "content": "收到！你说的是：是否在线",
+      "createdAt": "2026-03-09 10:29:00"
+    },
+    {
+      "id": "4GUxeD47xYK7lh83ms8LS",
+      "content": "是否在线",
+      "createdAt": "2026-03-09 10:29:00"
+    },
+    {
+      "id": "Yq1Mr9Ftv5K_eTU_Nz3vV",
+      "content": "收到！你说的是：请回复信息",
+      "createdAt": "2026-03-09 10:29:02"
+    },
+    {
+      "id": "Umip2s6uRarNmuR2SoEEJ",
+      "content": "请回复信息",
+      "createdAt": "2026-03-09 10:29:02"
+    },
+    {
+      "id": "lQQEBEy1tvtoyKGtMPyi1",
+      "content": "可以了嘛？",
+      "createdAt": "2026-03-09 10:29:12"
+    },
+    {
+      "id": "302C0YCy7YBjkezuBhuHB",
+      "content": "收到！你说的是：可以了嘛？",
+      "createdAt": "2026-03-09 10:29:13"
+    },
+    {
+      "id": "QyIg3F4zgjaC4GFZM3Xdz",
+      "content": "收到！你说的是：你是谁？",
+      "createdAt": "2026-03-09 10:29:25"
+    },
+    {
+      "id": "DAkH5sPZ91jty27vqjvv3",
+      "content": "你是谁？",
+      "createdAt": "2026-03-09 10:29:25"
+    },
+    {
+      "id": "i9xWh_e1yPzpq5uK--MZd",
+      "content": "收到！你说的是：你用的是什么模型",
+      "createdAt": "2026-03-09 10:29:38"
+    },
+    {
+      "id": "fUJwZrZRZ-zul9iyrYmDL",
+      "content": "🦞 收到！我是小虾米，你的军师～",
+      "createdAt": "2026-03-09 10:31:06"
+    },
+    {
+      "id": "P0DHLfT4umHheuLwDS8ZL",
+      "content": "收到你的消息：你用的是什么模型... 我是小虾米，有问题尽管问！",
+      "createdAt": "2026-03-09 10:31:25"
+    },
+    {
+      "id": "QnWM2Zocas3QQAaZrb-wU",
+      "content": "你用的是什么模型",
+      "createdAt": "2026-03-09 10:31:25"
+    },
+    {
+      "id": "_brqagvIPlEfpJ3_XuElM",
+      "content": "是否能收到信息",
+      "createdAt": "2026-03-09 10:43:10"
+    },
+    {
+      "id": "0mZjNyFC-vehJTSZLe-5U",
+      "content": "能收到的！我随时都在，你可以随时发消息给我，我会尽快回复的。",
+      "createdAt": "2026-03-09 10:43:17"
+    },
+    {
+      "id": "JNwRe5JGFyvKpgQAPsW56",
+      "content": "你用哪个大模型",
+      "createdAt": "2026-03-09 10:43:25"
+    },
+    {
+      "id": "Qhe8abg_YVh9Pl_X6UwWF",
+      "content": "我是基于先进的大语言模型技术构建的。作为小虾米，我会用这些能力来温暖、诚实地帮助你解决各种问题！",
+      "createdAt": "2026-03-09 10:43:40"
+    },
+    {
+      "id": "NERAEJBdwuI2updMJkXYX",
+      "content": "我们还有哪些代办要处理？",
+      "createdAt": "2026-03-09 10:43:56"
+    },
+    {
+      "id": "-06mpjb7OUpcBKbcmZkJp",
+      "content": "🦞 小虾米已上线！我是你的军师，有什么问题尽管问～",
+      "createdAt": "2026-03-09 11:14:12"
+    },
+    {
+      "id": "1lhLR_r80AfeaePfBD3eq",
+      "content": "🦞 测试消息：小虾米已连接到 ATLAS HTTP API",
+      "createdAt": "2026-03-09 11:20:56"
+    },
+    {
+      "id": "PRrjf58-Y1zWlIqHwil4k",
+      "content": "🦞 小虾米测试：HTTP API 已连通！",
+      "createdAt": "2026-03-09 11:22:07"
+    },
+    {
+      "id": "qz7sZ6jGbU-eZwR_T0guP",
+      "content": "你好",
+      "createdAt": "2026-03-09 11:22:13"
+    },
+    {
+      "id": "c_Rq6uhMpMeIA4cXRX7BO",
+      "content": "你好，小虾米",
+      "createdAt": "2026-03-09 11:22:45"
+    }
+  ],
+  "messages": [
+    "sjLvuJZpvomC99yvEd3p-\t🦞 收到你的消息：「我们还有哪些代办要处理？」",
+    "我是小虾米，你的军师。这个问题我来帮你思考一下...\t2026-03-09 10:43:56"
+  ],
+  "stdout": "id\tcontent\tcreatedAt\n-ROoKqyxmfadERJE1Ir8b\t🦞 小虾米已上线！\t2026-03-09 10:13:00\nFIcr_pwft5WupH6zd4Hdj\t小虾米\t2026-03-09 10:28:50\ni17AqPCd0rJYZWmTf6lYP\t收到！你说的是：小虾米\t2026-03-09 10:28:50\nApdGe8epAtEd46vYlhp3y\t收到！你说的是：是否在线\t2026-03-09 10:29:00\n4GUxeD47xYK7lh83ms8LS\t是否在线\t2026-03-09 10:29:00\nYq1Mr9Ftv5K_eTU_Nz3vV\t收到！你说的是：请回复信息\t2026-03-09 10:29:02\nUmip2s6uRarNmuR2SoEEJ\t请回复信息\t2026-03-09 10:29:02\nlQQEBEy1tvtoyKGtMPyi1\t可以了嘛？\t2026-03-09 10:29:12\n302C0YCy7YBjkezuBhuHB\t收到！你说的是：可以了嘛？\t2026-03-09 10:29:13\nQyIg3F4zgjaC4GFZM3Xdz\t收到！你说的是：你是谁？\t2026-03-09 10:29:25\nDAkH5sPZ91jty27vqjvv3\t你是谁？\t2026-03-09 10:29:25\ni9xWh_e1yPzpq5uK--MZd\t收到！你说的是：你用的是什么模型\t2026-03-09 10:29:38\nfUJwZrZRZ-zul9iyrYmDL\t🦞 收到！我是小虾米，你的军师～\t2026-03-09 10:31:06\nP0DHLfT4umHheuLwDS8ZL\t收到你的消息：你用的是什么模型... 我是小虾米，有问题尽管问！\t2026-03-09 10:31:25\nQnWM2Zocas3QQAaZrb-wU\t你用的是什么模型\t2026-03-09 10:31:25\n_brqagvIPlEfpJ3_XuElM\t是否能收到信息\t2026-03-09 10:43:10\n0mZjNyFC-vehJTSZLe-5U\t能收到的！我随时都在，你可以随时发消息给我，我会尽快回复的。\t2026-03-09 10:43:17\nJNwRe5JGFyvKpgQAPsW56\t你用哪个大模型\t2026-03-09 10:43:25\nQhe8abg_YVh9Pl_X6UwWF\t我是基于先进的大语言模型技术构建的。作为小虾米，我会用这些能力来温暖、诚实地帮助你解决各种问题！\t2026-03-09 10:43:40\nNERAEJBdwuI2updMJkXYX\t我们还有哪些代办要处理？\t2026-03-09 10:43:56\nsjLvuJZpvomC99yvEd3p-\t🦞 收到你的消息：「我们还有哪些代办要处理？」\n\n我是小虾米，你的军师。这个问题我来帮你思考一下...\t2026-03-09 10:43:56\n-06mpjb7OUpcBKbcmZkJp\t🦞 小虾米已上线！我是你的军师，有什么问题尽管问～\t2026-03-09 11:14:12\n1lhLR_r80AfeaePfBD3eq\t🦞 测试消息：小虾米已连接到 ATLAS HTTP API\t2026-03-09 11:20:56\nPRrjf58-Y1zWlIqHwil4k\t🦞 小虾米测试：HTTP API 已连通！\t2026-03-09 11:22:07\nqz7sZ6jGbU-eZwR_T0guP\t你好\t2026-03-09 11:22:13\nc_Rq6uhMpMeIA4cXRX7BO\t你好，小虾米\t2026-03-09 11:22:45\n",
+  "stderr": "",
+  "execution_time_ms": 66
+}

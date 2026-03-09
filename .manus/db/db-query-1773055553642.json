@@ -1,0 +1,14 @@
+{
+  "query": "SELECT COUNT(*) as total, COUNT(DISTINCT content) as unique_content FROM im_messages WHERE conversationId = 'openclaw-direct';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute SELECT COUNT(*) as total, COUNT(DISTINCT content) as unique_content FROM im_messages WHERE conversationId = 'openclaw-direct';",
+  "rows": [
+    {
+      "total": "26",
+      "unique_content": "26"
+    }
+  ],
+  "messages": [],
+  "stdout": "total\tunique_content\n26\t26\n",
+  "stderr": "",
+  "execution_time_ms": 60
+}

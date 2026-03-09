@@ -138,6 +138,20 @@ export function registerOpenClawIMRoutes(app: Express): void {
     const msgId = incomingMsgId ?? nanoid();
     const db = getDb();
 
+    // 幂等处理：如果该 msgId 已存在，直接返回成功（防止小虾米重试导致重复消息）
+    if (incomingMsgId) {
+      const existing = await db
+        .select({ id: imMessages.id })
+        .from(imMessages)
+        .where(eq(imMessages.id, incomingMsgId))
+        .limit(1);
+      if (existing.length > 0) {
+        console.log(`[OpenClaw] Duplicate msgId=${incomingMsgId}, skipping insert`);
+        res.json({ success: true, msgId: incomingMsgId, duplicate: true });
+        return;
+      }
+    }
+
     await db.insert(imMessages).values({
       id: msgId,
       conversationId: OPENCLAW_CONV_ID,
