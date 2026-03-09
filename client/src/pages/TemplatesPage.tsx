@@ -2,22 +2,30 @@
  * ATLAS V4.0 — 模板库
  * Features: browse, pin, custom create, AI generate, use in workspace
  */
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutTemplate, Plus, Search, Sparkles,
   FileSpreadsheet, TrendingUp, BarChart2, PieChart, Table2,
   Users, Package, DollarSign, X, Loader2, ChevronRight,
-  Pencil, Trash2, Pin, Check, Eye, Download,
+  Pencil, Trash2, Pin, Check, Eye, Download, Play,
 } from "lucide-react";
 import { useAtlas } from "@/contexts/AtlasContext";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
+import { templateStream } from "@/lib/api";
 
 interface TemplateField {
   name: string;
   type: string;
   example: string;
+}
+
+interface InputField {
+  key: string;
+  label: string;
+  type: string;
+  unit?: string;
 }
 
 interface Template {
@@ -37,6 +45,9 @@ interface Template {
   useCases?: string[];
   downloadUrl?: string;  // 演示文件下载链接
   downloadName?: string; // 下载文件名
+  // V13.7: input fields for calculation templates
+  inputFields?: InputField[];
+  systemPrompt?: string; // full system prompt for personal templates
 }
 
 const ICON_MAP: Record<string, typeof FileSpreadsheet> = {
@@ -368,6 +379,135 @@ function CreateTemplateModal({ onClose, onSave }: { onClose: () => void; onSave:
   );
 }
 
+// ── TemplateUseModal: input fields + streaming calculation ─────────────────────
+function TemplateUseModal({
+  template,
+  onClose,
+  onResult,
+}: {
+  template: Template;
+  onClose: () => void;
+  onResult: (text: string) => void;
+}) {
+  const fields = template.inputFields || [];
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(fields.map(f => [f.key, ""]))
+  );
+  const [streaming, setStreaming] = useState(false);
+  const [streamText, setStreamText] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
+
+  const handleRun = async () => {
+    // Validate required fields
+    for (const f of fields) {
+      if (!values[f.key]?.trim()) {
+        toast.error(`请填写「${f.label}」`);
+        return;
+      }
+    }
+    setStreaming(true);
+    setStreamText("");
+    abortRef.current = new AbortController();
+    await templateStream({
+      templateId: template.id,
+      inputs: values,
+      signal: abortRef.current.signal,
+      onChunk: (chunk) => setStreamText(prev => prev + chunk),
+      onDone: (full) => {
+        setStreaming(false);
+        onResult(full);
+      },
+      onError: (err) => {
+        setStreaming(false);
+        toast.error("计算失败：" + err.message);
+      },
+    });
+  };
+
+  const handleStop = () => {
+    abortRef.current?.abort();
+    setStreaming(false);
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }}
+      onClick={e => { if (e.target === e.currentTarget && !streaming) onClose(); }}>
+      <motion.div initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+        className="w-full max-w-lg mx-4 rounded-2xl overflow-hidden flex flex-col"
+        style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border-2)", boxShadow: "0 24px 64px rgba(0,0,0,0.5)", maxHeight: "85vh" }}>
+        {/* Header */}
+        <div className="px-5 py-4 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid var(--atlas-border)" }}>
+          <div className="flex items-center gap-2">
+            <Play size={14} style={{ color: "var(--atlas-accent)" }} />
+            <h2 className="text-sm font-semibold" style={{ color: "var(--atlas-text)" }}>使用模板「{template.title}」</h2>
+          </div>
+          <button onClick={onClose} disabled={streaming} style={{ color: "var(--atlas-text-3)" }}><X size={15} /></button>
+        </div>
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+          {fields.length > 0 ? (
+            <>
+              <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>请填写以下参数，AI 将自动计算并输出完整结果</p>
+              {fields.map(f => (
+                <div key={f.key}>
+                  <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--atlas-text-2)" }}>
+                    {f.label}{f.unit ? <span className="ml-1" style={{ color: "var(--atlas-text-3)" }}>({f.unit})</span> : null}
+                  </label>
+                  <input
+                    type={f.type === "number" ? "number" : "text"}
+                    value={values[f.key] || ""}
+                    onChange={e => setValues(prev => ({ ...prev, [f.key]: e.target.value }))}
+                    disabled={streaming}
+                    placeholder={`请输入${f.label}...`}
+                    className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
+                    style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border-2)", color: "var(--atlas-text)" }}
+                  />
+                </div>
+              ))}
+            </>
+          ) : (
+            <p className="text-xs" style={{ color: "var(--atlas-text-3)" }}>点击运行即可调用此模板</p>
+          )}
+          {/* Streaming result */}
+          {streamText && (
+            <div className="mt-3">
+              <div className="text-xs font-medium mb-1.5" style={{ color: "var(--atlas-text-2)" }}>计算结果</div>
+              <div className="px-3 py-3 rounded-lg text-xs leading-relaxed whitespace-pre-wrap"
+                style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)", color: "var(--atlas-text)", maxHeight: "200px", overflowY: "auto" }}>
+                {streamText}
+                {streaming && <span className="inline-block w-1.5 h-3 ml-0.5 rounded-sm animate-pulse" style={{ background: "var(--atlas-accent)" }} />}
+              </div>
+            </div>
+          )}
+        </div>
+        {/* Footer */}
+        <div className="px-5 py-4 flex items-center justify-between flex-shrink-0" style={{ borderTop: "1px solid var(--atlas-border)" }}>
+          <button onClick={onClose} disabled={streaming}
+            className="px-4 py-2 rounded-lg text-sm"
+            style={{ color: "var(--atlas-text-3)", background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}>
+            {streamText && !streaming ? "关闭" : "取消"}
+          </button>
+          {streaming ? (
+            <button onClick={handleStop}
+              className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium"
+              style={{ background: "rgba(239,68,68,0.15)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }}>
+              <X size={13} /> 停止
+            </button>
+          ) : (
+            <button onClick={handleRun}
+              className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium"
+              style={{ background: "var(--atlas-accent)", color: "#fff" }}>
+              <Play size={13} /> {streamText ? "重新计算" : "开始计算"}
+            </button>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 export default function TemplatesPage() {
   const { setActiveNav, addMessage, clearMessages } = useAtlas();
   const [templates, setTemplates] = useState<Template[]>(BUILTIN_TEMPLATES);
@@ -375,6 +515,7 @@ export default function TemplatesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null);
+  const [useModalTemplate, setUseModalTemplate] = useState<Template | null>(null);
 
   const filtered = templates.filter(t => {
     const matchCat = activeCategory === "全部" || (activeCategory === "自定义" ? t.custom : t.category === activeCategory);
@@ -389,11 +530,27 @@ export default function TemplatesPage() {
   const deleteTemplate = (id: string) => { setTemplates(prev => prev.filter(t => t.id !== id)); toast.success("模板已删除"); };
 
   const useTemplate = (t: Template) => {
+    // If template has inputFields, show the input modal instead of directly applying
+    if (t.inputFields && t.inputFields.length > 0) {
+      setUseModalTemplate(t);
+      return;
+    }
     clearMessages();
     addMessage({ role: "assistant", content: `已加载模板「${t.title}」\n\n${t.desc}\n\n**提示词已就绪：**\n${t.prompt}\n\n请上传数据文件，我将按此模板生成报表。` });
     setTemplates(prev => prev.map(tp => tp.id === t.id ? { ...tp, usageCount: tp.usageCount + 1 } : tp));
     setActiveNav("home");
     toast.success(`已应用模板「${t.title}」`);
+  };
+
+  const handleTemplateResult = (resultText: string) => {
+    const tmpl = useModalTemplate;
+    if (!tmpl) return;
+    clearMessages();
+    addMessage({ role: "assistant", content: `模板「${tmpl.title}」计算完成：\n\n${resultText}` });
+    setTemplates(prev => prev.map(tp => tp.id === tmpl.id ? { ...tp, usageCount: tp.usageCount + 1 } : tp));
+    setUseModalTemplate(null);
+    setActiveNav("home");
+    toast.success(`模板「${tmpl.title}」计算完成，已跳转到工作区`);
   };
 
   const TemplateCard = ({ t, index }: { t: Template; index: number }) => {
@@ -677,6 +834,16 @@ export default function TemplatesPage() {
       <AnimatePresence>
         {showCreate && (
           <CreateTemplateModal onClose={() => setShowCreate(false)} onSave={t => setTemplates(prev => [t, ...prev])} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {useModalTemplate && (
+          <TemplateUseModal
+            template={useModalTemplate}
+            onClose={() => setUseModalTemplate(null)}
+            onResult={handleTemplateResult}
+          />
         )}
       </AnimatePresence>
     </div>

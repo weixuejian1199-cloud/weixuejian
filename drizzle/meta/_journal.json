@@ -92,6 +92,13 @@
       "when": 1772977055026,
       "tag": "0012_tan_the_hunter",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1773035410327,
+      "tag": "0013_remarkable_power_man",
+      "breakpoints": true
     }
   ]
 }

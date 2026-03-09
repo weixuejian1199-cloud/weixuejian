@@ -322,3 +322,73 @@ export const imMessages = mysqlTable("im_messages", {
 
 export type ImMessage = typeof imMessages.$inferSelect;
 export type InsertImMessage = typeof imMessages.$inferInsert;
+
+// ── Personal Templates (V13.7) ─────────────────────────────────────────────────
+// Users can save calculation rules as reusable templates
+// e.g. "RUSIN multi-level pricing template": input cost price → auto-calculate all tier prices
+
+export const personalTemplates = mysqlTable("personal_templates", {
+  id:          varchar("id", { length: 64 }).primaryKey(),
+  userId:      int("userId").notNull(),
+  /** Display name of the template */
+  name:        varchar("name", { length: 255 }).notNull(),
+  /** Short description of what this template does */
+  description: text("description"),
+  /** Category: pricing | payroll | attendance | sales | custom */
+  category:    varchar("category", { length: 64 }).default("custom").notNull(),
+  /** The full conversation context / calculation rules as a system prompt */
+  systemPrompt: text("systemPrompt").notNull(),
+  /** JSON: list of required input fields, e.g. [{ key: "costPrice", label: "供货价", type: "number", unit: "元" }] */
+  inputFields: json("inputFields").$type<Array<{ key: string; label: string; type: string; unit?: string }>>(),
+  /** JSON: example output preview (first result) */
+  exampleOutput: json("exampleOutput"),
+  /** How many times this template has been used */
+  useCount:    int("useCount").default(0).notNull(),
+  /** Last time this template was used */
+  lastUsedAt:  timestamp("lastUsedAt"),
+  createdAt:   timestamp("createdAt").defaultNow().notNull(),
+  updatedAt:   timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PersonalTemplate = typeof personalTemplates.$inferSelect;
+export type InsertPersonalTemplate = typeof personalTemplates.$inferInsert;
+
+// ── Chat Conversations (V13.9 对话持久化) ──────────────────────────────────────
+// Each user's ATLAS chat session is a conversation. A new conversation is created
+// when the user starts a fresh chat. Messages are appended as the conversation progresses.
+
+export const chatConversations = mysqlTable("chat_conversations", {
+  id:          varchar("id", { length: 64 }).primaryKey(),
+  /** 0 = anonymous visitor */
+  userId:      int("userId").default(0).notNull(),
+  /** Optional: the file session IDs attached to this conversation */
+  sessionIds:  json("sessionIds").$type<string[]>(),
+  /** Short preview of the first user message */
+  title:       varchar("title", { length: 255 }),
+  /** Total number of messages in this conversation */
+  messageCount: int("messageCount").default(0).notNull(),
+  createdAt:   timestamp("createdAt").defaultNow().notNull(),
+  updatedAt:   timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ChatConversation = typeof chatConversations.$inferSelect;
+export type InsertChatConversation = typeof chatConversations.$inferInsert;
+
+// ── Chat Messages (V13.9 对话持久化) ──────────────────────────────────────────
+// Individual messages within a chat conversation.
+
+export const chatMessages = mysqlTable("chat_messages", {
+  id:             varchar("id", { length: 64 }).primaryKey(),
+  conversationId: varchar("conversationId", { length: 64 }).notNull(),
+  /** 'user' or 'assistant' */
+  role:           mysqlEnum("role", ["user", "assistant"]).notNull(),
+  content:        text("content").notNull(),
+  /** Optional: file names attached to this message */
+  fileNames:      json("fileNames").$type<string[]>(),
+  /** Token count estimate (for cost tracking) */
+  tokenEstimate:  int("tokenEstimate"),
+  createdAt:      timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = typeof chatMessages.$inferInsert;

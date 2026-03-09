@@ -8,7 +8,7 @@ import crypto from "crypto";
 import { getDb } from "./db";
 import {
   adminApiKeys, users, messageFeedback, openclawTasks,
-  reports, sessions,
+  reports, sessions, chatConversations, chatMessages,
 } from "../drizzle/schema";
 import { eq, desc, count, sql } from "drizzle-orm";
 
@@ -265,6 +265,64 @@ router.post("/notify", async (req: Request, res: Response) => {
     res.json({ success: ok, message: ok ? "Notification sent" : "Notification service unavailable" });
   } catch (err) {
     console.error("[Admin API] POST /notify error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── GET /api/admin/conversations ────────────────────────────────────────────────────
+// List all chat conversations with pagination (for 小虾米 monitoring)
+// Query params: ?page=1&limit=20&userId=
+router.get("/conversations", requireAdminApiKey, async (req: Request, res: Response) => {
+  try {
+    const db = await getDb();
+    if (!db) { res.status(503).json({ error: "Database unavailable" }); return; }
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, parseInt(req.query.limit as string) || 20);
+    const offset = (page - 1) * limit;
+    const userIdFilter = req.query.userId ? parseInt(req.query.userId as string) : null;
+
+    let query = db.select({
+      id: chatConversations.id,
+      userId: chatConversations.userId,
+      title: chatConversations.title,
+      messageCount: chatConversations.messageCount,
+      createdAt: chatConversations.createdAt,
+      updatedAt: chatConversations.updatedAt,
+    }).from(chatConversations);
+
+    if (userIdFilter) {
+      query = query.where(eq(chatConversations.userId, userIdFilter)) as typeof query;
+    }
+
+    const rows = await query.orderBy(desc(chatConversations.updatedAt)).limit(limit).offset(offset);
+    const [{ total }] = await db.select({ total: count() }).from(chatConversations);
+
+    res.json({ conversations: rows, total, page, limit });
+  } catch (err) {
+    console.error("[Admin API] GET /conversations error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── GET /api/admin/conversations/:id/messages ──────────────────────────────
+// Get all messages in a specific conversation
+router.get("/conversations/:id/messages", requireAdminApiKey, async (req: Request, res: Response) => {
+  try {
+    const db = await getDb();
+    if (!db) { res.status(503).json({ error: "Database unavailable" }); return; }
+    const convId = req.params.id;
+
+    const [conv] = await db.select().from(chatConversations)
+      .where(eq(chatConversations.id, convId)).limit(1);
+    if (!conv) { res.status(404).json({ error: "Conversation not found" }); return; }
+
+    const messages = await db.select().from(chatMessages)
+      .where(eq(chatMessages.conversationId, convId))
+      .orderBy(chatMessages.createdAt);
+
+    res.json({ conversation: conv, messages });
+  } catch (err) {
+    console.error("[Admin API] GET /conversations/:id/messages error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

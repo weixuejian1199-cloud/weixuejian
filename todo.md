@@ -517,3 +517,26 @@
 - [x] 思考过程面板：显示当前处理步骤（解析文件/分析数据/生成回复），默认折叠
 - [x] 点击“思考过程 ^”可展开/折叠，展开显示步骤详情
 - [x] 保存检查点并发布
+
+## V13.7 个人模板库增强
+
+- [x] 数据库新增 personal_templates 表（id/userId/name/description/systemPrompt/inputFields/useCount/createdAt）
+- [x] pnpm db:push 迁移数据库（表已存在于数据库，schema 已同步）
+- [x] 后端 POST /api/atlas/personal-templates — 保存模板（需登录）
+- [x] 后端 GET /api/atlas/personal-templates — 获取我的模板列表
+- [x] 后端 DELETE /api/atlas/personal-templates/:id — 删除模板
+- [x] 前端 TemplatesPage：点击「使用」后弹出参数输入弹窗（读取 inputFields）
+- [x] 前端 TemplatesPage：用户填入参数后调用 templateStream 流式计算
+- [x] 前端 api.ts：新增 templateStream 函数
+- [x] 单元测试：V13.7 PersonalTemplates schema 3 项全部通过
+
+## V13.9 对话持久化 + 小虾米监控接口
+
+- [x] 数据库新增 chat_conversations 表（id/userId/title/messageCount/sessionIds/createdAt/updatedAt）
+- [x] 数据库新增 chat_messages 表（id/conversationId/role/content/fileNames/createdAt）
+- [x] pnpm db:push 迁移数据库（migration 0014 已应用）
+- [x] 后端 atlas.ts：/api/atlas/chat 路由中自动创建/更新 conversation，保存每条用户消息和 AI 回复
+- [x] 后端 adminApi.ts：GET /api/admin/conversations — 查询对话列表（分页 + userId 过滤）
+- [x] 后端 adminApi.ts：GET /api/admin/conversations/:id/messages — 查询单个对话的消息
+- [x] 单元测试：V13.9 ChatConversations schema 3 项 + ChatMessages schema 3 项 + 对话持久化逻辑 4 项 + Admin API 2 项，共 12 项全部通过
+- [ ] WebSocket：AI 回复完成后推送完整消息给小虾米（待后续实现）

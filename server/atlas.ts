@@ -28,7 +28,7 @@ import { getSession, createSession, updateSession, createReport, updateReport, g
 import { authenticateRequest } from "./_core/auth";
 import { isOpenClawEnabled, callOpenClaw, callOpenClawStream, getPresignedUrlsForSessions } from "./openclaw";
 import { notifyTelegramNewTask } from "./openclawPolling";
-import { openclawTasks } from "../drizzle/schema";
+import { openclawTasks, chatConversations, chatMessages, personalTemplates } from "../drizzle/schema";
 
 // Optional auth middleware: injects req.userId if session cookie is valid
 async function optionalAuth(req: Request, _res: Response, next: NextFunction) {
@@ -530,11 +530,12 @@ export function registerAtlasRoutes(app: Express) {
 
   app.post("/api/atlas/chat", optionalAuth, async (req: Request, res: Response) => {
     try {
-      const { session_id, session_ids, message, history } = req.body as {
+      const { session_id, session_ids, message, history, conversation_id } = req.body as {
         session_id?: string;
         session_ids?: string[];
         message: string;
         history?: Array<{ role: "user" | "assistant"; content: string }>;
+        conversation_id?: string;
       };
       if (!message) {
         res.status(400).json({ error: "message is required" });
@@ -544,10 +545,48 @@ export function registerAtlasRoutes(app: Express) {
       // Support both single session_id and multiple session_ids
       const allSessionIds = session_ids?.length ? session_ids : session_id ? [session_id] : [];
 
+      // ── V13.9: Persist conversation and user message ─────────────────────
+      const userId = (req as any).userId || 0;
+      const convId = conversation_id || nanoid();
+      const db = await getDb();
+      if (db) {
+        try {
+          const { eq, sql: drizzleSql } = await import("drizzle-orm");
+          // Upsert conversation record
+          const existingConvs = await db.select().from(chatConversations)
+            .where(eq(chatConversations.id, convId));
+          if (existingConvs.length === 0) {
+            await db.insert(chatConversations).values({
+              id: convId,
+              userId,
+              sessionIds: allSessionIds.length ? allSessionIds : null,
+              title: message.slice(0, 100),
+              messageCount: 0,
+            });
+          }
+          // Save user message
+          await db.insert(chatMessages).values({
+            id: nanoid(),
+            conversationId: convId,
+            role: "user",
+            content: message,
+            fileNames: allSessionIds.length ? allSessionIds : null,
+          });
+          // Increment message count
+          await db.update(chatConversations)
+            .set({ messageCount: drizzleSql`${chatConversations.messageCount} + 1` })
+            .where(eq(chatConversations.id, convId));
+        } catch (persistErr) {
+          console.warn("[Atlas] Conversation persist error (non-fatal):", persistErr);
+        }
+      }
+
       // Disable Cloudflare/proxy buffering so streaming text reaches the browser in real-time
       res.setHeader("X-Accel-Buffering", "no");
       res.setHeader("Cache-Control", "no-cache, no-store");
       res.setHeader("Connection", "keep-alive");
+      // Return conversation_id in header so frontend can track it
+      res.setHeader("X-Conversation-Id", convId);
 
       // ── No-file mode: general conversation without data ──────────────────
       if (!allSessionIds.length) {
@@ -571,6 +610,20 @@ export function registerAtlasRoutes(app: Express) {
           { role: "user", content: message },
         ];
         const result = streamText({ model: openai.chat(selectModel()), system: noDataSystemPrompt, messages: msgs });
+        // V13.9: Persist AI reply after streaming completes
+        if (db) {
+          Promise.resolve(result.text).then(async (fullText) => {
+            try {
+              const { eq, sql: drizzleSql } = await import("drizzle-orm");
+              await db.insert(chatMessages).values({
+                id: nanoid(), conversationId: convId, role: "assistant", content: fullText,
+              });
+              await db.update(chatConversations)
+                .set({ messageCount: drizzleSql`${chatConversations.messageCount} + 1` })
+                .where(eq(chatConversations.id, convId));
+            } catch (e) { console.warn("[Atlas] AI reply persist error:", e); }
+          }).catch(() => {});
+        }
         result.pipeTextStreamToResponse(res);
         return;
       }
@@ -947,6 +1000,21 @@ ${dataTable}
         messages,
       });
 
+      // V13.9: Persist AI reply after streaming completes
+      if (db) {
+        Promise.resolve(result.text).then(async (fullText) => {
+          try {
+            const { eq, sql: drizzleSql } = await import("drizzle-orm");
+            await db.insert(chatMessages).values({
+              id: nanoid(), conversationId: convId, role: "assistant", content: fullText,
+            });
+            await db.update(chatConversations)
+              .set({ messageCount: drizzleSql`${chatConversations.messageCount} + 1` })
+              .where(eq(chatConversations.id, convId));
+          } catch (e) { console.warn("[Atlas] AI reply persist error (with-file):", e); }
+        }).catch(() => {});
+      }
+
       result.pipeTextStreamToResponse(res);
     } catch (err: any) {
       console.error("[Atlas] Chat error:", err);
@@ -1144,6 +1212,105 @@ ${sampleRows}
     } catch (err: any) {
       console.error("[Atlas] Generate report error:", err);
       res.status(500).json({ error: err.message || "Report generation failed" });
+    }
+  });
+
+  // ── Personal Templates API (V13.7) ─────────────────────────────────────────
+  // GET /api/atlas/templates — list user's personal templates
+  app.get("/api/atlas/templates", optionalAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).userId;
+      if (!userId) { res.status(401).json({ error: "Login required" }); return; }
+      const db = await getDb();
+      if (!db) { res.status(500).json({ error: "DB unavailable" }); return; }
+      const { eq, desc } = await import("drizzle-orm");
+      const rows = await db.select().from(personalTemplates)
+        .where(eq(personalTemplates.userId, userId))
+        .orderBy(desc(personalTemplates.updatedAt));
+      res.json({ templates: rows });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/atlas/templates — save a new personal template
+  app.post("/api/atlas/templates", optionalAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).userId;
+      if (!userId) { res.status(401).json({ error: "Login required" }); return; }
+      const { name, description, category, systemPrompt, inputFields, exampleOutput } = req.body;
+      if (!name || !systemPrompt) { res.status(400).json({ error: "name and systemPrompt are required" }); return; }
+      const db = await getDb();
+      if (!db) { res.status(500).json({ error: "DB unavailable" }); return; }
+      const id = nanoid();
+      await db.insert(personalTemplates).values({
+        id, userId, name, description, category: category || "custom",
+        systemPrompt, inputFields: inputFields || null, exampleOutput: exampleOutput || null,
+      });
+      res.json({ id, success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/atlas/templates/:id — delete a personal template
+  app.delete("/api/atlas/templates/:id", optionalAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).userId;
+      if (!userId) { res.status(401).json({ error: "Login required" }); return; }
+      const db = await getDb();
+      if (!db) { res.status(500).json({ error: "DB unavailable" }); return; }
+      const { eq, and } = await import("drizzle-orm");
+      await db.delete(personalTemplates)
+        .where(and(eq(personalTemplates.id, req.params.id), eq(personalTemplates.userId, userId)));
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/atlas/templates/:id/use — use a template (stream calculation)
+  app.post("/api/atlas/templates/:id/use", optionalAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).userId;
+      if (!userId) { res.status(401).json({ error: "Login required" }); return; }
+      const db = await getDb();
+      if (!db) { res.status(500).json({ error: "DB unavailable" }); return; }
+      const { eq } = await import("drizzle-orm");
+      const rows = await db.select().from(personalTemplates)
+        .where(eq(personalTemplates.id, req.params.id));
+      if (!rows.length) { res.status(404).json({ error: "Template not found" }); return; }
+      const tmpl = rows[0];
+      const { inputs } = req.body as { inputs?: Record<string, string> };
+      // Build user message from input fields
+      let userMsg = "请根据以下参数进行计算：\n";
+      if (inputs && Object.keys(inputs).length > 0) {
+        const fields = (tmpl.inputFields as Array<{ key: string; label: string; unit?: string }>) || [];
+        for (const f of fields) {
+          if (inputs[f.key] !== undefined) {
+            userMsg += `${f.label}：${inputs[f.key]}${f.unit ? ' ' + f.unit : ''}\n`;
+          }
+        }
+      }
+      // Update use count
+      const { sql: drizzleSql } = await import("drizzle-orm");
+      await db.update(personalTemplates)
+        .set({ useCount: drizzleSql`${personalTemplates.useCount} + 1`, lastUsedAt: new Date() })
+        .where(eq(personalTemplates.id, req.params.id));
+      // Stream response
+      res.setHeader("X-Accel-Buffering", "no");
+      res.setHeader("Cache-Control", "no-cache, no-store");
+      res.setHeader("Connection", "keep-alive");
+      const openai = createLLM();
+      const result = streamText({
+        model: openai.chat(selectModel()),
+        system: tmpl.systemPrompt,
+        messages: [{ role: "user", content: userMsg }],
+      });
+      result.pipeTextStreamToResponse(res);
+    } catch (err: any) {
+      console.error("[Atlas] Template use error:", err);
+      if (!res.headersSent) res.status(500).json({ error: err.message });
     }
   });
 

@@ -209,3 +209,93 @@ export const api = {
     })),
   getDownloadUrl,
 };
+
+// ── Template Stream (V13.7) ────────────────────────────────────────────────────
+// Call a personal template with input fields, stream the AI calculation result
+
+export interface TemplateStreamOptions {
+  templateId: string;
+  inputs: Record<string, string>;
+  signal?: AbortSignal;
+  onChunk: (chunk: string) => void;
+  onDone: (fullText: string) => void;
+  onError: (err: Error) => void;
+}
+
+export async function templateStream(opts: TemplateStreamOptions): Promise<void> {
+  const { templateId, inputs, signal, onChunk, onDone, onError } = opts;
+  try {
+    const res = await fetch(`/api/atlas/templates/${templateId}/use`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      signal,
+      body: JSON.stringify({ inputs }),
+    });
+
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try { const err = await res.json(); msg = err.error || msg; } catch {}
+      throw new Error(msg);
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error("No response body");
+
+    const decoder = new TextDecoder();
+    let fullText = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      fullText += chunk;
+      onChunk(chunk);
+    }
+    onDone(fullText);
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") return;
+    onError(err instanceof Error ? err : new Error(String(err)));
+  }
+}
+
+// ── Personal Templates CRUD (V13.7) ───────────────────────────────────────────
+
+export interface PersonalTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  category: string;
+  systemPrompt: string;
+  inputFields?: Array<{ key: string; label: string; type: string; unit?: string }>;
+  useCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function fetchPersonalTemplates(): Promise<PersonalTemplate[]> {
+  const res = await fetch("/api/atlas/templates", { credentials: "include" });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.templates || [];
+}
+
+export async function savePersonalTemplate(tmpl: {
+  name: string;
+  description?: string;
+  category?: string;
+  systemPrompt: string;
+  inputFields?: Array<{ key: string; label: string; type: string; unit?: string }>;
+}): Promise<{ id: string }> {
+  const res = await fetch("/api/atlas/templates", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(tmpl),
+  });
+  if (!res.ok) throw new Error("Failed to save template");
+  return res.json();
+}
+
+export async function deletePersonalTemplate(id: string): Promise<void> {
+  await fetch(`/api/atlas/templates/${id}`, { method: "DELETE", credentials: "include" });
+}
