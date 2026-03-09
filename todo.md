@@ -670,3 +670,40 @@
 - [x] 指数退避重连（3s → 6s → 12s → 最多 30s）
 - [x] 重连状态提示条（黄色横幅，重连成功自动消失）
 - [x] 重连后恢复消息（防止断线期间消息丢失）
+
+## V8.0 三栏布局重构（ATLAS AI Data Workspace）
+
+### 全局布局重构
+- [x] 新建 AtlasWorkspace 三栏框架（左220px + 中flex + 右320px）
+- [x] 浅色主题：白色背景，灰色边框分隔，蓝色 #2563eb 主色
+- [x] 底部全局输入框（横跨三栏，📎 / 🖼 图标 + 蓝色发送按钮）
+- [x] 更新 index.css 浅色主题 CSS 变量
+- [x] 更新 App.tsx 路由指向新 AtlasWorkspace
+
+### 左栏（导航 + 文件列表）
+- [x] 顶部 ATLAS logo
+- [x] 导航项：Chat / Analysis / Tasks / Files（带图标，Chat 蓝色高亮）
+- [x] Recent Chats 列表（蓝点/灰点 + 会话名称）
+- [x] Files 区域（文件名 + 时间戳）
+
+### 中栏（对话区）
+- [x] 用户消息气泡（右对齐，蓝色背景，带用户头像）
+- [x] AI 消息气泡（左对齐，灰色背景，带 ATLAS logo 头像）
+- [x] 文件附件卡片（Excel 绿色图标 + 文件名 + 大小）
+- [x] 消息撤回（2分钟内右键撤回）
+- [x] 消息复制（hover 显示，自己左下角/对方右下角）
+- [x] 打字机效果（AI 回复逐字显示）
+
+### 右栏（分析面板）
+- [x] 面板标题（Sales Analysis - Q1 2024 + ⋯ 菜单）
+- [x] 指标卡片（+15% Revenue Growth / +25% East Region / XYZ Model）
+- [x] Revenue Growth 柱状图（Jan/Feb/Mar，+15% 标注）
+- [x] Regional Sales 饼图（East 45% / West 30% / South 25%）
+- [x] 关键结论卡片（+25% East Region Leading Sales Increase）
+- [x] 随 AI 回复实时更新（解析 atlas-chart 块推送到右栏）
+- [x] 切换对话时重置面板
+
+### 联调
+- [x] atlas-chart JSON 解析逻辑迁移到右栏
+- [x] 现有 MainWorkspace 功能迁移（文件上传、AI 分析）
+- [x] WebSocket 自动重连保留

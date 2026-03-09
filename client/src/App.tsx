@@ -1,8 +1,6 @@
 /**
- * ATLAS V5.0 — App Root
- * Layout: Sidebar (collapsible) + Main Content
- * Theme: Dark (cold black) / Light (Manus white) switchable
- * Nav: home / dashboard / templates / search / library / settings
+ * ATLAS V8.0 — App Root
+ * Layout: AtlasWorkspace (three-column) for home, legacy layout for other pages
  */
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect } from "react";
@@ -14,7 +12,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 import LoginModal from "./components/LoginModal";
-import MainWorkspace from "./pages/MainWorkspace";
+import AtlasWorkspace from "./pages/AtlasWorkspace";
 import DashboardPage from "./pages/DashboardPage";
 import TemplatesPage from "./pages/TemplatesPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -27,6 +25,7 @@ import OpenClawMonitor from "./pages/OpenClawMonitor";
 
 function AppContent() {
   const { activeNav, theme, showLoginModal, setUser } = useAtlas();
+
   // Sync server auth state into AtlasContext
   const { data: meData } = trpc.auth.me.useQuery(undefined, {
     retry: false,
@@ -43,6 +42,29 @@ function AppContent() {
       role: (meData.role as "user" | "admin") ?? "user",
     });
   }, [meData, setUser]);
+
+  // Home uses the new three-column AtlasWorkspace (no TopBar/Sidebar wrapper)
+  if (activeNav === "home") {
+    return (
+      <div className={`flex h-screen overflow-hidden ${theme}`} style={{ background: "#fff" }}>
+        <AtlasWorkspace />
+        {showLoginModal && <LoginModal />}
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              background: "#fff",
+              border: "1px solid #e5e7eb",
+              color: "#111827",
+              fontSize: "13px",
+            },
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Other pages use the legacy Sidebar + TopBar layout
   const renderPage = () => {
     switch (activeNav) {
       case "dashboard":  return <DashboardPage />;
@@ -54,12 +76,10 @@ function AppContent() {
       case "hr":         return <HRCenterPage />;
       case "im":         return <IMPage />;
       case "openclaw-monitor": return <OpenClawMonitor />;
-      case "home":
-      default:           return <MainWorkspace />;
+      default:           return <AtlasWorkspace />;
     }
   };
 
-  // make sure to consider if you need authentication for certain routes
   return (
     <div
       className={`flex flex-col h-screen overflow-hidden ${theme}`}
