@@ -544,6 +544,11 @@ export function registerAtlasRoutes(app: Express) {
       // Support both single session_id and multiple session_ids
       const allSessionIds = session_ids?.length ? session_ids : session_id ? [session_id] : [];
 
+      // Disable Cloudflare/proxy buffering so streaming text reaches the browser in real-time
+      res.setHeader("X-Accel-Buffering", "no");
+      res.setHeader("Cache-Control", "no-cache, no-store");
+      res.setHeader("Connection", "keep-alive");
+
       // ── No-file mode: general conversation without data ──────────────────
       if (!allSessionIds.length) {
         const userId = (req as any).userId || 0;

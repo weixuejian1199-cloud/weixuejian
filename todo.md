@@ -505,3 +505,8 @@
 - [x] 定位主题没有生效的根本原因（旧版本 localStorage 写入的 atlas_theme: dark 被读取）
 - [x] 强制覆盖为浅色，确保新用户/无 localStorage 用户看到浅色（添加 atlas_theme_version v2 机制）
 - [x] 保存检查点并发布
+
+## V13.5 修复 Cloudflare 缓冲导致的发消息延迟/失败问题
+- [x] 排查根因：Cloudflare 缓冲了流式响应，导致 AI 全部生成完才一次性发送，用户感知为"卡死"或"无回复"
+- [x] 修复：在 /api/atlas/chat 路由中添加 X-Accel-Buffering: no 和 Cache-Control: no-cache 响应头，禁止 Cloudflare 缓冲
+- [ ] 保存检查点并发布
