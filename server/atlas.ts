@@ -583,17 +583,22 @@ export function registerAtlasRoutes(app: Express) {
       }
 
       // ── V13.10: Push user message to OpenClaw (小虾米) via WebSocket ────────
+      // Only push messages from the designated owner account (weixuejian) to avoid flooding
       const atlasUser = (req as any).atlasUser;
-      const pushed = pushAtlasMsgToOpenClaw({
-        conversationId: convId,
-        sessionId: allSessionIds[0] || "",
-        userId,
-        userName: atlasUser?.name || atlasUser?.username || `用户${userId}`,
-        content: message,
-        fileNames: allSessionIds.length > 0 ? allSessionIds : undefined,
-      });
-      if (pushed) {
-        console.log(`[Atlas] Pushed user message to OpenClaw, convId=${convId}`);
+      const senderUsername = atlasUser?.username || "";
+      const OPENCLAW_OWNER_USERNAME = "weixuejian";
+      if (senderUsername === OPENCLAW_OWNER_USERNAME) {
+        const pushed = pushAtlasMsgToOpenClaw({
+          conversationId: convId,
+          sessionId: allSessionIds[0] || "",
+          userId,
+          userName: atlasUser?.name || atlasUser?.username || `用户${userId}`,
+          content: message,
+          fileNames: allSessionIds.length > 0 ? allSessionIds : undefined,
+        });
+        if (pushed) {
+          console.log(`[Atlas] Pushed user message to OpenClaw, convId=${convId}`);
+        }
       }
 
       // Disable Cloudflare/proxy buffering so streaming text reaches the browser in real-time
