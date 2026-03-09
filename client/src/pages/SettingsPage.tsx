@@ -1137,12 +1137,12 @@ function IntegrationsSection() {
   const ATLAS_TOKEN = "atlas_session_shrimp_20260308";
   const ATLAS_SEND_URL = "https://atlascore.cn/api/openclaw/send";
 
-  const [webhookUrl, setWebhookUrl] = React.useState("");
-  const [webhookSaving, setWebhookSaving] = React.useState(false);
-  const [webhookConfigured, setWebhookConfigured] = React.useState(false);
-  const [copied, setCopied] = React.useState<string | null>(null);
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [webhookSaving, setWebhookSaving] = useState(false);
+  const [webhookConfigured, setWebhookConfigured] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     fetch("/api/openclaw/config", { credentials: "include" })
       .then(r => r.json())
       .then((d: { webhookUrl?: string; configured?: boolean }) => {
