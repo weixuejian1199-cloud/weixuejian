@@ -540,3 +540,12 @@
 - [x] 后端 adminApi.ts：GET /api/admin/conversations/:id/messages — 查询单个对话的消息
 - [x] 单元测试：V13.9 ChatConversations schema 3 项 + ChatMessages schema 3 项 + 对话持久化逻辑 4 项 + Admin API 2 项，共 12 项全部通过
 - [ ] WebSocket：AI 回复完成后推送完整消息给小虾米（待后续实现）
+
+## V13.10 ATLAS ↔ 小虾米双向对话
+
+- [x] 后端：/api/atlas/chat 路由中，用户消息发送后通过 WS 推送给小虾米（含 conversationId/sessionId/content/fileNames）
+- [x] 后端：wsServer.ts 新增 atlas_reply case，小虾米发回后存入 chat_messages 表
+- [x] 后端：GET /api/atlas/chat-replies?conversationId=&after= 接口，前端轮询获取小虾米回复
+- [x] 后端：/api/atlas/chat 返回 X-Conversation-Id 响应头，前端跟踪对话 ID
+- [x] 前端：MainWorkspace 保存 conversationId，AI 回复完成后启动 5s 轮询，小虾米回复显示在对话框
+- [x] 保存检查点并发布

@@ -18,6 +18,8 @@ import {
   imMessages,
   imParticipants,
   users,
+  chatConversations,
+  chatMessages,
 } from "../../drizzle/schema";
 import type { ImConversation, ImMessage, ImParticipant } from "../../drizzle/schema";
 import { verifySessionToken } from "../_core/auth";
@@ -69,6 +71,15 @@ interface WsMsgOpenClawReply extends WsMsgBase {
   done?: boolean;
 }
 
+/** 小虾米对 ATLAS 主工作台消息的回复（区别于 IM 对话的 openclaw_reply） */
+interface WsMsgAtlasReply extends WsMsgBase {
+  type: "atlas_reply";
+  conversationId: string;
+  content: string;
+  streaming?: boolean;
+  done?: boolean;
+}
+
 type WsMessage =
   | WsMsgPing
   | WsMsgSend
@@ -77,12 +88,35 @@ type WsMessage =
   | WsMsgGetContacts
   | WsMsgCreateDirect
   | WsMsgGetAiConv
-  | WsMsgOpenClawReply;
+  | WsMsgOpenClawReply
+  | WsMsgAtlasReply;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
 const onlineUsers = new Map<number, AuthedClient>();
 let openClawClient: WebSocket | null = null;
+
+/**
+ * 向小虾米（OpenClaw）推送 ATLAS 主工作台的用户消息
+ * 供 atlas.ts /api/atlas/chat 路由调用
+ */
+export function pushAtlasMsgToOpenClaw(payload: {
+  conversationId: string;
+  sessionId: string;
+  userId: number;
+  userName: string;
+  content: string;
+  fileNames?: string[];
+}): boolean {
+  if (!openClawClient || openClawClient.readyState !== WebSocket.OPEN) {
+    return false;
+  }
+  openClawClient.send(JSON.stringify({
+    type: "atlas_user_message",
+    ...payload,
+  }));
+  return true;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -543,6 +577,46 @@ async function handleMessage(client: AuthedClient, raw: string): Promise<void> {
             },
           });
           send(userClient.ws, { type: "ai_streaming_done", conversationId });
+        }
+      }
+      break;
+    }
+
+    case "atlas_reply": {
+      // 小虾米对 ATLAS 主工作台消息的回复：存入 chat_messages 表
+      if (!client.isOpenClaw) {
+        send(client.ws, { type: "error", message: "Unauthorized" });
+        break;
+      }
+      const { conversationId: atlasConvId, content: atlasContent, streaming: atlasStreaming, done: atlasDone } = msg;
+
+      if (atlasStreaming && !atlasDone) {
+        // 流式输出：存入临时缓存（待 done 后一次性存库）
+        // 暂时不存库，只记录日志
+        console.log(`[IM] atlas_reply streaming token for convId=${atlasConvId}`);
+      } else if (atlasDone) {
+        // 回复完成：存入 chat_messages 表
+        try {
+          const db = getDb();
+          const msgId = nanoid();
+          await db.insert(chatMessages).values({
+            id: msgId,
+            conversationId: atlasConvId,
+            role: "assistant",
+            content: atlasContent,
+          });
+          // 更新 conversation 的 messageCount
+          const convRows = await db.select().from(chatConversations)
+            .where(eq(chatConversations.id, atlasConvId)).limit(1);
+          if (convRows.length > 0) {
+            await db.update(chatConversations)
+              .set({ messageCount: (convRows[0].messageCount ?? 0) + 1 })
+              .where(eq(chatConversations.id, atlasConvId));
+          }
+          console.log(`[IM] atlas_reply saved to DB, convId=${atlasConvId}, msgId=${msgId}`);
+          send(client.ws, { type: "atlas_reply_ack", conversationId: atlasConvId, msgId });
+        } catch (e) {
+          console.error("[IM] atlas_reply DB error:", e);
         }
       }
       break;

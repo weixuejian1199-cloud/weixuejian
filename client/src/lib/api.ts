@@ -76,14 +76,15 @@ export interface ChatStreamOptions {
   message: string;
   history?: Array<{ role: "user" | "assistant"; content: string }>;
   signal?: AbortSignal;  // AbortController signal for cancellation
+  conversationId?: string;  // V13.10: persist conversation across turns
   onChunk: (chunk: string) => void;
-  onDone: (fullText: string) => void;
+  onDone: (fullText: string, conversationId?: string) => void;  // returns conversation_id from server
   onError: (err: Error) => void;
   onTelegramTask?: (taskId: string, message: string) => void; // Called when task is routed to Telegram
 }
 
 export async function chatStream(opts: ChatStreamOptions): Promise<void> {
-  const { sessionId, sessionIds, message, history, signal, onChunk, onDone, onError } = opts;
+  const { sessionId, sessionIds, message, history, signal, conversationId, onChunk, onDone, onError } = opts;
   const ids = sessionIds?.length ? sessionIds : sessionId ? [sessionId] : [];
 
   try {
@@ -92,8 +93,10 @@ export async function chatStream(opts: ChatStreamOptions): Promise<void> {
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       signal,
-      body: JSON.stringify({ session_ids: ids, session_id: ids[0], message, history }),
+      body: JSON.stringify({ session_ids: ids, session_id: ids[0], message, history, conversation_id: conversationId }),
     });
+    // V13.10: extract conversation_id from response header
+    const returnedConvId = res.headers.get("X-Conversation-Id") ?? conversationId;
 
     if (!res.ok) {
       let msg = `HTTP ${res.status}`;
@@ -131,7 +134,7 @@ export async function chatStream(opts: ChatStreamOptions): Promise<void> {
       onChunk(chunk);
     }
 
-    onDone(fullText);
+    onDone(fullText, returnedConvId ?? undefined);
   } catch (err) {
     // AbortError means user cancelled — treat as normal completion with partial text
     if (err instanceof Error && err.name === "AbortError") {

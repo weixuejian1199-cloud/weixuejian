@@ -27,6 +27,7 @@ import { storagePut, storageGet } from "./storage";
 import { getSession, createSession, updateSession, createReport, updateReport, getReport, getSimilarExamples, getUserReports, getDb } from "./db";
 import { authenticateRequest } from "./_core/auth";
 import { isOpenClawEnabled, callOpenClaw, callOpenClawStream, getPresignedUrlsForSessions } from "./openclaw";
+import { pushAtlasMsgToOpenClaw } from "./im/wsServer";
 import { notifyTelegramNewTask } from "./openclawPolling";
 import { openclawTasks, chatConversations, chatMessages, personalTemplates } from "../drizzle/schema";
 
@@ -579,6 +580,20 @@ export function registerAtlasRoutes(app: Express) {
         } catch (persistErr) {
           console.warn("[Atlas] Conversation persist error (non-fatal):", persistErr);
         }
+      }
+
+      // ── V13.10: Push user message to OpenClaw (小虾米) via WebSocket ────────
+      const atlasUser = (req as any).atlasUser;
+      const pushed = pushAtlasMsgToOpenClaw({
+        conversationId: convId,
+        sessionId: allSessionIds[0] || "",
+        userId,
+        userName: atlasUser?.name || atlasUser?.username || `用户${userId}`,
+        content: message,
+        fileNames: allSessionIds.length > 0 ? allSessionIds : undefined,
+      });
+      if (pushed) {
+        console.log(`[Atlas] Pushed user message to OpenClaw, convId=${convId}`);
       }
 
       // Disable Cloudflare/proxy buffering so streaming text reaches the browser in real-time
@@ -1314,8 +1329,40 @@ ${sampleRows}
     }
   });
 
-  // ── GET /api/atlas/download/:reportId ─────────────────────────────────────
+  // ── GET /api/atlas/chat-replies ─────────────────────────────────────────────────────
+  // 前端轮询：获取小虾米对指定对话的回复消息
+  // Query params: ?conversationId=xxx&after=<timestamp_ms>
+  app.get("/api/atlas/chat-replies", optionalAuth, async (req: Request, res: Response) => {
+    try {
+      const { conversationId, after } = req.query as { conversationId?: string; after?: string };
+      if (!conversationId) {
+        res.status(400).json({ error: "conversationId is required" });
+        return;
+      }
+      const db = await getDb();
+      if (!db) {
+        res.status(503).json({ error: "Database unavailable" });
+        return;
+      }
+      const { eq, and, gt } = await import("drizzle-orm");
+      // 只返回 assistant 角色的消息（小虾米回复）
+      const conditions = [eq(chatMessages.conversationId, conversationId), eq(chatMessages.role, "assistant")];
+      if (after) {
+        const afterDate = new Date(parseInt(after));
+        conditions.push(gt(chatMessages.createdAt, afterDate));
+      }
+      const messages = await db.select().from(chatMessages)
+        .where(and(...conditions))
+        .orderBy(chatMessages.createdAt)
+        .limit(20);
+      res.json({ messages });
+    } catch (err: any) {
+      console.error("[Atlas] chat-replies error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
 
+  // ── GET /api/atlas/download/:reportId ─────────────────────────────────────
   app.get("/api/atlas/download/:reportId", async (req: Request, res: Response) => {
     try {
       const { reportId } = req.params;

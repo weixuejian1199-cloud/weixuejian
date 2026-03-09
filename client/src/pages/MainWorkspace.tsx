@@ -56,6 +56,10 @@ export default function MainWorkspace() {
   // Store suggested actions from last upload (per-session)
   const [pendingActions, setPendingActions] = useState<SuggestedAction[]>([]);
   const [showMorePanel, setShowMorePanel] = useState(false);
+  // V13.10: track conversation_id for persistence and 小虾米 reply polling
+  const [conversationId, setConversationId] = useState<string | undefined>(undefined);
+  const openClawPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastPollTimestampRef = useRef<number>(Date.now());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -296,14 +300,50 @@ export default function MainWorkspace() {
           message: msg,
           history,
           signal: abortController.signal,
+          conversationId,  // V13.10: pass current conversation ID
           onChunk: (chunk) => {
             accumulated += chunk;
             // Strip <suggestions> block from visible text during streaming
             const visibleText = accumulated.replace(/<suggestions>[\s\S]*?<\/suggestions>/, "").replace(/<suggestions>[\s\S]*$/, "");
             updateLastMessage(visibleText, { isStreaming: true });
           },
-          onDone: (fullText) => {
+          onDone: (fullText, returnedConvId) => {
             const finalText = fullText || accumulated;
+            // V13.10: save conversation_id from server response
+            if (returnedConvId) {
+              setConversationId(returnedConvId);
+              // Start polling for 小虾米 replies (every 5s, stop after 5 min)
+              if (openClawPollRef.current) clearInterval(openClawPollRef.current);
+              lastPollTimestampRef.current = Date.now();
+              let pollCount = 0;
+              const maxPolls = 60; // 5 min
+              openClawPollRef.current = setInterval(async () => {
+                pollCount++;
+                if (pollCount > maxPolls) {
+                  clearInterval(openClawPollRef.current!);
+                  openClawPollRef.current = null;
+                  return;
+                }
+                try {
+                  const r = await fetch(
+                    `/api/atlas/chat-replies?conversationId=${returnedConvId}&after=${lastPollTimestampRef.current}`,
+                    { credentials: "include" }
+                  );
+                  if (!r.ok) return;
+                  const data = await r.json() as { messages: Array<{ id: string; content: string; createdAt: string }> };
+                  if (data.messages && data.messages.length > 0) {
+                    // Show 小虾米 reply as a new assistant message
+                    const latestMsg = data.messages[data.messages.length - 1];
+                    addMessage({ role: "assistant", content: `🦐 **小虾米回复**\n\n${latestMsg.content}` });
+                    lastPollTimestampRef.current = new Date(latestMsg.createdAt).getTime();
+                    clearInterval(openClawPollRef.current!);
+                    openClawPollRef.current = null;
+                  }
+                } catch (e) {
+                  console.warn("[Poll] chat-replies error:", e);
+                }
+              }, 5_000);
+            }
             // First try to extract <suggestions> block
             const { cleanText, suggestions } = parseSuggestions(finalText);
             const parsedActions = suggestions.length > 0 ? suggestions : parseInlineOptions(cleanText);
@@ -369,7 +409,7 @@ export default function MainWorkspace() {
       setIsGenerating(false);
       setIsProcessing(false);
     }
-  }, [input, isGenerating, hasFiles, readyFiles, messages, addMessage, updateLastMessage, setIsProcessing, addReport, parseSuggestions, parseInlineOptions]);
+  }, [input, isGenerating, hasFiles, readyFiles, messages, addMessage, updateLastMessage, setIsProcessing, addReport, parseSuggestions, parseInlineOptions, conversationId, setConversationId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
