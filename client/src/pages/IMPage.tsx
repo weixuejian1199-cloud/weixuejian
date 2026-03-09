@@ -238,37 +238,61 @@ export default function IMPage() {
     retry: false,
   });
 
-  // 加载小虾米历史对话记录
-  const { data: openClawHistory } = trpc.im.getOpenClawMessages.useQuery(undefined, {
-    enabled: user?.role === "admin",
-    refetchOnWindowFocus: false,
-    retry: false,
-  });
-  // 历史记录加载完成后初始化（只初始化一次）
-  useEffect(() => {
-    if (openClawHistory && !openClawHistoryLoaded) {
-      setOpenClawMessages(openClawHistory);
-      setOpenClawHistoryLoaded(true);
-    }
-  }, [openClawHistory, openClawHistoryLoaded]);
+  // ── HTTP 轮询：加载小虾米历史消息 + 每 3s 增量拉取新消息 ──────────────────
+  const lastMsgTimeRef = useRef<string | null>(null);
+  const isAdminUser = user?.role === "admin";
 
-  // Poll OpenClaw connection status (admin only, every 10s)
-  const { data: openClawStatus } = trpc.im.getOpenClawStatus.useQuery(undefined, {
-    refetchOnWindowFocus: false,
-    refetchInterval: user?.role === "admin" ? 10000 : false,
-    enabled: user?.role === "admin",
-  });
-  // Sync openClawOnline state
+  // 初始加载历史消息
   useEffect(() => {
-    setOpenClawOnline(openClawStatus?.connected ?? false);
-  }, [openClawStatus]);
+    if (!isAdminUser) return;
+    fetch("/api/openclaw/messages", { credentials: "include" })
+      .then(r => r.json())
+      .then((data: { messages: Array<{id: string; role: "user"|"assistant"; content: string; senderName: string|null; createdAt: string}> }) => {
+        if (data.messages?.length > 0) {
+          setOpenClawMessages(data.messages);
+          lastMsgTimeRef.current = data.messages[data.messages.length - 1].createdAt;
+        }
+        setOpenClawHistoryLoaded(true);
+      })
+      .catch(() => setOpenClawHistoryLoaded(true));
+  }, [isAdminUser]);
 
-  const handleOpenClawReply = useCallback((msg: { id: string; role: "assistant"; content: string; createdAt: string }) => {
-    setOpenClawMessages(prev => [...prev, msg]);
-  }, []);
+  // 每 3s 轮询新消息（仅当小虾米对话窗口激活时）
+  useEffect(() => {
+    if (!isAdminUser) return;
+    const poll = setInterval(() => {
+      const afterParam = lastMsgTimeRef.current
+        ? `?after=${encodeURIComponent(lastMsgTimeRef.current)}`
+        : "";
+      fetch(`/api/openclaw/messages${afterParam}`, { credentials: "include" })
+        .then(r => r.json())
+        .then((data: { messages: Array<{id: string; role: "user"|"assistant"; content: string; senderName: string|null; createdAt: string}> }) => {
+          if (data.messages?.length > 0) {
+            setOpenClawMessages(prev => {
+              const existingIds = new Set(prev.map(m => m.id));
+              const newMsgs = data.messages.filter(m => !existingIds.has(m.id));
+              if (newMsgs.length === 0) return prev;
+              lastMsgTimeRef.current = newMsgs[newMsgs.length - 1].createdAt;
+              return [...prev, ...newMsgs];
+            });
+          }
+        })
+        .catch(() => {});
+    }, 3000);
+    return () => clearInterval(poll);
+  }, [isAdminUser]);
+
+  // 小虾米「在线」状态：只要 Webhook URL 已配置就视为可用
+  useEffect(() => {
+    if (!isAdminUser) return;
+    fetch("/api/openclaw/config", { credentials: "include" })
+      .then(r => r.json())
+      .then((data: { configured: boolean }) => setOpenClawOnline(data.configured ?? false))
+      .catch(() => {});
+  }, [isAdminUser]);
 
   const { connected, conversations, contacts, messages, streamingTokens, send } =
-    useImWebSocket(tokenData?.token ?? null, handleOpenClawReply);
+    useImWebSocket(tokenData?.token ?? null);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -586,22 +610,33 @@ export default function IMPage() {
             setInputText={setOpenClawInput}
             isOnline={openClawOnline}
             onSend={(text) => {
-              // 将消息加入本地显示
+              // 1. 本地先显示
               const localMsg = {
-                id: Date.now().toString(),
+                id: `local-${Date.now()}`,
                 role: "user" as const,
                 content: text,
                 createdAt: new Date().toISOString(),
               };
               setOpenClawMessages(prev => [...prev, localMsg]);
               setOpenClawInput("");
-              // 通过 WS 推送给小虾米
-              send({
-                type: "send_to_openclaw",
-                content: text,
-                fromUserId: 0,
-                fromUserName: user?.name ?? "admin",
-              });
+              // 2. HTTP POST 到后端，后端存库并推送 Webhook
+              fetch("/api/openclaw/admin/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ content: text }),
+              })
+                .then(r => r.json())
+                .then((data: { success: boolean; msgId: string; webhookStatus: string }) => {
+                  // 用服务器返回的真实 msgId 替换本地临时 ID
+                  setOpenClawMessages(prev =>
+                    prev.map(m => m.id === localMsg.id ? { ...m, id: data.msgId } : m)
+                  );
+                  if (data.webhookStatus === "no_webhook_configured") {
+                    toast.warning("小虾米 Webhook 未配置，消息已存库但未推送");
+                  }
+                })
+                .catch(() => toast.error("发送失败，请重试"));
             }}
           />
         ) : (
@@ -832,7 +867,7 @@ function OpenClawPanel({ messages, inputText, setInputText, isOnline, onSend }: 
             </span>
           </div>
           <div className="text-xs" style={{ color: "var(--atlas-text-3)" }}>
-            {isOnline ? "✦ 已连接 · 正在监控 Qwen 回复质量" : "未连接 · 需要在本地 Mac 启动小虾米客户端"}
+            {isOnline ? "❖ Webhook 已配置 · 消息可正常收发" : "未配置 Webhook URL · 请在设置页配置"}
           </div>
         </div>
       </div>
@@ -876,7 +911,7 @@ function OpenClawPanel({ messages, inputText, setInputText, isOnline, onSend }: 
                 style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.2)" }}
               >
                 <p className="text-xs" style={{ color: "#f97316" }}>
-                  ⚠️ 小虾米未连接。请在本地 Mac 启动小虾米客户端，并配置 ATLAS 服务器地址。
+                  ⚠️ 小虾米 Webhook 未配置。请在设置页配置 OPENCLAW_WEBHOOK_URL 环境变量，或联系小虾米工程师提供 Webhook 地址。
                 </p>
               </div>
             )}
@@ -933,8 +968,8 @@ function OpenClawPanel({ messages, inputText, setInputText, isOnline, onSend }: 
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isOnline ? "给小虾米发消息..." : "小虾米未连接，暂时无法发送消息"}
-            disabled={!isOnline}
+            placeholder="给小虾米发消息..."
+            disabled={false}
             rows={1}
             className="flex-1 resize-none bg-transparent outline-none text-sm py-1"
             style={{
@@ -951,11 +986,11 @@ function OpenClawPanel({ messages, inputText, setInputText, isOnline, onSend }: 
           />
           <button
             onClick={() => { if (inputText.trim()) onSend(inputText.trim()); }}
-            disabled={!inputText.trim() || !isOnline}
+            disabled={!inputText.trim()}
             className="w-8 h-8 rounded-lg flex items-center justify-center transition-all flex-shrink-0 mb-0.5"
             style={{
-              background: inputText.trim() && isOnline ? "#f97316" : "var(--atlas-border)",
-              color: inputText.trim() && isOnline ? "#fff" : "var(--atlas-text-3)",
+              background: inputText.trim() ? "#f97316" : "var(--atlas-border)",
+              color: inputText.trim() ? "#fff" : "var(--atlas-text-3)",
             }}
           >
             <Send size={14} />
