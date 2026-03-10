@@ -915,6 +915,78 @@ export default function ChatWorkspace() {
     }
   }, []);
 
+  // Generate preview charts from dfInfo after file upload
+  const generatePreviewCharts = useCallback((dfInfo: { row_count: number; col_count: number; columns: Array<{ name: string; inferred_type: string; sample_values: any[] }>; preview: Record<string, any>[] }, filename: string) => {
+    const preview = dfInfo.preview || [];
+    if (preview.length === 0) return;
+
+    const numericCols = dfInfo.columns.filter(c => c.inferred_type === "numeric");
+    const textCols = dfInfo.columns.filter(c => c.inferred_type === "text" || c.inferred_type === "category");
+
+    const charts: ChartBlock[] = [];
+    const metrics: MetricCard[] = [];
+
+    // Generate a bar chart using first text col as X and first numeric col as Y
+    if (textCols.length > 0 && numericCols.length > 0) {
+      const xCol = textCols[0].name;
+      const yCol = numericCols[0].name;
+      const chartData = preview.slice(0, 10).map(row => ({
+        [xCol]: String(row[xCol] ?? ""),
+        [yCol]: Number(row[yCol] ?? 0),
+      }));
+      if (chartData.some(d => d[yCol] !== 0)) {
+        charts.push({
+          type: "bar",
+          title: `${yCol} 预览`,
+          xKey: xCol,
+          yKey: yCol,
+          data: chartData,
+        });
+      }
+    }
+
+    // If there are 2+ numeric cols, generate a second chart
+    if (textCols.length > 0 && numericCols.length >= 2) {
+      const xCol = textCols[0].name;
+      const yCol = numericCols[1].name;
+      const chartData = preview.slice(0, 10).map(row => ({
+        [xCol]: String(row[xCol] ?? ""),
+        [yCol]: Number(row[yCol] ?? 0),
+      }));
+      if (chartData.some(d => d[yCol] !== 0)) {
+        charts.push({
+          type: "bar",
+          title: `${yCol} 预览`,
+          xKey: xCol,
+          yKey: yCol,
+          data: chartData,
+        });
+      }
+    }
+
+    // Generate metric cards from numeric columns
+    numericCols.slice(0, 4).forEach(col => {
+      const values = preview.map(row => Number(row[col.name] ?? 0)).filter(v => !isNaN(v));
+      if (values.length === 0) return;
+      const sum = values.reduce((a, b) => a + b, 0);
+      const avg = sum / values.length;
+      metrics.push({
+        label: col.name,
+        value: avg >= 10000 ? `${(avg / 10000).toFixed(1)}万` : avg.toFixed(1),
+        change: `共 ${dfInfo.row_count} 行`,
+        trend: "neutral",
+      });
+    });
+
+    if (charts.length > 0) {
+      setPanelCharts(charts);
+      setPanelTitle(`${filename} 数据预览`);
+    }
+    if (metrics.length > 0) {
+      setPanelMetrics(metrics);
+    }
+  }, []);
+
   const processFile = useCallback(async (file: File) => {
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (!["xlsx", "xls", "csv"].includes(ext || "")) {
@@ -968,11 +1040,24 @@ export default function ChatWorkspace() {
         // @ts-ignore
         suggestedActions: result.suggested_actions || DEFAULT_ACTIONS,
       });
+
+      // Auto-generate preview charts in the right panel from dfInfo
+      const dfInfoForChart = {
+        row_count: result.df_info.row_count,
+        col_count: result.df_info.col_count,
+        columns: (result.df_info.fields || []).map((f: any) => ({
+          name: f.name,
+          inferred_type: f.type || "text",
+          sample_values: f.sample || [],
+        })),
+        preview: result.df_info.preview || [],
+      };
+      generatePreviewCharts(dfInfoForChart, result.filename || file.name);
     } catch (err: any) {
       updateUploadedFile(tempId, { status: "error" });
       toast.error(`${file.name} 上传失败：${err.message}`);
     }
-  }, [addUploadedFile, updateUploadedFile, addMessage, activeTaskId, tasks, updateTask]);
+  }, [addUploadedFile, updateUploadedFile, addMessage, activeTaskId, tasks, updateTask, generatePreviewCharts]);
 
   const handleFiles = useCallback((files: FileList | File[]) => {
     if (!activeTaskId) createNewTask();
