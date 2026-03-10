@@ -996,18 +996,22 @@ export default function ChatWorkspace() {
     setPendingActions([]);
     setPanelLoading(true);
 
+    // Ensure there is an active task before adding messages
+    // createNewTask() returns the new task id synchronously, and also updates the internal ref
+    // so that addMessage (which uses the ref) will correctly target the new task
+    const currentTaskId = activeTaskId ?? createNewTask();
+
     addMessage({ role: "user", content: msg });
     const steps = hasFiles
       ? ["解析文件数据", "理解你的需求", "生成回复"]
       : ["理解你的需求", "生成回复"];
     addMessage({ role: "assistant", content: "", isStreaming: true, thinkingSteps: steps });
-
-    if (activeTaskId) {
-      const currentTask = tasks.find(t => t.id === activeTaskId);
-      const isFirstMessage = currentTask?.messages.filter(m => m.role === "user").length === 0;
-      if (isFirstMessage && (currentTask?.title === "新建任务" || !currentTask?.title)) {
+    if (currentTaskId) {
+      const currentTask = tasks.find(t => t.id === currentTaskId);
+      const isFirstMessage = !currentTask || currentTask.messages.filter(m => m.role === "user").length === 0;
+      if (isFirstMessage && (!currentTask?.title || currentTask?.title === "新对话" || currentTask?.title === "新建任务")) {
         const autoTitle = msg.replace(/[，。！？,.!?]+$/, "").slice(0, 20) + (msg.length > 20 ? "..." : "");
-        updateTask(activeTaskId, { title: autoTitle });
+        updateTask(currentTaskId, { title: autoTitle });
       }
     }
 
@@ -1174,7 +1178,7 @@ export default function ChatWorkspace() {
       setIsGenerating(false);
       setIsProcessing(false);
     }
-  }, [input, isGenerating, hasFiles, readyFiles, messages, addMessage, updateLastMessage, setIsProcessing, addReport, parseSuggestions, parseInlineOptions, conversationId, extractAndPushCharts, activeTaskId, tasks, updateTask]);
+  }, [input, isGenerating, hasFiles, readyFiles, messages, addMessage, updateLastMessage, setIsProcessing, addReport, parseSuggestions, parseInlineOptions, conversationId, extractAndPushCharts, activeTaskId, createNewTask, tasks, updateTask]);
 
   const handleDownload = (reportId: string, filename: string) => {
     const a = document.createElement("a");

@@ -258,6 +258,8 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
   const [activeNav, setActiveNav] = useState<NavItem>("home");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTaskId, setActiveTaskIdState] = useState<string | null>(() => localStorage.getItem("atlas_active_task"));
+  // Ref to always have the latest activeTaskId without stale closures
+  const activeTaskIdRef = useRef<string | null>(localStorage.getItem("atlas_active_task"));
   const [theme, setThemeState] = useState<Theme>(() => {
     const saved = localStorage.getItem("atlas_theme");
     return (saved as Theme) || "light";
@@ -315,6 +317,7 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
 
   const setActiveTaskId = useCallback((id: string | null) => {
     setActiveTaskIdState(id);
+    activeTaskIdRef.current = id;
     if (id) localStorage.setItem("atlas_active_task", id);
     else localStorage.removeItem("atlas_active_task");
   }, []);
@@ -332,7 +335,14 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
 
   const deleteTask = useCallback((id: string) => {
     setTasks(prev => prev.filter(t => t.id !== id));
-    setActiveTaskIdState(prev => prev === id ? null : prev);
+    setActiveTaskIdState(prev => {
+      if (prev === id) {
+        activeTaskIdRef.current = null;
+        localStorage.removeItem("atlas_active_task");
+        return null;
+      }
+      return prev;
+    });
   }, []);
 
   const createNewTask = useCallback((): string => {
@@ -386,20 +396,24 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
 
   const addMessage = useCallback((msg: Omit<Message, "id" | "timestamp">) => {
     const full: Message = { ...msg, id: genId(), timestamp: new Date() };
+    // Use ref to always get the latest activeTaskId, avoiding stale closure issues
+    const taskId = activeTaskIdRef.current;
     setTasks(prev => prev.map(t =>
-      t.id === activeTaskId ? { ...t, messages: [...t.messages, full] } : t
+      t.id === taskId ? { ...t, messages: [...t.messages, full] } : t
     ));
-  }, [activeTaskId]);
+  }, []);
 
   const updateLastMessage = useCallback((content: string, extra?: Partial<Message>) => {
+    // Use ref to always get the latest activeTaskId, avoiding stale closure issues
+    const taskId = activeTaskIdRef.current;
     setTasks(prev => prev.map(t => {
-      if (t.id !== activeTaskId) return t;
+      if (t.id !== taskId) return t;
       const msgs = [...t.messages];
       if (msgs.length === 0) return t;
       msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], content, ...extra };
       return { ...t, messages: msgs };
     }));
-  }, [activeTaskId]);
+  }, []);
 
   const clearMessages = useCallback(() => {
     setTasks(prev => prev.map(t =>

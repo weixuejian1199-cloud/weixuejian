@@ -205,22 +205,7 @@ function ModuleNav({
               )}
             </button>
 
-            {/* Chat sub-items */}
-            {isChat && chatExpanded && (
-              <div className="ml-4 mt-0.5 mb-1 pl-3 space-y-0.5" style={{ borderLeft: "1px solid rgba(74,144,226,0.2)" }}>
-                <ChatSubItem
-                  label="ATLAS"
-                  isActive={isActive}
-                  onClick={() => setActiveModule("chat")}
-                />
-                <ChatSubItem
-                  label="OpenClaw"
-                  isActive={false}
-                  onClick={() => toast.info("功能即将上线")}
-                  hasArrow
-                />
-              </div>
-            )}
+
           </div>
         );
       })}
