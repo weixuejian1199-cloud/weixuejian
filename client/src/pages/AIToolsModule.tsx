@@ -48,12 +48,11 @@ export default function AIToolsModule() {
 
   return (
     <div className="flex h-full overflow-hidden" style={{ background: "#fff" }}>
-      {/* Left: Data Source List — 35% */}
+      {/* Center: Data Source List */}
       <div
         className="flex flex-col overflow-hidden"
         style={{
-          width: "35%",
-          minWidth: "260px",
+          width: "50%",
           borderRight: "1px solid var(--atlas-border)",
         }}
       >
@@ -139,8 +138,8 @@ export default function AIToolsModule() {
         </div>
       </div>
 
-      {/* Right: Detail / Add Panel — 65% */}
-      <div className="flex flex-col overflow-hidden" style={{ flex: 1, background: "var(--atlas-surface)" }}>
+      {/* Right: Detail / Add Panel */}
+      <div className="flex flex-col flex-1 overflow-hidden" style={{ background: "var(--atlas-surface)" }}>
         {showAddPanel ? (
           <AddSourcePanel onClose={() => setShowAddPanel(false)} />
         ) : selectedSource ? (
@@ -149,8 +148,6 @@ export default function AIToolsModule() {
           <EmptyDetail />
         )}
       </div>
-
-
     </div>
   );
 }

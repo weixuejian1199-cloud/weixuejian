@@ -63,10 +63,10 @@ export default function AutomationModule() {
 
   return (
     <div className="flex h-full overflow-hidden" style={{ background: "#fff" }}>
-      {/* Left: Task List — 35% */}
+      {/* Center: Task List */}
       <div
         className="flex flex-col overflow-hidden"
-        style={{ width: "35%", minWidth: "260px", borderRight: "1px solid var(--atlas-border)" }}
+        style={{ width: "50%", borderRight: "1px solid var(--atlas-border)" }}
       >
         {/* Header */}
         <div
@@ -139,8 +139,8 @@ export default function AutomationModule() {
         </div>
       </div>
 
-      {/* Right: Task Detail — 65% */}
-      <div className="flex flex-col overflow-hidden" style={{ flex: 1, background: "var(--atlas-surface)" }}>
+      {/* Right: Task Detail */}
+      <div className="flex flex-col flex-1 overflow-hidden" style={{ background: "var(--atlas-surface)" }}>
         {selectedTask ? (
           <TaskDetail
             task={selectedTask}
@@ -154,8 +154,6 @@ export default function AutomationModule() {
           </div>
         )}
       </div>
-
-
     </div>
   );
 }

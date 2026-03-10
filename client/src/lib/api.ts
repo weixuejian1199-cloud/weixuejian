@@ -62,8 +62,6 @@ export async function uploadFile(file: File): Promise<UploadResponse> {
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
     try { const err = await res.json(); msg = err.error || msg; } catch {}
-    // Notify app of expired/invalid session so it can show the login modal
-    if (res.status === 401) window.dispatchEvent(new CustomEvent("atlas:unauthorized"));
     throw new Error(msg);
   }
 
@@ -103,8 +101,6 @@ export async function chatStream(opts: ChatStreamOptions): Promise<void> {
     if (!res.ok) {
       let msg = `HTTP ${res.status}`;
       try { const err = await res.json(); msg = err.error || msg; } catch {}
-      // Notify app of expired/invalid session so it can show the login modal
-      if (res.status === 401) window.dispatchEvent(new CustomEvent("atlas:unauthorized"));
       throw new Error(msg);
     }
 

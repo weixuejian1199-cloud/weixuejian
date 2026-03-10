@@ -4,8 +4,6 @@ import { authenticateRequest } from "./auth";
 import { getOrCreateAnonUser } from "../db";
 import { ANON_COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { nanoid } from "nanoid";
-import { getSessionCookieOptions } from "./cookies";
-import { parse as parseCookieHeader } from "cookie";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
@@ -20,10 +18,6 @@ export async function createContext(
 ): Promise<TrpcContext> {
   let user: User | null = null;
 
-  // Parse cookies from the raw header (avoids dependency on cookie-parser middleware)
-  const rawCookieHeader = opts.req.headers.cookie ?? "";
-  const cookies = parseCookieHeader(rawCookieHeader);
-
   try {
     user = await authenticateRequest(opts.req);
   } catch {
@@ -33,11 +27,16 @@ export async function createContext(
   const getEffectiveUserId = async (): Promise<number> => {
     if (user) return user.id;
     // Get or create anon id from cookie
+    const cookies = opts.req.cookies as Record<string, string>;
     let anonId = cookies[ANON_COOKIE_NAME];
     if (!anonId) {
       anonId = nanoid(16);
-      const cookieOpts = getSessionCookieOptions(opts.req);
-      opts.res.cookie(ANON_COOKIE_NAME, anonId, { ...cookieOpts, maxAge: ONE_YEAR_MS });
+      opts.res.cookie(ANON_COOKIE_NAME, anonId, {
+        httpOnly: true,
+        sameSite: "lax",
+        maxAge: ONE_YEAR_MS,
+        path: "/",
+      });
     }
     const anon = await getOrCreateAnonUser(anonId);
     return anon.id;

@@ -15,20 +15,6 @@ import { useAtlas } from "@/contexts/AtlasContext";
 
 type FileTab = "all" | "excel" | "analyzed";
 
-interface FieldInfo {
-  name: string;
-  type: "numeric" | "text" | "datetime";
-  dtype: string;
-  null_count: number;
-  unique_count: number;
-  sample: (string | number)[];
-}
-interface DfInfo {
-  row_count: number;
-  col_count: number;
-  fields: FieldInfo[];
-  preview: Record<string, unknown>[];
-}
 interface FileSession {
   id: string;
   originalName: string;
@@ -37,7 +23,6 @@ interface FileSession {
   fileSizeKb?: number | null;
   rowCount?: number | null;
   colCount?: number | null;
-  dfInfo?: DfInfo | any | null;
   status: string;
   isMerged?: number | null;
   createdAt: Date | string;
@@ -70,7 +55,7 @@ export default function FilesModule() {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { setActiveModule, createNewTask, addUploadedFile } = useAtlas();
+  const { setActiveModule, setActiveTaskId } = useAtlas();
 
   const utils = trpc.useUtils();
   const { data: sessions = [], isLoading } = trpc.session.list.useQuery(undefined, {
@@ -96,16 +81,7 @@ export default function FilesModule() {
   });
 
   const handleOpenInChat = (file: FileSession) => {
-    // Create a new task and mount the session file into it
-    const taskId = createNewTask();
-    addUploadedFile({
-      id: `file-${Date.now()}`,
-      name: file.originalName,
-      size: (file.fileSizeKb ?? 0) * 1024,
-      sessionId: file.id,
-      status: "ready",
-      uploadedAt: new Date(),
-    });
+    setActiveTaskId(file.id);
     setActiveModule("chat");
     toast.success(`已在对话中打开：${file.originalName}`);
   };
@@ -164,10 +140,10 @@ export default function FilesModule() {
         )}
       </AnimatePresence>
 
-      {/* Left: File List — 35% */}
+      {/* Center: File List */}
       <div
         className="flex flex-col overflow-hidden"
-        style={{ width: "35%", minWidth: 260, borderRight: "1px solid var(--atlas-border)" }}
+        style={{ width: "50%", borderRight: "1px solid var(--atlas-border)" }}
       >
         {/* Header */}
         <div
@@ -338,8 +314,8 @@ export default function FilesModule() {
         </div>
       </div>
 
-      {/* Right: Preview Panel — 65% */}
-      <div className="flex flex-col overflow-hidden" style={{ flex: 1, background: "var(--atlas-surface)" }}>
+      {/* Right: Preview Panel */}
+      <div className="flex flex-col flex-1 overflow-hidden" style={{ background: "var(--atlas-surface)" }}>
         <AnimatePresence mode="wait">
           {selectedFile ? (
             <motion.div
@@ -378,8 +354,6 @@ export default function FilesModule() {
           )}
         </AnimatePresence>
       </div>
-
-
     </div>
   );
 }
@@ -447,90 +421,41 @@ function FilePreviewPanel({
           ))}
         </div>
 
-        {/* Data preview — 字段类型统计 + 数值字段样本 */}
-        {file.dfInfo && (
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--atlas-text-3)" }}>
-              字段概览
-            </div>
-            {/* 字段类型统计卡片 */}
-            <div className="grid grid-cols-3 gap-2 mb-3">
-              {([
-                { label: "数字列", count: file.dfInfo.fields.filter((f: FieldInfo) => f.type === "numeric").length, color: "#2563eb", bg: "rgba(37,99,235,0.06)" },
-                { label: "文本列", count: file.dfInfo.fields.filter((f: FieldInfo) => f.type === "text").length, color: "#7c3aed", bg: "rgba(124,58,237,0.06)" },
-                { label: "时间列", count: file.dfInfo.fields.filter((f: FieldInfo) => f.type === "datetime").length, color: "#0891b2", bg: "rgba(8,145,178,0.06)" },
-              ] as const).map(item => (
-                <div
-                  key={item.label}
-                  className="rounded-lg px-2 py-2 text-center"
-                  style={{ background: item.bg, border: `1px solid ${item.color}20` }}
-                >
-                  <div className="text-base font-bold" style={{ color: item.color }}>{item.count}</div>
-                  <div className="text-[10px] mt-0.5" style={{ color: "var(--atlas-text-3)" }}>{item.label}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* 字段列表 */}
-            <div
-              className="rounded-xl overflow-hidden"
-              style={{ border: "1px solid var(--atlas-border)", background: "#fff" }}
-            >
-              {file.dfInfo.fields.slice(0, 8).map((field: FieldInfo, i: number, arr: FieldInfo[]) => (
-                <div
-                  key={field.name}
-                  className="flex items-center justify-between px-3 py-2"
-                  style={{
-                    borderBottom: i < arr.length - 1 ? "1px solid var(--atlas-border)" : "none",
-                  }}
-                >
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span
-                      className="text-[10px] px-1.5 py-0.5 rounded font-medium flex-shrink-0"
-                      style={{
-                        background: field.type === "numeric" ? "rgba(37,99,235,0.08)" : field.type === "datetime" ? "rgba(8,145,178,0.08)" : "rgba(124,58,237,0.08)",
-                        color: field.type === "numeric" ? "#2563eb" : field.type === "datetime" ? "#0891b2" : "#7c3aed",
-                      }}
-                    >
-                      {field.type === "numeric" ? "N" : field.type === "datetime" ? "D" : "T"}
-                    </span>
-                    <span className="text-xs truncate" style={{ color: "var(--atlas-text)" }}>{field.name}</span>
-                  </div>
-                  <span className="text-[10px] flex-shrink-0 ml-2" style={{ color: "var(--atlas-text-4)" }}>
-                    {field.unique_count} 唯一
-                  </span>
-                </div>
-              ))}
-              {file.dfInfo.fields.length > 8 && (
-                <div className="px-3 py-2 text-center">
-                  <span className="text-[10px]" style={{ color: "var(--atlas-text-4)" }}>
-                    还有 {file.dfInfo.fields.length - 8} 个字段未显示
-                  </span>
-                </div>
-              )}
-            </div>
+        {/* Data preview placeholder */}
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--atlas-text-3)" }}>
+            数据预览
           </div>
-        )}
-
-        {/* 无 dfInfo 时显示简单占位 */}
-        {!file.dfInfo && file.rowCount && (
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--atlas-text-3)" }}>
-              数据预览
-            </div>
-            <div
-              className="rounded-xl overflow-hidden"
-              style={{ border: "1px solid var(--atlas-border)", background: "#fff" }}
-            >
-              <div className="flex items-center gap-2 px-4 py-3">
-                <CheckCircle2 size={12} style={{ color: "#10b981" }} />
-                <span className="text-xs" style={{ color: "var(--atlas-text-2)" }}>
-                  {file.rowCount} 行 × {file.colCount || "?"} 列，已就绪
-                </span>
+          <div
+            className="rounded-xl overflow-hidden"
+            style={{ border: "1px solid var(--atlas-border)", background: "#fff" }}
+          >
+            {file.rowCount ? (
+              <div className="px-4 py-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <BarChart2 size={13} style={{ color: "#2563eb" }} />
+                  <span className="text-xs font-medium" style={{ color: "var(--atlas-text-2)" }}>
+                    共 {file.rowCount} 行 × {file.colCount || "?"} 列
+                  </span>
+                </div>
+                <div
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                  style={{ background: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.1)" }}
+                >
+                  <CheckCircle2 size={12} style={{ color: "#10b981" }} />
+                  <span className="text-xs" style={{ color: "var(--atlas-text-2)" }}>
+                    文件已上传，点击下方按钮开始 AI 分析
+                  </span>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex items-center gap-2 px-4 py-3">
+                <AlertCircle size={13} style={{ color: "var(--atlas-text-4)" }} />
+                <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>暂无预览数据</span>
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         {/* CTA */}
         <button
