@@ -2,6 +2,9 @@
  * ATLAS V15.0 — App Root
  * Six-module architecture: chat / files / ai-tools / automation / knowledge / settings
  * Layout: AtlasNavigation (20%) | Module Content (80%)
+ *
+ * Guest mode: LoginModal is only rendered when showLoginModal === true.
+ * No forced login — users can use all basic features without signing in.
  */
 import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
@@ -21,9 +24,9 @@ import KnowledgeModule from "./pages/KnowledgeModule";
 import SettingsModule from "./pages/SettingsModule";
 
 function AppContent() {
-  const { activeModule, setUser } = useAtlas();
+  const { activeModule, setUser, showLoginModal } = useAtlas();
 
-  // Sync server auth state into AtlasContext
+  // Sync server auth state into AtlasContext (silently — no redirect on failure)
   const { data: meData } = trpc.auth.me.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
@@ -63,7 +66,8 @@ function AppContent() {
         {renderModule()}
       </div>
 
-      <LoginModal />
+      {/* Login modal — only shown when explicitly triggered, never forced on load */}
+      {showLoginModal && <LoginModal />}
     </div>
   );
 }

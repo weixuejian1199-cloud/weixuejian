@@ -1,13 +1,14 @@
 /**
  * ATLAS V15.0 — Left Navigation
  * 20% width, fixed sidebar with module switching
+ * Guest mode: login button shown when user is not signed in
  */
 import React, { useState } from "react";
 import { useAtlas, ActiveModule, Task } from "../contexts/AtlasContext";
 import {
   MessageSquare, FolderOpen, Wrench, Zap, BookOpen,
   Settings, Gift, Plus, ChevronDown, ChevronRight,
-  Bot, MoreHorizontal, Trash2, Edit2, LogOut, User
+  Bot, Trash2, LogOut, User, LogIn
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
@@ -31,7 +32,15 @@ const MODULES: ModuleItem[] = [
 
 // ── Sub-components ───────────────────────────────────────────────────────────
 
-function NavLogo({ user, onLogout }: { user: any; onLogout: () => void }) {
+function NavLogo({
+  user,
+  onLogout,
+  onLogin,
+}: {
+  user: any;
+  onLogout: () => void;
+  onLogin: () => void;
+}) {
   const [showMenu, setShowMenu] = useState(false);
 
   return (
@@ -44,12 +53,13 @@ function NavLogo({ user, onLogout }: { user: any; onLogout: () => void }) {
         <span className="font-semibold text-[13px] text-[var(--atlas-text)] tracking-wide">ATLAS</span>
       </div>
 
-      {/* User avatar */}
-      {user && (
+      {/* User area: avatar (logged in) or login button (guest) */}
+      {user ? (
         <div className="relative">
           <button
             onClick={() => setShowMenu(!showMenu)}
             className="w-7 h-7 rounded-full bg-[var(--atlas-surface-2)] border border-[var(--atlas-border)] flex items-center justify-center hover:bg-[var(--atlas-surface)] transition-colors overflow-hidden"
+            title={user.name}
           >
             {user.avatar ? (
               <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
@@ -63,7 +73,7 @@ function NavLogo({ user, onLogout }: { user: any; onLogout: () => void }) {
               <div className="absolute right-0 top-9 z-50 bg-[var(--atlas-elevated)] border border-[var(--atlas-border)] rounded-lg shadow-lg py-1 w-44 animate-atlas-fade-in">
                 <div className="px-3 py-2 border-b border-[var(--atlas-border)]">
                   <p className="text-[12px] font-medium text-[var(--atlas-text)] truncate">{user.name}</p>
-                  <p className="text-[11px] text-[var(--atlas-text-3)] truncate">{user.email}</p>
+                  <p className="text-[11px] text-[var(--atlas-text-3)] truncate">{user.email || "未设置邮箱"}</p>
                 </div>
                 <button
                   onClick={() => { onLogout(); setShowMenu(false); }}
@@ -76,6 +86,29 @@ function NavLogo({ user, onLogout }: { user: any; onLogout: () => void }) {
             </>
           )}
         </div>
+      ) : (
+        /* Guest: show a subtle login button */
+        <button
+          onClick={onLogin}
+          title="登录 / 注册"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all border"
+          style={{
+            color: "var(--atlas-accent)",
+            borderColor: "var(--atlas-accent)",
+            background: "var(--atlas-accent-light)",
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLElement).style.background = "var(--atlas-accent)";
+            (e.currentTarget as HTMLElement).style.color = "#fff";
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.background = "var(--atlas-accent-light)";
+            (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
+          }}
+        >
+          <LogIn size={12} />
+          登录
+        </button>
       )}
     </div>
   );
@@ -245,6 +278,7 @@ export default function AtlasNavigation() {
     activeModule, setActiveModule,
     user, setUser,
     tasks, activeTaskId, setActiveTaskId, createNewTask, deleteTask,
+    setShowLoginModal,
   } = useAtlas();
 
   const logoutMutation = trpc.auth.logout.useMutation({
@@ -262,8 +296,12 @@ export default function AtlasNavigation() {
       className="flex flex-col h-full bg-[var(--atlas-surface)] border-r border-[var(--atlas-border)] select-none"
       style={{ width: "var(--atlas-nav-w)", minWidth: "var(--atlas-nav-w)" }}
     >
-      {/* Logo + User */}
-      <NavLogo user={user} onLogout={() => logoutMutation.mutate()} />
+      {/* Logo + User / Login button */}
+      <NavLogo
+        user={user}
+        onLogout={() => logoutMutation.mutate()}
+        onLogin={() => setShowLoginModal(true)}
+      />
 
       {/* Module navigation — top 50% */}
       <div className="flex-shrink-0 py-1">
