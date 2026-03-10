@@ -52,7 +52,8 @@ export default function AIToolsModule() {
       <div
         className="flex flex-col overflow-hidden"
         style={{
-          width: "50%",
+          width: "20%",
+          minWidth: "200px",
           borderRight: "1px solid var(--atlas-border)",
         }}
       >
@@ -139,7 +140,7 @@ export default function AIToolsModule() {
       </div>
 
       {/* Right: Detail / Add Panel */}
-      <div className="flex flex-col flex-1 overflow-hidden" style={{ background: "var(--atlas-surface)" }}>
+      <div className="flex flex-col overflow-hidden" style={{ width: "80%", background: "var(--atlas-surface)" }}>
         {showAddPanel ? (
           <AddSourcePanel onClose={() => setShowAddPanel(false)} />
         ) : selectedSource ? (

@@ -57,7 +57,7 @@ export default function KnowledgeModule() {
       {/* Center: Knowledge List */}
       <div
         className="flex flex-col overflow-hidden"
-        style={{ width: "50%", borderRight: "1px solid var(--atlas-border)" }}
+        style={{ width: "20%", minWidth: "200px", borderRight: "1px solid var(--atlas-border)" }}
       >
         {/* Header */}
         <div
@@ -178,7 +178,7 @@ export default function KnowledgeModule() {
       </div>
 
       {/* Right: Detail */}
-      <div className="flex flex-col flex-1 overflow-hidden" style={{ background: "var(--atlas-surface)" }}>
+      <div className="flex flex-col overflow-hidden" style={{ width: "80%", background: "var(--atlas-surface)" }}>
         {selectedItem ? (
           <KnowledgeDetail item={selectedItem} />
         ) : (

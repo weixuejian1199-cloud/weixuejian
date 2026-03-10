@@ -66,7 +66,7 @@ export default function AutomationModule() {
       {/* Center: Task List */}
       <div
         className="flex flex-col overflow-hidden"
-        style={{ width: "50%", borderRight: "1px solid var(--atlas-border)" }}
+        style={{ width: "20%", minWidth: "200px", borderRight: "1px solid var(--atlas-border)" }}
       >
         {/* Header */}
         <div
@@ -140,7 +140,7 @@ export default function AutomationModule() {
       </div>
 
       {/* Right: Task Detail */}
-      <div className="flex flex-col flex-1 overflow-hidden" style={{ background: "var(--atlas-surface)" }}>
+      <div className="flex flex-col overflow-hidden" style={{ width: "80%", background: "var(--atlas-surface)" }}>
         {selectedTask ? (
           <TaskDetail
             task={selectedTask}

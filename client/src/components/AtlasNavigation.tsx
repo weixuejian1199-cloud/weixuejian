@@ -539,14 +539,6 @@ export default function AtlasNavigation() {
       {/* Divider */}
       <div className="mx-4 my-1" style={{ borderTop: "1px solid var(--atlas-border)" }} />
 
-      {/* AI Engine section */}
-      <div className="flex-shrink-0">
-        <AIEngineSection onTaskClick={handleTaskClick} />
-      </div>
-
-      {/* Divider */}
-      <div className="mx-4 my-1" style={{ borderTop: "1px solid var(--atlas-border)" }} />
-
       {/* Recent chats */}
       <RecentChats
         tasks={tasks}
