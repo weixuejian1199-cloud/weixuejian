@@ -41,52 +41,58 @@ export default function TopBar({ navCollapsed, onToggleNav }: TopBarProps) {
       }}
     >
       {/* Left: sidebar toggle + Logo */}
-      <div className="flex items-center gap-2 flex-shrink-0" style={{ width: "220px" }}>
-        {/* Sidebar toggle button */}
-        <button
-          onClick={onToggleNav}
-          className="w-8 h-8 rounded-lg flex items-center justify-center transition-all flex-shrink-0"
-          style={{ color: "var(--atlas-text-3)", background: "transparent" }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.background = "rgba(74,144,226,0.08)";
-            (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.background = "transparent";
-            (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
-          }}
-          title={navCollapsed ? "展开侧栏" : "收起侧栏"}
-        >
-          {navCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
-        </button>
-
-        {/* Logo */}
-        <div className="flex items-center gap-2">
-          <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{
-              background: "linear-gradient(135deg, #4A90E2 0%, #6BA3F5 100%)",
-              boxShadow: "0 2px 8px rgba(74,144,226,0.35)",
+      <div className="flex items-center gap-2 flex-shrink-0" style={{ width: navCollapsed ? "auto" : "220px" }}>
+        {/* 展开按鈕：侧边栏收起时才显示 */}
+        {navCollapsed && (
+          <button
+            onClick={onToggleNav}
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all flex-shrink-0"
+            style={{ color: "var(--atlas-text-3)", background: "transparent" }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.background = "rgba(74,144,226,0.08)";
+              (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
             }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = "transparent";
+              (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+            }}
+            title="展开侧栏"
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M7 1L13 12H1L7 1Z" fill="white" fillOpacity="0.9" />
-              <path d="M7 5L10 11H4L7 5Z" fill="white" fillOpacity="0.4" />
-            </svg>
+            <PanelLeftOpen size={17} />
+          </button>
+        )}
+
+        {/* Logo：侧边栏收起时才显示（展开时在侧边栏内显示） */}
+        {navCollapsed && (
+          <div className="flex items-center gap-2">
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{
+                background: "linear-gradient(135deg, #4A90E2 0%, #6BA3F5 100%)",
+                boxShadow: "0 2px 8px rgba(74,144,226,0.35)",
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M7 1L13 12H1L7 1Z" fill="white" fillOpacity="0.9" />
+                <path d="M7 5L10 11H4L7 5Z" fill="white" fillOpacity="0.4" />
+              </svg>
+            </div>
+            <span className="font-bold text-[15px] tracking-wide" style={{ color: "var(--atlas-text)" }}>
+              ATLAS
+            </span>
           </div>
-          <span className="font-bold text-[15px] tracking-wide" style={{ color: "var(--atlas-text)" }}>
-            ATLAS
-          </span>
-        </div>
+        )}
       </div>
 
       {/* Center: Tagline */}
       <div className="flex-1 flex items-center justify-center">
         <span
-          className="text-[13px] select-none"
-          style={{ color: "var(--atlas-text-3)", letterSpacing: "0.01em" }}
+          className="text-[14px] select-none font-medium"
+          style={{ color: "var(--atlas-text-2)", letterSpacing: "0.02em" }}
         >
-          ATLAS &nbsp;|&nbsp; 一个模块，一种心智。
+          <span style={{ color: "var(--atlas-accent)", fontWeight: 700 }}>ATLAS</span>
+          <span style={{ color: "var(--atlas-text-4)", margin: "0 6px" }}>|</span>
+          <span style={{ color: "var(--atlas-text-2)" }}>一个模块，一种心智。</span>
         </span>
       </div>
 

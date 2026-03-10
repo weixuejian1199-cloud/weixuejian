@@ -1,5 +1,5 @@
 /**
- * ATLAS V16.3 — App Root
+ * ATLAS V16.6 — App Root
  * Layout: TopBar (48px) | AtlasNavigation (220px, collapsible) | Module Content (flex-1)
  * Light blue-gray theme, glassmorphism style
  * Guest mode: no forced login
@@ -24,10 +24,10 @@ import SettingsModule from "./pages/SettingsModule";
 import InvitePage from "./pages/InvitePage";
 
 function AppContent() {
-  const { activeModule, setUser, showLoginModal } = useAtlas();
+  const { activeModule, setUser, showLoginModal, setShowLoginModal } = useAtlas();
   const [navCollapsed, setNavCollapsed] = useState(false);
 
-  const { data: meData } = trpc.auth.me.useQuery(undefined, {
+  const { data: meData, refetch: refetchMe } = trpc.auth.me.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -43,6 +43,20 @@ function AppContent() {
       role: (meData.role as "user" | "admin") ?? "user",
     });
   }, [meData, setUser]);
+
+  // Listen for unauthorized events (stale/expired cookie) and show login modal.
+  // This handles the case where the user has an old browser session with an
+  // expired JWT — requests silently fail without this handler.
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setUser(null);
+      setShowLoginModal(true);
+      // Refresh auth state so UI reflects the logged-out state
+      refetchMe();
+    };
+    window.addEventListener("atlas:unauthorized", handleUnauthorized);
+    return () => window.removeEventListener("atlas:unauthorized", handleUnauthorized);
+  }, [setUser, setShowLoginModal, refetchMe]);
 
   const renderModule = () => {
     switch (activeModule) {
@@ -71,7 +85,7 @@ function AppContent() {
       {/* Main area: Nav + Content */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Left Navigation — collapsible */}
-        {!navCollapsed && <AtlasNavigation />}
+        {!navCollapsed && <AtlasNavigation onCollapse={() => setNavCollapsed(true)} />}
 
         {/* Module Content — flex-1 */}
         <div className="flex-1 min-w-0 overflow-hidden">

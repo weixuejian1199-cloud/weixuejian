@@ -8,7 +8,7 @@ import { useAtlas, ActiveModule, Task } from "../contexts/AtlasContext";
 import {
   MessageSquare, FolderOpen, Wrench, Zap, BookOpen,
   Settings, Gift, Plus, ChevronDown, ChevronRight,
-  Bot, Trash2, LogOut, User, LogIn, FileText
+  Bot, Trash2, LogOut, User, LogIn, FileText, PanelLeftClose
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
@@ -27,7 +27,6 @@ const MODULES: ModuleItem[] = [
   { id: "files",      label: "文件",      icon: <FolderOpen size={18} /> },
   { id: "ai-tools",   label: "AI 工具",   icon: <Wrench size={18} /> },
   { id: "automation", label: "AI 自动化", icon: <Zap size={18} /> },
-  { id: "knowledge",  label: "知识库",    icon: <BookOpen size={18} /> },
 ];
 
 // AI引擎快捷任务
@@ -312,7 +311,7 @@ function RecentChats({
     <div className="flex-1 overflow-y-auto px-3 py-2 min-h-0">
       <div className="flex items-center justify-between px-2 mb-2">
         <span
-          className="text-[11px] font-semibold uppercase tracking-widest"
+          className="text-[12px] font-semibold uppercase tracking-widest"
           style={{ color: "var(--atlas-text-4)" }}
         >
           最近对话
@@ -350,7 +349,7 @@ function RecentChats({
             >
               <button
                 onClick={() => setActiveTaskId(task.id)}
-                className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-[13px] transition-colors text-left"
+                className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-[13.5px] transition-colors text-left"
                 style={activeTaskId === task.id ? {
                   background: "rgba(74,144,226,0.1)",
                   color: "var(--atlas-text)",
@@ -406,7 +405,7 @@ function NavBottom({ setActiveModule }: { setActiveModule: (m: ActiveModule) => 
       {/* 分享好礼卡片 */}
       <button
         onClick={() => setActiveModule("invite" as any)}
-        className="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all text-left"
+        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-left"
         style={{
           background: "rgba(255,255,255,0.7)",
           backdropFilter: "blur(8px)",
@@ -423,19 +422,19 @@ function NavBottom({ setActiveModule }: { setActiveModule: (m: ActiveModule) => 
         }}
       >
         <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
           style={{ background: "linear-gradient(135deg, #FF6B9D 0%, #FF8E53 100%)" }}
         >
-          <Gift size={15} color="white" />
+          <Gift size={13} color="white" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[13px] font-medium truncate" style={{ color: "var(--atlas-text)" }}>与好友分享 ATLAS</p>
+          <p className="text-[12px] font-medium truncate" style={{ color: "var(--atlas-text)" }}>与好友分享 ATLAS</p>
           <p className="text-[11px]" style={{ color: "var(--atlas-text-3)" }}>各得 500 积分</p>
         </div>
         <ChevronRight size={14} style={{ color: "var(--atlas-text-4)", flexShrink: 0 }} />
       </button>
 
-      {/* 选理 + 用户 */}
+      {/* 设置 + 知识库（图标按钮） */}
       <div className="flex gap-1 pt-1">
         <button
           onClick={() => setActiveModule("settings")}
@@ -449,34 +448,35 @@ function NavBottom({ setActiveModule }: { setActiveModule: (m: ActiveModule) => 
             (e.currentTarget as HTMLElement).style.background = "transparent";
             (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
           }}
+          title="设置"
         >
           <Settings size={16} />
-          <span>选理</span>
+          <span>设置</span>
         </button>
         <button
-          onClick={() => toast.info("功能即将上线")}
-          className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg text-[14px] transition-all"
+          onClick={() => setActiveModule("knowledge" as any)}
+          className="w-9 h-9 flex items-center justify-center rounded-lg transition-all flex-shrink-0"
           style={{ color: "var(--atlas-text-3)" }}
           onMouseEnter={e => {
             (e.currentTarget as HTMLElement).style.background = "rgba(74,144,226,0.08)";
-            (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+            (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
           }}
           onMouseLeave={e => {
             (e.currentTarget as HTMLElement).style.background = "transparent";
             (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
           }}
+          title="知识库"
         >
-          <User size={16} />
-          <span>用户</span>
+          <BookOpen size={16} />
         </button>
       </div>
     </div>
   );
 }
 
-// ── Main Navigation ───────────────────────────────────────────────────────────
+// ── Main Navigation ─────────────────────────────────────────────────────────────────────────────────
 
-export default function AtlasNavigation() {
+export default function AtlasNavigation({ onCollapse }: { onCollapse?: () => void }) {
   const {
     activeModule, setActiveModule,
     user, setUser,
@@ -509,6 +509,46 @@ export default function AtlasNavigation() {
         borderRight: "1px solid var(--atlas-border)",
       }}
     >
+      {/* Top: Logo + Collapse button */}
+      <div
+        className="flex items-center justify-between px-3 flex-shrink-0"
+        style={{ height: "48px", borderBottom: "1px solid var(--atlas-border)" }}
+      >
+        <div className="flex items-center gap-2">
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{
+              background: "linear-gradient(135deg, #4A90E2 0%, #6BA3F5 100%)",
+              boxShadow: "0 2px 8px rgba(74,144,226,0.3)",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M7 1L13 12H1L7 1Z" fill="white" fillOpacity="0.9" />
+              <path d="M7 5L10 11H4L7 5Z" fill="white" fillOpacity="0.4" />
+            </svg>
+          </div>
+          <span className="font-bold text-[15px] tracking-wide" style={{ color: "var(--atlas-text)" }}>ATLAS</span>
+        </div>
+        {onCollapse && (
+          <button
+            onClick={onCollapse}
+            className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+            style={{ color: "var(--atlas-text-4)", background: "transparent" }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.background = "rgba(74,144,226,0.08)";
+              (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = "transparent";
+              (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-4)";
+            }}
+            title="收起侧栏"
+          >
+            <PanelLeftClose size={15} />
+          </button>
+        )}
+      </div>
+
       {/* Module navigation */}
       <div className="flex-shrink-0">
         <ModuleNav activeModule={activeModule} setActiveModule={setActiveModule} />

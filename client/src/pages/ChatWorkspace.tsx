@@ -77,7 +77,7 @@ function AnalysisPanel({ charts, metrics, title, isLoading }: {
     <div
       className="flex flex-col h-full flex-shrink-0"
       style={{
-        width: "40%",
+        width: "45%",
         borderLeft: "1px solid rgba(74,144,226,0.15)",
         background: "rgba(255,255,255,0.6)",
         backdropFilter: "blur(20px)",
