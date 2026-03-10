@@ -389,6 +389,7 @@ export default function MainWorkspace() {
           .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
 
         let accumulated = "";
+        let openClawTimedOut = false; // Flag: OpenClaw 30s timeout triggered auto-retry
         await chatStream({
           sessionIds,
           message: msg,
@@ -397,11 +398,49 @@ export default function MainWorkspace() {
           conversationId,  // V13.10: pass current conversation ID
           onChunk: (chunk) => {
             accumulated += chunk;
+            // Detect OpenClaw 30s timeout signal → trigger auto-retry with Qwen
+            if (accumulated.includes("__OPENCLAW_TIMEOUT_RETRY__")) {
+              openClawTimedOut = true;
+              updateLastMessage("⚡ 正在切换备用引擎，自动重试中...", { isStreaming: true });
+              return;
+            }
             // Strip <suggestions> block from visible text during streaming
             const visibleText = accumulated.replace(/<suggestions>[\s\S]*?<\/suggestions>/, "").replace(/<suggestions>[\s\S]*$/, "");
             updateLastMessage(visibleText, { isStreaming: true });
           },
-          onDone: (fullText, returnedConvId) => {
+          onDone: async (fullText, returnedConvId) => {
+            // Auto-retry with Qwen when OpenClaw timed out
+            if (openClawTimedOut) {
+              accumulated = "";
+              openClawTimedOut = false;
+              const retryAbort = new AbortController();
+              abortControllerRef.current = retryAbort;
+              await chatStream({
+                sessionIds,
+                message: msg,
+                history,
+                signal: retryAbort.signal,
+                conversationId,
+                onChunk: (chunk) => {
+                  accumulated += chunk;
+                  const visibleText = accumulated.replace(/<suggestions>[\s\S]*?<\/suggestions>/, "").replace(/<suggestions>[\s\S]*$/, "");
+                  updateLastMessage(visibleText, { isStreaming: true });
+                },
+                onDone: (retryFullText, retryConvId) => {
+                  const finalRetryText = retryFullText || accumulated;
+                  if (retryConvId) setConversationId(retryConvId);
+                  const { cleanText, suggestions } = parseSuggestions(finalRetryText);
+                  const parsedActions = suggestions.length > 0 ? suggestions : parseInlineOptions(cleanText);
+                  updateLastMessage(cleanText, { suggestedActions: parsedActions } as any);
+                },
+                onError: (retryErr) => {
+                  updateLastMessage(`对话失败：${retryErr.message || "请求失败"}\n\n请稍后重试。`);
+                  toast.error("对话失败，请重试");
+                  setInput(msg);
+                },
+              });
+              return;
+            }
             const finalText = fullText || accumulated;
             // V13.10: save conversation_id from server response
             if (returnedConvId) {

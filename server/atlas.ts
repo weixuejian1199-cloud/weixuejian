@@ -1290,7 +1290,7 @@ ${dataTable}
           // on the same connection — just end the response with a fallback notice
           if (res.headersSent) {
             if (!res.writableEnded) {
-              res.write(`0:${JSON.stringify("\n\n⚠️ 小虾米响应超时，已自动切换到备用分析引擎，正在重新处理...\n")}\n`);
+              res.write(`0:${JSON.stringify("\n\n__OPENCLAW_TIMEOUT_RETRY__\n")}\n`);
               res.end();
             }
             return;
