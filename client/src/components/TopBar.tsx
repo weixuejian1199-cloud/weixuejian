@@ -1,19 +1,36 @@
 /**
- * ATLAS V16 — Top Bar
- * Left: ATLAS logo | Center: tagline | Right: ≡ ⓘ ♥
+ * ATLAS V16.3 — Top Bar
+ * Left: sidebar toggle + ATLAS logo | Center: tagline | Right: ≡ ⓘ ♥ + user avatar
  */
 import { useState } from "react";
-import { Menu, Info, Heart, ChevronDown } from "lucide-react";
+import { Menu, Info, Heart, ChevronDown, User, LogOut, LogIn, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useAtlas } from "../contexts/AtlasContext";
+import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
-export default function TopBar() {
-  const { setActiveModule } = useAtlas() as any;
+interface TopBarProps {
+  navCollapsed: boolean;
+  onToggleNav: () => void;
+}
+
+export default function TopBar({ navCollapsed, onToggleNav }: TopBarProps) {
+  const { setActiveModule, user, setUser, setShowLoginModal } = useAtlas() as any;
   const [heartOpen, setHeartOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  const logoutMutation = trpc.auth.logout.useMutation({
+    onSuccess: () => {
+      setUser(null);
+      toast.success("已退出登录");
+    },
+    onError: () => {
+      toast.error("退出失败，请重试");
+    },
+  });
 
   return (
     <div
-      className="flex items-center justify-between flex-shrink-0 px-5"
+      className="flex items-center justify-between flex-shrink-0 px-3"
       style={{
         height: "48px",
         background: "rgba(255,255,255,0.88)",
@@ -23,23 +40,44 @@ export default function TopBar() {
         zIndex: 50,
       }}
     >
-      {/* Left: Logo */}
-      <div className="flex items-center gap-2.5 flex-shrink-0" style={{ width: "220px" }}>
-        <div
-          className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{
-            background: "linear-gradient(135deg, #4A90E2 0%, #6BA3F5 100%)",
-            boxShadow: "0 2px 8px rgba(74,144,226,0.35)",
+      {/* Left: sidebar toggle + Logo */}
+      <div className="flex items-center gap-2 flex-shrink-0" style={{ width: "220px" }}>
+        {/* Sidebar toggle button */}
+        <button
+          onClick={onToggleNav}
+          className="w-8 h-8 rounded-lg flex items-center justify-center transition-all flex-shrink-0"
+          style={{ color: "var(--atlas-text-3)", background: "transparent" }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLElement).style.background = "rgba(74,144,226,0.08)";
+            (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
           }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.background = "transparent";
+            (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+          }}
+          title={navCollapsed ? "展开侧栏" : "收起侧栏"}
         >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M7 1L13 12H1L7 1Z" fill="white" fillOpacity="0.9" />
-            <path d="M7 5L10 11H4L7 5Z" fill="white" fillOpacity="0.4" />
-          </svg>
+          {navCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+        </button>
+
+        {/* Logo */}
+        <div className="flex items-center gap-2">
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{
+              background: "linear-gradient(135deg, #4A90E2 0%, #6BA3F5 100%)",
+              boxShadow: "0 2px 8px rgba(74,144,226,0.35)",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M7 1L13 12H1L7 1Z" fill="white" fillOpacity="0.9" />
+              <path d="M7 5L10 11H4L7 5Z" fill="white" fillOpacity="0.4" />
+            </svg>
+          </div>
+          <span className="font-bold text-[15px] tracking-wide" style={{ color: "var(--atlas-text)" }}>
+            ATLAS
+          </span>
         </div>
-        <span className="font-bold text-[15px] tracking-wide" style={{ color: "var(--atlas-text)" }}>
-          ATLAS
-        </span>
       </div>
 
       {/* Center: Tagline */}
@@ -52,26 +90,8 @@ export default function TopBar() {
         </span>
       </div>
 
-      {/* Right: Icons */}
+      {/* Right: Icons + User */}
       <div className="flex items-center gap-1 flex-shrink-0" style={{ width: "220px", justifyContent: "flex-end" }}>
-        {/* ≡ Menu */}
-        <button
-          onClick={() => toast.info("功能即将上线")}
-          className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
-          style={{ color: "var(--atlas-text-3)", background: "transparent" }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.background = "rgba(74,144,226,0.08)";
-            (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.background = "transparent";
-            (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
-          }}
-          title="菜单"
-        >
-          <Menu size={17} />
-        </button>
-
         {/* ⓘ Info */}
         <button
           onClick={() => toast.info("功能即将上线")}
@@ -147,6 +167,85 @@ export default function TopBar() {
             </>
           )}
         </div>
+
+        {/* Divider */}
+        <div className="w-px h-5 mx-1" style={{ background: "rgba(74,144,226,0.15)" }} />
+
+        {/* User avatar / Login button */}
+        {user ? (
+          <div className="relative">
+            <button
+              onClick={() => setUserMenuOpen(v => !v)}
+              className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden transition-all"
+              style={{
+                border: "2px solid rgba(74,144,226,0.3)",
+                background: "rgba(74,144,226,0.1)",
+              }}
+              title={user.name}
+            >
+              {user.avatar ? (
+                <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+              ) : (
+                <User size={14} style={{ color: "var(--atlas-accent)" }} />
+              )}
+            </button>
+            {userMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
+                <div
+                  className="absolute right-0 top-10 z-50 py-1 w-44 animate-atlas-fade-in"
+                  style={{
+                    background: "rgba(255,255,255,0.96)",
+                    backdropFilter: "blur(16px)",
+                    border: "1px solid rgba(74,144,226,0.15)",
+                    borderRadius: "10px",
+                    boxShadow: "0 8px 24px rgba(74,144,226,0.15)",
+                  }}
+                >
+                  <div className="px-3 py-2.5" style={{ borderBottom: "1px solid var(--atlas-border)" }}>
+                    <p className="text-[13px] font-medium truncate" style={{ color: "var(--atlas-text)" }}>{user.name}</p>
+                    <p className="text-[11px] truncate mt-0.5" style={{ color: "var(--atlas-text-3)" }}>{user.email || "未设置邮箱"}</p>
+                  </div>
+                  <button
+                    onClick={() => { setActiveModule("settings"); setUserMenuOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-[13px] transition-colors"
+                    style={{ color: "var(--atlas-text-2)" }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(74,144,226,0.06)"}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
+                  >
+                    <User size={13} />
+                    账号设置
+                  </button>
+                  <button
+                    onClick={() => { logoutMutation.mutate(); setUserMenuOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-[13px] transition-colors"
+                    style={{ color: "var(--atlas-text-2)" }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(74,144,226,0.06)"}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
+                  >
+                    <LogOut size={13} />
+                    退出登录
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowLoginModal(true)}
+            className="flex items-center gap-1.5 px-3 h-8 rounded-lg text-[13px] font-medium transition-all"
+            style={{
+              background: "linear-gradient(135deg, #4A90E2 0%, #6BA3F5 100%)",
+              color: "white",
+              boxShadow: "0 2px 8px rgba(74,144,226,0.3)",
+            }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = "0.9"}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = "1"}
+          >
+            <LogIn size={14} />
+            登录
+          </button>
+        )}
       </div>
     </div>
   );

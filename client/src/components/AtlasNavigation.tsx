@@ -524,13 +524,6 @@ export default function AtlasNavigation() {
         borderRight: "1px solid var(--atlas-border)",
       }}
     >
-      {/* Logo + User */}
-      <NavLogo
-        user={user}
-        onLogout={() => logoutMutation.mutate()}
-        onLogin={() => setShowLoginModal(true)}
-      />
-
       {/* Module navigation */}
       <div className="flex-shrink-0">
         <ModuleNav activeModule={activeModule} setActiveModule={setActiveModule} />

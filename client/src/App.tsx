@@ -1,6 +1,6 @@
 /**
- * ATLAS V16 — App Root
- * Layout: TopBar (48px) | AtlasNavigation (220px) | Module Content (flex-1)
+ * ATLAS V16.3 — App Root
+ * Layout: TopBar (48px) | AtlasNavigation (220px, collapsible) | Module Content (flex-1)
  * Light blue-gray theme, glassmorphism style
  * Guest mode: no forced login
  */
@@ -25,6 +25,7 @@ import InvitePage from "./pages/InvitePage";
 
 function AppContent() {
   const { activeModule, setUser, showLoginModal } = useAtlas();
+  const [navCollapsed, setNavCollapsed] = useState(false);
 
   const { data: meData } = trpc.auth.me.useQuery(undefined, {
     retry: false,
@@ -61,13 +62,16 @@ function AppContent() {
       className="flex flex-col h-screen overflow-hidden"
       style={{ background: "var(--atlas-bg)" }}
     >
-      {/* Top Bar — 48px */}
-      <TopBar />
+      {/* Top Bar — 48px, with sidebar toggle + user avatar */}
+      <TopBar
+        navCollapsed={navCollapsed}
+        onToggleNav={() => setNavCollapsed(v => !v)}
+      />
 
       {/* Main area: Nav + Content */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Left Navigation — 220px */}
-        <AtlasNavigation />
+        {/* Left Navigation — collapsible */}
+        {!navCollapsed && <AtlasNavigation />}
 
         {/* Module Content — flex-1 */}
         <div className="flex-1 min-w-0 overflow-hidden">
