@@ -1,22 +1,25 @@
 /**
- * ATLAS V4.0 — TopBar
- * Manus-inspired minimal header
- * - Mobile: hamburger menu to toggle sidebar
- * - Desktop: breadcrumb + status + user avatar
+ * ATLAS V14.9 — TopBar
+ * Right side: Search icon (replaces "新建" button) · Help · Bell · Status · User
+ * Breadcrumb: 对话 / 数据中枢 / 模板库 / 设置
  */
 import { useState, useEffect, useRef } from "react";
-import { Plus, Loader2, Menu, Bell, HelpCircle, ChevronRight, LogOut, Settings, ChevronDown } from "lucide-react";
+import { Search, Loader2, Menu, Bell, HelpCircle, ChevronRight, LogOut, Settings, ChevronDown } from "lucide-react";
 import { useAtlas, type NavItem } from "@/contexts/AtlasContext";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 
 const SECTION_NAMES: Record<string, string> = {
-  home:      "工作台",
+  home:      "对话",
   dashboard: "数据中枢",
   templates: "模板库",
+  hr:        "HR 中心",
   history:   "历史记录",
   settings:  "设置",
+  library:   "库",
+  search:    "搜索",
+  invite:    "邀请",
 };
 
 // ── UserMenu Component ──────────────────────────────────────────────────────
@@ -54,11 +57,12 @@ function UserMenu({
     return (
       <button
         onClick={() => setShowLoginModal(true)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-medium transition-all"
         style={{
           background: "rgba(91,140,255,0.1)",
           border: "1px solid rgba(91,140,255,0.2)",
           color: "var(--atlas-accent)",
+          fontSize: "13px",
         }}
         onMouseEnter={e => (e.currentTarget.style.background = "rgba(91,140,255,0.18)")}
         onMouseLeave={e => (e.currentTarget.style.background = "rgba(91,140,255,0.1)")}
@@ -90,18 +94,19 @@ function UserMenu({
       >
         {/* Avatar circle */}
         <div
-          className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+          className="w-6 h-6 rounded-full flex items-center justify-center font-bold flex-shrink-0"
           style={{
             background: "linear-gradient(135deg, #5B8CFF 0%, #7B5FFF 100%)",
             color: "#fff",
+            fontSize: "11px",
           }}
         >
           {user.name[0].toUpperCase()}
         </div>
         {/* Name (hidden on mobile) */}
         <span
-          className="hidden sm:block text-xs font-medium max-w-[80px] truncate"
-          style={{ color: "var(--atlas-text)" }}
+          className="hidden sm:block font-medium max-w-[80px] truncate"
+          style={{ color: "var(--atlas-text)", fontSize: "13px" }}
         >
           {user.name}
         </span>
@@ -132,22 +137,20 @@ function UserMenu({
             className="px-3 py-2.5"
             style={{ borderBottom: "1px solid var(--atlas-border)" }}
           >
-            <p className="text-xs font-semibold truncate" style={{ color: "var(--atlas-text)" }}>
+            <p className="font-semibold truncate" style={{ color: "var(--atlas-text)", fontSize: "13px" }}>
               {user.name}
             </p>
             {user.email && (
-              <p className="text-xs truncate mt-0.5" style={{ color: "var(--atlas-text-3)" }}>
+              <p className="truncate mt-0.5" style={{ color: "var(--atlas-text-3)", fontSize: "11px" }}>
                 {user.email}
               </p>
             )}
-            <div
-              className="flex items-center gap-1 mt-1.5"
-            >
+            <div className="flex items-center gap-1 mt-1.5">
               <div
                 className="w-1.5 h-1.5 rounded-full"
                 style={{ background: "var(--atlas-success)" }}
               />
-              <span className="text-xs" style={{ color: "var(--atlas-success)", fontSize: "10px" }}>
+              <span style={{ color: "var(--atlas-success)", fontSize: "10px" }}>
                 已登录
               </span>
             </div>
@@ -156,26 +159,26 @@ function UserMenu({
           <div className="py-1">
             <button
               onClick={() => { setActiveNav("settings"); setOpen(false); }}
-              className="flex items-center gap-2 w-full px-3 py-2 text-xs transition-all"
-              style={{ color: "var(--atlas-text-2)" }}
+              className="flex items-center gap-2 w-full px-3 py-2 transition-all"
+              style={{ color: "var(--atlas-text-2)", fontSize: "13px" }}
               onMouseEnter={e => (e.currentTarget.style.background = "var(--atlas-surface)")}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
             >
-              <Settings size={12} />
+              <Settings size={13} />
               账号设置
             </button>
             <button
               onClick={() => logoutMut.mutate()}
               disabled={logoutMut.isPending}
-              className="flex items-center gap-2 w-full px-3 py-2 text-xs transition-all"
-              style={{ color: "#F87171" }}
+              className="flex items-center gap-2 w-full px-3 py-2 transition-all"
+              style={{ color: "#F87171", fontSize: "13px" }}
               onMouseEnter={e => (e.currentTarget.style.background = "rgba(248,113,113,0.08)")}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
             >
               {logoutMut.isPending ? (
-                <Loader2 size={12} className="animate-spin" />
+                <Loader2 size={13} className="animate-spin" />
               ) : (
-                <LogOut size={12} />
+                <LogOut size={13} />
               )}
               退出登录
             </button>
@@ -190,7 +193,6 @@ export default function TopBar() {
   const {
     activeNav, setActiveNav,
     sidebarOpen, setSidebarOpen,
-    createNewTask,
     user, setShowLoginModal,
   } = useAtlas();
 
@@ -209,13 +211,7 @@ export default function TopBar() {
     return () => clearInterval(t);
   }, []);
 
-  const handleNew = () => {
-    createNewTask();
-    setActiveNav("home");
-    toast.success("已新建工作区");
-  };
-
-  const sectionLabel = SECTION_NAMES[activeNav] || "工作台";
+  const sectionLabel = SECTION_NAMES[activeNav] || "对话";
 
   return (
     <header
@@ -261,35 +257,38 @@ export default function TopBar() {
 
       {/* ── Breadcrumb (desktop) ── */}
       <div className="hidden md:flex items-center gap-1.5">
-        <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>ATLAS</span>
+        <span style={{ color: "var(--atlas-text-3)", fontSize: "13px" }}>ATLAS</span>
         <ChevronRight size={11} style={{ color: "var(--atlas-text-3)", opacity: 0.5 }} />
-        <span className="text-xs font-medium" style={{ color: "var(--atlas-text-2)" }}>{sectionLabel}</span>
+        <span className="font-medium" style={{ color: "var(--atlas-text-2)", fontSize: "13px" }}>{sectionLabel}</span>
       </div>
 
       <div className="flex-1" />
 
       {/* ── Actions ── */}
       <div className="flex items-center gap-1.5">
-        {/* New button */}
+        {/* Search icon — replaces "新建" button */}
         <button
-          onClick={handleNew}
-          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+          onClick={() => setActiveNav("search")}
+          className="w-7 h-7 rounded-lg flex items-center justify-center transition-all"
           style={{
-            background: "var(--atlas-elevated)",
-            border: "1px solid var(--atlas-border)",
-            color: "var(--atlas-text-2)",
+            color: activeNav === "search" ? "var(--atlas-accent)" : "var(--atlas-text-3)",
+            background: activeNav === "search" ? "var(--atlas-nav-active-bg)" : "transparent",
           }}
           onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.color = "var(--atlas-text)";
-            (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border-2)";
+            if (activeNav !== "search") {
+              (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
+              (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+            }
           }}
           onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
-            (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border)";
+            if (activeNav !== "search") {
+              (e.currentTarget as HTMLElement).style.background = "transparent";
+              (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+            }
           }}
+          title="搜索"
         >
-          <Plus size={12} />
-          新建
+          <Search size={15} />
         </button>
 
         {/* Help */}
@@ -349,7 +348,6 @@ export default function TopBar() {
             />
           )}
           <span
-            className="text-xs"
             style={{
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: "10px",

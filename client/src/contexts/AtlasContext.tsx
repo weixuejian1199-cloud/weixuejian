@@ -5,7 +5,7 @@
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 
-export type NavItem = "home" | "dashboard" | "templates" | "settings" | "search" | "library" | "invite" | "hr" | "im" | "openclaw-monitor";
+export type NavItem = "home" | "dashboard" | "templates" | "settings" | "search" | "library" | "invite" | "hr";
 export type Theme = "dark" | "light";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -168,6 +168,7 @@ interface AtlasContextType {
   addTask: (t: Task) => void;
   updateTask: (id: string, updates: Partial<Omit<Task, "messages" | "uploadedFiles">>) => void;
   deleteTask: (id: string) => void;
+  renameTask: (id: string, title: string) => void;
   createNewTask: () => string; // returns new task id
 
   // Current task's files (scoped to activeTaskId)
@@ -352,6 +353,16 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("atlas:unauthorized", handleUnauthorized);
   }, []);
 
+  // Listen for rename task events from Sidebar
+  useEffect(() => {
+    const handleRename = (e: Event) => {
+      const { taskId, title } = (e as CustomEvent<{ taskId: string; title: string }>).detail;
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, title } : t));
+    };
+    window.addEventListener("atlas:renameTask", handleRename);
+    return () => window.removeEventListener("atlas:renameTask", handleRename);
+  }, []);
+
   // ── Task management ──────────────────────────────────────────────────────
 
   // Create a brand-new empty task and activate it
@@ -385,6 +396,10 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
   const deleteTask = useCallback((id: string) => {
     setTasks(prev => prev.filter(t => t.id !== id));
     setActiveTaskIdState(prev => prev === id ? null : prev);
+  }, []);
+
+  const renameTask = useCallback((id: string, title: string) => {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, title } : t));
   }, []);
   // ── Per-task files (scoped to activeTaskId) ──────────────────────────────
 
@@ -547,7 +562,7 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
       theme, toggleTheme, setTheme,
       user, setUser,
       showLoginModal, setShowLoginModal,
-      tasks, addTask, updateTask, deleteTask, createNewTask,
+      tasks, addTask, updateTask, deleteTask, renameTask, createNewTask,
       uploadedFiles, addUploadedFile, updateUploadedFile, removeUploadedFile, clearFiles,
       messages, addMessage, updateLastMessage, clearMessages,
       isProcessing, setIsProcessing,

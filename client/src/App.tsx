@@ -1,8 +1,8 @@
 /**
- * ATLAS V5.0 — App Root
+ * ATLAS V14.9 — App Root
  * Layout: Sidebar (collapsible) + Main Content
  * Theme: Dark (cold black) / Light (Manus white) switchable
- * Nav: home / dashboard / templates / search / library / settings
+ * Nav: home(对话) / dashboard / templates / search / library / settings / hr / invite
  */
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect } from "react";
@@ -22,8 +22,6 @@ import SearchPage from "./pages/SearchPage";
 import LibraryPage from "./pages/LibraryPage";
 import InvitePage from "./pages/InvitePage";
 import HRCenterPage from "./pages/HRCenterPage";
-import IMPage from "./pages/IMPage";
-import OpenClawMonitor from "./pages/OpenClawMonitor";
 
 function AppContent() {
   const { activeNav, theme, showLoginModal, setUser } = useAtlas();
@@ -43,6 +41,7 @@ function AppContent() {
       role: (meData.role as "user" | "admin") ?? "user",
     });
   }, [meData, setUser]);
+
   const renderPage = () => {
     switch (activeNav) {
       case "dashboard":  return <DashboardPage />;
@@ -52,8 +51,6 @@ function AppContent() {
       case "library":    return <LibraryPage />;
       case "invite":     return <InvitePage />;
       case "hr":         return <HRCenterPage />;
-      case "im":         return <IMPage />;
-      case "openclaw-monitor": return <OpenClawMonitor />;
       case "home":
       default:           return <MainWorkspace />;
     }
