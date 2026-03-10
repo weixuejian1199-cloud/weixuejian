@@ -707,3 +707,61 @@
 - [x] atlas-chart JSON 解析逻辑迁移到右栏
 - [x] 现有 MainWorkspace 功能迁移（文件上传、AI 分析）
 - [x] WebSocket 自动重连保留
+
+## V8.0 Bug 修复
+
+- [ ] Bug 1：AtlasWorkspace 页面未全屏自适应（底部有空白，未撑满浏览器）
+- [ ] Bug 2：OpenClaw 监控入口丢失（新三栏布局中未保留 openclaw-monitor 导航项）
+
+## V15.0 全面重构：六模块产品架构（第一阶段）
+
+### 全局布局重构
+- [ ] 重构 AtlasContext：新增 activeModule 类型（chat/files/ai-tools/automation/knowledge/settings）
+- [ ] 新建 AppLayout.tsx：20:40:40 三栏布局，左侧导航固定，中右内容区按模块切换
+- [ ] 重构左侧导航：ATLAS Logo + 用户头像（右上角）+ 五模块 + 最近对话 + 底部三项
+- [ ] 更新 index.css：白色主题，精准网格，蓝色 #2563EB 主色，Inter 字体
+- [ ] 更新 App.tsx：统一入口，所有模块在 AppLayout 内切换
+
+### 对话模块（工作台）
+- [ ] 重构 ChatWorkspace.tsx：中间对话区（消息流 + 拖拽上传 + 输入框三图标）
+- [ ] 重构 ChatResultPanel.tsx：右侧结果面板（指标卡 + 表格 + 图表 + 空状态浮动卡片）
+- [ ] 输入框三图标：+ 上传文件 / 🔌 工作流 / 🧩 模板中心
+- [ ] 模板中心弹窗：预设提示词快捷选择
+- [ ] 流式输出：右侧面板实时渲染（指标卡跳入 + 表格逐行 + 图表最后）
+- [ ] 空状态：浮动示例图表卡片（暗示分析结果）
+
+### 文件模块
+- [ ] 新建 FilesModule.tsx：三栏（导航+文件列表+预览面板）
+- [ ] 文件列表：Tab（全部/Excel/已分析）+ 搜索 + 上传按钮
+- [ ] 右侧预览：数据前5行 + 「用这个文件开始对话」按钮 + 历史分析记录
+- [ ] 侧边抽屉对话：点击按钮从右侧滑出，文件自动挂载
+
+### AI 工具模块（占位）
+- [ ] 新建 AIToolsModule.tsx：已连接数据源列表 + 添加数据源入口
+- [ ] 右侧：选中数据源后显示快捷分析面板
+
+### AI 自动化模块（占位）
+- [ ] 新建 AutomationModule.tsx：定时任务/监控告警/事件触发三分类
+- [ ] 右侧：任务详情 + 执行记录
+
+### 知识库模块（占位）
+- [ ] 新建 KnowledgeModule.tsx：知识列表（全部/FAQ/手册/问答）+ 详情预览
+- [ ] 来源标签：手动上传/AI自动提取/对话自动沉淀
+
+### 设置模块
+- [ ] 保留现有 SettingsPage 功能，适配新布局
+
+## V15.0 实际完成状态（Phase 1 验收）
+- [x] AtlasContext 重构：activeModule 类型（chat/files/ai-tools/automation/knowledge/settings）
+- [x] App.tsx：统一入口，20:40:40 三栏布局，左侧 AtlasNavigation（20%）+ 模块内容（80%）
+- [x] AtlasNavigation.tsx：ATLAS Logo + 用户头像（右上角）+ 五模块 + 最近对话 + 底部三项
+- [x] index.css：白色主题，精准网格，蓝色 #2563EB 主色，Inter 字体
+- [x] ChatWorkspace.tsx：中间对话区（消息流 + 拖拽上传 + 输入框三图标）+ 右侧结果面板
+- [x] FilesModule.tsx：文件列表（Tab/搜索/上传）+ 右侧预览面板
+- [x] AIToolsModule.tsx：已连接数据源列表 + 添加数据源入口 + 快捷分析面板
+- [x] AutomationModule.tsx：定时任务/监控告警/事件触发三分类 + 任务详情 + 执行记录
+- [x] KnowledgeModule.tsx：知识列表（全部/FAQ/手册/问答）+ 详情预览 + 来源标签
+- [x] SettingsModule.tsx：机器人管理 + 账号信息 + API 密钥 + 安全设置
+
+## 测试修复（2026-03-10）
+- [x] 修复 openclawPolling.test.ts 失败测试：为 checkStuckTasks 的 db.select 调用添加额外 mock（所有 81 个测试通过）

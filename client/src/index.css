@@ -4,9 +4,9 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ═══════════════════════════════════════════════════════════════
-   ATLAS V4.0 — Design System
-   Dark: #0F1115 cold black / Light: Manus-inspired warm white
-   Accent: #5B8CFF electric blue
+   ATLAS V15 — Design System
+   White / #F9FAFB surface / #2563EB accent blue
+   Inter font, clean grid, professional minimal
 ═══════════════════════════════════════════════════════════════ */
 
 @theme inline {
@@ -37,64 +37,70 @@
   --color-sidebar-border: var(--sidebar-border);
 }
 
-/* ── Light Theme (default) ────────────────────────────────────── */
+/* ── Light Theme ─────────────────────────────────────────────── */
 :root,
 .light {
   --radius: 0.5rem;
 
   /* Shadcn compat */
   --background: oklch(1 0 0);
-  --foreground: oklch(0.15 0.01 260);
+  --foreground: oklch(0.13 0.01 260);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.15 0.01 260);
+  --card-foreground: oklch(0.13 0.01 260);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.15 0.01 260);
-  --primary: oklch(0.55 0.18 255);
+  --popover-foreground: oklch(0.13 0.01 260);
+  --primary: oklch(0.52 0.19 255);
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.96 0.003 260);
+  --secondary: oklch(0.97 0.002 260);
   --secondary-foreground: oklch(0.35 0.01 260);
-  --muted: oklch(0.96 0.003 260);
-  --muted-foreground: oklch(0.55 0.01 260);
-  --accent: oklch(0.96 0.003 260);
-  --accent-foreground: oklch(0.15 0.01 260);
+  --muted: oklch(0.97 0.002 260);
+  --muted-foreground: oklch(0.52 0.01 260);
+  --accent: oklch(0.97 0.002 260);
+  --accent-foreground: oklch(0.13 0.01 260);
   --destructive: oklch(0.58 0.22 25);
-  --border: oklch(0.9 0.005 260);
-  --input: oklch(0.9 0.005 260);
-  --ring: oklch(0.55 0.18 255);
-  --sidebar: oklch(0.97 0.003 260);
-  --sidebar-foreground: oklch(0.15 0.01 260);
-  --sidebar-border: oklch(0.9 0.005 260);
+  --border: oklch(0.91 0.004 260);
+  --input: oklch(0.91 0.004 260);
+  --ring: oklch(0.52 0.19 255);
+  --sidebar: oklch(0.975 0.002 260);
+  --sidebar-foreground: oklch(0.13 0.01 260);
+  --sidebar-border: oklch(0.91 0.004 260);
 
-  /* ATLAS custom tokens — light */
-  --atlas-bg:          #FFFFFF;
-  --atlas-surface:     #F7F8FA;
-  --atlas-elevated:    #FFFFFF;
-  --atlas-card:        #FFFFFF;
-  --atlas-border:      rgba(0,0,0,0.07);
-  --atlas-border-2:    rgba(0,0,0,0.12);
-  --atlas-text:        #111318;
-  --atlas-text-2:      #4B5568;
-  --atlas-text-3:      #9CA3AF;
-  --atlas-accent:      #4F7FFF;
-  --atlas-accent-2:    #6B4FFF;
-  --atlas-success:     #10B981;
-  --atlas-warning:     #F59E0B;
-  --atlas-danger:      #EF4444;
-  --atlas-sidebar-w:   240px;
-  --atlas-topbar-h:    48px;
-  --atlas-radius:      8px;
+  /* ATLAS V15 tokens */
+  --atlas-bg:           #FFFFFF;
+  --atlas-surface:      #F9FAFB;
+  --atlas-surface-2:    #F3F4F6;
+  --atlas-elevated:     #FFFFFF;
+  --atlas-border:       #E5E7EB;
+  --atlas-border-2:     #D1D5DB;
+  --atlas-text:         #111827;
+  --atlas-text-2:       #374151;
+  --atlas-text-3:       #6B7280;
+  --atlas-text-4:       #9CA3AF;
+  --atlas-accent:       #2563EB;
+  --atlas-accent-hover: #1D4ED8;
+  --atlas-accent-light: #EFF6FF;
+  --atlas-accent-2:     #7C3AED;
+  --atlas-success:      #059669;
+  --atlas-success-bg:   #ECFDF5;
+  --atlas-warning:      #D97706;
+  --atlas-warning-bg:   #FFFBEB;
+  --atlas-danger:       #DC2626;
+  --atlas-danger-bg:    #FEF2F2;
+  --atlas-nav-w:        240px;
+  --atlas-nav-w-sm:     64px;
+  --atlas-radius:       8px;
+  --atlas-radius-lg:    12px;
 }
 
-/* ── Dark Theme ────────────────────────────────────────────────── */
+/* ── Dark Theme ─────────────────────────────────────────────── */
 .dark {
-  /* Shadcn compat */
   --background: oklch(0.12 0.008 260);
   --foreground: oklch(0.92 0.005 260);
   --card: oklch(0.16 0.008 260);
   --card-foreground: oklch(0.92 0.005 260);
   --popover: oklch(0.16 0.008 260);
   --popover-foreground: oklch(0.92 0.005 260);
-  --primary: oklch(0.62 0.18 255);
+  --primary: oklch(0.60 0.19 255);
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.20 0.008 260);
   --secondary-foreground: oklch(0.75 0.01 260);
@@ -105,127 +111,225 @@
   --destructive: oklch(0.65 0.22 25);
   --border: oklch(1 0 0 / 8%);
   --input: oklch(1 0 0 / 10%);
-  --ring: oklch(0.62 0.18 255);
+  --ring: oklch(0.60 0.19 255);
   --sidebar: oklch(0.155 0.008 260);
   --sidebar-foreground: oklch(0.92 0.005 260);
   --sidebar-border: oklch(1 0 0 / 8%);
 
-  /* ATLAS custom tokens — dark */
-  --atlas-bg:          #0F1115;
-  --atlas-surface:     #181B21;
-  --atlas-elevated:    #1E2128;
-  --atlas-card:        #22262F;
-  --atlas-border:      rgba(255,255,255,0.07);
-  --atlas-border-2:    rgba(255,255,255,0.12);
-  --atlas-text:        #E8EAF0;
-  --atlas-text-2:      #9BA3B4;
-  --atlas-text-3:      #5C6478;
-  --atlas-accent:      #5B8CFF;
-  --atlas-accent-2:    #7B5FFF;
-  --atlas-success:     #34D399;
-  --atlas-warning:     #FBBF24;
-  --atlas-danger:      #F87171;
-  --atlas-sidebar-w:   240px;
-  --atlas-topbar-h:    48px;
-  --atlas-radius:      8px;
+  --atlas-bg:           #0F1115;
+  --atlas-surface:      #181B21;
+  --atlas-surface-2:    #1E2128;
+  --atlas-elevated:     #22262F;
+  --atlas-border:       rgba(255,255,255,0.08);
+  --atlas-border-2:     rgba(255,255,255,0.14);
+  --atlas-text:         #F1F3F9;
+  --atlas-text-2:       #C8CDD8;
+  --atlas-text-3:       #8B91A0;
+  --atlas-text-4:       #5A6070;
+  --atlas-accent:       #3B82F6;
+  --atlas-accent-hover: #60A5FA;
+  --atlas-accent-light: rgba(59,130,246,0.12);
+  --atlas-accent-2:     #8B5CF6;
+  --atlas-success:      #10B981;
+  --atlas-success-bg:   rgba(16,185,129,0.1);
+  --atlas-warning:      #F59E0B;
+  --atlas-warning-bg:   rgba(245,158,11,0.1);
+  --atlas-danger:       #EF4444;
+  --atlas-danger-bg:    rgba(239,68,68,0.1);
 }
 
-/* ── Base ─────────────────────────────────────────────────────── */
+/* ── Base Reset ─────────────────────────────────────────────── */
 @layer base {
-  * { @apply border-border outline-ring/50; }
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
   body {
-    @apply bg-background text-foreground;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--atlas-text);
+    background: var(--atlas-bg);
     -webkit-font-smoothing: antialiased;
-    transition: background-color 0.25s ease, color 0.25s ease;
-  }
-  button:not(:disabled), [role="button"]:not([aria-disabled="true"]),
-  [type="button"]:not(:disabled), [type="submit"]:not(:disabled),
-  a[href], select:not(:disabled) { @apply cursor-pointer; }
-}
-
-/* ── Components ───────────────────────────────────────────────── */
-@layer components {
-  .container {
-    width: 100%; margin-left: auto; margin-right: auto;
-    padding-left: 1rem; padding-right: 1rem;
-  }
-  @media (min-width: 640px) { .container { padding-left: 1.5rem; padding-right: 1.5rem; } }
-  @media (min-width: 1024px) { .container { padding-left: 2rem; padding-right: 2rem; max-width: 1280px; } }
-  .flex { min-height: 0; min-width: 0; }
-
-  /* Atlas chip */
-  .atlas-chip {
-    display: inline-flex; align-items: center;
-    padding: 4px 10px; border-radius: 20px;
-    font-size: 11px; font-weight: 500;
-    background: var(--atlas-elevated);
-    border: 1px solid var(--atlas-border-2);
-    color: var(--atlas-text-2);
-    transition: all 0.15s ease;
-    cursor: pointer;
-  }
-  .atlas-chip:hover {
-    background: rgba(91,140,255,0.1);
-    border-color: rgba(91,140,255,0.3);
-    color: var(--atlas-accent);
+    -moz-osx-font-smoothing: grayscale;
   }
 
   /* Scrollbar */
-  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--atlas-border-2); border-radius: 2px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--atlas-text-3); }
+  ::-webkit-scrollbar-thumb { background: var(--atlas-border-2); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--atlas-text-4); }
 
-  /* Sidebar transition */
-  .atlas-sidebar {
-    transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.22s ease,
-                transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-  }
+  /* Selection */
+  ::selection { background: var(--atlas-accent-light); color: var(--atlas-accent); }
 
-  /* Theme transition */
-  *, *::before, *::after {
-    transition-property: background-color, border-color, color;
-    transition-duration: 0.2s;
-    transition-timing-function: ease;
+  /* Focus rings */
+  :focus-visible {
+    outline: 2px solid var(--atlas-accent);
+    outline-offset: 2px;
   }
 
-  /* Pulse dot animation */
-  @keyframes pulse-dot {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(0.85); }
-  }
-  .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
-
-  /* Thinking dots bounce animation */
-  @keyframes thinking-bounce {
-    0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
-    40% { transform: translateY(-4px); opacity: 1; }
-  }
-  .atlas-thinking-dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--atlas-text-3);
-    animation: thinking-bounce 1.2s ease-in-out infinite;
-  }
-
-  /* Number counter */
-  @keyframes count-up {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  .count-up { animation: count-up 0.4s ease forwards; }
-
-  /* Dashboard card shimmer */
-  @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-  }
-  .shimmer {
-    background: linear-gradient(90deg, var(--atlas-elevated) 25%, var(--atlas-card) 50%, var(--atlas-elevated) 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-  }
+  /* Border color default */
+  * { border-color: var(--atlas-border); }
 }
+
+/* ── Utilities ──────────────────────────────────────────────── */
+@layer utilities {
+  .container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .flex { min-width: 0; min-height: 0; }
+
+  /* Atlas-specific utilities */
+  .atlas-card {
+    background: var(--atlas-elevated);
+    border: 1px solid var(--atlas-border);
+    border-radius: var(--atlas-radius-lg);
+  }
+
+  .atlas-surface {
+    background: var(--atlas-surface);
+    border: 1px solid var(--atlas-border);
+    border-radius: var(--atlas-radius);
+  }
+
+  .atlas-text-primary { color: var(--atlas-text); }
+  .atlas-text-secondary { color: var(--atlas-text-2); }
+  .atlas-text-muted { color: var(--atlas-text-3); }
+  .atlas-text-faint { color: var(--atlas-text-4); }
+  .atlas-accent-text { color: var(--atlas-accent); }
+
+  /* Subtle grid background */
+  .atlas-grid-bg {
+    background-image:
+      linear-gradient(var(--atlas-border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--atlas-border) 1px, transparent 1px);
+    background-size: 32px 32px;
+    opacity: 0.4;
+  }
+
+  /* Smooth transitions */
+  .atlas-transition { transition: all 0.15s ease; }
+  .atlas-transition-slow { transition: all 0.25s ease; }
+}
+
+/* ── Animations ─────────────────────────────────────────────── */
+@keyframes atlas-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes atlas-slide-in-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes atlas-pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes atlas-thinking {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+.animate-atlas-fade-in { animation: atlas-fade-in 0.2s ease forwards; }
+.animate-atlas-slide-right { animation: atlas-slide-in-right 0.2s ease forwards; }
+
+/* ── Markdown / Streamdown ──────────────────────────────────── */
+.atlas-prose {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--atlas-text);
+}
+
+.atlas-prose h1, .atlas-prose h2, .atlas-prose h3 {
+  font-weight: 600;
+  margin: 1em 0 0.5em;
+  color: var(--atlas-text);
+}
+
+.atlas-prose h1 { font-size: 1.25em; }
+.atlas-prose h2 { font-size: 1.1em; }
+.atlas-prose h3 { font-size: 1em; }
+
+.atlas-prose p { margin: 0.5em 0; }
+
+.atlas-prose ul, .atlas-prose ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.atlas-prose li { margin: 0.25em 0; }
+
+.atlas-prose code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.85em;
+  background: var(--atlas-surface-2);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  color: var(--atlas-accent-2);
+}
+
+.atlas-prose pre {
+  background: var(--atlas-surface-2);
+  border: 1px solid var(--atlas-border);
+  border-radius: var(--atlas-radius);
+  padding: 1em;
+  overflow-x: auto;
+  margin: 0.75em 0;
+}
+
+.atlas-prose pre code {
+  background: none;
+  padding: 0;
+  color: var(--atlas-text);
+}
+
+.atlas-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin: 0.75em 0;
+}
+
+.atlas-prose th {
+  background: var(--atlas-surface);
+  font-weight: 600;
+  text-align: left;
+  padding: 8px 12px;
+  border: 1px solid var(--atlas-border);
+  color: var(--atlas-text-2);
+}
+
+.atlas-prose td {
+  padding: 7px 12px;
+  border: 1px solid var(--atlas-border);
+  color: var(--atlas-text);
+}
+
+.atlas-prose tr:hover td { background: var(--atlas-surface); }
+
+.atlas-prose blockquote {
+  border-left: 3px solid var(--atlas-accent);
+  padding-left: 1em;
+  margin: 0.75em 0;
+  color: var(--atlas-text-2);
+}
+
+.atlas-prose strong { font-weight: 600; color: var(--atlas-text); }
+.atlas-prose em { font-style: italic; }
+.atlas-prose a { color: var(--atlas-accent); text-decoration: underline; }
+.atlas-prose hr { border: none; border-top: 1px solid var(--atlas-border); margin: 1em 0; }
