@@ -48,12 +48,12 @@ export default function AIToolsModule() {
 
   return (
     <div className="flex h-full overflow-hidden" style={{ background: "#fff" }}>
-      {/* Center: Data Source List */}
+      {/* Left: Data Source List — 35% */}
       <div
         className="flex flex-col overflow-hidden"
         style={{
-          width: "20%",
-          minWidth: "200px",
+          width: "35%",
+          minWidth: "260px",
           borderRight: "1px solid var(--atlas-border)",
         }}
       >
@@ -139,8 +139,8 @@ export default function AIToolsModule() {
         </div>
       </div>
 
-      {/* Center: Detail / Add Panel — 35% */}
-      <div className="flex flex-col overflow-hidden" style={{ width: "35%", background: "var(--atlas-surface)", borderRight: "1px solid var(--atlas-border)" }}>
+      {/* Right: Detail / Add Panel — 65% */}
+      <div className="flex flex-col overflow-hidden" style={{ flex: 1, background: "var(--atlas-surface)" }}>
         {showAddPanel ? (
           <AddSourcePanel onClose={() => setShowAddPanel(false)} />
         ) : selectedSource ? (
@@ -150,22 +150,7 @@ export default function AIToolsModule() {
         )}
       </div>
 
-      {/* Right: Analysis Panel — 45% */}
-      <div
-        className="flex flex-col items-center justify-center h-full"
-        style={{ width: "45%", background: "var(--atlas-bg)", padding: "24px 20px" }}
-      >
-        <div className="flex flex-col items-center gap-3 text-center">
-          <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center"
-            style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.15)" }}
-          >
-            <BarChart2 size={22} style={{ color: "#2563eb" }} />
-          </div>
-          <p className="text-sm font-medium" style={{ color: "var(--atlas-text-2)" }}>分析结果将在这里展示</p>
-          <p className="text-xs" style={{ color: "var(--atlas-text-4)" }}>连接数据源后，选择快捷分析或向 AI 提问</p>
-        </div>
-      </div>
+
     </div>
   );
 }

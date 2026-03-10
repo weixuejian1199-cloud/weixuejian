@@ -54,10 +54,10 @@ export default function KnowledgeModule() {
 
   return (
     <div className="flex h-full overflow-hidden" style={{ background: "#fff" }}>
-      {/* Center: Knowledge List */}
+      {/* Left: Knowledge List — 35% */}
       <div
         className="flex flex-col overflow-hidden"
-        style={{ width: "20%", minWidth: "200px", borderRight: "1px solid var(--atlas-border)" }}
+        style={{ width: "35%", minWidth: "260px", borderRight: "1px solid var(--atlas-border)" }}
       >
         {/* Header */}
         <div
@@ -177,8 +177,8 @@ export default function KnowledgeModule() {
         </div>
       </div>
 
-      {/* Center: Detail — 35% */}
-      <div className="flex flex-col overflow-hidden" style={{ width: "35%", background: "var(--atlas-surface)", borderRight: "1px solid var(--atlas-border)" }}>
+      {/* Right: Detail — 65% */}
+      <div className="flex flex-col overflow-hidden" style={{ flex: 1, background: "var(--atlas-surface)" }}>
         {selectedItem ? (
           <KnowledgeDetail item={selectedItem} />
         ) : (
@@ -189,22 +189,7 @@ export default function KnowledgeModule() {
         )}
       </div>
 
-      {/* Right: Knowledge Preview Panel — 45% */}
-      <div
-        className="flex flex-col items-center justify-center h-full"
-        style={{ width: "45%", background: "var(--atlas-bg)", padding: "24px 20px" }}
-      >
-        <div className="flex flex-col items-center gap-3 text-center">
-          <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center"
-            style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.15)" }}
-          >
-            <FileText size={22} style={{ color: "#2563eb" }} />
-          </div>
-          <p className="text-sm font-medium" style={{ color: "var(--atlas-text-2)" }}>知识预览将在这里展示</p>
-          <p className="text-xs" style={{ color: "var(--atlas-text-4)" }}>选择左侧条目，查看内容预览和引用记录</p>
-        </div>
-      </div>
+
     </div>
   );
 }

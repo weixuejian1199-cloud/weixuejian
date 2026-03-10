@@ -164,10 +164,10 @@ export default function FilesModule() {
         )}
       </AnimatePresence>
 
-      {/* Left: File List — 20% */}
+      {/* Left: File List — 35% */}
       <div
         className="flex flex-col overflow-hidden"
-        style={{ width: "20%", minWidth: 200, borderRight: "1px solid var(--atlas-border)" }}
+        style={{ width: "35%", minWidth: 260, borderRight: "1px solid var(--atlas-border)" }}
       >
         {/* Header */}
         <div
@@ -338,8 +338,8 @@ export default function FilesModule() {
         </div>
       </div>
 
-      {/* Center: Preview Panel — 60% */}
-      <div className="flex flex-col overflow-hidden" style={{ width: "35%", background: "var(--atlas-surface)", borderRight: "1px solid var(--atlas-border)" }}>
+      {/* Right: Preview Panel — 65% */}
+      <div className="flex flex-col overflow-hidden" style={{ flex: 1, background: "var(--atlas-surface)" }}>
         <AnimatePresence mode="wait">
           {selectedFile ? (
             <motion.div
@@ -379,45 +379,7 @@ export default function FilesModule() {
         </AnimatePresence>
       </div>
 
-      {/* Right: Info Panel — 20% */}
-      <div
-        className="flex flex-col overflow-hidden"
-        style={{ width: "45%", background: "var(--atlas-bg)", padding: "20px 16px" }}
-      >
-        {selectedFile ? (
-          <div className="space-y-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--atlas-text-4)" }}>文件信息</p>
-              <div className="space-y-2.5">
-                <div className="flex justify-between text-xs">
-                  <span style={{ color: "var(--atlas-text-3)" }}>文件大小</span>
-                  <span style={{ color: "var(--atlas-text)" }}>{selectedFile.fileSizeKb ? `${selectedFile.fileSizeKb} KB` : "—"}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span style={{ color: "var(--atlas-text-3)" }}>数据行数</span>
-                  <span style={{ color: "var(--atlas-text)" }}>{selectedFile.rowCount ?? "—"} 行</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span style={{ color: "var(--atlas-text-3)" }}>数据列数</span>
-                  <span style={{ color: "var(--atlas-text)" }}>{selectedFile.colCount ?? "—"} 列</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span style={{ color: "var(--atlas-text-3)" }}>上传时间</span>
-                  <span style={{ color: "var(--atlas-text)" }}>{selectedFile.createdAt ? new Date(selectedFile.createdAt).toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" }) : "—"}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span style={{ color: "var(--atlas-text-3)" }}>状态</span>
-                  <span className="px-1.5 py-0.5 rounded-full text-xs" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }}>已就绪</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
-            <p className="text-xs" style={{ color: "var(--atlas-text-4)" }}>选择文件<br/>查看详情</p>
-          </div>
-        )}
-      </div>
+
     </div>
   );
 }
