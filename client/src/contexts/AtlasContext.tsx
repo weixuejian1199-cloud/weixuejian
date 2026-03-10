@@ -67,6 +67,8 @@ export interface Message {
   thinkingSteps?: string[];  // Steps shown in "思考过程" panel
   suggestedActions?: Array<{ icon: string; label: string; prompt: string }>;  // Quick action buttons
   isHidden?: boolean;  // Hidden messages (auto-triggered, not shown in UI)
+  isAnalyzing?: boolean;  // Show analysis progress animation
+  analyzeProgress?: number;  // 0-100, simulated analysis progress
 }
 
 export interface ReportRecord {

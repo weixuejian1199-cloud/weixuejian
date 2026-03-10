@@ -168,25 +168,50 @@ export default function MainWorkspace() {
         setPendingActions(DEFAULT_ACTIONS);
       }
 
-      // "上传即分析"：直接使用后端返回的 ai_analysis（已包含 atlas-table 关键指标表）
-      // 不再触发第二次 chatStream，避免重复 AI 调用，更快更稳定
-      const analysisText = result.ai_analysis ||
-        `这是一份数据文件，共 ${result.df_info.row_count} 行、${result.df_info.col_count} 列。`;
-
-      const { cleanText, suggestions } = parseSuggestionsHelper(analysisText);
-      const finalSuggestions = suggestions.length > 0
-        ? suggestions
-        : (result.suggested_actions || DEFAULT_ACTIONS);
-
+      // "上传即分析"：先插入分析进度动画消息，然后替换为真实结果
       // Add a hidden user trigger message (not shown in UI)
       addMessage({ role: "user", content: `[自动分析] ${result.filename}`, isHidden: true } as any);
-      // Add AI analysis as assistant message directly
+
+      // Insert analysis progress placeholder message
       addMessage({
         role: "assistant",
-        content: cleanText,
+        content: "",
+        isAnalyzing: true,
+        analyzeProgress: 15,
         isStreaming: false,
-        suggestedActions: finalSuggestions,
       } as any);
+
+      // Simulate progress: 15 → 30 → 50 → 70 → 85 → 92 over ~6 seconds
+      const progressSteps = [30, 50, 70, 85, 92];
+      const progressIntervals: ReturnType<typeof setTimeout>[] = [];
+      const delays = [800, 1800, 3000, 4500, 6000];
+      progressSteps.forEach((pct, i) => {
+        const t = setTimeout(() => {
+          updateLastMessage("", { isAnalyzing: true, analyzeProgress: pct });
+        }, delays[i]);
+        progressIntervals.push(t);
+      });
+
+      // After a short delay (simulating AI processing), replace with real result
+      // The backend already computed ai_analysis during upload, so we just need
+      // a brief animation before showing the result
+      const showResult = () => {
+        progressIntervals.forEach(clearTimeout);
+        const analysisText = result.ai_analysis ||
+          `这是一份数据文件，共 ${result.df_info.row_count} 行、${result.df_info.col_count} 列。`;
+        const { cleanText, suggestions } = parseSuggestionsHelper(analysisText);
+        const finalSuggestions = suggestions.length > 0
+          ? suggestions
+          : (result.suggested_actions || DEFAULT_ACTIONS);
+        updateLastMessage(cleanText, {
+          isAnalyzing: false,
+          analyzeProgress: 100,
+          isStreaming: false,
+          suggestedActions: finalSuggestions,
+        });
+      };
+      // Show result after minimum 2.5s animation (feels natural, not too long)
+      setTimeout(showResult, 2500);
 
     } catch (err: any) {
       updateUploadedFile(tempId, { status: "error" });
@@ -1124,8 +1149,65 @@ function MessageFeedbackButtons({ messagePreview }: { messagePreview: string }) 
   );
 }
 
-// -- MessageBubble ---------------------------------------------------------------
+// -- AnalysisProgressBar -------------------------------------------------------
+function AnalysisProgressBar({ progress }: { progress: number }) {
+  const stages = [
+    { min: 0,  max: 25,  label: "正在读取数据…" },
+    { min: 25, max: 50,  label: "识别业务场景…" },
+    { min: 50, max: 75,  label: "提炼关键指标…" },
+    { min: 75, max: 95,  label: "生成分析报告…" },
+    { min: 95, max: 100, label: "即将完成…" },
+  ];
+  const stage = stages.find(s => progress >= s.min && progress < s.max) || stages[stages.length - 1];
 
+  return (
+    <div className="py-2">
+      <div className="flex items-center justify-between mb-2">
+        <span style={{ fontSize: "13px", color: "var(--atlas-text-2)", fontWeight: 500 }}>
+          {stage.label}
+        </span>
+        <span style={{ fontSize: "13px", color: "var(--atlas-accent)", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+          {progress}%
+        </span>
+      </div>
+      <div
+        className="relative overflow-hidden rounded-full"
+        style={{ height: "6px", background: "var(--atlas-border)" }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            height: "100%",
+            width: `${progress}%`,
+            background: "linear-gradient(90deg, #5b8cff 0%, #a78bfa 100%)",
+            borderRadius: "9999px",
+            transition: "width 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
+            boxShadow: "0 0 8px rgba(91,140,255,0.5)",
+          }}
+        />
+        {/* Shimmer sweep effect */}
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: "-60%",
+            width: "60%",
+            height: "100%",
+            background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)",
+            animation: "shimmer-sweep 1.8s ease-in-out infinite",
+          }}
+        />
+      </div>
+      <p style={{ fontSize: "11px", color: "var(--atlas-text-3)", marginTop: "8px" }}>
+        ATLAS 正在智能分析中，请稍候…
+      </p>
+    </div>
+  );
+}
+
+// -- MessageBubble ---------------------------------------------------------------
 function MessageBubble({
   message,
   onDownload,
@@ -1247,7 +1329,11 @@ function MessageBubble({
             border: "1px solid var(--atlas-border)",
           }}
         >
-          {message.isStreaming && !message.content ? (
+          {/* @ts-ignore */}
+          {message.isAnalyzing ? (
+            /* 分析进度动画 */
+            <AnalysisProgressBar progress={(message as any).analyzeProgress ?? 15} />
+          ) : message.isStreaming && !message.content ? (
             /* 正在思考动画 */
             <div className="flex items-center gap-2 py-0.5">
               <div className="flex items-center gap-1">
