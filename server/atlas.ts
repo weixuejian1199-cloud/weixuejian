@@ -144,10 +144,42 @@ function parseExcelBuffer(buffer: Buffer, filename: string): { data: Record<stri
   const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
   const sheetNames = workbook.SheetNames;
   const sheet = workbook.Sheets[sheetNames[0]];
-  const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+
+  // First pass: try default parsing (header row = row 1)
+  let data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
     defval: null,
     raw: false,
   });
+
+  // Detect __EMPTY columns — means the real header is not on row 1
+  // Try rows 2-6 as header until we find one with meaningful column names
+  const hasEmptyHeaders = data.length > 0 &&
+    Object.keys(data[0]).some(k => k.startsWith("__EMPTY"));
+
+  if (hasEmptyHeaders) {
+    // Try header rows 2 through 6 (0-indexed: 1 through 5)
+    for (let headerRow = 1; headerRow <= 5; headerRow++) {
+      const candidate = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+        defval: null,
+        raw: false,
+        range: headerRow, // use this row as header
+      });
+      if (
+        candidate.length > 0 &&
+        !Object.keys(candidate[0]).some(k => k.startsWith("__EMPTY")) &&
+        Object.keys(candidate[0]).some(k => k.trim() !== "")
+      ) {
+        data = candidate;
+        break;
+      }
+    }
+  }
+
+  // Clean up: remove rows where ALL values are null/empty (blank separator rows)
+  data = data.filter(row =>
+    Object.values(row).some(v => v !== null && v !== undefined && v !== "")
+  );
+
   return { data, sheetNames };
 }
 
@@ -187,6 +219,161 @@ function buildDataFrameInfo(data: Record<string, unknown>[], sheetNames?: string
     fields,
     preview: data.slice(0, 5),
   };
+}
+
+// ── Business scenario detection ─────────────────────────────────────────────
+
+interface ScenarioResult {
+  name: string;       // 场景名称（中文）
+  type: string;       // 场景类型 key
+  confidence: number; // 0-1
+  primaryFields: string[]; // 主要数值字段
+  groupFields: string[];   // 分组字段（姓名/门店等）
+  dateFields: string[];    // 时间字段
+}
+
+function detectScenario(fields: FieldInfo[]): ScenarioResult {
+  const names = fields.map(f => f.name.toLowerCase());
+  const numericFields = fields.filter(f => f.type === "numeric").map(f => f.name);
+  const textFields = fields.filter(f => f.type === "text").map(f => f.name);
+  const dateFields = fields.filter(f => f.type === "datetime").map(f => f.name);
+
+  // Helper: find matching field names
+  const match = (patterns: RegExp[]) =>
+    fields.filter(f => patterns.some(p => p.test(f.name.toLowerCase())));
+
+  // Scenario detection rules (ordered by specificity)
+  const payrollFields = match([/工资|薪资|底薪|绩效工资|实发|应发|扣款|社保|公积金|个税|salary|pay|wage/]);
+  const attendanceFields = match([/出勤|考勤|迟到|早退|旷工|打卡|上班|下班|attendance|clock/]);
+  const dividendFields = match([/分红|分配|奖金|提成|佣金|dividend|bonus|commission/]);
+  const salesFields = match([/销售|金额|订单|gmv|营业额|收入|revenue|amount|sales/]);
+  const inventoryFields = match([/库存|入库|出库|库量|数量|stock|inventory/]);
+  const storeFields = match([/门店|店铺|店名|渠道|平台|store|shop|channel/]);
+  const nameFields = match([/姓名|名字|员工|人员|会员|用户|name|staff|member/]);
+
+  // Score each scenario
+  const scores: Record<string, number> = {
+    payroll: payrollFields.length * 3 + (attendanceFields.length > 0 ? 1 : 0),
+    attendance: attendanceFields.length * 3,
+    dividend: dividendFields.length * 3,
+    sales: salesFields.length * 2 + (storeFields.length > 0 ? 2 : 0),
+    inventory: inventoryFields.length * 3,
+  };
+
+  const maxScore = Math.max(...Object.values(scores));
+  const topType = maxScore > 0
+    ? Object.entries(scores).sort((a, b) => b[1] - a[1])[0][0]
+    : "general";
+
+  const scenarioNames: Record<string, string> = {
+    payroll: "工资/薪酬数据",
+    attendance: "考勤数据",
+    dividend: "分红/奖金数据",
+    sales: storeFields.length > 0 ? "多门店销售数据" : "销售/电商数据",
+    inventory: "库存数据",
+    general: "业务数据",
+  };
+
+  // Determine primary numeric fields for this scenario
+  const primaryFieldMap: Record<string, RegExp[]> = {
+    payroll: [/工资|薪资|底薪|绩效|实发|应发/],
+    attendance: [/出勤|天数|次数/],
+    dividend: [/分红|奖金|提成|佣金/],
+    sales: [/销售|金额|gmv|营业额|收入/],
+    inventory: [/库存|数量|入库|出库/],
+    general: [],
+  };
+  const primaryPatterns = primaryFieldMap[topType] || [];
+  const primaryFields = primaryPatterns.length > 0
+    ? match(primaryPatterns).map(f => f.name)
+    : numericFields.slice(0, 3);
+
+  const groupFields = [
+    ...nameFields.map(f => f.name),
+    ...storeFields.map(f => f.name),
+  ].slice(0, 2);
+
+  return {
+    name: scenarioNames[topType] || "业务数据",
+    type: topType,
+    confidence: maxScore > 0 ? Math.min(maxScore / 9, 1) : 0.3,
+    primaryFields: primaryFields.length > 0 ? primaryFields : numericFields.slice(0, 3),
+    groupFields,
+    dateFields: dateFields.slice(0, 2),
+  };
+}
+
+// ── Key metrics computation (pure code, no AI, 100% stable) ──────────────────
+
+interface KeyMetric {
+  name: string;
+  value: string | number;
+  field: string;
+  type: "sum" | "avg" | "max" | "min" | "count" | "top" | "pct";
+}
+
+function computeKeyMetrics(
+  data: Record<string, unknown>[],
+  scenario: ScenarioResult,
+  dfInfo: DataFrameInfo
+): KeyMetric[] {
+  const metrics: KeyMetric[] = [];
+  const numericFields = dfInfo.fields.filter(f => f.type === "numeric");
+
+  // Always add row count
+  metrics.push({ name: "数据总行数", value: data.length, field: "_count", type: "count" });
+
+  // For each primary numeric field, compute sum / avg / max / min
+  const targetFields = scenario.primaryFields.length > 0
+    ? scenario.primaryFields.slice(0, 4)
+    : numericFields.slice(0, 3).map(f => f.name);
+
+  for (const fieldName of targetFields) {
+    const values = data
+      .map(row => Number(row[fieldName]))
+      .filter(v => !isNaN(v) && isFinite(v));
+    if (values.length === 0) continue;
+
+    const sum = values.reduce((a, b) => a + b, 0);
+    const avg = sum / values.length;
+    const max = Math.max(...values);
+    const min = Math.min(...values);
+
+    // Format numbers
+    const fmt = (n: number) => {
+      if (Math.abs(n) >= 10000) return `${(n / 10000).toFixed(2)}万`;
+      return n % 1 === 0 ? n.toString() : n.toFixed(2);
+    };
+
+    metrics.push({ name: `${fieldName}合计`, value: fmt(sum), field: fieldName, type: "sum" });
+    metrics.push({ name: `${fieldName}均值`, value: fmt(avg), field: fieldName, type: "avg" });
+    metrics.push({ name: `${fieldName}最高`, value: fmt(max), field: fieldName, type: "max" });
+    metrics.push({ name: `${fieldName}最低`, value: fmt(min), field: fieldName, type: "min" });
+
+    if (metrics.length >= 9) break;
+  }
+
+  // Add group-level top3 if we have a group field
+  if (scenario.groupFields.length > 0 && scenario.primaryFields.length > 0) {
+    const groupField = scenario.groupFields[0];
+    const valueField = scenario.primaryFields[0];
+    const groupMap = new Map<string, number>();
+    for (const row of data) {
+      const key = String(row[groupField] ?? "");
+      if (!key) continue;
+      const val = Number(row[valueField]);
+      if (!isNaN(val)) {
+        groupMap.set(key, (groupMap.get(key) || 0) + val);
+      }
+    }
+    if (groupMap.size > 0) {
+      const sorted = Array.from(groupMap.entries()).sort((a, b) => b[1] - a[1]);
+      const top3 = sorted.slice(0, 3).map(([k, v]) => `${k}(${v >= 10000 ? (v / 10000).toFixed(1) + '万' : v.toFixed(0)})`).join("、");
+      metrics.push({ name: `${valueField}Top3`, value: top3, field: groupField, type: "top" });
+    }
+  }
+
+  return metrics.slice(0, 8);
 }
 
 // ── Persistent session helpers ────────────────────────────────────────────────
@@ -441,8 +628,11 @@ export function registerAtlasRoutes(app: Express) {
         status: "ready",
       });
 
-      // 5. AI analysis (non-streaming, fast summary)
-      const openai = createLLM();
+      // 5. Detect scenario + compute key metrics (pure code, no AI dependency)
+      const scenario = detectScenario(dfInfo.fields);
+      const keyMetrics = computeKeyMetrics(data, scenario, dfInfo);
+
+      // Build field summary for AI context
       const fieldSummary = dfInfo.fields.slice(0, 15).map(f =>
         `${f.name}(${f.type}, ${f.unique_count}个唯一值, 示例:${f.sample.slice(0, 3).join("/")})`
       ).join(", ");
@@ -457,55 +647,95 @@ export function registerAtlasRoutes(app: Express) {
         }
       }
 
-      // Build smart suggested actions BEFORE AI call so we can include them in the prompt
-      const fieldNames2 = dfInfo.fields.map(f => f.name.toLowerCase());
-      const hasSales2 = fieldNames2.some(f => /销售|金额|订单|gmv|amount|sales|revenue/.test(f));
-      const hasPayroll2 = fieldNames2.some(f => /工资|薪资|底薪|绩效工资|salary|pay|wage/.test(f));
-      const hasAttendance2 = fieldNames2.some(f => /出勤|考勤|迟到|早退|attendance|clock/.test(f));
-      const hasDividend2 = fieldNames2.some(f => /分红|分配|奖金|dividend|bonus/.test(f));
-      const hasStore2 = fieldNames2.some(f => /门店|店铺|店名|store|shop/.test(f));
-      const hasDate2 = fieldNames2.some(f => /日期|时间|月份|date|time|month/.test(f));
-      const hasName2 = fieldNames2.some(f => /姓名|名字|员工|人员|name|staff|employee/.test(f));
       const numericFields = dfInfo.fields.filter(f => f.type === "numeric").map(f => f.name);
-      const topNumericField = numericFields[0] || "";
 
-      // Build context-aware hint for AI
-      const dataTypeHint = [
-        hasSales2 ? "销售/电商数据" : "",
-        hasPayroll2 ? "工资/薪酬数据" : "",
-        hasAttendance2 ? "考勤数据" : "",
-        hasDividend2 ? "分红/奖金数据" : "",
-        hasStore2 ? "多门店数据" : "",
-      ].filter(Boolean).join("、") || "通用业务数据";
+      // Build metrics summary for AI
+      const metricsSummary = keyMetrics.map(m => `${m.name}: ${m.value}`).join("、");
+
+      // Build suggested actions based on scenario
+      const hasSales2 = scenario.type === "sales";
+      const hasPayroll2 = scenario.type === "payroll";
+      const hasAttendance2 = scenario.type === "attendance";
+      const hasDividend2 = scenario.type === "dividend";
+      const hasStore2 = scenario.groupFields.some(f => /门店|店铺|store|shop/.test(f.toLowerCase()));
+      const hasDate2 = scenario.dateFields.length > 0;
+      const hasName2 = scenario.groupFields.some(f => /姓名|名字|员工|name|staff/.test(f.toLowerCase()));
+
+      // Build pure-code fallback atlas-table for key metrics
+      const fallbackTable = {
+        title: `${originalname} 关键指标`,
+        columns: ["指标名称", "指标值"],
+        rows: keyMetrics.map(m => [m.name, String(m.value)]),
+        highlight: 1,
+        sortBy: -1,
+        sortDir: "desc",
+      };
+      const fallbackTableStr = "```atlas-table\n" + JSON.stringify(fallbackTable, null, 2) + "\n```";
+
+      // Build system prompt for upload analysis (avoid backtick nesting by using string concat)
+      const fieldListStr = dfInfo.fields.slice(0, 4).map(f => f.name).join('、') + (dfInfo.fields.length > 4 ? '等' : '');
+      const qualityHint = qualityIssues.length > 0 ? '（并加一句质量提醒）' : '';
+      const uploadSystemPrompt = [
+        '你是 ATLAS，一个专业的智能数据分析助手。用户刚刚上传了文件，你必须立刻输出以下内容：',
+        '',
+        '**第一部分：一句话识别**（不超过30字）',
+        `格式：「这是一份[${scenario.name}]，共${dfInfo.row_count}行、${dfInfo.col_count}列。」${qualityHint}`,
+        '',
+        '**第二部分：关键指标表**',
+        '必须输出以下 atlas-table 格式（严格遵守）：',
+        '',
+        '\`\`\`atlas-table',
+        '{',
+        `  "title": "[${originalname}] 关键指标",`,
+        '  "columns": ["指标名称", "指标值", "说明"],',
+        '  "rows": [',
+        `    ["数据总行数", "${dfInfo.row_count}", "有效数据行"],`,
+        `    ["字段数", "${dfInfo.col_count}", "包括: ${fieldListStr}"],`,
+        `    // 在此基础上，根据实际数据补充 5-6 个最重要的业务指标（已计算值：${metricsSummary}）`,
+        '  ],',
+        '  "highlight": 1,',
+        '  "sortBy": -1,',
+        '  "sortDir": "desc"',
+        '}',
+        '\`\`\`',
+        '',
+        '**第三部分：3个分析方向**（带字段名）',
+        '格式：【①】具体操作（如「按门店汇总销售额排名」）',
+        '',
+        `数据场景：${scenario.name}，置信度：${(scenario.confidence * 100).toFixed(0)}%`,
+        `主要数值字段：${scenario.primaryFields.join('、') || '无'}`,
+        `分组字段：${scenario.groupFields.join('、') || '无'}`,
+        `已计算指标：${metricsSummary}`,
+        '',
+        '注意：',
+        '- rows 中的注释行必须删除，只保留真实数据行',
+        '- 指标值直接用已计算的真实数值，不要编造',
+        '- 输出不超过150字，不要有任何前置序言',
+      ].join('\n');
 
       let aiAnalysis = "";
       try {
+        const openai = createLLM();
         const result = await streamText({
           model: openai.chat(selectModel(dfInfo.row_count)),
-          system: `你是 ATLAS，一个专业的智能业务助手（行政+财务+数据分析三合一）。用户刚刚上传了文件，你需要做一个「文件识别报告」：
-
-规则：
-1. 第一句：自然识别数据类型，说明文件名、行数、判断是什么类型的数据（如：「这是一份销售数据，共1200行」）
-2. 如有数据质量问题，简短提醒（一句话）
-3. 根据字段内容，给出 **3个具体可执行的分析方向**，格式：
-   - 每个选项用【数字圆圈】开头：【①】【②】【③】
-   - 选项要具体，带上字段名（如：「按门店汇总销售额排名」「生成含个税的工资条」）
-   - 不要泛泛说「数据分析」，要说具体做什么
-4. 最后一句：「你也可以直接告诉我需求，或拖入报表模板，我会按格式填入数据」
-
-数据类型判断：${dataTypeHint}
-数值字段：${numericFields.slice(0, 5).join("、") || "无"}
-格式要求：不超过200字，语气自然友好，像懂业务的同事在问你。`,
+          system: uploadSystemPrompt,
           messages: [{
             role: "user",
-            content: `文件名：${originalname}，共 ${dfInfo.row_count} 行 ${dfInfo.col_count} 列。字段：${fieldSummary}。${qualityIssues.length > 0 ? '数据质量：' + qualityIssues.join('；') : '数据质量良好'}。`,
+            content: `文件名：${originalname}，共 ${dfInfo.row_count} 行 ${dfInfo.col_count} 列。字段：${fieldSummary}。${qualityIssues.length > 0 ? '数据质量：' + qualityIssues.join('；') : '数据质量良好'}。已计算指标：${metricsSummary}`,
           }],
+          maxOutputTokens: 800,
         });
         aiAnalysis = await result.text;
+        // Validate: if AI didn't output atlas-table, use fallback
+        if (!aiAnalysis.includes("atlas-table")) {
+          console.warn("[Atlas] AI analysis missing atlas-table, using fallback");
+          const intro = aiAnalysis.split("\n")[0] || `这是一份${scenario.name}，共${dfInfo.row_count}行、${dfInfo.col_count}列。`;
+          aiAnalysis = `${intro}\n\n${fallbackTableStr}`;
+        }
       } catch (e) {
-        console.warn("[Atlas] AI analysis failed:", e);
+        console.warn("[Atlas] AI analysis failed, using pure-code fallback:", e);
         const qualityNote = qualityIssues.length > 0 ? `\n\n⚠️ 数据质量提醒：${qualityIssues.join('；')}` : '';
-        aiAnalysis = `收到！**${originalname}** 共 ${dfInfo.row_count.toLocaleString()} 行，包含字段：${dfInfo.fields.slice(0, 6).map(f => f.name).join('、')}${dfInfo.fields.length > 6 ? '等' : ''}。${qualityNote}\n\n你想怎么处理这份数据？`;
+        aiAnalysis = `这是一份**${scenario.name}**，共 ${dfInfo.row_count.toLocaleString()} 行、${dfInfo.col_count} 列。${qualityNote}\n\n${fallbackTableStr}`;
       }
 
       // Generate smart suggested actions based on field names

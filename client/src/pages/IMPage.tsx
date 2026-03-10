@@ -249,6 +249,8 @@ export default function IMPage() {
   const [openClawInput, setOpenClawInput] = useState("");
   const [openClawOnline, setOpenClawOnline] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Track whether we just switched conversation (instant scroll) vs new message (smooth scroll)
+  const justSwitchedConvRef = useRef(false);
   const isAdminUser = user?.role === "admin";
 
    // ── Bot state ──────────────────────────────────────────────────────────
@@ -368,13 +370,18 @@ export default function IMPage() {
     useImWebSocket(tokenData?.token ?? null);
 
   // Auto-scroll to bottom
+  // When switching conversations: instant jump (no animation)
+  // When new message arrives: smooth scroll
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const behavior = justSwitchedConvRef.current ? "instant" : "smooth";
+    justSwitchedConvRef.current = false;
+    messagesEndRef.current?.scrollIntoView({ behavior } as ScrollIntoViewOptions);
   }, [messages, streamingTokens, activeConvId]);
 
   // Load messages when switching conversation
   useEffect(() => {
     if (activeConvId) {
+      justSwitchedConvRef.current = true; // Mark as conversation switch → instant scroll
       send({ type: "get_messages", conversationId: activeConvId });
     }
   }, [activeConvId, send]);
@@ -974,9 +981,14 @@ interface OpenClawPanelProps {
 
 function OpenClawPanel({ messages, inputText, setInputText, isOnline, onSend }: OpenClawPanelProps) {
   const endRef = useRef<HTMLDivElement>(null);
+  const prevLengthRef = useRef(0);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    // First load or conversation switch: instant jump to bottom
+    // New message added: smooth scroll
+    const isNewMessage = messages.length > prevLengthRef.current && prevLengthRef.current > 0;
+    prevLengthRef.current = messages.length;
+    endRef.current?.scrollIntoView({ behavior: isNewMessage ? "smooth" : "instant" } as ScrollIntoViewOptions);
   }, [messages]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

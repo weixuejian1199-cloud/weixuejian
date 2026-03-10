@@ -609,3 +609,22 @@
 ### P3 - 代码质量
 - [ ] 拆分 atlas.ts（>1500行）为 upload.ts / chat.ts / report.ts
 - [ ] 清理 Telegram 相关依赖包
+
+## 2026-03-10 用户体验修复
+
+- [x] 对话框切换时瞬间跳到底部（IMPage + OpenClawPanel，instant vs smooth）
+- [x] 修复 __EMPTY 字段名：parseExcelBuffer 自动检测真正表头行（最多向下扫描6行）
+- [x] 上传即分析：文件上传完成后自动触发 chatStream，直接输出数据摘要+预览+洞察
+- [x] Message 接口添加 suggestedActions 和 isHidden 字段
+- [x] 隐藏自动触发的用户消息（isHidden: true），对话框只显示 AI 分析结果
+
+## 2026-03-10 核心智能功能升级（上传即分析）
+
+- [x] 上传即分析：文件上传完成后，AI 自动输出关键指标表（atlas-table 格式），无需用户手动输入
+- [x] 后端场景识别：自动识别销售/工资/考勤/分红/库存等业务场景（detectScenario 函数）
+- [x] 后端关键指标提炼：纯代码计算 5-8 个关键指标（总计/均值/最大/最小/Top3），AI 失败时纯代码兜底（computeKeyMetrics 函数）
+- [x] Excel 表头识别优化：自动跳过合并单元格/空行，找到真正的表头行，解决 __EMPTY 字段名问题
+- [x] 对话框切换时瞬间跳到底部（不再从顶部慢慢滚动）
+- [x] 错误提示优化：HTTP 401/413/429/500 对应中文友好提示
+- [x] 文件上传进度条（XMLHttpRequest 真实进度）
+- [x] 前端：上传完成后直接用后端 ai_analysis 作为 AI 消息（不再触发二次 chatStream，更快更稳定）

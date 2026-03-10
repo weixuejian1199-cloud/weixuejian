@@ -23,6 +23,25 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
 
+// Helper: strip <suggestions> block from text and parse into SuggestedAction[]
+function parseSuggestionsHelper(text: string): { cleanText: string; suggestions: SuggestedAction[] } {
+  const match = text.match(/<suggestions>\s*([\s\S]*?)\s*<\/suggestions>/);
+  if (!match) return { cleanText: text, suggestions: [] };
+  const cleanText = text.replace(/<suggestions>[\s\S]*?<\/suggestions>/, "").trimEnd();
+  try {
+    const arr: string[] = JSON.parse(match[1].trim());
+    const icons = ["\u{1F4AC}", "\u{1F4CA}", "\u{1F50D}", "\u{1F4DD}", "\u26A1", "\u{1F4CB}"];
+    const suggestions: SuggestedAction[] = arr.slice(0, 3).map((label, i) => ({
+      icon: icons[i % icons.length],
+      label,
+      prompt: label,
+    }));
+    return { cleanText, suggestions };
+  } catch {
+    return { cleanText, suggestions: [] };
+  }
+}
+
 // -- Suggested actions shown after upload (dynamic from backend, fallback below)
 const DEFAULT_ACTIONS: SuggestedAction[] = [
   { icon: "📊", label: "生成汇总表", prompt: "帮我生成数据汇总表，包含关键指标和统计" },
@@ -149,19 +168,31 @@ export default function MainWorkspace() {
         setPendingActions(DEFAULT_ACTIONS);
       }
 
-      // Show AI greeting with suggested actions embedded in message
+      // "上传即分析"：直接使用后端返回的 ai_analysis（已包含 atlas-table 关键指标表）
+      // 不再触发第二次 chatStream，避免重复 AI 调用，更快更稳定
+      const analysisText = result.ai_analysis ||
+        `这是一份数据文件，共 ${result.df_info.row_count} 行、${result.df_info.col_count} 列。`;
+
+      const { cleanText, suggestions } = parseSuggestionsHelper(analysisText);
+      const finalSuggestions = suggestions.length > 0
+        ? suggestions
+        : (result.suggested_actions || DEFAULT_ACTIONS);
+
+      // Add a hidden user trigger message (not shown in UI)
+      addMessage({ role: "user", content: `[自动分析] ${result.filename}`, isHidden: true } as any);
+      // Add AI analysis as assistant message directly
       addMessage({
         role: "assistant",
-        content: result.ai_analysis,
-        // @ts-ignore - extended field for suggested actions
-        suggestedActions: result.suggested_actions || DEFAULT_ACTIONS,
-      });
+        content: cleanText,
+        isStreaming: false,
+        suggestedActions: finalSuggestions,
+      } as any);
 
     } catch (err: any) {
       updateUploadedFile(tempId, { status: "error" });
       toast.error(`${file.name} 上传失败：${err.message}`);
     }
-  }, [addUploadedFile, updateUploadedFile, addMessage, activeTaskId, tasks, updateTask]);
+  }, [addUploadedFile, updateUploadedFile, addMessage, updateLastMessage, setIsGenerating, activeTaskId, tasks, updateTask]);
 
   const handleFiles = useCallback((files: FileList | File[]) => {
     // Ensure we have an active task
@@ -579,7 +610,7 @@ export default function MainWorkspace() {
             <EmptyState onUpload={() => fileInputRef.current?.click()} onQuickAsk={(q) => handleSend(q)} />
           ) : (() => {
             const startIdx = Math.max(0, messages.length - visibleCount);
-            const visibleMessages = messages.slice(startIdx);
+            const visibleMessages = messages.slice(startIdx).filter(m => !m.isHidden);
             const hasMore = startIdx > 0;
             return (
               <>
