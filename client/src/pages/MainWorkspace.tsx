@@ -452,45 +452,6 @@ export default function MainWorkspace() {
             toast.error("对话失败，请重试");
             setInput(msg);
           },
-          onTelegramTask: (taskId, pendingMsg) => {
-            // Show pending message immediately
-            updateLastMessage(pendingMsg, { isStreaming: false });
-            // Start polling for task completion (every 10s, max 60 times = 600s / 10 min)
-            let attempts = 0;
-            const maxAttempts = 60;
-            const pollInterval = setInterval(async () => {
-              attempts++;
-              try {
-                const r = await fetch(`/api/atlas/task/${taskId}/status`, { credentials: "include" });
-                if (!r.ok) return;
-                const data = await r.json() as { status: string; reply?: string; error_msg?: string; output_files?: Array<{ name: string; fileUrl: string }> };
-                if (data.status === "completed" && data.reply) {
-                  clearInterval(pollInterval);
-                  const parsedActions = parseInlineOptions(data.reply);
-                  let finalMsg = data.reply;
-                  if (data.output_files && data.output_files.length > 0) {
-                    finalMsg += "\n\n📄 **输出文件**\n" + data.output_files.map(f => `- [${f.name}](${f.fileUrl})`).join("\n");
-                  }
-                  updateLastMessage(finalMsg, { suggestedActions: parsedActions } as any);
-                  toast.success("任务已完成！");
-                  setIsGenerating(false);
-                } else if (data.status === "failed" || data.status === "error") {
-                  clearInterval(pollInterval);
-                  const errDetail = data.error_msg || "处理失败，请重试";
-                  updateLastMessage(`❌ ${errDetail}\n\n请重新发送消息，或上传文件后再试。`);
-                  toast.error(errDetail);
-                  setIsGenerating(false);
-                } else if (attempts >= maxAttempts) {
-                  clearInterval(pollInterval);
-                  updateLastMessage(pendingMsg + "\n\n⏰ 任务超时（10分钟无响应），请重新发送消息重试。");
-                  toast.error("任务超时，请重试");
-                  setIsGenerating(false);
-                }
-              } catch (e) {
-                console.warn("[Poll] task status error:", e);
-              }
-            }, 10_000);
-          },
         });
       }
     } catch (err: any) {

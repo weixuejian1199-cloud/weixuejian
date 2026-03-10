@@ -30,6 +30,37 @@ import { isOpenClawEnabled, callOpenClaw, callOpenClawStream, getPresignedUrlsFo
 import { pushAtlasMsgToOpenClaw, pushQwenReplyToOpenClaw } from "./im/wsServer";
 import { openclawTasks, chatConversations, chatMessages, personalTemplates } from "../drizzle/schema";
 
+// ── In-memory Rate Limiter ───────────────────────────────────────────────────
+// Limits /api/atlas/chat to 20 requests per user per minute
+// Key: userId (authenticated) or IP (anonymous)
+const RATE_LIMIT_MAX = 20;
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
+
+interface RateEntry { count: number; resetAt: number; }
+const rateLimitMap = new Map<string, RateEntry>();
+
+// Cleanup stale entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  Array.from(rateLimitMap.entries()).forEach(([key, entry]) => {
+    if (entry.resetAt < now) rateLimitMap.delete(key);
+  });
+}, 5 * 60_000);
+
+function checkRateLimit(key: string): { allowed: boolean; remaining: number; resetIn: number } {
+  const now = Date.now();
+  const entry = rateLimitMap.get(key);
+  if (!entry || entry.resetAt < now) {
+    rateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true, remaining: RATE_LIMIT_MAX - 1, resetIn: RATE_LIMIT_WINDOW_MS };
+  }
+  if (entry.count >= RATE_LIMIT_MAX) {
+    return { allowed: false, remaining: 0, resetIn: entry.resetAt - now };
+  }
+  entry.count++;
+  return { allowed: true, remaining: RATE_LIMIT_MAX - entry.count, resetIn: entry.resetAt - now };
+}
+
 // Optional auth middleware: injects req.userId if session cookie is valid
 async function optionalAuth(req: Request, _res: Response, next: NextFunction) {
   try {
@@ -831,7 +862,21 @@ export function registerAtlasRoutes(app: Express) {
       // Support both single session_id and multiple session_ids
       const allSessionIds = session_ids?.length ? session_ids : session_id ? [session_id] : [];
 
-      // ── V13.9: Persist conversation and user message ─────────────────────
+      // ── Rate Limiting: 20 requests per user/IP per minute ─────────────────
+      const rateLimitKey = (req as any).userId
+        ? `user:${(req as any).userId}`
+        : `ip:${req.ip ?? req.socket.remoteAddress ?? "unknown"}`;
+      const rl = checkRateLimit(rateLimitKey);
+      if (!rl.allowed) {
+        const resetSec = Math.ceil(rl.resetIn / 1000);
+        res.status(429).json({
+          error: `请求过于频繁，请 ${resetSec} 秒后再试（每分钟最多 ${RATE_LIMIT_MAX} 次）`,
+          retryAfter: resetSec,
+        });
+        return;
+      }
+
+      // ── V13.9: Persist conversation and user message ─────────────────
       const userId = (req as any).userId || 0;
       const convId = conversation_id || nanoid();
       const db = await getDb();
@@ -1216,7 +1261,7 @@ ${dataTable}
 - 这个块不会显示给用户，前端会自动解析成按钮
 -- **正文质量优先，不要为了生成追问而拖长正文**`;
       const totalRows = data.length;
-      // ── OpenClaw SSE streamingg (if configured) ──────────────────────────
+          // ── OpenClaw SSE streaming (if configured) ──────────────────────
       if (isOpenClawEnabled()) {
         console.log("[Atlas] Routing to OpenClaw SSE channel");
         try {
@@ -1224,23 +1269,33 @@ ${dataTable}
           const sessionDataKeys = allSessionIds.map(id => `atlas-data/${id}-data.json`);
           const fileUrls = await getPresignedUrlsForSessions(sessionDataKeys);
           const fileNames = validSessions.map(s => s!.originalName);
-          const userId = String((req as any).userId ?? "anonymous");
+          const ocUserId = String((req as any).userId ?? "anonymous");
 
           await callOpenClawStream(
             {
               message,
               file_urls: fileUrls,
               file_names: fileNames,
-              user_id: userId,
+              user_id: ocUserId,
               source: "atlas",
             },
             res,
-            userId
+            ocUserId
           );
           return;
         } catch (openClawErr: any) {
           console.error("[Atlas] OpenClaw SSE failed, falling back to Qwen:", openClawErr.message);
-          // Fall through to Qwen on error
+          // If headers not yet sent (connection failed before writing), fall through silently
+          // If headers already sent (30s no-data timeout mid-stream), we can't send Qwen response
+          // on the same connection — just end the response with a fallback notice
+          if (res.headersSent) {
+            if (!res.writableEnded) {
+              res.write(`0:${JSON.stringify("\n\n⚠️ 小虾米响应超时，已自动切换到备用分析引擎，正在重新处理...\n")}\n`);
+              res.end();
+            }
+            return;
+          }
+          // Headers not sent → fall through to Qwen below
         }
       }
 

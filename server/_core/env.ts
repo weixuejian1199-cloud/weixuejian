@@ -10,9 +10,8 @@ export const ENV = {
   // OpenClaw (小虾米 Agent) — optional, if not set falls back to Qwen
   openClawApiKey: process.env.OPENCLAW_API_KEY ?? "",
   openClawEndpoint: process.env.OPENCLAW_API_URL ?? process.env.OPENCLAW_ENDPOINT ?? "https://gateway.openclaw.ai/v1/chat",
-  // Telegram Bot — for OpenClaw task notifications
-  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
-  telegramChatId: process.env.TELEGRAM_CHAT_ID ?? "",
+  // App base URL — used for building callback URLs (e.g., bot reply URLs)
+  appBaseUrl: process.env.APP_BASE_URL ?? "https://atlascore.cn",
   // OpenClaw polling session key — used to authenticate OpenClaw agent polling requests
   openClawSessionKey: process.env.OPENCLAW_SESSION_KEY ?? "",
   // Alibaba DashScope (Qwen3-Max + Kimi-K2.5)

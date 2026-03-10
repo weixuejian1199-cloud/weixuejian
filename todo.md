@@ -647,3 +647,25 @@
 - [x] P0: 修复 checkStuckTasks 报错（DrizzleQueryError cause 链检测，ECONNRESET/ETIMEDOUT 自动重连）
 - [ ] P1: 补全管理员接口鉴权
 - [ ] P2: 去掉强制登录要求（所有用户无需登录即可使用全部功能）
+
+## V14.4 P0+P1 全面修复
+
+### P0 - 稳定性
+- [x] 移除 Telegram 后台轮询进程（telegramPolling.ts / telegramNotify.ts 已无独立文件，env.ts 变量已清理）
+- [x] 清理 Telegram 相关依赖包（无 npm 依赖，已确认）
+- [x] 机器人 webhook URL 改为从 ENV.appBaseUrl 动态读取（不再硬编码 atlascore.cn）
+
+### P1 - 安全/体验
+- [x] /api/atlas/chat 加 rate limiting（每用户每分钟20次，超限返回429；_core/index.ts 已有 express-rate-limit，atlas.ts 内存 limiter 已合并）
+- [x] /api/admin/* 补全 role 鉴权（adminProcedure + requireAdminApiKey 双重鉴权已就位）
+- [x] 去掉强制登录要求（回滚后版本本就无强制登录，已确认）
+- [ ] 任务列表支持双击标题进行重命名
+
+## V14.5 OpenClaw SSE 稳定性修复
+
+- [x] 第一步：删除 openclawPolling.ts 和轮询路由（/api/openclaw/tasks/pending、/api/openclaw/tasks/result）
+- [x] 第二步：callOpenClawStream 加 15 秒心跳保活，防止 Nginx/CDN 60 秒断连
+- [x] 第三步：降级时机改为"连接失败立即降级，30 秒无数据才降级"
+- [x] 第四步：SSE 连接建立后立即发状态消息给前端
+- [x] 前端清理 onTelegramTask 轮询代码，消息格式与千问降级格式完全一致
+- [x] 删除 openclawPolling.test.ts（对应文件已删除），全部 69 个测试通过

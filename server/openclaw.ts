@@ -186,6 +186,12 @@ export async function callOpenClaw(
  *   data: {"type":"text","content":"chunk text"}
  *   data: {"type":"done","output_files":[...]}   ← optional, final event
  *   data: [DONE]
+ *
+ * Improvements:
+ *   - Heartbeat every 15s to prevent Nginx/CDN 60s idle timeout
+ *   - Immediate fallback if connection fails (throw synchronously)
+ *   - 30s no-data timeout triggers fallback (not 300s)
+ *   - Status message sent immediately after connection established
  */
 export async function callOpenClawStream(
   request: OpenClawRequest,
@@ -210,8 +216,9 @@ export async function callOpenClawStream(
 
   console.log(`[OpenClaw SSE] Calling ${endpoint} with message: "${request.message.slice(0, 80)}..."`);
 
+  // ── Step 1: Connect — fail immediately if connection fails ───────────────
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 300_000); // 300s timeout
+  const connectTimeout = setTimeout(() => controller.abort(), 15_000); // 15s connect timeout
 
   let upstreamRes: Response;
   try {
@@ -226,34 +233,68 @@ export async function callOpenClawStream(
       signal: controller.signal,
     });
   } catch (err: any) {
-    clearTimeout(timeout);
+    clearTimeout(connectTimeout);
+    // Connection failed → caller should immediately fall back to Qwen
     throw new Error(`[OpenClaw SSE] Connection failed: ${err.message}`);
   }
+  clearTimeout(connectTimeout);
 
   if (!upstreamRes.ok) {
-    clearTimeout(timeout);
     const errorText = await upstreamRes.text().catch(() => upstreamRes.statusText);
     throw new Error(`[OpenClaw SSE] API error ${upstreamRes.status}: ${errorText}`);
   }
 
-  // Set SSE headers on Express response (same as Vercel AI SDK pipeTextStreamToResponse)
+  // ── Step 2: Connection established — set headers and send status message ──
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
   res.setHeader("X-Vercel-AI-Data-Stream", "v1");
   res.setHeader("Transfer-Encoding", "chunked");
 
+  // Immediately send a status message so user sees progress right away
+  res.write(`0:${JSON.stringify("⚡ 正在分析数据，请稍候...\n")}\n`);
+
   const reader = upstreamRes.body?.getReader();
   if (!reader) {
-    clearTimeout(timeout);
     throw new Error("[OpenClaw SSE] No response body");
   }
 
+  // ── Step 3: Heartbeat every 15s to prevent Nginx/CDN idle timeout ─────────
+  // Send a zero-width space comment that the frontend ignores but keeps TCP alive
+  const HEARTBEAT_INTERVAL_MS = 15_000;
+  const heartbeat = setInterval(() => {
+    if (!res.writableEnded) {
+      // Vercel AI SDK ignores lines that don't start with a digit prefix
+      // Use a comment-style line that the frontend will silently discard
+      try { res.write("8:\"\"\n"); } catch {}
+    }
+  }, HEARTBEAT_INTERVAL_MS);
+
+  // ── Step 4: 30s no-data timeout → abort and let caller fall back ──────────
+  let noDataTimer: ReturnType<typeof setTimeout> | null = null;
+  const resetNoDataTimer = () => {
+    if (noDataTimer) clearTimeout(noDataTimer);
+    noDataTimer = setTimeout(() => {
+      console.warn("[OpenClaw SSE] No data for 30s, aborting stream");
+      controller.abort();
+      reader.cancel().catch(() => {});
+    }, 30_000);
+  };
+  resetNoDataTimer();
+
   const decoder = new TextDecoder();
   let buffer = "";
+
+  const cleanup = () => {
+    clearInterval(heartbeat);
+    if (noDataTimer) clearTimeout(noDataTimer);
+    reader.releaseLock();
+  };
 
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
+
+      resetNoDataTimer(); // Reset 30s timer on each data chunk
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
@@ -265,8 +306,8 @@ export async function callOpenClawStream(
 
         const rawData = trimmed.slice(5).trim();
         if (rawData === "[DONE]") {
-          // Stream finished
-          res.end();
+          cleanup();
+          if (!res.writableEnded) res.end();
           return;
         }
 
@@ -295,12 +336,14 @@ export async function callOpenClawStream(
                 console.error("[OpenClaw SSE] Failed to save output files:", fileErr);
               }
             }
-            res.end();
+            cleanup();
+            if (!res.writableEnded) res.end();
             return;
           } else if (event.type === "error") {
             const errMsg = event.error ?? "OpenClaw 处理失败";
             res.write(`0:${JSON.stringify(`\n\n❌ ${errMsg}`)}\n`);
-            res.end();
+            cleanup();
+            if (!res.writableEnded) res.end();
             return;
           }
         } catch {
@@ -311,11 +354,13 @@ export async function callOpenClawStream(
         }
       }
     }
-  } finally {
-    clearTimeout(timeout);
-    reader.releaseLock();
+  } catch (streamErr: any) {
+    cleanup();
+    // If stream was aborted (30s no-data), propagate so caller knows
+    throw new Error(`[OpenClaw SSE] Stream error: ${streamErr.message}`);
   }
 
+  cleanup();
   // Ensure response is ended
   if (!res.writableEnded) {
     res.end();

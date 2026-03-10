@@ -7,7 +7,6 @@ import rateLimit from "express-rate-limit";
 import { registerChatRoutes } from "./chat";
 import { registerAtlasRoutes } from "../atlas";
 import { registerHrRoutes } from "../hr";
-import { registerOpenClawPollingRoutes } from "../openclawPolling";
 import { registerOpenClawIMRoutes } from "../openclawIM";
 import adminApiRouter from "../adminApi";
 import botRouter from "../botRouter";
@@ -71,8 +70,6 @@ async function startServer() {
   registerAtlasRoutes(app);
   // HR module (payslip & attendance)
   registerHrRoutes(app);
-  // OpenClaw polling endpoints
-  registerOpenClawPollingRoutes(app);
   // OpenClaw IM HTTP API (admin ↔ 小虾米 双向通信)
   registerOpenClawIMRoutes(app);
   // Admin REST API (for OpenClaw and external systems)

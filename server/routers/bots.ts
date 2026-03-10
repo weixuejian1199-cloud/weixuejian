@@ -9,6 +9,7 @@ import { getDb } from "../db";
 import { bots, botMessages } from "../../drizzle/schema";
 import { eq, desc, and, gt } from "drizzle-orm";
 import crypto from "crypto";
+import { ENV } from "../_core/env";
 
 function generateBotToken(): string {
   return "atlas_bot_" + crypto.randomBytes(20).toString("hex");
@@ -130,7 +131,7 @@ export const botsRouter = router({
         const fromUserName = ctx.user.name || ctx.user.username || "用户";
         // OpenClaw hooks/agent 格式：message 字段 + Authorization Bearer token
         // 将 atlasMetadata 嵌入 message 文本，确保 Claude 能读取回调信息
-        const replyUrl = `https://atlascore.cn/api/bots/${input.botId}/reply`;
+        const replyUrl = `${ENV.appBaseUrl}/api/bots/${input.botId}/reply`;
         const replyToken = bot.token;
         const payload = {
           message: `[来自 ATLAS 用户 ${fromUserName}]: ${input.content}
