@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 
 // ── Module Types ────────────────────────────────────────────────────────────
-export type ActiveModule = "chat" | "files" | "ai-tools" | "automation" | "knowledge" | "settings";
+export type ActiveModule = "chat" | "files" | "ai-tools" | "automation" | "knowledge" | "settings" | "invite";
 
 // Legacy compat
 export type NavItem = "home" | "dashboard" | "templates" | "settings" | "search" | "library" | "invite" | "hr" | "im" | "openclaw-monitor";

@@ -78,8 +78,9 @@ function AnalysisPanel({ charts, metrics, title, isLoading }: {
       className="flex flex-col h-full flex-shrink-0"
       style={{
         width: "40%",
-        borderLeft: "1px solid var(--atlas-border)",
-        background: "var(--atlas-surface)",
+        borderLeft: "1px solid rgba(74,144,226,0.15)",
+        background: "rgba(255,255,255,0.6)",
+        backdropFilter: "blur(20px)",
       }}
     >
       {/* Header */}
@@ -157,48 +158,149 @@ function AnalysisPanel({ charts, metrics, title, isLoading }: {
 
 function EmptyAnalysisPanel() {
   return (
-    <div className="flex flex-col items-center justify-center h-full px-6 text-center gap-5">
-      <div
-        className="w-14 h-14 rounded-2xl flex items-center justify-center"
-        style={{
-          background: "rgba(37,99,235,0.06)",
-          border: "1px solid rgba(37,99,235,0.12)",
-        }}
-      >
-        <BarChart2 size={24} style={{ color: "rgba(37,99,235,0.4)" }} />
-      </div>
-      <div>
-        <p className="text-sm font-medium mb-1.5" style={{ color: "var(--atlas-text-2)" }}>
-          数据结果将在这里展示
-        </p>
-        <p className="text-xs leading-relaxed" style={{ color: "var(--atlas-text-3)" }}>
-          上传数据并开始对话后，图表和关键指标将实时渲染
-        </p>
-      </div>
-      {/* Skeleton preview */}
-      <div className="space-y-2 w-full">
-        {["门店销售趋势", "收入分布", "环比增长"].map((label, i) => (
-          <div
-            key={i}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg"
-            style={{ background: "rgba(0,0,0,0.02)", border: "1px solid var(--atlas-border)" }}
+    <div className="flex flex-col items-center justify-center h-full px-6 gap-6" style={{ position: "relative", overflow: "hidden" }}>
+      {/* 3D 数据球 */}
+      <div className="relative flex items-center justify-center" style={{ width: 200, height: 200 }}>
+        {/* 外圈光晓 */}
+        <div
+          className="absolute inset-0 rounded-full animate-atlas-glow"
+          style={{
+            background: "radial-gradient(circle, rgba(74,144,226,0.15) 0%, rgba(74,144,226,0.05) 50%, transparent 70%)",
+          }}
+        />
+        {/* 球体主体 */}
+        <div
+          className="relative rounded-full"
+          style={{
+            width: 140,
+            height: 140,
+            background: "radial-gradient(circle at 35% 35%, rgba(255,255,255,0.9) 0%, rgba(147,197,253,0.6) 30%, rgba(74,144,226,0.4) 60%, rgba(37,99,235,0.3) 100%)",
+            boxShadow: "0 8px 32px rgba(74,144,226,0.3), inset 0 -4px 16px rgba(37,99,235,0.2), inset 0 4px 8px rgba(255,255,255,0.6)",
+          }}
+        >
+          {/* 旋转网格线 SVG */}
+          <svg
+            className="absolute inset-0 animate-atlas-sphere"
+            width="140" height="140" viewBox="0 0 140 140"
+            style={{ opacity: 0.35 }}
           >
-            <div
-              className="w-2 h-2 rounded-full flex-shrink-0"
-              style={{ background: `rgba(37,99,235,${0.25 - i * 0.06})` }}
-            />
-            <span className="text-xs" style={{ color: "var(--atlas-text-4)" }}>{label}</span>
-            <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--atlas-border)" }}>
+            {/* 经线 */}
+            <ellipse cx="70" cy="70" rx="68" ry="20" fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="0.8" />
+            <ellipse cx="70" cy="70" rx="68" ry="40" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="0.8" />
+            <ellipse cx="70" cy="70" rx="68" ry="60" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.8" />
+            {/* 纬线 */}
+            <ellipse cx="70" cy="70" rx="20" ry="68" fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="0.8" />
+            <ellipse cx="70" cy="70" rx="40" ry="68" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="0.8" />
+            <ellipse cx="70" cy="70" rx="60" ry="68" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="0.8" />
+          </svg>
+          {/* 节点点 */}
+          <svg className="absolute inset-0" width="140" height="140" viewBox="0 0 140 140">
+            {[
+              [70, 30], [100, 50], [110, 80], [90, 110], [50, 115],
+              [25, 90], [30, 55], [55, 35], [85, 70], [45, 75],
+            ].map(([cx, cy], i) => (
+              <circle
+                key={i}
+                cx={cx} cy={cy} r="3"
+                fill="rgba(255,255,255,0.9)"
+                style={{ animation: `atlas-pulse-glow ${1.5 + i * 0.3}s ease-in-out infinite` }}
+              />
+            ))}
+            {/* 连线 */}
+            <line x1="70" y1="30" x2="100" y2="50" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+            <line x1="100" y1="50" x2="110" y2="80" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+            <line x1="110" y1="80" x2="85" y2="70" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+            <line x1="85" y1="70" x2="45" y2="75" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+            <line x1="45" y1="75" x2="30" y2="55" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+            <line x1="30" y1="55" x2="55" y2="35" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+            <line x1="55" y1="35" x2="70" y2="30" stroke="rgba(255,255,255,0.4)" strokeWidth="0.8" />
+          </svg>
+        </div>
+
+        {/* 浮动图表卡片 — 左上 */}
+        <div
+          className="absolute animate-atlas-float"
+          style={{
+            top: 10, left: -20,
+            background: "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid rgba(74,144,226,0.2)",
+            borderRadius: 10,
+            padding: "8px 12px",
+            boxShadow: "0 4px 16px rgba(74,144,226,0.15)",
+            minWidth: 80,
+          }}
+        >
+          <div style={{ fontSize: 9, color: "var(--atlas-text-3)", marginBottom: 4 }}>门店销售</div>
+          <svg width="60" height="28" viewBox="0 0 60 28">
+            <polyline points="0,22 12,16 24,18 36,8 48,12 60,4" fill="none" stroke="#4A90E2" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <polyline points="0,22 12,16 24,18 36,8 48,12 60,4" fill="url(#g1)" opacity="0.2" />
+            <defs>
+              <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#4A90E2" />
+                <stop offset="100%" stopColor="transparent" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+
+        {/* 浮动图表卡片 — 右上 */}
+        <div
+          className="absolute animate-atlas-float-delay"
+          style={{
+            top: 5, right: -25,
+            background: "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid rgba(74,144,226,0.2)",
+            borderRadius: 10,
+            padding: "8px 10px",
+            boxShadow: "0 4px 16px rgba(74,144,226,0.15)",
+          }}
+        >
+          <div style={{ fontSize: 9, color: "var(--atlas-text-3)", marginBottom: 4 }}>收入分布</div>
+          <div className="flex items-end gap-1">
+            {[14, 20, 16, 24, 18].map((h, i) => (
               <div
-                className="h-full rounded-full"
+                key={i}
                 style={{
-                  width: `${55 - i * 12}%`,
-                  background: `rgba(37,99,235,${0.2 - i * 0.04})`,
+                  width: 7, height: h,
+                  borderRadius: 2,
+                  background: `rgba(74,144,226,${0.4 + i * 0.1})`,
                 }}
               />
-            </div>
+            ))}
           </div>
-        ))}
+        </div>
+
+        {/* 浮动卡片 — 左下 */}
+        <div
+          className="absolute animate-atlas-float"
+          style={{
+            bottom: 15, left: -15,
+            background: "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid rgba(74,144,226,0.2)",
+            borderRadius: 10,
+            padding: "6px 10px",
+            boxShadow: "0 4px 16px rgba(74,144,226,0.15)",
+            animationDelay: "0.8s",
+          }}
+        >
+          <div className="flex items-center gap-1.5">
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981" }} />
+            <span style={{ fontSize: 10, color: "var(--atlas-text-2)", fontWeight: 500 }}>1:44</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 文字说明 */}
+      <div className="text-center">
+        <p className="text-[13px] font-medium mb-1" style={{ color: "var(--atlas-text-2)" }}>
+          数据结果将在这里展示
+        </p>
+        <p className="text-[12px] leading-relaxed" style={{ color: "var(--atlas-text-3)" }}>
+          上传数据并开始对话后，图表和关键指标将实时渲染
+        </p>
       </div>
     </div>
   );
@@ -290,8 +392,8 @@ function ChatArea({ messages, isGenerating, onDownload, onQuickAction }: {
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center px-6 overflow-y-auto">
-        <EmptyState />
+      <div className="flex-1 overflow-hidden" style={{ position: "relative" }}>
+        <EmptyState onSuggestion={onQuickAction} />
       </div>
     );
   }
@@ -317,76 +419,93 @@ function ChatArea({ messages, isGenerating, onDownload, onQuickAction }: {
   );
 }
 
-function EmptyState() {
+function EmptyState({ onSuggestion }: { onSuggestion?: (prompt: string) => void }) {
+  const QUICK_SUGGESTIONS = [
+    { label: "合并14家门店销售表", prompt: "请帮我合并14家门店的销售数据，生成汇总表" },
+    { label: "数据多店铺行款水", prompt: "请帮我整理多店铺的行款流水数据" },
+    { label: "把不同格式账单汇总一条线", prompt: "请把不同格式的账单数据汇总成一条线" },
+  ];
+
   return (
-    <div className="flex flex-col items-center gap-6 w-full max-w-md text-center">
+    <div className="w-full h-full flex flex-col justify-end pb-8 pl-5 pr-[40%]">
+      {/* 用户气泡 — 参考设计稿，靠左，正常大小 */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.92 }}
-        animate={{ opacity: 1, scale: 1 }}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="flex flex-col items-center gap-3"
+        className="flex items-start gap-2.5 mb-4"
       >
+        {/* 用户头像 */}
         <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center"
+          className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden"
           style={{
-            background: "linear-gradient(135deg, rgba(37,99,235,0.1) 0%, rgba(37,99,235,0.04) 100%)",
-            border: "1px solid rgba(37,99,235,0.15)",
+            background: "linear-gradient(135deg, #4A90E2 0%, #9B8FF5 100%)",
+            boxShadow: "0 2px 8px rgba(74,144,226,0.3)",
+            border: "2px solid rgba(255,255,255,0.8)",
           }}
         >
-          <BarChart2 size={26} style={{ color: "#2563eb" }} />
+          <span style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>U</span>
         </div>
-        <div>
-          <h2 className="font-bold text-lg tracking-tight mb-1" style={{ color: "var(--atlas-text)" }}>
-            ATLAS
-          </h2>
-          <p className="text-sm" style={{ color: "#2563eb", fontWeight: 500 }}>
-            行政 · 财务 · 数据分析 智能助手
+
+        {/* 气泡 */}
+        <div
+          className="px-4 py-2.5 rounded-2xl rounded-tl-sm"
+          style={{
+            background: "linear-gradient(135deg, #5B9CF6 0%, #8B7CF5 100%)",
+            boxShadow: "0 4px 16px rgba(91,156,246,0.35), inset 0 1px 0 rgba(255,255,255,0.25)",
+            maxWidth: 320,
+          }}
+        >
+          <p style={{ color: "#fff", fontSize: 14, lineHeight: "1.6", fontWeight: 500 }}>
+            把多份数据拖进来，按我的汇总成一份总表。
           </p>
         </div>
       </motion.div>
 
+      {/* 快捷建议卡片 */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15 }}
-        className="w-full"
+        className="space-y-2 ml-10"
       >
-        <div
-          className="px-4 py-4 rounded-2xl text-left"
-          style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}
-        >
-          <p style={{ color: "var(--atlas-text)", fontSize: "13px", lineHeight: "1.75" }}>
-            上传 Excel 或 CSV 文件，用一句话告诉我需求——
-          </p>
-          <p style={{ color: "var(--atlas-text-2)", fontSize: "13px", lineHeight: "1.75", marginTop: 4 }}>
-            「生成工资条」「汇总各店销售」「做考勤统计」
-          </p>
-          <div className="flex items-center gap-0 mt-4">
-            {[
-              { icon: "📁", label: "上传文件" },
-              { icon: "💬", label: "说需求" },
-              { icon: "📊", label: "下载报表" },
-            ].map((step, i) => (
-              <div key={i} className="flex items-center">
-                <div
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full"
-                  style={{
-                    background: `rgba(37,99,235,${0.1 - i * 0.025})`,
-                    border: `1px solid rgba(37,99,235,${0.2 - i * 0.05})`,
-                  }}
-                >
-                  <span style={{ fontSize: 11 }}>{step.icon}</span>
-                  <span style={{ fontSize: 11, fontWeight: 500, color: `rgba(37,99,235,${0.9 - i * 0.15})` }}>
-                    {step.label}
-                  </span>
-                </div>
-                {i < 2 && (
-                  <ChevronRight size={11} style={{ color: "rgba(37,99,235,0.25)", margin: "0 2px" }} />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+        {QUICK_SUGGESTIONS.map((s, i) => (
+          <motion.button
+            key={i}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 + i * 0.06 }}
+            onClick={() => onSuggestion?.(s.prompt)}
+            className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-left transition-all"
+            style={{
+              background: "rgba(255,255,255,0.75)",
+              backdropFilter: "blur(12px)",
+              border: "1px solid rgba(74,144,226,0.18)",
+              boxShadow: "0 2px 8px rgba(74,144,226,0.08)",
+              maxWidth: 320,
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.95)";
+              (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(74,144,226,0.15)";
+              (e.currentTarget as HTMLElement).style.borderColor = "rgba(74,144,226,0.35)";
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.75)";
+              (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 8px rgba(74,144,226,0.08)";
+              (e.currentTarget as HTMLElement).style.borderColor = "rgba(74,144,226,0.18)";
+            }}
+          >
+            {/* 图标 */}
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: "rgba(74,144,226,0.1)" }}
+            >
+              <FileSpreadsheet size={14} style={{ color: "var(--atlas-accent)" }} />
+            </div>
+            <span className="flex-1 text-[13px]" style={{ color: "var(--atlas-text-2)" }}>{s.label}</span>
+            <ChevronRight size={14} style={{ color: "var(--atlas-text-4)", flexShrink: 0 }} />
+          </motion.button>
+        ))}
       </motion.div>
     </div>
   );
@@ -413,8 +532,15 @@ function MessageBubble({ message, onDownload, onQuickAction, isLastAssistant }: 
   if (message.role === "user") {
     return (
       <motion.div initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="flex justify-end">
-        <div className="max-w-[72%] px-4 py-2.5 rounded-2xl" style={{ background: "#2563eb", color: "#fff" }}>
-          <p style={{ fontSize: 14, lineHeight: "1.6" }}>{message.content}</p>
+        <div
+          className="max-w-[72%] px-4 py-2.5 rounded-2xl rounded-tr-sm"
+          style={{
+            background: "linear-gradient(135deg, #5B9CF6 0%, #8B7CF5 100%)",
+            boxShadow: "0 4px 16px rgba(91,156,246,0.3), inset 0 1px 0 rgba(255,255,255,0.2)",
+            color: "#fff",
+          }}
+        >
+          <p style={{ fontSize: 14, lineHeight: "1.6", fontWeight: 500 }}>{message.content}</p>
         </div>
       </motion.div>
     );
@@ -587,7 +713,7 @@ function BottomInputBar({ value, onChange, onSend, onFileUpload, isGenerating, o
   };
 
   return (
-    <div className="flex-shrink-0 px-4 pb-4 pt-2" style={{ background: "#fff" }}>
+    <div className="flex-shrink-0 px-4 pb-4 pt-2" style={{ background: "var(--atlas-bg)" }}>
       <input
         ref={fileInputRef}
         type="file"
@@ -600,9 +726,10 @@ function BottomInputBar({ value, onChange, onSend, onFileUpload, isGenerating, o
       <div
         className="rounded-2xl overflow-hidden"
         style={{
-          border: "1.5px solid var(--atlas-border)",
-          background: "#fff",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+          border: "1.5px solid rgba(74,144,226,0.2)",
+          background: "rgba(255,255,255,0.88)",
+          backdropFilter: "blur(12px)",
+          boxShadow: "0 4px 16px rgba(74,144,226,0.1)",
         }}
       >
         {/* Textarea */}
@@ -1077,7 +1204,7 @@ export default function ChatWorkspace() {
   return (
     <div
       className="flex h-full overflow-hidden relative"
-      style={{ background: "#fff" }}
+      style={{ background: "var(--atlas-bg)" }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}

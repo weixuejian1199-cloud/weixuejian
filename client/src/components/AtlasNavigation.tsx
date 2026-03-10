@@ -1,20 +1,20 @@
 /**
- * ATLAS V15.0 — Left Navigation
- * 20% width, fixed sidebar with module switching
- * Guest mode: login button shown when user is not signed in
+ * ATLAS V16 — Left Navigation
+ * 220px width, light blue-gray theme
+ * 字体调大参考设计稿，AI引擎分组，底部分享好礼卡片
  */
 import React, { useState } from "react";
 import { useAtlas, ActiveModule, Task } from "../contexts/AtlasContext";
 import {
   MessageSquare, FolderOpen, Wrench, Zap, BookOpen,
   Settings, Gift, Plus, ChevronDown, ChevronRight,
-  Bot, Trash2, LogOut, User, LogIn
+  Bot, Trash2, LogOut, User, LogIn, FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
-// ── Module config ────────────────────────────────────────────────────────────
+// ── Module config ─────────────────────────────────────────────────────────────
 
 interface ModuleItem {
   id: ActiveModule;
@@ -23,20 +23,23 @@ interface ModuleItem {
 }
 
 const MODULES: ModuleItem[] = [
-  { id: "chat",       label: "对话",     icon: <MessageSquare size={16} /> },
-  { id: "files",      label: "文件",     icon: <FolderOpen size={16} /> },
-  { id: "ai-tools",   label: "AI 工具",  icon: <Wrench size={16} /> },
-  { id: "automation", label: "AI 自动化", icon: <Zap size={16} /> },
-  { id: "knowledge",  label: "知识库",   icon: <BookOpen size={16} /> },
+  { id: "chat",       label: "对话",      icon: <MessageSquare size={18} /> },
+  { id: "files",      label: "文件",      icon: <FolderOpen size={18} /> },
+  { id: "ai-tools",   label: "AI 工具",   icon: <Wrench size={18} /> },
+  { id: "automation", label: "AI 自动化", icon: <Zap size={18} /> },
+  { id: "knowledge",  label: "知识库",    icon: <BookOpen size={18} /> },
 ];
 
-// ── Sub-components ───────────────────────────────────────────────────────────
+// AI引擎快捷任务
+const AI_ENGINE_TASKS = [
+  { id: "store-export",  label: "门店导出",   icon: <FileText size={14} /> },
+  { id: "march-collect", label: "3月即存集",  icon: <FileText size={14} /> },
+  { id: "cq-extract",    label: "重庆劝拨江", icon: <FileText size={14} /> },
+];
 
-function NavLogo({
-  user,
-  onLogout,
-  onLogin,
-}: {
+// ── NavLogo ───────────────────────────────────────────────────────────────────
+
+function NavLogo({ user, onLogout, onLogin }: {
   user: any;
   onLogout: () => void;
   onLogin: () => void;
@@ -44,40 +47,70 @@ function NavLogo({
   const [showMenu, setShowMenu] = useState(false);
 
   return (
-    <div className="flex items-center justify-between px-4 h-14 border-b border-[var(--atlas-border)] flex-shrink-0">
+    <div
+      className="flex items-center justify-between px-4 flex-shrink-0"
+      style={{ height: "48px", borderBottom: "1px solid var(--atlas-border)" }}
+    >
       {/* Logo */}
-      <div className="flex items-center gap-2">
-        <div className="w-7 h-7 rounded-lg bg-[var(--atlas-accent)] flex items-center justify-center flex-shrink-0">
-          <span className="text-white font-bold text-xs">A</span>
+      <div className="flex items-center gap-2.5">
+        <div
+          className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{
+            background: "linear-gradient(135deg, #4A90E2 0%, #6BA3F5 100%)",
+            boxShadow: "0 2px 8px rgba(74,144,226,0.3)",
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 14 14" fill="none">
+            <path d="M7 1L13 12H1L7 1Z" fill="white" fillOpacity="0.9" />
+            <path d="M7 5L10 11H4L7 5Z" fill="white" fillOpacity="0.4" />
+          </svg>
         </div>
-        <span className="font-semibold text-[13px] text-[var(--atlas-text)] tracking-wide">ATLAS</span>
+        <span className="font-bold text-[15px] tracking-wide" style={{ color: "var(--atlas-text)" }}>
+          ATLAS
+        </span>
       </div>
 
-      {/* User area: avatar (logged in) or login button (guest) */}
+      {/* User area */}
       {user ? (
         <div className="relative">
           <button
             onClick={() => setShowMenu(!showMenu)}
-            className="w-7 h-7 rounded-full bg-[var(--atlas-surface-2)] border border-[var(--atlas-border)] flex items-center justify-center hover:bg-[var(--atlas-surface)] transition-colors overflow-hidden"
+            className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden transition-all"
+            style={{
+              border: "2px solid rgba(74,144,226,0.3)",
+              background: "rgba(74,144,226,0.1)",
+            }}
             title={user.name}
           >
             {user.avatar ? (
               <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
             ) : (
-              <User size={13} className="text-[var(--atlas-text-3)]" />
+              <User size={14} style={{ color: "var(--atlas-accent)" }} />
             )}
           </button>
           {showMenu && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-              <div className="absolute right-0 top-9 z-50 bg-[var(--atlas-elevated)] border border-[var(--atlas-border)] rounded-lg shadow-lg py-1 w-44 animate-atlas-fade-in">
-                <div className="px-3 py-2 border-b border-[var(--atlas-border)]">
-                  <p className="text-[12px] font-medium text-[var(--atlas-text)] truncate">{user.name}</p>
-                  <p className="text-[11px] text-[var(--atlas-text-3)] truncate">{user.email || "未设置邮箱"}</p>
+              <div
+                className="absolute right-0 top-10 z-50 py-1 w-44 animate-atlas-fade-in"
+                style={{
+                  background: "rgba(255,255,255,0.96)",
+                  backdropFilter: "blur(16px)",
+                  border: "1px solid rgba(74,144,226,0.15)",
+                  borderRadius: "10px",
+                  boxShadow: "0 8px 24px rgba(74,144,226,0.15)",
+                }}
+              >
+                <div className="px-3 py-2.5" style={{ borderBottom: "1px solid var(--atlas-border)" }}>
+                  <p className="text-[13px] font-medium truncate" style={{ color: "var(--atlas-text)" }}>{user.name}</p>
+                  <p className="text-[11px] truncate mt-0.5" style={{ color: "var(--atlas-text-3)" }}>{user.email || "未设置邮箱"}</p>
                 </div>
                 <button
                   onClick={() => { onLogout(); setShowMenu(false); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--atlas-text-2)] hover:bg-[var(--atlas-surface)] transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-[13px] transition-colors"
+                  style={{ color: "var(--atlas-text-2)" }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(74,144,226,0.06)"}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
                 >
                   <LogOut size={13} />
                   退出登录
@@ -87,22 +120,20 @@ function NavLogo({
           )}
         </div>
       ) : (
-        /* Guest: show a subtle login button */
         <button
           onClick={onLogin}
-          title="登录 / 注册"
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all border"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium transition-all"
           style={{
             color: "var(--atlas-accent)",
-            borderColor: "var(--atlas-accent)",
-            background: "var(--atlas-accent-light)",
+            border: "1px solid rgba(74,144,226,0.3)",
+            background: "rgba(74,144,226,0.06)",
           }}
           onMouseEnter={e => {
             (e.currentTarget as HTMLElement).style.background = "var(--atlas-accent)";
             (e.currentTarget as HTMLElement).style.color = "#fff";
           }}
           onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.background = "var(--atlas-accent-light)";
+            (e.currentTarget as HTMLElement).style.background = "rgba(74,144,226,0.06)";
             (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
           }}
         >
@@ -114,11 +145,19 @@ function NavLogo({
   );
 }
 
-function ModuleNav({ activeModule, setActiveModule }: { activeModule: ActiveModule; setActiveModule: (m: ActiveModule) => void }) {
+// ── ModuleNav ─────────────────────────────────────────────────────────────────
+
+function ModuleNav({
+  activeModule,
+  setActiveModule,
+}: {
+  activeModule: ActiveModule;
+  setActiveModule: (m: ActiveModule) => void;
+}) {
   const [chatExpanded, setChatExpanded] = useState(true);
 
   return (
-    <div className="px-2 pt-2">
+    <div className="px-3 pt-3 pb-1">
       {MODULES.map(mod => {
         const isActive = activeModule === mod.id;
         const isChat = mod.id === "chat";
@@ -131,27 +170,55 @@ function ModuleNav({ activeModule, setActiveModule }: { activeModule: ActiveModu
                 if (isChat) setChatExpanded(v => !v);
               }}
               className={cn(
-                "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 group",
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] transition-all duration-150 group mb-0.5",
                 isActive
-                  ? "bg-[var(--atlas-accent-light)] text-[var(--atlas-accent)] font-medium"
-                  : "text-[var(--atlas-text-2)] hover:bg-[var(--atlas-surface)] hover:text-[var(--atlas-text)]"
+                  ? "font-semibold"
+                  : "font-normal"
               )}
+              style={isActive ? {
+                background: "linear-gradient(135deg, #4A90E2 0%, #6BA3F5 100%)",
+                color: "#fff",
+                boxShadow: "0 2px 8px rgba(74,144,226,0.3)",
+              } : {
+                color: "var(--atlas-text-2)",
+                background: "transparent",
+              }}
+              onMouseEnter={e => {
+                if (!isActive) {
+                  (e.currentTarget as HTMLElement).style.background = "rgba(74,144,226,0.08)";
+                  (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
+                }
+              }}
+              onMouseLeave={e => {
+                if (!isActive) {
+                  (e.currentTarget as HTMLElement).style.background = "transparent";
+                  (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+                }
+              }}
             >
-              <span className={cn("flex-shrink-0", isActive ? "text-[var(--atlas-accent)]" : "text-[var(--atlas-text-3)] group-hover:text-[var(--atlas-text-2)]")}>
-                {mod.icon}
-              </span>
+              <span className="flex-shrink-0">{mod.icon}</span>
               <span className="flex-1 text-left">{mod.label}</span>
               {isChat && (
-                <span className="text-[var(--atlas-text-4)]">
-                  {chatExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                <span style={{ opacity: 0.7 }}>
+                  {chatExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 </span>
               )}
             </button>
 
             {/* Chat sub-items */}
             {isChat && chatExpanded && (
-              <div className="ml-4 mt-0.5 mb-1 border-l border-[var(--atlas-border)] pl-3 space-y-0.5">
-                <ChatSubItem label="ATLAS" isDefault isActive={isActive} onClick={() => setActiveModule("chat")} />
+              <div className="ml-4 mt-0.5 mb-1 pl-3 space-y-0.5" style={{ borderLeft: "1px solid rgba(74,144,226,0.2)" }}>
+                <ChatSubItem
+                  label="ATLAS"
+                  isActive={isActive}
+                  onClick={() => setActiveModule("chat")}
+                />
+                <ChatSubItem
+                  label="OpenClaw"
+                  isActive={false}
+                  onClick={() => toast.info("功能即将上线")}
+                  hasArrow
+                />
               </div>
             )}
           </div>
@@ -161,27 +228,92 @@ function ModuleNav({ activeModule, setActiveModule }: { activeModule: ActiveModu
   );
 }
 
-function ChatSubItem({ label, isDefault, isActive, onClick }: { label: string; isDefault?: boolean; isActive: boolean; onClick: () => void }) {
+function ChatSubItem({
+  label,
+  isActive,
+  onClick,
+  hasArrow,
+}: {
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+  hasArrow?: boolean;
+}) {
   return (
     <button
       onClick={onClick}
-      className={cn(
-        "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[12px] transition-colors",
-        isActive
-          ? "bg-[var(--atlas-accent-light)] text-[var(--atlas-accent)]"
-          : "text-[var(--atlas-text-3)] hover:bg-[var(--atlas-surface)] hover:text-[var(--atlas-text-2)]"
-      )}
+      className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-[14px] transition-colors"
+      style={isActive ? {
+        background: "rgba(74,144,226,0.1)",
+        color: "var(--atlas-accent)",
+      } : {
+        color: "var(--atlas-text-3)",
+      }}
+      onMouseEnter={e => {
+        if (!isActive) {
+          (e.currentTarget as HTMLElement).style.background = "rgba(74,144,226,0.06)";
+          (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+        }
+      }}
+      onMouseLeave={e => {
+        if (!isActive) {
+          (e.currentTarget as HTMLElement).style.background = "transparent";
+          (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+        }
+      }}
     >
-      <Bot size={12} className="flex-shrink-0" />
+      <Bot size={13} className="flex-shrink-0" />
       <span className="flex-1 text-left truncate">{label}</span>
-      {isDefault && (
-        <span className="text-[10px] text-[var(--atlas-text-4)] bg-[var(--atlas-surface-2)] px-1.5 py-0.5 rounded">默认</span>
-      )}
+      {hasArrow && <ChevronRight size={12} style={{ opacity: 0.5 }} />}
     </button>
   );
 }
 
-function RecentChats({ tasks, activeTaskId, setActiveTaskId, createNewTask, deleteTask }: {
+// ── AI Engine Section ─────────────────────────────────────────────────────────
+
+function AIEngineSection({ onTaskClick }: { onTaskClick: (label: string) => void }) {
+  return (
+    <div className="px-3 pb-2">
+      <div className="px-3 mb-2 mt-1">
+        <span
+          className="text-[11px] font-semibold uppercase tracking-widest"
+          style={{ color: "var(--atlas-text-4)" }}
+        >
+          AI 引擎
+        </span>
+      </div>
+      {AI_ENGINE_TASKS.map(task => (
+        <button
+          key={task.id}
+          onClick={() => onTaskClick(task.label)}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[14px] transition-all mb-0.5"
+          style={{ color: "var(--atlas-text-3)", background: "transparent" }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLElement).style.background = "rgba(74,144,226,0.06)";
+            (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.background = "transparent";
+            (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+          }}
+        >
+          <span className="flex-shrink-0" style={{ color: "var(--atlas-text-4)" }}>{task.icon}</span>
+          <span className="flex-1 text-left truncate">{task.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Recent Chats ──────────────────────────────────────────────────────────────
+
+function RecentChats({
+  tasks,
+  activeTaskId,
+  setActiveTaskId,
+  createNewTask,
+  deleteTask,
+}: {
   tasks: Task[];
   activeTaskId: string | null;
   setActiveTaskId: (id: string | null) => void;
@@ -192,13 +324,26 @@ function RecentChats({ tasks, activeTaskId, setActiveTaskId, createNewTask, dele
   const recentTasks = tasks.slice(0, 20);
 
   return (
-    <div className="flex-1 overflow-y-auto px-2 py-2 min-h-0">
-      {/* Section header */}
-      <div className="flex items-center justify-between px-2 mb-1.5">
-        <span className="text-[11px] font-medium text-[var(--atlas-text-4)] uppercase tracking-wider">最近对话</span>
+    <div className="flex-1 overflow-y-auto px-3 py-2 min-h-0">
+      <div className="flex items-center justify-between px-2 mb-2">
+        <span
+          className="text-[11px] font-semibold uppercase tracking-widest"
+          style={{ color: "var(--atlas-text-4)" }}
+        >
+          最近对话
+        </span>
         <button
           onClick={() => createNewTask()}
-          className="w-5 h-5 rounded flex items-center justify-center text-[var(--atlas-text-4)] hover:text-[var(--atlas-accent)] hover:bg-[var(--atlas-accent-light)] transition-colors"
+          className="w-5 h-5 rounded-md flex items-center justify-center transition-colors"
+          style={{ color: "var(--atlas-text-4)" }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLElement).style.background = "rgba(74,144,226,0.1)";
+            (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.background = "transparent";
+            (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-4)";
+          }}
           title="新建对话"
         >
           <Plus size={12} />
@@ -207,8 +352,7 @@ function RecentChats({ tasks, activeTaskId, setActiveTaskId, createNewTask, dele
 
       {recentTasks.length === 0 ? (
         <div className="px-2 py-4 text-center">
-          <p className="text-[11px] text-[var(--atlas-text-4)]">暂无对话记录</p>
-          <p className="text-[11px] text-[var(--atlas-text-4)] mt-0.5">上传文件开始分析</p>
+          <p className="text-[12px]" style={{ color: "var(--atlas-text-4)" }}>暂无对话记录</p>
         </div>
       ) : (
         <div className="space-y-0.5">
@@ -221,23 +365,42 @@ function RecentChats({ tasks, activeTaskId, setActiveTaskId, createNewTask, dele
             >
               <button
                 onClick={() => setActiveTaskId(task.id)}
-                className={cn(
-                  "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[12px] transition-colors text-left",
-                  activeTaskId === task.id
-                    ? "bg-[var(--atlas-surface-2)] text-[var(--atlas-text)]"
-                    : "text-[var(--atlas-text-3)] hover:bg-[var(--atlas-surface)] hover:text-[var(--atlas-text-2)]"
-                )}
+                className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-[13px] transition-colors text-left"
+                style={activeTaskId === task.id ? {
+                  background: "rgba(74,144,226,0.1)",
+                  color: "var(--atlas-text)",
+                } : {
+                  color: "var(--atlas-text-3)",
+                }}
+                onMouseEnter={e => {
+                  if (activeTaskId !== task.id) {
+                    (e.currentTarget as HTMLElement).style.background = "rgba(74,144,226,0.06)";
+                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (activeTaskId !== task.id) {
+                    (e.currentTarget as HTMLElement).style.background = "transparent";
+                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+                  }
+                }}
               >
-                <MessageSquare size={11} className="flex-shrink-0 text-[var(--atlas-text-4)]" />
+                <MessageSquare size={12} className="flex-shrink-0" style={{ color: "var(--atlas-text-4)" }} />
                 <span className="flex-1 truncate">{task.title || "未命名对话"}</span>
               </button>
               {hoveredId === task.id && (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteTask(task.id);
+                  onClick={e => { e.stopPropagation(); deleteTask(task.id); }}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded flex items-center justify-center transition-colors"
+                  style={{ color: "var(--atlas-text-4)" }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.color = "#DC2626";
+                    (e.currentTarget as HTMLElement).style.background = "rgba(220,38,38,0.08)";
                   }}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded flex items-center justify-center text-[var(--atlas-text-4)] hover:text-[var(--atlas-danger)] hover:bg-[var(--atlas-danger-bg)] transition-colors"
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-4)";
+                    (e.currentTarget as HTMLElement).style.background = "transparent";
+                  }}
                 >
                   <Trash2 size={11} />
                 </button>
@@ -250,28 +413,83 @@ function RecentChats({ tasks, activeTaskId, setActiveTaskId, createNewTask, dele
   );
 }
 
+// ── NavBottom ─────────────────────────────────────────────────────────────────
+
 function NavBottom({ setActiveModule }: { setActiveModule: (m: ActiveModule) => void }) {
   return (
-    <div className="flex-shrink-0 border-t border-[var(--atlas-border)] px-2 py-2 space-y-0.5">
+    <div className="flex-shrink-0 px-3 pb-3 space-y-1" style={{ borderTop: "1px solid var(--atlas-border)", paddingTop: "12px" }}>
+      {/* 分享好礼卡片 */}
       <button
-        onClick={() => toast.info("分享好礼功能即将上线")}
-        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-[var(--atlas-text-2)] hover:bg-[var(--atlas-surface)] hover:text-[var(--atlas-text)] transition-colors"
+        onClick={() => setActiveModule("invite" as any)}
+        className="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all text-left"
+        style={{
+          background: "rgba(255,255,255,0.7)",
+          backdropFilter: "blur(8px)",
+          border: "1px solid rgba(74,144,226,0.15)",
+          boxShadow: "0 2px 8px rgba(74,144,226,0.08)",
+        }}
+        onMouseEnter={e => {
+          (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.9)";
+          (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(74,144,226,0.15)";
+        }}
+        onMouseLeave={e => {
+          (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.7)";
+          (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 8px rgba(74,144,226,0.08)";
+        }}
       >
-        <Gift size={15} className="text-[var(--atlas-text-3)]" />
-        分享好礼
+        <div
+          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: "linear-gradient(135deg, #FF6B9D 0%, #FF8E53 100%)" }}
+        >
+          <Gift size={15} color="white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-medium truncate" style={{ color: "var(--atlas-text)" }}>与好友分享 ATLAS</p>
+          <p className="text-[11px]" style={{ color: "var(--atlas-text-3)" }}>各得 500 积分</p>
+        </div>
+        <ChevronRight size={14} style={{ color: "var(--atlas-text-4)", flexShrink: 0 }} />
       </button>
-      <button
-        onClick={() => setActiveModule("settings")}
-        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-[var(--atlas-text-2)] hover:bg-[var(--atlas-surface)] hover:text-[var(--atlas-text)] transition-colors"
-      >
-        <Settings size={15} className="text-[var(--atlas-text-3)]" />
-        设置
-      </button>
+
+      {/* 选理 + 用户 */}
+      <div className="flex gap-1 pt-1">
+        <button
+          onClick={() => setActiveModule("settings")}
+          className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg text-[14px] transition-all"
+          style={{ color: "var(--atlas-text-3)" }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLElement).style.background = "rgba(74,144,226,0.08)";
+            (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.background = "transparent";
+            (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+          }}
+        >
+          <Settings size={16} />
+          <span>选理</span>
+        </button>
+        <button
+          onClick={() => toast.info("功能即将上线")}
+          className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg text-[14px] transition-all"
+          style={{ color: "var(--atlas-text-3)" }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLElement).style.background = "rgba(74,144,226,0.08)";
+            (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.background = "transparent";
+            (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-3)";
+          }}
+        >
+          <User size={16} />
+          <span>用户</span>
+        </button>
+      </div>
     </div>
   );
 }
 
-// ── Main Navigation ──────────────────────────────────────────────────────────
+// ── Main Navigation ───────────────────────────────────────────────────────────
 
 export default function AtlasNavigation() {
   const {
@@ -291,31 +509,49 @@ export default function AtlasNavigation() {
     },
   });
 
+  const handleTaskClick = (label: string) => {
+    setActiveModule("chat");
+    toast.info(`已选择：${label}`);
+  };
+
   return (
     <div
-      className="flex flex-col h-full bg-[var(--atlas-surface)] border-r border-[var(--atlas-border)] select-none"
-      style={{ width: "var(--atlas-nav-w)", minWidth: "var(--atlas-nav-w)" }}
+      className="flex flex-col h-full select-none"
+      style={{
+        width: "var(--atlas-nav-w)",
+        minWidth: "var(--atlas-nav-w)",
+        background: "var(--atlas-surface)",
+        borderRight: "1px solid var(--atlas-border)",
+      }}
     >
-      {/* Logo + User / Login button */}
+      {/* Logo + User */}
       <NavLogo
         user={user}
         onLogout={() => logoutMutation.mutate()}
         onLogin={() => setShowLoginModal(true)}
       />
 
-      {/* Module navigation — top 50% */}
-      <div className="flex-shrink-0 py-1">
+      {/* Module navigation */}
+      <div className="flex-shrink-0">
         <ModuleNav activeModule={activeModule} setActiveModule={setActiveModule} />
       </div>
 
       {/* Divider */}
-      <div className="mx-4 border-t border-[var(--atlas-border)]" />
+      <div className="mx-4 my-1" style={{ borderTop: "1px solid var(--atlas-border)" }} />
 
-      {/* Recent chats — bottom 50% (scrollable) */}
+      {/* AI Engine section */}
+      <div className="flex-shrink-0">
+        <AIEngineSection onTaskClick={handleTaskClick} />
+      </div>
+
+      {/* Divider */}
+      <div className="mx-4 my-1" style={{ borderTop: "1px solid var(--atlas-border)" }} />
+
+      {/* Recent chats */}
       <RecentChats
         tasks={tasks}
         activeTaskId={activeTaskId}
-        setActiveTaskId={(id) => {
+        setActiveTaskId={id => {
           setActiveTaskId(id);
           setActiveModule("chat");
         }}
@@ -327,7 +563,7 @@ export default function AtlasNavigation() {
         deleteTask={deleteTask}
       />
 
-      {/* Bottom actions */}
+      {/* Bottom */}
       <NavBottom setActiveModule={setActiveModule} />
     </div>
   );
