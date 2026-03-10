@@ -203,12 +203,18 @@ describe("OpenClaw Polling API", () => {
       const limitMock1 = vi.fn().mockResolvedValue([fakeTask]);
       const whereMock1 = vi.fn().mockReturnValue({ limit: limitMock1 });
       const fromMock1 = vi.fn().mockReturnValue({ where: whereMock1 });
+      // Second select: getTaskOutputFiles after saveTaskResult
       const limitMock2 = vi.fn().mockResolvedValue([fakeTaskWithFiles]);
       const whereMock2 = vi.fn().mockReturnValue({ limit: limitMock2 });
       const fromMock2 = vi.fn().mockReturnValue({ where: whereMock2 });
+      // Third select: getTaskOutputFiles called again inside submitTaskResult
+      const limitMock3 = vi.fn().mockResolvedValue([fakeTaskWithFiles]);
+      const whereMock3 = vi.fn().mockReturnValue({ limit: limitMock3 });
+      const fromMock3 = vi.fn().mockReturnValue({ where: whereMock3 });
       mockDb.select
         .mockReturnValueOnce({ from: fromMock1 })
-        .mockReturnValueOnce({ from: fromMock2 });
+        .mockReturnValueOnce({ from: fromMock2 })
+        .mockReturnValueOnce({ from: fromMock3 });
 
       const updateWhereMock = vi.fn().mockResolvedValue({});
       const updateSetMock = vi.fn().mockReturnValue({ where: updateWhereMock });

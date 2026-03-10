@@ -307,8 +307,21 @@ ${extraContext}
 - 排名查询：「查销售额前10名的店铺」→ 找销售额字段，降序排列，返回前10
 - 筛选查询：「找出退货率最高的店铺」→ 找退货率字段，找最大值对应的店铺
 - 聚合查询：「各店铺平均销售额是多少」→ 按店铺分组，计算均值
-- 对比查询：「1月和2月的销售额对比」→ 按月份筛选，对比两个时期
+- 对比查询：、1月和2月的销售额对比」→ 按月份筛选，对比两个时期
 - 趋势查询：「最近3个月的增长趋势」→ 按时间排序，计算环比增长率
+
+《字段别名映射表》（模糊匹配，用户说的词可能与字段名不完全一致）：
+- 业绩 = 销售额 = GMV = 流水 = 订单金额 = revenue = sales
+- 会员 = 用户 = 客户 = 消费者 = 昵称 = member
+- 门店 = 店铺 = 店名 = 渠道 = store = shop
+- 员工 = 姓名 = 人员 = 工人 = staff = employee
+- 工资 = 薪资 = 底薪 = 实发 = salary = pay
+- 日期 = 时间 = 月份 = 周期 = date = time = month
+- 订单数 = 笔数 = 数量 = 件数 = orders = count
+- 退款 = 退货 = 退单 = refund
+- 客单价 = 人均 = 平均单价 = AOV
+
+当用户查询的字段名与数据中的字段名不完全一致时，必须优先使用语义理解匹配对应字段，不要说「找不到字段」。
 
 【深度分析模式（最重要）】
 当用户说「综合分析」「分析一下」「看看数据」「全面分析」「给点建议」「可视化汇总」「数据诊断」时，必须做真正的分析，绝对不要直接生成报表：
@@ -389,6 +402,8 @@ export function registerAtlasRoutes(app: Express) {
         }
       })();
       const ext = originalname.split(".").pop()?.toLowerCase() || "xlsx";
+      // Security: sanitize filename to prevent path traversal
+      const safeFilename = originalname.replace(/[/\\<>:"'|?*\x00-\x1f]/g, "_").slice(0, 200);
       const sessionId = nanoid();
       const fileKey = `atlas-uploads/${sessionId}-${Date.now()}.${ext}`;
 
@@ -443,18 +458,45 @@ export function registerAtlasRoutes(app: Express) {
         }
       }
 
+      // Build smart suggested actions BEFORE AI call so we can include them in the prompt
+      const fieldNames2 = dfInfo.fields.map(f => f.name.toLowerCase());
+      const hasSales2 = fieldNames2.some(f => /销售|金额|订单|gmv|amount|sales|revenue/.test(f));
+      const hasPayroll2 = fieldNames2.some(f => /工资|薪资|底薪|绩效工资|salary|pay|wage/.test(f));
+      const hasAttendance2 = fieldNames2.some(f => /出勤|考勤|迟到|早退|attendance|clock/.test(f));
+      const hasDividend2 = fieldNames2.some(f => /分红|分配|奖金|dividend|bonus/.test(f));
+      const hasStore2 = fieldNames2.some(f => /门店|店铺|店名|store|shop/.test(f));
+      const hasDate2 = fieldNames2.some(f => /日期|时间|月份|date|time|month/.test(f));
+      const hasName2 = fieldNames2.some(f => /姓名|名字|员工|人员|name|staff|employee/.test(f));
+      const numericFields = dfInfo.fields.filter(f => f.type === "numeric").map(f => f.name);
+      const topNumericField = numericFields[0] || "";
+
+      // Build context-aware hint for AI
+      const dataTypeHint = [
+        hasSales2 ? "销售/电商数据" : "",
+        hasPayroll2 ? "工资/薪酬数据" : "",
+        hasAttendance2 ? "考勤数据" : "",
+        hasDividend2 ? "分红/奖金数据" : "",
+        hasStore2 ? "多门店数据" : "",
+      ].filter(Boolean).join("、") || "通用业务数据";
+
       let aiAnalysis = "";
       try {
         const result = await streamText({
           model: openai.chat(selectModel(dfInfo.row_count)),
-          system: `你是 ATLAS，一个专业的智能业务助手（行政+财务+数据分析三合一）。用户刚刚上传了文件，你需要做一个简洁的「文件识别报告」：
+          system: `你是 ATLAS，一个专业的智能业务助手（行政+财务+数据分析三合一）。用户刚刚上传了文件，你需要做一个「文件识别报告」：
 
-1. 用1句话自然打招呼，说明识别到了什么数据（文件名、行数、关键字段）
-2. 如果有数据质量问题（缺失值、异常值），简短提醒
-3. 根据字段类型，主动问用户「你想做什么分析？」，并给出2-3个最相关的具体选项（如：销售排名、环比趋势、异常检测、汇总报表等），让用户直接选
-4. 最后补充一句：「如果你有报表模版，可以直接拖进来，我会按你的格式输出结果」
+规则：
+1. 第一句：自然识别数据类型，说明文件名、行数、判断是什么类型的数据（如：「这是一份销售数据，共1200行」）
+2. 如有数据质量问题，简短提醒（一句话）
+3. 根据字段内容，给出 **3个具体可执行的分析方向**，格式：
+   - 每个选项用【数字圆圈】开头：【①】【②】【③】
+   - 选项要具体，带上字段名（如：「按门店汇总销售额排名」「生成含个税的工资条」）
+   - 不要泛泛说「数据分析」，要说具体做什么
+4. 最后一句：「你也可以直接告诉我需求，或拖入报表模板，我会按格式填入数据」
 
-格式要求：简洁、友好，不超过180字。不要用「你好我是ATLAS」这种机械语气。用对话感强的语气，像一个懂业务的助手在问你。`,
+数据类型判断：${dataTypeHint}
+数值字段：${numericFields.slice(0, 5).join("、") || "无"}
+格式要求：不超过200字，语气自然友好，像懂业务的同事在问你。`,
           messages: [{
             role: "user",
             content: `文件名：${originalname}，共 ${dfInfo.row_count} 行 ${dfInfo.col_count} 列。字段：${fieldSummary}。${qualityIssues.length > 0 ? '数据质量：' + qualityIssues.join('；') : '数据质量良好'}。`,
@@ -468,42 +510,49 @@ export function registerAtlasRoutes(app: Express) {
       }
 
       // Generate smart suggested actions based on field names
-      const fieldNames = dfInfo.fields.map(f => f.name.toLowerCase());
       const suggestedActions: Array<{ label: string; prompt: string; icon: string }> = [];
 
-      // Detect data type and suggest relevant actions
-      const hasSales = fieldNames.some(f => /销售|金额|订单|gmv|amount|sales|revenue/.test(f));
-      const hasPayroll = fieldNames.some(f => /工资|薪资|工资|工资|工资|工资|salary|pay|wage/.test(f));
-      const hasAttendance = fieldNames.some(f => /出勤|考勤|迟到|早退|attendance|clock/.test(f));
-      const hasDividend = fieldNames.some(f => /分红|分配|奖金|dividend|bonus/.test(f));
-      const hasStore = fieldNames.some(f => /门店|店铺|店名|store|shop/.test(f));
-      const hasDate = fieldNames.some(f => /日期|时间|月份|date|time|month/.test(f));
-      const hasName = fieldNames.some(f => /姓名|名字|员工|人员|name|staff|employee/.test(f));
+      // Reuse pre-computed flags from above
+      const hasSales = hasSales2;
+      const hasPayroll = hasPayroll2;
+      const hasAttendance = hasAttendance2;
+      const hasDividend = hasDividend2;
+      const hasStore = hasStore2;
+      const hasDate = hasDate2;
+      const hasName = hasName2;
 
-      if (hasPayroll || (hasName && dfInfo.fields.some(f => /numeric/.test(f.type)))) {
-        suggestedActions.push({ icon: "📝", label: "生成工资条", prompt: "帮我根据这份数据生成工资条，包含姓名、工资明细和实发金额" });
+      // Build precise suggested actions with actual field names
+      if (hasPayroll || (hasName && numericFields.length > 0)) {
+        const payField = numericFields.find(f => /工资|薪资|底薪/.test(f)) || numericFields[0] || "工资";
+        suggestedActions.push({ icon: "📝", label: "生成工资条", prompt: `帮我根据这份数据生成工资条，包含姓名、${payField}明细和实发金额` });
       }
       if (hasDividend) {
-        suggestedActions.push({ icon: "💰", label: "分红明细表", prompt: "帮我生成分红明细表，按分红金额从高到低排序" });
-        suggestedActions.push({ icon: "🏆", label: "Top10 排名", prompt: "帮我找出分红最高的前10名和最低的后10名" });
+        const divField = numericFields.find(f => /分红|奖金|奖/.test(f)) || numericFields[0] || "奖金";
+        suggestedActions.push({ icon: "💰", label: "分红明细表", prompt: `帮我按${divField}从高到低生成分红明细表` });
+        suggestedActions.push({ icon: "🏆", label: "Top10 排名", prompt: `帮我找出${divField}最高的前10名和最低的后10名` });
       }
       if (hasSales) {
-        suggestedActions.push({ icon: "📊", label: "销售汇总表", prompt: "帮我汇总销售数据，显示总销售额、订单数和关键指标" });
-      }
-      if (hasStore) {
-        suggestedActions.push({ icon: "🏦", label: "门店对比", prompt: "帮我按门店分组汇总，对比各门店表现" });
+        const salesField = numericFields.find(f => /销售|金额|gmv|revenue/.test(f.toLowerCase())) || numericFields[0] || "销售额";
+        suggestedActions.push({ icon: "📊", label: "销售汇总表", prompt: `帮我汇总销售数据，显示${salesField}、订单数和关键指标` });
+        if (hasStore) {
+          suggestedActions.push({ icon: "🏦", label: "门店排名", prompt: `帮我按门店分组汇总${salesField}，对比各门店表现并排名` });
+        }
       }
       if (hasAttendance) {
         suggestedActions.push({ icon: "📅", label: "考勤汇总", prompt: "帮我汇总考勤数据，统计出勤天数、迟到次数和早退记录" });
       }
-      if (hasDate) {
+      if (hasDate && !hasSales) {
         suggestedActions.push({ icon: "📈", label: "趋势分析", prompt: "帮我按时间分析数据趋势，看看有什么规律" });
       }
 
-      // Always add generic options
+      // Always add generic options if not enough
       if (suggestedActions.length < 2) {
-        suggestedActions.push({ icon: "📊", label: "生成汇总表", prompt: "帮我生成数据汇总表，包含关键指标和统计" });
-        suggestedActions.push({ icon: "🔍", label: "数据分析", prompt: "帮我分析这份数据，找出关键规律和异常值" });
+        if (numericFields.length > 0) {
+          suggestedActions.push({ icon: "📊", label: "生成汇总表", prompt: `帮我汇总${numericFields.slice(0, 3).join('、')}等关键指标` });
+        } else {
+          suggestedActions.push({ icon: "📊", label: "生成汇总表", prompt: "帮我生成数据汇总表，包含关键指标和统计" });
+        }
+        suggestedActions.push({ icon: "🔍", label: "全面分析", prompt: "帮我全面分析这份数据，找出关键规律、异常值和可优化方向" });
       }
       suggestedActions.push({ icon: "✨", label: "自定义需求", prompt: "" }); // empty prompt = open input
 
@@ -522,7 +571,8 @@ export function registerAtlasRoutes(app: Express) {
       });
     } catch (err: any) {
       console.error("[Atlas] Upload error:", err);
-      res.status(500).json({ error: err.message || "Upload failed" });
+      const safeMsg = process.env.NODE_ENV === "production" ? "文件处理失败，请重试" : (err.message || "Upload failed");
+      res.status(500).json({ error: safeMsg });
     }
   });
 
@@ -538,8 +588,14 @@ export function registerAtlasRoutes(app: Express) {
         history?: Array<{ role: "user" | "assistant"; content: string }>;
         conversation_id?: string;
       };
-      if (!message) {
+      if (!message || typeof message !== "string") {
         res.status(400).json({ error: "message is required" });
+        return;
+      }
+      // Security: limit message length to prevent token abuse
+      const MAX_MSG_LEN = 8000;
+      if (message.length > MAX_MSG_LEN) {
+        res.status(400).json({ error: `消息过长，最多 ${MAX_MSG_LEN} 字符` });
         return;
       }
 
@@ -1356,7 +1412,7 @@ ${sampleRows}
       result.pipeTextStreamToResponse(res);
     } catch (err: any) {
       console.error("[Atlas] Template use error:", err);
-      if (!res.headersSent) res.status(500).json({ error: err.message });
+        if (!res.headersSent) res.status(500).json({ error: process.env.NODE_ENV === "production" ? "对话处理失败，请重试" : err.message });
     }
   });
 
