@@ -116,7 +116,11 @@ export default function MainWorkspace() {
   }, [input]);
 
   // -- File processing: multiple files go into the SAME task
-  const processFile = useCallback(async (file: File) => {
+  // explicitTaskId: passed from handleFiles when activeTaskId was null at call time
+  const processFile = useCallback(async (file: File, explicitTaskId?: string) => {
+    // Use explicitly passed taskId (handles the case where activeTaskId was null when handleFiles was called)
+    const taskId = explicitTaskId ?? activeTaskId;
+    if (!taskId) return; // No task to attach to (should not happen)
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (!["xlsx", "xls", "csv"].includes(ext || "")) {
       toast.error(`不支持 .${ext} 格式，请上传 Excel 或 CSV`);
@@ -128,11 +132,56 @@ export default function MainWorkspace() {
     }
 
     const tempId = nanoid();
-    addUploadedFile({ id: tempId, name: file.name, size: file.size, status: "uploading", uploadedAt: new Date(), uploadProgress: 0 });
+    addUploadedFile({ id: tempId, name: file.name, size: file.size, status: "uploading", uploadedAt: new Date(), uploadProgress: 0 }, taskId);
+
+    // ★ 文件选择后立即插入进度条消息（覆盖上传+分析全过程）
+    addMessage({ role: "user", content: `[自动分析] ${file.name}`, isHidden: true } as any, taskId);
+    addMessage({
+      role: "assistant",
+      content: "",
+      isAnalyzing: true,
+      analyzeProgress: 5,
+      isStreaming: false,
+    } as any, taskId);
+
+    // 进度定时器引用（用于清理）
+    const progressTimers: ReturnType<typeof setTimeout>[] = [];
+    let currentProgress = 5;
+
+    // 上传阶段：5% → 30%（随文件上传真实进度推进）
+    const uploadPhaseTimer = setInterval(() => {
+      if (currentProgress < 28) {
+        currentProgress = Math.min(currentProgress + 3, 28);
+        updateLastMessage("", { isAnalyzing: true, analyzeProgress: currentProgress });
+      }
+    }, 400);
+    progressTimers.push(uploadPhaseTimer as any);
 
     try {
       const result = await uploadFile(file, (percent) => {
         updateUploadedFile(tempId, { uploadProgress: percent });
+        // 上传进度映射到 5%-30% 区间
+        const mappedProgress = Math.round(5 + (percent / 100) * 25);
+        if (mappedProgress > currentProgress) {
+          currentProgress = mappedProgress;
+          updateLastMessage("", { isAnalyzing: true, analyzeProgress: currentProgress });
+        }
+      });
+
+      // 上传完成，清除上传阶段定时器
+      clearInterval(uploadPhaseTimer);
+
+      // 分析阶段：30% → 50% → 70% → 85% → 92%
+      currentProgress = 30;
+      updateLastMessage("", { isAnalyzing: true, analyzeProgress: 30 });
+      const analysisSteps = [50, 70, 85, 92];
+      const analysisDelays = [600, 1500, 2800, 4200];
+      analysisSteps.forEach((pct, i) => {
+        const t = setTimeout(() => {
+          currentProgress = pct;
+          updateLastMessage("", { isAnalyzing: true, analyzeProgress: pct });
+        }, analysisDelays[i]);
+        progressTimers.push(t);
       });
 
       updateUploadedFile(tempId, {
@@ -168,35 +217,9 @@ export default function MainWorkspace() {
         setPendingActions(DEFAULT_ACTIONS);
       }
 
-      // "上传即分析"：先插入分析进度动画消息，然后替换为真实结果
-      // Add a hidden user trigger message (not shown in UI)
-      addMessage({ role: "user", content: `[自动分析] ${result.filename}`, isHidden: true } as any);
-
-      // Insert analysis progress placeholder message
-      addMessage({
-        role: "assistant",
-        content: "",
-        isAnalyzing: true,
-        analyzeProgress: 15,
-        isStreaming: false,
-      } as any);
-
-      // Simulate progress: 15 → 30 → 50 → 70 → 85 → 92 over ~6 seconds
-      const progressSteps = [30, 50, 70, 85, 92];
-      const progressIntervals: ReturnType<typeof setTimeout>[] = [];
-      const delays = [800, 1800, 3000, 4500, 6000];
-      progressSteps.forEach((pct, i) => {
-        const t = setTimeout(() => {
-          updateLastMessage("", { isAnalyzing: true, analyzeProgress: pct });
-        }, delays[i]);
-        progressIntervals.push(t);
-      });
-
-      // After a short delay (simulating AI processing), replace with real result
-      // The backend already computed ai_analysis during upload, so we just need
-      // a brief animation before showing the result
+      // 分析结果出来后，清除所有定时器，替换为真实内容
       const showResult = () => {
-        progressIntervals.forEach(clearTimeout);
+        progressTimers.forEach(t => { clearTimeout(t); clearInterval(t as any); });
         const analysisText = result.ai_analysis ||
           `这是一份数据文件，共 ${result.df_info.row_count} 行、${result.df_info.col_count} 列。`;
         const { cleanText, suggestions } = parseSuggestionsHelper(analysisText);
@@ -210,10 +233,18 @@ export default function MainWorkspace() {
           suggestedActions: finalSuggestions,
         });
       };
-      // Show result after minimum 2.5s animation (feels natural, not too long)
-      setTimeout(showResult, 2500);
+      // 最短展示 1.5s 动画后显示结果
+      setTimeout(showResult, 1500);
 
     } catch (err: any) {
+      // 清除所有定时器
+      progressTimers.forEach(t => { clearTimeout(t); clearInterval(t as any); });
+      clearInterval(uploadPhaseTimer);
+      // 移除进度条消息（替换为错误提示）
+      updateLastMessage(`上传失败：${(err as any).message || "请重试"}`, {
+        isAnalyzing: false,
+        analyzeProgress: 0,
+      });
       updateUploadedFile(tempId, { status: "error" });
       toast.error(`${file.name} 上传失败：${err.message}`);
     }
@@ -221,10 +252,10 @@ export default function MainWorkspace() {
 
   const handleFiles = useCallback((files: FileList | File[]) => {
     // Ensure we have an active task
-    if (!activeTaskId) {
-      createNewTask();
-    }
-    Array.from(files).forEach(processFile);
+    // Note: createNewTask() returns the new task ID synchronously (before React re-renders)
+    // We pass it explicitly to processFile to avoid the stale activeTaskId closure issue
+    const taskId = activeTaskId || createNewTask();
+    Array.from(files).forEach(file => processFile(file, taskId));
   }, [processFile, activeTaskId, createNewTask]);
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };

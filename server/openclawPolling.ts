@@ -8,7 +8,7 @@
  * Authentication: Authorization: Bearer <OPENCLAW_SESSION_KEY>
  */
 import { Express, Request, Response } from "express";
-import { getDb } from "./db";
+import { getDb, resetDb } from "./db";
 import { openclawTasks, OpenclawTask } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { storagePut } from "./storage";
@@ -226,8 +226,25 @@ async function checkStuckTasks() {
 
       console.warn(`[OpenClaw] Task ${task.id} timed out (picked up at ${task.pickedUpAt?.toISOString()})`);
     }
-  } catch (err) {
-    console.error("[OpenClaw] checkStuckTasks error:", err);
+  } catch (err: any) {
+    // If the DB connection was reset (idle timeout), clear the cached connection
+    // so the next call to getDb() creates a fresh one.
+    // DrizzleQueryError wraps the original error in err.cause
+    const causeMsg = String(
+      err?.cause?.message ?? err?.cause?.code ?? ""
+    );
+    const topMsg = String(err?.message ?? "");
+    const combined = topMsg + " " + causeMsg;
+    const isConnReset = combined.includes("ECONNRESET") ||
+      combined.includes("ECONNREFUSED") ||
+      combined.includes("PROTOCOL_CONNECTION_LOST") ||
+      combined.includes("ETIMEDOUT");
+    if (isConnReset) {
+      resetDb();
+      console.warn("[OpenClaw] DB connection reset detected, reconnecting on next call");
+    } else {
+      console.error("[OpenClaw] checkStuckTasks error:", err);
+    }
   }
 }
 

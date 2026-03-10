@@ -172,14 +172,14 @@ interface AtlasContextType {
 
   // Current task's files (scoped to activeTaskId)
   uploadedFiles: UploadedFile[];
-  addUploadedFile: (file: UploadedFile) => void;
+  addUploadedFile: (file: UploadedFile, targetTaskId?: string) => void;
   updateUploadedFile: (id: string, updates: Partial<UploadedFile>) => void;
   removeUploadedFile: (id: string) => void;
   clearFiles: () => void;
 
   // Current task's messages (scoped to activeTaskId)
   messages: Message[];
-  addMessage: (msg: Omit<Message, "id" | "timestamp">) => void;
+  addMessage: (msg: Omit<Message, "id" | "timestamp">, targetTaskId?: string) => void;
   updateLastMessage: (content: string, extra?: Partial<Message>) => void;
   clearMessages: () => void;
 
@@ -393,9 +393,10 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
   const uploadedFiles = activeTask?.uploadedFiles ?? [];
   const messages = activeTask?.messages ?? [];
 
-  const addUploadedFile = useCallback((file: UploadedFile) => {
+  const addUploadedFile = useCallback((file: UploadedFile, targetTaskId?: string) => {
+    const tid = targetTaskId ?? activeTaskId;
     setTasks(prev => prev.map(t =>
-      t.id === activeTaskId
+      t.id === tid
         ? { ...t, uploadedFiles: [file, ...t.uploadedFiles] }
         : t
     ));
@@ -425,10 +426,11 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
 
   // ── Per-task messages ────────────────────────────────────────────────────
 
-  const addMessage = useCallback((msg: Omit<Message, "id" | "timestamp">) => {
+  const addMessage = useCallback((msg: Omit<Message, "id" | "timestamp">, targetTaskId?: string) => {
     const newMsg: Message = { ...msg, id: genId(), timestamp: new Date() };
+    const tid = targetTaskId ?? activeTaskId;
     setTasks(prev => prev.map(t =>
-      t.id === activeTaskId
+      t.id === tid
         ? { ...t, messages: [...t.messages, newMsg] }
         : t
     ));

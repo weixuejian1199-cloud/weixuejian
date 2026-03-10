@@ -19,6 +19,14 @@ export async function getDb() {
   return _db;
 }
 
+/**
+ * Reset the cached DB connection so the next call to getDb() creates a fresh one.
+ * Call this when you catch ECONNRESET / ECONNREFUSED / PROTOCOL_CONNECTION_LOST.
+ */
+export function resetDb() {
+  _db = null;
+}
+
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) {
     throw new Error("User openId is required for upsert");
