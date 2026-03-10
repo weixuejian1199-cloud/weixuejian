@@ -5,6 +5,7 @@ import { getOrCreateAnonUser } from "../db";
 import { ANON_COOKIE_NAME, COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { nanoid } from "nanoid";
 import { getSessionCookieOptions } from "./cookies";
+import { parse as parseCookieHeader } from "cookie";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
@@ -19,6 +20,10 @@ export async function createContext(
 ): Promise<TrpcContext> {
   let user: User | null = null;
 
+  // Parse cookies from the raw header (avoids dependency on cookie-parser middleware)
+  const rawCookieHeader = opts.req.headers.cookie ?? "";
+  const cookies = parseCookieHeader(rawCookieHeader);
+
   try {
     user = await authenticateRequest(opts.req);
   } catch {
@@ -28,7 +33,6 @@ export async function createContext(
   // If there's a session cookie but it failed to authenticate (expired/invalid JWT),
   // clear the stale cookie so the browser doesn't keep sending it and the user
   // can see they need to log in again.
-  const cookies = opts.req.cookies as Record<string, string>;
   if (!user && cookies[COOKIE_NAME]) {
     const cookieOpts = getSessionCookieOptions(opts.req);
     opts.res.clearCookie(COOKIE_NAME, { ...cookieOpts });

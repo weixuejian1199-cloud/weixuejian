@@ -177,8 +177,8 @@ export default function KnowledgeModule() {
         </div>
       </div>
 
-      {/* Right: Detail */}
-      <div className="flex flex-col overflow-hidden" style={{ width: "80%", background: "var(--atlas-surface)" }}>
+      {/* Center: Detail — 35% */}
+      <div className="flex flex-col overflow-hidden" style={{ width: "35%", background: "var(--atlas-surface)", borderRight: "1px solid var(--atlas-border)" }}>
         {selectedItem ? (
           <KnowledgeDetail item={selectedItem} />
         ) : (
@@ -187,6 +187,23 @@ export default function KnowledgeModule() {
             <p className="text-sm" style={{ color: "var(--atlas-text-3)" }}>选择左侧条目查看详情</p>
           </div>
         )}
+      </div>
+
+      {/* Right: Knowledge Preview Panel — 45% */}
+      <div
+        className="flex flex-col items-center justify-center h-full"
+        style={{ width: "45%", background: "var(--atlas-bg)", padding: "24px 20px" }}
+      >
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div
+            className="w-12 h-12 rounded-2xl flex items-center justify-center"
+            style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.15)" }}
+          >
+            <FileText size={22} style={{ color: "#2563eb" }} />
+          </div>
+          <p className="text-sm font-medium" style={{ color: "var(--atlas-text-2)" }}>知识预览将在这里展示</p>
+          <p className="text-xs" style={{ color: "var(--atlas-text-4)" }}>选择左侧条目，查看内容预览和引用记录</p>
+        </div>
       </div>
     </div>
   );

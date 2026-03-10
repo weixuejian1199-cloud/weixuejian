@@ -339,7 +339,7 @@ export default function FilesModule() {
       </div>
 
       {/* Center: Preview Panel — 60% */}
-      <div className="flex flex-col overflow-hidden" style={{ width: "60%", background: "var(--atlas-surface)", borderRight: "1px solid var(--atlas-border)" }}>
+      <div className="flex flex-col overflow-hidden" style={{ width: "35%", background: "var(--atlas-surface)", borderRight: "1px solid var(--atlas-border)" }}>
         <AnimatePresence mode="wait">
           {selectedFile ? (
             <motion.div
@@ -382,7 +382,7 @@ export default function FilesModule() {
       {/* Right: Info Panel — 20% */}
       <div
         className="flex flex-col overflow-hidden"
-        style={{ width: "20%", background: "var(--atlas-bg)", padding: "20px 16px" }}
+        style={{ width: "45%", background: "var(--atlas-bg)", padding: "20px 16px" }}
       >
         {selectedFile ? (
           <div className="space-y-4">
