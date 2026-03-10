@@ -127,20 +127,40 @@ export const botsRouter = router({
 
       // 推送到机器人 Webhook（异步，不阻断用户操作）
       if (bot.webhookUrl) {
+        const fromUserName = ctx.user.name || ctx.user.username || "用户";
+        // OpenClaw hooks/agent 格式：message 字段 + Authorization Bearer token
+        // 将 atlasMetadata 嵌入 message 文本，确保 Claude 能读取回调信息
+        const replyUrl = `https://atlascore.cn/api/bots/${input.botId}/reply`;
+        const replyToken = bot.token;
         const payload = {
-            type: "user_message",
-            msgId,
-            botId: input.botId,
-            fromUserId: ctx.user.id,
-            fromUserName: ctx.user.name || ctx.user.username || "用户",
-            content: input.content,
-            timestamp: new Date().toISOString(),
-          };
+          message: `[来自 ATLAS 用户 ${fromUserName}]: ${input.content}
+
+---ATLAS_METADATA---
+replyUrl: ${replyUrl}
+replyToken: ${replyToken}
+fromUserId: ${ctx.user.id}
+msgId: ${msgId}
+---END_ATLAS_METADATA---
+
+处理完后必须用 curl 回调 replyUrl，带上 Authorization: Bearer replyToken，body: {"content":"你的回复","userId":"${ctx.user.id}"}`,
+          name: "ATLAS",
+        };
+        console.log(`[Bot] Pushing webhook to: ${bot.webhookUrl}`);
         fetch(bot.webhookUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/json", "X-Atlas-Bot-Token": bot.token },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer atlas_webhook_token_20260309`,
+          },
           body: JSON.stringify(payload),
           signal: AbortSignal.timeout(10000),
+        }).then(async (res) => {
+          if (!res.ok) {
+            const text = await res.text().catch(() => "");
+            console.warn(`[Bot] Webhook push failed (${res.status}):`, text);
+          } else {
+            console.log(`[Bot] Webhook pushed to ${bot.webhookUrl}, runId:`, (await res.json().catch(() => ({}))).runId);
+          }
         }).catch((e) => {
           console.warn("[Bot] Webhook push failed:", e);
         });
