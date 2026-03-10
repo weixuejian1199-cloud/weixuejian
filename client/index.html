@@ -1,6 +1,12 @@
 <!doctype html>
 <html lang="zh-CN">
   <head>
+    <!-- Force HTTPS redirect: iOS Safari requires HTTPS for module scripts and cookies -->
+    <script>
+      if (location.protocol === 'http:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        location.replace('https:' + location.href.substring(location.protocol.length));
+      }
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <title>ATLAS — 智能报表系统</title>

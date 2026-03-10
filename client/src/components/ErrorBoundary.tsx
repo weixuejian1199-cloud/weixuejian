@@ -21,34 +21,44 @@ class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
+  componentDidCatch(error: Error, info: { componentStack: string }) {
+    // Log to console for debugging on mobile
+    console.error("[ErrorBoundary] Caught error:", error.message);
+    console.error("[ErrorBoundary] Stack:", error.stack);
+    console.error("[ErrorBoundary] Component stack:", info.componentStack);
+  }
+
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex items-center justify-center min-h-screen p-8 bg-background">
-          <div className="flex flex-col items-center w-full max-w-2xl p-8">
+        <div className="flex items-center justify-center min-h-screen p-8 bg-background text-foreground">
+          <div className="flex flex-col items-center w-full max-w-md p-6">
             <AlertTriangle
-              size={48}
-              className="text-destructive mb-6 flex-shrink-0"
+              size={40}
+              className="text-destructive mb-4 flex-shrink-0"
             />
 
-            <h2 className="text-xl mb-4">An unexpected error occurred.</h2>
+            <h2 className="text-lg font-semibold mb-2">页面加载出错</h2>
+            <p className="text-muted-foreground text-sm mb-4 text-center">
+              请尝试刷新页面，若问题持续请联系客服
+            </p>
 
-            <div className="p-4 w-full rounded bg-muted overflow-auto mb-6">
-              <pre className="text-sm text-muted-foreground whitespace-break-spaces">
-                {this.state.error?.stack}
+            <div className="p-3 w-full rounded bg-muted overflow-auto mb-5 max-h-32">
+              <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-all">
+                {this.state.error?.message || "Unknown error"}
               </pre>
             </div>
 
             <button
               onClick={() => window.location.reload()}
               className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg",
+                "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium",
                 "bg-primary text-primary-foreground",
-                "hover:opacity-90 cursor-pointer"
+                "hover:opacity-90 active:opacity-80 cursor-pointer"
               )}
             >
-              <RotateCcw size={16} />
-              Reload Page
+              <RotateCcw size={15} />
+              刷新页面
             </button>
           </div>
         </div>

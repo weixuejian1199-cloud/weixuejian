@@ -628,3 +628,9 @@
 - [x] 错误提示优化：HTTP 401/413/429/500 对应中文友好提示
 - [x] 文件上传进度条（XMLHttpRequest 真实进度）
 - [x] 前端：上传完成后直接用后端 ai_analysis 作为 AI 消息（不再触发二次 chatStream，更快更稳定）
+
+## V12.11 手机端白屏修复（进行中）
+
+- [x] 配置 Vite build target 兼容 iOS Safari 14+（解决 ES2022+ 语法不支持问题）
+- [x] 加固错误边界：白屏时显示中文友好错误信息，添加 componentDidCatch 日志
+- [x] HTTP → HTTPS 重定向脚本（index.html 中自动跳转，等 SSL 证书配置后生效）

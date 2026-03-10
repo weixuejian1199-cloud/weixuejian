@@ -167,6 +167,8 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    // Target iOS Safari 14+ and modern browsers for compatibility
+    target: ["es2015", "safari14", "chrome87", "firefox78"],
   },
   server: {
     host: true,
