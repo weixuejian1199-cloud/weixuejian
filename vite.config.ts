@@ -183,9 +183,5 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
-    hmr: {
-      clientPort: 443,
-      protocol: "wss",
-    },
   },
 });

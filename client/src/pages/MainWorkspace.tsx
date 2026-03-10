@@ -17,9 +17,6 @@ import {
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTableRenderer";
-import { AtlasChartRenderer, parseAtlasChartBlocks } from "@/components/AtlasChartRenderer";
-import FeishuChatInput from "@/components/FeishuChatInput";
-import FullscreenEditor from "@/components/FullscreenEditor";
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
 import { uploadFile, chatStream, generateReport, getDownloadUrl, type SuggestedAction } from "@/lib/api";
 import { trpc } from "@/lib/trpc";
@@ -54,7 +51,6 @@ export default function MainWorkspace() {
 
   const [input, setInput] = useState("");
   const [isDragging, setIsDragging] = useState(false);
-  const [showFullscreen, setShowFullscreen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeFileMenu, setActiveFileMenu] = useState<string | null>(null);
   // Store suggested actions from last upload (per-session)
@@ -559,37 +555,111 @@ export default function MainWorkspace() {
         </div>
       </div>
 
-      {/* Bottom input area — Feishu style */}
+      {/* Bottom input area */}
       <div className="flex-shrink-0" style={{ borderTop: "1px solid var(--atlas-border)" }}>
         <div className="w-full max-w-4xl mx-auto px-6 pt-3 pb-4">
-          <FeishuChatInput
-            value={input}
-            onChange={setInput}
-            onSend={(text) => handleSend(text)}
-            onUploadFile={(file) => {
-              // Trigger file processing via the existing file input mechanism
-              const dt = new DataTransfer();
-              dt.items.add(file);
-              handleFiles(dt.files);
-              return Promise.resolve({ id: file.name, name: file.name, size: file.size, type: file.type });
+
+          {/* Input box */}
+          <div
+            className="rounded-xl overflow-hidden"
+            style={{
+              background: "var(--atlas-elevated)",
+              border: "1px solid var(--atlas-border-2)",
+              transition: "border-color 0.15s ease",
             }}
-            onFullscreenSend={(text) => {
-              setShowFullscreen(false);
-              handleSend(text);
-            }}
-            placeholder={
-              hasFiles
-                ? "描述你的需求，例如：帮我提取姓名和工资，生成汇总表..."
-                : "直接提问，或拖入 Excel/CSV 文件开始分析..."
-            }
-            disabled={isGenerating}
-            sending={isGenerating}
-            recipientName="ATLAS AI"
-          />
+            onFocusCapture={e => (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.4)"}
+            onBlurCapture={e => (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border-2)"}
+          >
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                hasFiles
+                  ? "描述你的需求，例如：帮我提取姓名和工资，生成汇总表..."
+                  : "直接提问，或拖入 Excel/CSV 文件开始分析..."
+              }
+              disabled={isGenerating}
+              rows={1}
+              className="w-full bg-transparent outline-none resize-none px-4 pt-3 pb-1"
+              style={{
+                color: "var(--atlas-text)",
+                fontSize: "14px",
+                lineHeight: "1.6",
+                minHeight: 42,
+                maxHeight: 160,
+                fontFamily: "inherit",
+              }}
+            />
+            <div className="flex items-center justify-between px-3 pb-2.5 pt-1">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+                  style={{
+                    background: "var(--atlas-surface)",
+                    border: "1px solid var(--atlas-border)",
+                    color: "var(--atlas-text-2)",
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.4)";
+                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border)";
+                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+                  }}
+                  title="上传文件（支持多选）"
+                >
+                  <Paperclip size={12} />
+                  上传文件
+                </button>
+                <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>
+                  Enter 发送
+                </span>
+              </div>
+              {isGenerating ? (
+                <button
+                  onClick={handleStop}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                  style={{
+                    background: "rgba(239,68,68,0.12)",
+                    border: "1px solid rgba(239,68,68,0.25)",
+                    color: "#ef4444",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.2)";
+                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(239,68,68,0.45)";
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.12)";
+                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(239,68,68,0.25)";
+                  }}
+                >
+                  <Square size={11} fill="currentColor" />
+                  停止
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleSend()}
+                  disabled={!input.trim()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                  style={{
+                    background: input.trim() ? "var(--atlas-accent)" : "var(--atlas-border)",
+                    color: input.trim() ? "#fff" : "var(--atlas-text-3)",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <Send size={13} />
+                  发送
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
-
-
 
       {/* Quick action pills — always visible below input */}
       {!isGenerating && messages.length === 0 && (
@@ -1096,22 +1166,9 @@ function MessageBubble({
               <span style={{ fontSize: "13px", color: "var(--atlas-text-3)" }}>ATLAS 正在思考…</span>
             </div>
           ) : (() => {
-            const { segments: tableSegs } = parseAtlasTableBlocks(message.content || "");
-            const hasAtlasTable = tableSegs.some(s => s.type === "table");
-            // Further parse text segments for atlas-chart blocks
-            const allSegments: Array<{ type: "text" | "table" | "chart"; content: string }> = [];
-            for (const seg of tableSegs) {
-              if (seg.type === "table") {
-                allSegments.push(seg);
-              } else {
-                const chartParts = parseAtlasChartBlocks(seg.content);
-                for (const part of chartParts) {
-                  allSegments.push(part);
-                }
-              }
-            }
-            const hasSpecialBlocks = allSegments.some(s => s.type !== "text");
-            if (!hasSpecialBlocks) {
+            const { segments } = parseAtlasTableBlocks(message.content || "");
+            const hasAtlasTable = segments.some(s => s.type === "table");
+            if (!hasAtlasTable) {
               return (
                 <div className="atlas-prose" style={{ fontSize: "14px", lineHeight: "1.7" }}>
                   <Streamdown>{message.content}</Streamdown>
@@ -1120,15 +1177,13 @@ function MessageBubble({
             }
             return (
               <div>
-                {allSegments.map((seg, idx) =>
+                {segments.map((seg, idx) =>
                   seg.type === "text" ? (
                     seg.content.trim() ? (
                       <div key={idx} className="atlas-prose" style={{ fontSize: "14px", lineHeight: "1.7" }}>
                         <Streamdown>{seg.content}</Streamdown>
                       </div>
                     ) : null
-                  ) : seg.type === "chart" ? (
-                    <AtlasChartRenderer key={idx} rawJson={seg.content} />
                   ) : (
                     <AtlasTableRenderer
                       key={idx}

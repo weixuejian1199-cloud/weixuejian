@@ -26,7 +26,6 @@ import { verifySessionToken } from "../_core/auth";
 import { ENV } from "../_core/env";
 import { nanoid } from "nanoid";
 import { streamAIReply } from "./aiReply";
-import { streamAgentReply, detectIntentFast } from "./agentRouter";
 
 // ── DB ────────────────────────────────────────────────────────────────────────
 
@@ -95,12 +94,6 @@ interface WsMsgOpenClawDirectReply extends WsMsgBase {
   content: string;
 }
 
-interface WsMsgRecallMessage extends WsMsgBase {
-  type: "recall_message";
-  messageId: string;
-  conversationId: string;
-}
-
 type WsMessage =
   | WsMsgPing
   | WsMsgSend
@@ -112,8 +105,7 @@ type WsMessage =
   | WsMsgOpenClawReply
   | WsMsgAtlasReply
   | WsMsgSendToOpenClaw
-  | WsMsgOpenClawDirectReply
-  | WsMsgRecallMessage;
+  | WsMsgOpenClawDirectReply;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -327,8 +319,7 @@ function triggerAiReply(
   conversationId: string,
   userId: number,
   userName: string,
-  content: string,
-  history?: Array<{ role: "user" | "assistant"; content: string }>
+  content: string
 ): void {
   if (openClawClient && openClawClient.readyState === WebSocket.OPEN) {
     send(openClawClient, {
@@ -341,99 +332,41 @@ function triggerAiReply(
     return;
   }
 
-  // 意图识别：通知前端当前使用的 Agent
-  const agentType = detectIntentFast(content, false);
-  const userClient = onlineUsers.get(userId);
-  if (userClient) {
-    send(userClient.ws, { type: "agent_type", conversationId, agentType });
-  }
-
-  streamAgentReply({
+  streamAIReply({
     conversationId,
     userId,
-    userName,
-    userMessage: content,
-    history: history ?? [],
-    agentType,
+    content,
     onToken: (token: string) => {
-      const client = onlineUsers.get(userId);
-      if (client) {
-        send(client.ws, { type: "ai_streaming", conversationId, token });
+      const userClient = onlineUsers.get(userId);
+      if (userClient) {
+        send(userClient.ws, { type: "ai_streaming", conversationId, token });
       }
     },
-    onDone: async (result) => {
-      const agentName = {
-        data_analysis: "数据分析助手",
-        hr: "HR 助手",
-        quality_monitor: "质量监控",
-        general: "AI 助手",
-      }[result.agentType] ?? "AI 助手";
-
+    onDone: async (fullReply: string) => {
       const aiMsgId = await saveMessage({
         conversationId,
         senderId: 0,
-        senderName: agentName,
-        content: result.content,
+        senderName: "AI 助手",
+        content: fullReply,
         type: "text",
-        fileInfo: result.suggestedActions ? { suggestedActions: result.suggestedActions } : null,
       });
-      const client = onlineUsers.get(userId);
-      if (client) {
-        send(client.ws, {
+      const userClient = onlineUsers.get(userId);
+      if (userClient) {
+        send(userClient.ws, {
           type: "new_message",
           data: {
             id: aiMsgId,
             conversationId,
             senderId: 0,
-            senderName: agentName,
+            senderName: "AI 助手",
             type: "text",
-            content: result.content,
-            fileInfo: result.suggestedActions ? { suggestedActions: result.suggestedActions } : null,
+            content: fullReply,
+            fileInfo: null,
             createdAt: new Date().toISOString(),
-            agentType: result.agentType,
           },
         });
-        send(client.ws, { type: "ai_streaming_done", conversationId });
+        send(userClient.ws, { type: "ai_streaming_done", conversationId });
       }
-    },
-    onError: async (err) => {
-      console.error("[Agent] Error:", err.message);
-      // Fallback to basic streamAIReply
-      streamAIReply({
-        conversationId,
-        userId,
-        content,
-        onToken: (token: string) => {
-          const client = onlineUsers.get(userId);
-          if (client) send(client.ws, { type: "ai_streaming", conversationId, token });
-        },
-        onDone: async (fullReply: string) => {
-          const aiMsgId = await saveMessage({
-            conversationId,
-            senderId: 0,
-            senderName: "AI 助手",
-            content: fullReply,
-            type: "text",
-          });
-          const client = onlineUsers.get(userId);
-          if (client) {
-            send(client.ws, {
-              type: "new_message",
-              data: {
-                id: aiMsgId,
-                conversationId,
-                senderId: 0,
-                senderName: "AI 助手",
-                type: "text",
-                content: fullReply,
-                fileInfo: null,
-                createdAt: new Date().toISOString(),
-              },
-            });
-            send(client.ws, { type: "ai_streaming_done", conversationId });
-          }
-        },
-      });
     },
   });
 }
@@ -641,21 +574,7 @@ async function handleMessage(client: AuthedClient, raw: string): Promise<void> {
         .limit(1);
 
       if (conv[0]?.type === "ai") {
-        // 获取最近 20 条历史消息作为上下文
-        const historyRows = await db
-          .select()
-          .from(imMessages)
-          .where(eq(imMessages.conversationId, conversationId))
-          .orderBy(desc(imMessages.createdAt))
-          .limit(20);
-        const history = historyRows
-          .reverse()
-          .filter((m: ImMessage) => m.id !== msgId) // 排除刚存的用户消息
-          .map((m: ImMessage) => ({
-            role: (m.senderId === 0 ? "assistant" : "user") as "user" | "assistant",
-            content: m.content,
-          }));
-        triggerAiReply(conversationId, client.userId, client.userName, content, history);
+        triggerAiReply(conversationId, client.userId, client.userName, content);
       }
       break;
     }
@@ -809,42 +728,6 @@ async function handleMessage(client: AuthedClient, raw: string): Promise<void> {
       console.log(`[IM] OpenClaw direct reply broadcast: ${msg.content.slice(0, 50)}`);
       break;
     }
-    case "recall_message": {
-      const { messageId, conversationId: recallConvId } = msg;
-      // Verify sender owns the message
-      const msgRow = await db
-        .select()
-        .from(imMessages)
-        .where(eq(imMessages.id, messageId))
-        .limit(1);
-      if (msgRow.length === 0) {
-        send(client.ws, { type: "error", message: "Message not found" });
-        break;
-      }
-      if (msgRow[0].senderId !== client.userId) {
-        send(client.ws, { type: "error", message: "Cannot recall others' messages" });
-        break;
-      }
-      // Check 2-minute window
-      const sentAt = new Date(msgRow[0].createdAt).getTime();
-      if (Date.now() - sentAt > 2 * 60 * 1000) {
-        send(client.ws, { type: "error", message: "超过2分钟，无法撤回" });
-        break;
-      }
-      // Update message content to recalled
-      await db
-        .update(imMessages)
-        .set({ content: "[消息已撤回]", type: "ai_thinking" })
-        .where(eq(imMessages.id, messageId));
-      // Broadcast recall event to all participants
-      broadcastToConversation(recallConvId, {
-        type: "message_recalled",
-        messageId,
-        conversationId: recallConvId,
-      });
-      break;
-    }
-
     default:
       send(client.ws, { type: "error", message: "Unknown message type" });
   }

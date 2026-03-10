@@ -1,8 +1,0 @@
-{
-  "query": "UPDATE bots SET webhook_url = 'https://liquefiable-oppositely-renda.ngrok-free.dev/hooks/agent', updated_at = NOW() WHERE id = '4ceb933306e285d2305efeb537f4ca92';",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute UPDATE bots SET webhook_url = 'https://liquefiable-oppositely-renda.ngrok-free.dev/hooks/agent', updated_at = NOW() WHERE id = '4ceb933306e285d2305efeb537f4ca92';",
-  "returncode": 1,
-  "logs": [
-    "ERROR 1054 (42S22) at line 1: Unknown column 'webhook_url' in 'field list'"
-  ]
-}

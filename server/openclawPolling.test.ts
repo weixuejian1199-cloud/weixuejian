@@ -198,18 +198,8 @@ describe("OpenClaw Polling API", () => {
         ...fakeTask,
         outputFiles: [{ name: "汇总.xlsx", fileKey: "test-key", fileUrl: "https://s3.example.com/test.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }],
       };
-
-      // NOTE: checkStuckTasks() is called immediately when registerOpenClawPollingRoutes()
-      // is invoked, so it consumes one db.select() call before the test request.
-      // We need to account for that extra call.
-      const stuckLimitMock = vi.fn().mockResolvedValue([]);
-      const stuckWhereMock = vi.fn().mockReturnValue({ limit: stuckLimitMock });
-      const stuckFromMock = vi.fn().mockReturnValue({ where: stuckWhereMock });
-
-      // Call order:
-      //   1. checkStuckTasks() on app init → stuckFromMock
-      //   2. submitTaskResult: find task by id → fromMock1
-      //   3. getTaskOutputFiles: fetch updated task → fromMock2
+      // First call: find task by id (for submitTaskResult)
+      // Second call: getTaskOutputFiles (after update)
       const limitMock1 = vi.fn().mockResolvedValue([fakeTask]);
       const whereMock1 = vi.fn().mockReturnValue({ limit: limitMock1 });
       const fromMock1 = vi.fn().mockReturnValue({ where: whereMock1 });
@@ -217,7 +207,6 @@ describe("OpenClaw Polling API", () => {
       const whereMock2 = vi.fn().mockReturnValue({ limit: limitMock2 });
       const fromMock2 = vi.fn().mockReturnValue({ where: whereMock2 });
       mockDb.select
-        .mockReturnValueOnce({ from: stuckFromMock })
         .mockReturnValueOnce({ from: fromMock1 })
         .mockReturnValueOnce({ from: fromMock2 });
 
@@ -226,8 +215,6 @@ describe("OpenClaw Polling API", () => {
       mockDb.update.mockReturnValue({ set: updateSetMock });
 
       const app = buildApp();
-      // Allow checkStuckTasks async call to settle
-      await new Promise(r => setTimeout(r, 20));
       const res = await request(app)
         .post("/api/openclaw/tasks/result")
         .set("Authorization", VALID_AUTH)

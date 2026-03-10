@@ -1,17 +1,14 @@
 /**
- * ATLAS V15.0 — Global State Context
- * Six-module architecture: chat / files / ai-tools / automation / knowledge / settings
+ * ATLAS V5.0 — Global State Context
+ * Multi-task architecture: each task has its own messages + files
+ * Switching activeTaskId instantly restores the full session
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 
-// ── Module Types ────────────────────────────────────────────────────────────
-export type ActiveModule = "chat" | "files" | "ai-tools" | "automation" | "knowledge" | "settings";
-
-// Legacy compat
 export type NavItem = "home" | "dashboard" | "templates" | "settings" | "search" | "library" | "invite" | "hr" | "im" | "openclaw-monitor";
 export type Theme = "dark" | "light";
 
-// ── Core Types ──────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────
 
 export interface User {
   id: string;
@@ -66,7 +63,7 @@ export interface Message {
   report_filename?: string;
   download_url?: string;
   tableData?: TableSheet[];
-  thinkingSteps?: string[];
+  thinkingSteps?: string[];  // Steps shown in "思考过程" panel
 }
 
 export interface ReportRecord {
@@ -78,6 +75,7 @@ export interface ReportRecord {
   status: "completed" | "failed";
 }
 
+// A Task now owns its own messages and files
 export interface Task {
   id: string;
   title: string;
@@ -88,7 +86,8 @@ export interface Task {
   col_count?: number;
   report_id?: string;
   report_filename?: string;
-  backendSessionId?: string;
+  backendSessionId?: string; // server-side session id for deletion
+  // Per-task session data
   messages: Message[];
   uploadedFiles: UploadedFile[];
 }
@@ -140,11 +139,7 @@ export interface ScheduledTask {
 // ── Context Type ────────────────────────────────────────────────────────────
 
 interface AtlasContextType {
-  // V15 Module Navigation
-  activeModule: ActiveModule;
-  setActiveModule: (m: ActiveModule) => void;
-
-  // Legacy nav (kept for compat)
+  // Layout
   activeNav: NavItem;
   setActiveNav: (nav: NavItem) => void;
   sidebarOpen: boolean;
@@ -168,16 +163,16 @@ interface AtlasContextType {
   addTask: (t: Task) => void;
   updateTask: (id: string, updates: Partial<Omit<Task, "messages" | "uploadedFiles">>) => void;
   deleteTask: (id: string) => void;
-  createNewTask: () => string;
+  createNewTask: () => string; // returns new task id
 
-  // Current task's files
+  // Current task's files (scoped to activeTaskId)
   uploadedFiles: UploadedFile[];
   addUploadedFile: (file: UploadedFile) => void;
   updateUploadedFile: (id: string, updates: Partial<UploadedFile>) => void;
   removeUploadedFile: (id: string) => void;
   clearFiles: () => void;
 
-  // Current task's messages
+  // Current task's messages (scoped to activeTaskId)
   messages: Message[];
   addMessage: (msg: Omit<Message, "id" | "timestamp">) => void;
   updateLastMessage: (content: string, extra?: Partial<Message>) => void;
@@ -244,102 +239,122 @@ export const SYSTEM_TEMPLATES: Template[] = [
   { id: "finance-summary", name: "财务汇总表", description: "多维度财务数据汇总，含实际到账", prompt: "生成财务汇总报表，包含销售额、实际到账金额、退款金额、净收入，按时间和分类汇总", icon: "💰", category: "财务" },
   { id: "inventory-alert", name: "库存预警报表", description: "识别低库存商品，自动预警", prompt: "分析库存数据，生成库存预警报表，标注低库存商品、滞销商品，并给出补货建议", icon: "📦", category: "库存" },
   { id: "weekly-summary", name: "周度经营汇总", description: "本周 vs 上周核心指标对比", prompt: "生成本周经营汇总报表，对比上周数据，显示GMV、订单量、退款率、客单价的环比变化，标注增减幅度", icon: "📅", category: "综合" },
-  { id: "attendance", name: "考勤统计", description: "员工考勤汇总，含迟到、早退、缺勤", prompt: "分析考勤数据，生成考勤统计报表，包含出勤率、迟到次数、早退次数、缺勤天数，按员工汇总", icon: "⏰", category: "HR" },
-  { id: "payroll", name: "工资条生成", description: "根据考勤和绩效自动生成工资条", prompt: "根据提供的考勤和绩效数据，生成工资条，包含基本工资、绩效奖金、扣款明细、实发工资", icon: "💳", category: "HR" },
 ];
 
 // ── Provider ────────────────────────────────────────────────────────────────
 
 export function AtlasProvider({ children }: { children: React.ReactNode }) {
-  const [activeModule, setActiveModuleState] = useState<ActiveModule>(() => {
-    const saved = localStorage.getItem("atlas_active_module");
-    return (saved as ActiveModule) || "chat";
-  });
   const [activeNav, setActiveNav] = useState<NavItem>("home");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTaskId, setActiveTaskIdState] = useState<string | null>(() => localStorage.getItem("atlas_active_task"));
-  const [theme, setThemeState] = useState<Theme>(() => {
-    const saved = localStorage.getItem("atlas_theme");
-    return (saved as Theme) || "light";
+  const [theme, setTheme] = useState<Theme>(() => {
+    // V13.4 强制重置：清除旧版本写入的深色偏好，默认浅色
+    // 只有用户在新版本（v2+）里主动切换到深色才保留
+    const stored = localStorage.getItem("atlas_theme");
+    const version = localStorage.getItem("atlas_theme_version");
+    if (version !== "2") {
+      // 旧版本写入的主题偏好，全部重置为浅色
+      localStorage.removeItem("atlas_theme");
+      localStorage.setItem("atlas_theme_version", "2");
+      return "light";
+    }
+    return stored === "dark" ? "dark" : "light";
   });
-  const [user, setUserState] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [tasks, setTasks] = useState<Task[]>(() => {
     try {
-      const saved = localStorage.getItem("atlas_tasks_v3");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.map((t: any) => ({
-          ...t,
-          messages: (t.messages || []).map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) })),
-          uploadedFiles: (t.uploadedFiles || []).map((f: any) => ({ ...f, uploadedAt: new Date(f.uploadedAt) })),
-        }));
-      }
-    } catch { /* ignore */ }
-    return [];
+      const saved = localStorage.getItem("atlas_tasks");
+      if (!saved) return [];
+      const parsed = JSON.parse(saved) as Task[];
+      // Restore Date objects and clear streaming state
+      return parsed.map(t => ({
+        ...t,
+        messages: t.messages.map(m => ({
+          ...m,
+          timestamp: new Date(m.timestamp),
+          isStreaming: false,
+        })),
+        uploadedFiles: t.uploadedFiles.map(f => ({
+          ...f,
+          uploadedAt: new Date(f.uploadedAt),
+        })),
+      }));
+    } catch { return []; }
   });
   const [isProcessing, setIsProcessing] = useState(false);
   const [reports, setReports] = useState<ReportRecord[]>([]);
   const [templates, setTemplates] = useState<Template[]>(SYSTEM_TEMPLATES);
   const [platforms, setPlatforms] = useState<PlatformConnection[]>([]);
-  const [apiKeys, setApiKeys] = useState<ApiKeyConfig[]>([]);
+  const [apiKeys, setApiKeys] = useState<ApiKeyConfig[]>(() => {
+    try { return JSON.parse(localStorage.getItem("atlas_api_keys") || "[]"); } catch { return []; }
+  });
   const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([]);
-  const [backendUrl, setBackendUrl] = useState("");
-  const [apiKey, setApiKey] = useState("");
+  const [backendUrl, setBackendUrlState] = useState(() => localStorage.getItem("atlas_backend_url") || "http://localhost:8000");
 
-  // Persist tasks
-  useEffect(() => {
-    localStorage.setItem("atlas_tasks_v3", JSON.stringify(tasks));
-  }, [tasks]);
-
-  // Persist theme
-  const setTheme = useCallback((t: Theme) => {
-    setThemeState(t);
-    localStorage.setItem("atlas_theme", t);
-    document.documentElement.classList.toggle("dark", t === "dark");
-  }, []);
-
-  const toggleTheme = useCallback(() => {
-    setTheme(theme === "dark" ? "light" : "dark");
-  }, [theme, setTheme]);
-
-  // Apply theme on mount
+  // Apply theme to document
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
-  }, []);
-
-  const setActiveModule = useCallback((m: ActiveModule) => {
-    setActiveModuleState(m);
-    localStorage.setItem("atlas_active_module", m);
-  }, []);
-
-  const setActiveTaskId = useCallback((id: string | null) => {
-    setActiveTaskIdState(id);
-    if (id) localStorage.setItem("atlas_active_task", id);
+    document.documentElement.classList.toggle("light", theme === "light");
+    localStorage.setItem("atlas_theme", theme);
+  }, [theme]);
+  // Persist tasks to localStorage (debounced to avoid excessive writes)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        // Limit stored tasks to last 20 to avoid localStorage quota issues
+        const toStore = tasks.slice(0, 20).map(t => ({
+          ...t,
+          // Limit messages per task to last 50 to save space
+          messages: t.messages.slice(-50).map(m => ({
+            ...m,
+            isStreaming: false,
+            // Truncate very long content to avoid quota issues
+            content: m.content.length > 10000 ? m.content.slice(0, 10000) + '...' : m.content,
+          })),
+          // Don't persist file binary data
+          uploadedFiles: t.uploadedFiles.map(f => ({ ...f })),
+        }));
+        localStorage.setItem("atlas_tasks", JSON.stringify(toStore));
+      } catch (e) {
+        // If quota exceeded, clear old tasks
+        try { localStorage.removeItem("atlas_tasks"); } catch {}
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [tasks]);
+  // Persist activeTaskId
+  useEffect(() => {
+    if (activeTaskId) localStorage.setItem("atlas_active_task", activeTaskId);
     else localStorage.removeItem("atlas_active_task");
+  }, [activeTaskId]);
+
+  // Responsive: auto-close sidebar on small screens
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) setSidebarOpen(false);
+      else setSidebarOpen(true);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const setUser = useCallback((u: User | null) => setUserState(u), []);
-
-  // Task helpers
-  const addTask = useCallback((t: Task) => {
-    setTasks(prev => [t, ...prev]);
+  // Listen for unauthorized API errors
+  useEffect(() => {
+    const handleUnauthorized = () => setShowLoginModal(true);
+    window.addEventListener("atlas:unauthorized", handleUnauthorized);
+    return () => window.removeEventListener("atlas:unauthorized", handleUnauthorized);
   }, []);
 
-  const updateTask = useCallback((id: string, updates: Partial<Omit<Task, "messages" | "uploadedFiles">>) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
-  }, []);
+  // ── Task management ──────────────────────────────────────────────────────
 
-  const deleteTask = useCallback((id: string) => {
-    setTasks(prev => prev.filter(t => t.id !== id));
-    setActiveTaskIdState(prev => prev === id ? null : prev);
-  }, []);
-
+  // Create a brand-new empty task and activate it
   const createNewTask = useCallback((): string => {
     const id = `task-${Date.now()}`;
     const newTask: Task = {
       id,
-      title: "新对话",
+      title: "新建任务",
       filename: "",
       created_at: new Date().toISOString(),
       status: "uploaded",
@@ -347,17 +362,37 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
       uploadedFiles: [],
     };
     setTasks(prev => [newTask, ...prev]);
-    setActiveTaskId(id);
+    setActiveTaskIdState(id);
     return id;
-  }, [setActiveTaskId]);
+  }, []);
 
-  // Current task's files
-  const currentTask = tasks.find(t => t.id === activeTaskId);
-  const uploadedFiles = currentTask?.uploadedFiles ?? [];
+  const setActiveTaskId = useCallback((id: string | null) => {
+    setActiveTaskIdState(id);
+  }, []);
+
+  const addTask = useCallback((t: Task) => {
+    setTasks(prev => [t, ...prev]);
+  }, []);
+
+   const updateTask = useCallback((id: string, updates: Partial<Omit<Task, "messages" | "uploadedFiles">>) => {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+  }, []);
+  const deleteTask = useCallback((id: string) => {
+    setTasks(prev => prev.filter(t => t.id !== id));
+    setActiveTaskIdState(prev => prev === id ? null : prev);
+  }, []);
+  // ── Per-task files (scoped to activeTaskId) ──────────────────────────────
+
+  // Get current task (memoized by activeTaskId)
+  const activeTask = tasks.find(t => t.id === activeTaskId) ?? null;
+  const uploadedFiles = activeTask?.uploadedFiles ?? [];
+  const messages = activeTask?.messages ?? [];
 
   const addUploadedFile = useCallback((file: UploadedFile) => {
     setTasks(prev => prev.map(t =>
-      t.id === activeTaskId ? { ...t, uploadedFiles: [...t.uploadedFiles, file] } : t
+      t.id === activeTaskId
+        ? { ...t, uploadedFiles: [file, ...t.uploadedFiles] }
+        : t
     ));
   }, [activeTaskId]);
 
@@ -371,7 +406,9 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
 
   const removeUploadedFile = useCallback((id: string) => {
     setTasks(prev => prev.map(t =>
-      t.id === activeTaskId ? { ...t, uploadedFiles: t.uploadedFiles.filter(f => f.id !== id) } : t
+      t.id === activeTaskId
+        ? { ...t, uploadedFiles: t.uploadedFiles.filter(f => f.id !== id) }
+        : t
     ));
   }, [activeTaskId]);
 
@@ -381,22 +418,25 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
     ));
   }, [activeTaskId]);
 
-  // Current task's messages
-  const messages = currentTask?.messages ?? [];
+  // ── Per-task messages ────────────────────────────────────────────────────
 
   const addMessage = useCallback((msg: Omit<Message, "id" | "timestamp">) => {
-    const full: Message = { ...msg, id: genId(), timestamp: new Date() };
+    const newMsg: Message = { ...msg, id: genId(), timestamp: new Date() };
     setTasks(prev => prev.map(t =>
-      t.id === activeTaskId ? { ...t, messages: [...t.messages, full] } : t
+      t.id === activeTaskId
+        ? { ...t, messages: [...t.messages, newMsg] }
+        : t
     ));
   }, [activeTaskId]);
 
   const updateLastMessage = useCallback((content: string, extra?: Partial<Message>) => {
     setTasks(prev => prev.map(t => {
       if (t.id !== activeTaskId) return t;
+      if (!t.messages.length) return t;
       const msgs = [...t.messages];
-      if (msgs.length === 0) return t;
-      msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], content, ...extra };
+      // If extra explicitly sets isStreaming, use it; otherwise default to false
+      const isStreamingVal = extra && 'isStreaming' in extra ? extra.isStreaming : false;
+      msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], content, ...extra, isStreaming: isStreamingVal };
       return { ...t, messages: msgs };
     }));
   }, [activeTaskId]);
@@ -407,73 +447,115 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
     ));
   }, [activeTaskId]);
 
-  // Reports
-  const addReport = useCallback((r: ReportRecord) => {
-    setReports(prev => [r, ...prev]);
-  }, []);
+  // ── Reports ──────────────────────────────────────────────────────────────
 
-  // Templates
-  const addTemplate = useCallback((t: Template) => setTemplates(prev => [...prev, t]), []);
+  const addReport = useCallback((r: ReportRecord) => setReports(prev => [r, ...prev]), []);
+
+  // ── Templates ────────────────────────────────────────────────────────────
+
+  const addTemplate = useCallback((t: Template) => setTemplates(prev => [t, ...prev]), []);
   const updateTemplate = useCallback((id: string, updates: Partial<Template>) => {
     setTemplates(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
   }, []);
-  const removeTemplate = useCallback((id: string) => {
-    setTemplates(prev => prev.filter(t => t.id !== id));
-  }, []);
+  const removeTemplate = useCallback((id: string) => setTemplates(prev => prev.filter(t => t.id !== id)), []);
   const pinTemplate = useCallback((id: string) => {
     setTemplates(prev => prev.map(t => t.id === id ? { ...t, isPinned: !t.isPinned } : t));
   }, []);
 
-  // Platforms
-  const addPlatform = useCallback((p: PlatformConnection) => setPlatforms(prev => [...prev, p]), []);
+  // ── Platforms ────────────────────────────────────────────────────────────
+
+  const addPlatform = useCallback((p: PlatformConnection) => setPlatforms(prev => [p, ...prev]), []);
   const updatePlatform = useCallback((id: string, updates: Partial<PlatformConnection>) => {
     setPlatforms(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
   }, []);
   const removePlatform = useCallback((id: string) => setPlatforms(prev => prev.filter(p => p.id !== id)), []);
 
-  // API Keys
-  const addApiKey = useCallback((k: ApiKeyConfig) => setApiKeys(prev => [...prev, k]), []);
-  const updateApiKey = useCallback((id: string, updates: Partial<ApiKeyConfig>) => {
-    setApiKeys(prev => prev.map(k => k.id === id ? { ...k, ...updates } : k));
-  }, []);
-  const removeApiKey = useCallback((id: string) => setApiKeys(prev => prev.filter(k => k.id !== id)), []);
+  // ── API Keys ─────────────────────────────────────────────────────────────
 
-  // Scheduled Tasks
+  const addApiKey = useCallback((k: ApiKeyConfig) => {
+    setApiKeys(prev => {
+      const next = [...prev, k];
+      localStorage.setItem("atlas_api_keys", JSON.stringify(next));
+      return next;
+    });
+  }, []);
+  const updateApiKey = useCallback((id: string, updates: Partial<ApiKeyConfig>) => {
+    setApiKeys(prev => {
+      const next = prev.map(k => k.id === id ? { ...k, ...updates } : k);
+      localStorage.setItem("atlas_api_keys", JSON.stringify(next));
+      return next;
+    });
+  }, []);
+  const removeApiKey = useCallback((id: string) => {
+    setApiKeys(prev => {
+      const next = prev.filter(k => k.id !== id);
+      localStorage.setItem("atlas_api_keys", JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  // ── Scheduled Tasks ──────────────────────────────────────────────────────
+
   const addScheduledTask = useCallback((t: ScheduledTask) => setScheduledTasks(prev => [...prev, t]), []);
   const updateScheduledTask = useCallback((id: string, updates: Partial<ScheduledTask>) => {
     setScheduledTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
   }, []);
   const removeScheduledTask = useCallback((id: string) => setScheduledTasks(prev => prev.filter(t => t.id !== id)), []);
 
-  // Legacy history compat
-  const [history, setHistory] = useState<Task[]>([]);
-  const addHistory = useCallback((h: Omit<Task, "messages" | "uploadedFiles">) => {
-    setHistory(prev => [{ ...h, messages: [], uploadedFiles: [] }, ...prev]);
+  const setBackendUrl = useCallback((url: string) => {
+    setBackendUrlState(url);
+    localStorage.setItem("atlas_backend_url", url);
   }, []);
 
-  const value: AtlasContextType = {
-    activeModule, setActiveModule,
-    activeNav, setActiveNav,
-    sidebarOpen, setSidebarOpen,
-    activeTaskId, setActiveTaskId,
-    theme, toggleTheme, setTheme,
-    user, setUser,
-    showLoginModal, setShowLoginModal,
-    tasks, addTask, updateTask, deleteTask, createNewTask,
-    uploadedFiles, addUploadedFile, updateUploadedFile, removeUploadedFile, clearFiles,
-    messages, addMessage, updateLastMessage, clearMessages,
-    isProcessing, setIsProcessing,
-    reports, addReport,
-    templates, addTemplate, updateTemplate, removeTemplate, pinTemplate,
-    platforms, addPlatform, updatePlatform, removePlatform,
-    apiKeys, addApiKey, updateApiKey, removeApiKey,
-    scheduledTasks, addScheduledTask, updateScheduledTask, removeScheduledTask,
-    backendUrl, setBackendUrl,
-    apiKey, setApiKey,
-    history, setHistory, addHistory,
-  };
+  const toggleTheme = useCallback(() => {
+    setTheme(t => t === "dark" ? "light" : "dark");
+  }, []);
 
-  return <AtlasContext.Provider value={value}>{children}</AtlasContext.Provider>;
+  // Legacy compat
+  const apiKey = apiKeys.find(k => k.isDefault)?.key || apiKeys[0]?.key || "";
+  const setApiKey = useCallback((key: string) => {
+    if (apiKeys.length === 0) {
+      addApiKey({ id: "default", label: "默认 Key", key, model: "glm-5", provider: "智谱 AI", isDefault: true });
+    } else {
+      updateApiKey(apiKeys[0].id, { key });
+    }
+  }, [apiKeys, addApiKey, updateApiKey]);
+
+  // addHistory: creates a task with empty messages/files (legacy compat for processFile)
+  const addHistory = useCallback((h: Omit<Task, "messages" | "uploadedFiles">) => {
+    setTasks(prev => {
+      // If task already exists (same id), just update metadata
+      if (prev.some(t => t.id === h.id)) {
+        return prev.map(t => t.id === h.id ? { ...t, ...h } : t);
+      }
+      return [{ ...h, messages: [], uploadedFiles: [] }, ...prev];
+    });
+  }, []);
+
+  return (
+    <AtlasContext.Provider value={{
+      activeNav, setActiveNav,
+      sidebarOpen, setSidebarOpen,
+      activeTaskId, setActiveTaskId,
+      theme, toggleTheme, setTheme,
+      user, setUser,
+      showLoginModal, setShowLoginModal,
+      tasks, addTask, updateTask, deleteTask, createNewTask,
+      uploadedFiles, addUploadedFile, updateUploadedFile, removeUploadedFile, clearFiles,
+      messages, addMessage, updateLastMessage, clearMessages,
+      isProcessing, setIsProcessing,
+      reports, addReport,
+      templates, addTemplate, updateTemplate, removeTemplate, pinTemplate,
+      platforms, addPlatform, updatePlatform, removePlatform,
+      apiKeys, addApiKey, updateApiKey, removeApiKey,
+      scheduledTasks, addScheduledTask, updateScheduledTask, removeScheduledTask,
+      backendUrl, setBackendUrl,
+      apiKey, setApiKey,
+      history: tasks, setHistory: setTasks as any, addHistory,
+    }}>
+      {children}
+    </AtlasContext.Provider>
+  );
 }
 
 export function useAtlas() {

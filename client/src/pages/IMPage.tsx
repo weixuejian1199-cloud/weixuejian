@@ -11,15 +11,13 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, Send, Loader2, Circle, MessageSquare, Search, Zap } from "lucide-react";
+import { Bot, User, Send, Loader2, Circle, MessageSquare, Search, X, Zap, Shield } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAtlas } from "@/contexts/AtlasContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
-import FeishuChatInput, { UploadedFile } from "@/components/FeishuChatInput";
-import { useTypewriter } from "@/hooks/useTypewriter";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -76,17 +74,11 @@ interface BotMessage {
 function useImWebSocket(token: string | null, onOpenClawReply?: (msg: { id: string; role: "assistant"; content: string; createdAt: string }) => void) {
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
-  const [reconnecting, setReconnecting] = useState(false);
   const [conversations, setConversations] = useState<IMConversation[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [messages, setMessages] = useState<Record<string, IMMessage[]>>({});
   const [streamingTokens, setStreamingTokens] = useState<Record<string, string>>({});
-  const [currentAgentType, setCurrentAgentType] = useState<Record<string, string>>({});
   const pingInterval = useRef<ReturnType<typeof setInterval> | null>(null);
-  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const reconnectDelay = useRef(3000); // start at 3s
-  const destroyed = useRef(false);
-  const activeConvIdRef = useRef<string | null>(null);
 
   const send = useCallback((data: object) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -94,24 +86,19 @@ function useImWebSocket(token: string | null, onOpenClawReply?: (msg: { id: stri
     }
   }, []);
 
-  const connect = useCallback((tok: string) => {
-    if (destroyed.current) return;
-    const wsUrl = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/api/ws/im?token=${encodeURIComponent(tok)}`;
+  useEffect(() => {
+    if (!token) return;
+
+    const wsUrl = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/api/ws/im?token=${encodeURIComponent(token)}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      if (destroyed.current) { ws.close(); return; }
       setConnected(true);
-      setReconnecting(false);
-      reconnectDelay.current = 3000; // reset backoff on success
+      // Load initial data
       ws.send(JSON.stringify({ type: "get_conversations" }));
       ws.send(JSON.stringify({ type: "get_contacts" }));
-      // Reload active conversation messages after reconnect
-      if (activeConvIdRef.current) {
-        ws.send(JSON.stringify({ type: "get_messages", conversationId: activeConvIdRef.current }));
-      }
-      // Keepalive ping every 25s (Cloudflare 100s timeout)
+      // Keepalive ping every 25s
       pingInterval.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: "ping" }));
@@ -119,16 +106,9 @@ function useImWebSocket(token: string | null, onOpenClawReply?: (msg: { id: stri
       }, 25000);
     };
 
-    ws.onclose = (e) => {
+    ws.onclose = () => {
       setConnected(false);
       if (pingInterval.current) clearInterval(pingInterval.current);
-      if (destroyed.current) return;
-      // Don't reconnect on intentional close (code 1000)
-      if (e.code === 1000) return;
-      setReconnecting(true);
-      const delay = reconnectDelay.current;
-      reconnectDelay.current = Math.min(delay * 2, 30000); // exponential backoff, max 30s
-      reconnectTimer.current = setTimeout(() => connect(tok), delay);
     };
 
     ws.onerror = () => {
@@ -154,8 +134,6 @@ function useImWebSocket(token: string | null, onOpenClawReply?: (msg: { id: stri
           case "new_message":
             setMessages(prev => {
               const convMsgs = prev[msg.data.conversationId] ?? [];
-              // Deduplicate by id
-              if (convMsgs.some(m => m.id === msg.data.id)) return prev;
               return {
                 ...prev,
                 [msg.data.conversationId]: [...convMsgs, msg.data],
@@ -187,6 +165,7 @@ function useImWebSocket(token: string | null, onOpenClawReply?: (msg: { id: stri
             ws.send(JSON.stringify({ type: "get_conversations" }));
             break;
           case "openclaw_im_reply":
+            // 小虾米通过 IM 直接回复 admin
             onOpenClawReply?.({
               id: msg.id ?? Date.now().toString(),
               role: "assistant" as const,
@@ -194,48 +173,22 @@ function useImWebSocket(token: string | null, onOpenClawReply?: (msg: { id: stri
               createdAt: msg.createdAt ?? new Date().toISOString(),
             });
             break;
-          case "message_recalled":
-            setMessages(prev => {
-              const convMsgs = prev[msg.conversationId] ?? [];
-              return {
-                ...prev,
-                [msg.conversationId]: convMsgs.map(m =>
-                  m.id === msg.messageId
-                    ? { ...m, content: "[消息已撤回]", type: "recalled" as const }
-                    : m
-                ),
-              };
-            });
-            break;
-          case "agent_type":
-            setCurrentAgentType(prev => ({ ...prev, [msg.conversationId]: msg.agentType }));
-            break;
           case "error":
             console.error("[IM WS]", msg.message);
-            if (msg.message === "超过2分钟，无法撤回") {
-              import("sonner").then(({ toast }) => toast.error("超过2分钟，无法撤回"));
-            }
             break;
         }
       } catch {
         // ignore parse errors
       }
     };
-  }, [onOpenClawReply]);
 
-  useEffect(() => {
-    if (!token) return;
-    destroyed.current = false;
-    connect(token);
     return () => {
-      destroyed.current = true;
       if (pingInterval.current) clearInterval(pingInterval.current);
-      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
-      wsRef.current?.close(1000, "component unmount");
+      ws.close();
     };
-  }, [token, connect]);
+  }, [token]);
 
-  return { connected, reconnecting, conversations, contacts, messages, streamingTokens, currentAgentType, send, setConversations, activeConvIdRef, wsRef };
+  return { connected, conversations, contacts, messages, streamingTokens, send, setConversations };
 }
 
 // ── Avatar ─────────────────────────────────────────────────────────────────────
@@ -411,20 +364,8 @@ export default function IMPage() {
       .catch(() => {});
   }, [isAdminUser]);
 
-  const { connected, reconnecting, conversations, contacts, messages, streamingTokens, currentAgentType, send, setConversations, activeConvIdRef, wsRef } = useImWebSocket(
-    tokenData?.token ?? null,
-    (msg) => {
-      setOpenClawMessages(prev => {
-        if (prev.some(m => m.id === msg.id)) return prev;
-        return [...prev, msg];
-      });
-    }
-  );
-
-  // Sync activeConvId to ref so reconnect can reload messages
-  useEffect(() => {
-    activeConvIdRef.current = activeConvId;
-  }, [activeConvId, activeConvIdRef]);
+  const { connected, conversations, contacts, messages, streamingTokens, send } =
+    useImWebSocket(tokenData?.token ?? null);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -479,50 +420,12 @@ export default function IMPage() {
     if (direct) setActiveConvId(direct.id);
   }, [conversations, activeConvId]);
 
-  const [isSending, setIsSending] = useState(false);
-
-  const handleSend = useCallback((textOverride?: string) => {
-    const text = (textOverride ?? inputText).trim();
+  const handleSend = useCallback(() => {
+    const text = inputText.trim();
     if (!text || !activeConvId) return;
-    if (!connected) {
-      toast.error("连接已断开，正在重连中，请稍后重试");
-      return;
-    }
-    setIsSending(true);
     send({ type: "send_message", conversationId: activeConvId, content: text });
-    if (!textOverride) setInputText("");
-    // Timeout: if no new_message received within 8s, show retry toast
-    const timeout = setTimeout(() => {
-      setIsSending(false);
-      toast.error("发送超时，请检查网络后重试", {
-        action: {
-          label: "重试",
-          onClick: () => handleSend(text),
-        },
-      });
-    }, 8000);
-    // Clear timeout when message arrives
-    const unsub = () => clearTimeout(timeout);
-    // Listen for new_message to cancel timeout
-    const origOnMessage = wsRef.current?.onmessage;
-    if (wsRef.current) {
-      const ws = wsRef.current;
-      const prevHandler = ws.onmessage;
-      ws.onmessage = (e: MessageEvent) => {
-        try {
-          const m = JSON.parse(e.data as string);
-          if (m.type === "new_message" && m.data?.conversationId === activeConvId) {
-            clearTimeout(timeout);
-            setIsSending(false);
-            ws.onmessage = prevHandler;
-          }
-        } catch {}
-        if (prevHandler) prevHandler.call(ws, e);
-      };
-    }
-    void origOnMessage;
-    void unsub;
-  }, [inputText, activeConvId, send, connected]);
+    setInputText("");
+  }, [inputText, activeConvId, send]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -549,20 +452,9 @@ export default function IMPage() {
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden" style={{ background: "var(--atlas-bg)" }}>
-      {/* Reconnecting banner */}
-      {reconnecting && (
-        <div
-          className="flex items-center justify-center gap-2 py-1.5 text-xs font-medium flex-shrink-0"
-          style={{ background: "#f59e0b", color: "#fff" }}
-        >
-          <Loader2 size={12} className="animate-spin" />
-          连接已断开，正在重新连接...
-        </div>
-      )}
-      <div className="flex flex-1 overflow-hidden">
-        {/* ── Left Panel ── */}
-        <div
+    <div className="flex h-full overflow-hidden" style={{ background: "var(--atlas-bg)" }}>
+      {/* ── Left Panel ── */}
+      <div
         className="flex flex-col flex-shrink-0 overflow-hidden"
         style={{
           width: 260,
@@ -582,11 +474,11 @@ export default function IMPage() {
           <div className="ml-auto flex items-center gap-1">
             <Circle
               size={7}
-              fill={connected ? "#34D399" : reconnecting ? "#f59e0b" : "#6B7280"}
-              style={{ color: connected ? "#34D399" : reconnecting ? "#f59e0b" : "#6B7280" }}
+              fill={connected ? "#34D399" : "#6B7280"}
+              style={{ color: connected ? "#34D399" : "#6B7280" }}
             />
             <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>
-              {connected ? "在线" : reconnecting ? "重连中..." : "连接中"}
+              {connected ? "在线" : "连接中"}
             </span>
           </div>
         </div>
@@ -914,25 +806,7 @@ export default function IMPage() {
                       {activeConv.isAi ? "AI 助手" : getConvName(activeConv)}
                     </div>
                     {activeConv.isAi && (
-                      <div className="text-xs flex items-center gap-1.5" style={{ color: "var(--atlas-text-3)" }}>
-                        {(() => {
-                          const agent = currentAgentType[activeConvId ?? ""];
-                          const agentLabels: Record<string, { label: string; color: string }> = {
-                            data_analysis: { label: "数据分析", color: "#3b82f6" },
-                            hr: { label: "HR 助手", color: "#8b5cf6" },
-                            quality_monitor: { label: "质量监控", color: "#f59e0b" },
-                            general: { label: "通用助手", color: "#10b981" },
-                          };
-                          const info = agent ? agentLabels[agent] : null;
-                          return info ? (
-                            <span
-                              className="px-1.5 py-0.5 rounded text-xs font-medium"
-                              style={{ background: `${info.color}20`, color: info.color }}
-                            >
-                              {info.label}
-                            </span>
-                          ) : null;
-                        })()}
+                      <div className="text-xs" style={{ color: "var(--atlas-text-3)" }}>
                         由千问 AI 驱动 · 接入 OpenClaw 后升级
                       </div>
                     )}
@@ -967,17 +841,13 @@ export default function IMPage() {
                 {currentMessages.map(msg => {
                   const isMe = msg.senderId === myUserId;
                   const isAiMsg = msg.senderId === 0;
-                  const isRecalled = (msg as {type?: string}).type === "recalled" || msg.content === "[消息已撤回]";
-                  const sentAt = new Date(msg.createdAt).getTime();
-                  const canRecall = isMe && !isRecalled && Date.now() - sentAt < 2 * 60 * 1000;
-
                   return (
                     <motion.div
                       key={msg.id}
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.15 }}
-                      className={`flex gap-3 group ${isMe ? "flex-row-reverse" : "flex-row"}`}
+                      className={`flex gap-3 ${isMe ? "flex-row-reverse" : "flex-row"}`}
                     >
                       {!isMe && (
                         <Avatar
@@ -986,115 +856,33 @@ export default function IMPage() {
                           size={30}
                         />
                       )}
-                      <div className="relative max-w-[70%]">
-                        {isRecalled ? (
-                          <div
-                            className="rounded-2xl px-4 py-2.5 text-sm italic"
-                            style={{ color: "var(--atlas-text-3)", background: "var(--atlas-elevated)" }}
-                          >
-                            消息已撤回
+                      <div
+                        className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                          isMe ? "rounded-tr-sm" : "rounded-tl-sm"
+                        }`}
+                        style={{
+                          background: isMe
+                            ? "var(--atlas-accent)"
+                            : "var(--atlas-elevated)",
+                          color: isMe ? "#fff" : "var(--atlas-text)",
+                        }}
+                      >
+                        {isAiMsg ? (
+                          <div className="prose prose-sm max-w-none dark:prose-invert">
+                            <ReactMarkdown>{msg.content}</ReactMarkdown>
                           </div>
                         ) : (
-                          <>
-                            <div
-                              className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                                isMe ? "rounded-tr-sm" : "rounded-tl-sm"
-                              }`}
-                              style={{
-                                background: isMe
-                                  ? "var(--atlas-accent)"
-                                  : "var(--atlas-elevated)",
-                                color: isMe ? "#fff" : "var(--atlas-text)",
-                              }}
-                            >
-                              {isAiMsg ? (
-                                <div className="prose prose-sm max-w-none dark:prose-invert">
-                                  <ReactMarkdown>{msg.content}</ReactMarkdown>
-                                </div>
-                              ) : (
-                                <span style={{ whiteSpace: "pre-wrap" }}>{msg.content}</span>
-                              )}
-                              <div
-                                className="text-xs mt-1 opacity-60"
-                                style={{ textAlign: isMe ? "right" : "left" }}
-                              >
-                                {new Date(msg.createdAt).toLocaleTimeString("zh-CN", {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
-                              </div>
-                            </div>
-                            {/* Action buttons on hover */}
-                            <div
-                              className="absolute -bottom-5 opacity-0 group-hover:opacity-100 transition-all duration-150 flex items-center gap-1"
-                              style={{ [isMe ? "left" : "right"]: 4, zIndex: 10 }}
-                            >
-                              {/* Copy button */}
-                              <button
-                                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium shadow-sm"
-                                style={{ background: "#1a1a1a", color: "#fff", border: "1px solid rgba(255,255,255,0.1)" }}
-                                onClick={() => {
-                                  navigator.clipboard.writeText(msg.content)
-                                    .then(() => toast.success("已复制"))
-                                    .catch(() => toast.error("复制失败"));
-                                }}
-                              >
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                                </svg>
-                                复制
-                              </button>
-                              {/* Recall button (own messages within 2min) */}
-                              {canRecall && (
-                                <button
-                                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium shadow-sm"
-                                  style={{ background: "rgba(239,68,68,0.85)", color: "#fff", border: "1px solid rgba(255,255,255,0.1)" }}
-                                  onClick={() => {
-                                    send({ type: "recall_message", messageId: msg.id, conversationId: msg.conversationId });
-                                  }}
-                                >
-                                  撤回
-                                </button>
-                              )}
-                            </div>
-                          </>
+                          <span style={{ whiteSpace: "pre-wrap" }}>{msg.content}</span>
                         )}
-                        {/* Suggested actions for AI messages */}
-                        {isAiMsg && !isRecalled && (() => {
-                          const fileInfo = (msg as {fileInfo?: {suggestedActions?: string[]}}).fileInfo;
-                          const actions = fileInfo?.suggestedActions;
-                          if (!actions || actions.length === 0) return null;
-                          return (
-                            <div className="flex flex-wrap gap-1.5 mt-2">
-                              {actions.map((action: string) => (
-                                <button
-                                  key={action}
-                                  className="px-3 py-1 rounded-full text-xs font-medium transition-all"
-                                  style={{
-                                    background: "var(--atlas-elevated)",
-                                    border: "1px solid var(--atlas-border)",
-                                    color: "var(--atlas-accent)",
-                                  }}
-                                  onMouseEnter={e => {
-                                    (e.currentTarget as HTMLElement).style.background = "var(--atlas-accent)";
-                                    (e.currentTarget as HTMLElement).style.color = "#fff";
-                                  }}
-                                  onMouseLeave={e => {
-                                    (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
-                                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
-                                  }}
-                                  onClick={() => {
-                                    setInputText(action);
-                                    handleSend(action);
-                                  }}
-                                >
-                                  {action}
-                                </button>
-                              ))}
-                            </div>
-                          );
-                        })()}
+                        <div
+                          className="text-xs mt-1 opacity-60"
+                          style={{ textAlign: isMe ? "right" : "left" }}
+                        >
+                          {new Date(msg.createdAt).toLocaleTimeString("zh-CN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
                       </div>
                       {isMe && (
                         <Avatar name={user?.name ?? "我"} size={30} />
@@ -1127,17 +915,48 @@ export default function IMPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input box — Feishu style */}
-            <FeishuChatInput
-              value={inputText}
-              onChange={setInputText}
-              onSend={() => handleSend()}
-              disabled={!connected}
-              placeholder="输入消息，Enter 发送，Shift+Enter 换行"
-            />
+            {/* Input box */}
+            <div
+              className="flex-shrink-0 px-4 py-3"
+              style={{ borderTop: "1px solid var(--atlas-border)", background: "var(--atlas-surface)" }}
+            >
+              <div
+                className="flex items-end gap-2 rounded-xl px-3 py-2"
+                style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}
+              >
+                <textarea
+                  value={inputText}
+                  onChange={e => setInputText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="输入消息，Enter 发送，Shift+Enter 换行"
+                  rows={1}
+                  className="flex-1 resize-none bg-transparent outline-none text-sm py-1"
+                  style={{
+                    color: "var(--atlas-text)",
+                    maxHeight: 120,
+                    overflowY: "auto",
+                  }}
+                  onInput={e => {
+                    const el = e.currentTarget;
+                    el.style.height = "auto";
+                    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+                  }}
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={!inputText.trim() || !connected}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-all flex-shrink-0 mb-0.5"
+                  style={{
+                    background: inputText.trim() && connected ? "var(--atlas-accent)" : "var(--atlas-border)",
+                    color: inputText.trim() && connected ? "#fff" : "var(--atlas-text-3)",
+                  }}
+                >
+                  <Send size={14} />
+                </button>
+              </div>
+            </div>
           </>
         )}
-        </div>
       </div>
     </div>
   );
@@ -1280,14 +1099,48 @@ function OpenClawPanel({ messages, inputText, setInputText, isOnline, onSend }: 
         <div ref={endRef} />
       </div>
 
-      {/* Input — Feishu style */}
-      <FeishuChatInput
-        value={inputText}
-        onChange={setInputText}
-        onSend={(text) => { if (text.trim()) onSend(text.trim()); }}
-        placeholder="给小虾米发消息..."
-        disabled={!isOnline}
-      />
+      {/* Input */}
+      <div
+        className="flex-shrink-0 px-4 py-3"
+        style={{ borderTop: "1px solid var(--atlas-border)", background: "var(--atlas-surface)" }}
+      >
+        <div
+          className="flex items-end gap-2 rounded-xl px-3 py-2"
+          style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}
+        >
+          <textarea
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="给小虾米发消息..."
+            disabled={false}
+            rows={1}
+            className="flex-1 resize-none bg-transparent outline-none text-sm py-1"
+            style={{
+              color: "var(--atlas-text)",
+              maxHeight: 120,
+              overflowY: "auto",
+              opacity: isOnline ? 1 : 0.5,
+            }}
+            onInput={e => {
+              const el = e.currentTarget;
+              el.style.height = "auto";
+              el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+            }}
+          />
+          <button
+            onClick={() => { if (inputText.trim()) onSend(inputText.trim()); }}
+            disabled={!inputText.trim()}
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all flex-shrink-0 mb-0.5"
+            style={{
+              background: inputText.trim() ? "#f97316" : "var(--atlas-border)",
+              color: inputText.trim() ? "#fff" : "var(--atlas-text-3)",
+            }}
+          >
+            <Send size={14} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1383,13 +1236,33 @@ function BotChatPanel({ bot, messages, inputText, setInputText, onSend }: BotCha
         <div ref={endRef} />
       </div>
 
-      {/* Input — Feishu style */}
-      <FeishuChatInput
-        value={inputText}
-        onChange={setInputText}
-        onSend={(text) => { if (text.trim()) onSend(text.trim()); }}
-        placeholder={`给 ${bot?.name || "机器人"} 发消息...`}
-      />
+      {/* Input */}
+      <div className="flex-shrink-0 px-4 py-3" style={{ borderTop: "1px solid var(--atlas-border)", background: "var(--atlas-surface)" }}>
+        <div className="flex items-end gap-2 rounded-xl px-3 py-2" style={{ background: "var(--atlas-elevated)", border: "1px solid var(--atlas-border)" }}>
+          <textarea
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={`给 ${bot?.name || "机器人"} 发消息...`}
+            rows={1}
+            className="flex-1 resize-none bg-transparent outline-none text-sm py-1"
+            style={{ color: "var(--atlas-text)", maxHeight: 120, overflowY: "auto" }}
+            onInput={e => {
+              const el = e.currentTarget;
+              el.style.height = "auto";
+              el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+            }}
+          />
+          <button
+            onClick={() => { if (inputText.trim()) onSend(inputText.trim()); }}
+            disabled={!inputText.trim()}
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all flex-shrink-0 mb-0.5"
+            style={{ background: inputText.trim() ? "var(--atlas-accent)" : "var(--atlas-border)", color: inputText.trim() ? "#fff" : "var(--atlas-text-3)" }}
+          >
+            <Send size={14} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
