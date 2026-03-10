@@ -588,3 +588,24 @@
 ## V14.3 机器人点击 Bug 修复
 
 - [x] Bug：IMPage 点击机器人列表项时打开了错误的对话窗口（显示同事头像）—— 修复 isBotActive 判断条件，点击其他联系人时清空 activeBotId
+
+## Bug 修复清单（2026-03-10 全面修复）
+
+### P0 - 必须立刻修复
+- [ ] 移除 Telegram 后台轮询进程和所有相关代码
+- [ ] 修复机器人 ngrok 临时地址依赖（改为从数据库动态读取 webhook URL）
+
+### P1 - 尽快修复
+- [ ] 修复 checkStuckTasks 报错（Cannot read properties of undefined (reading 'from')）
+- [ ] 加 rate limiting（/api/atlas/chat 每用户每分钟20次）
+- [ ] 补全管理员接口全局鉴权
+
+### P2 - 影响体验
+- [x] 对话历史加分页（每次加载20条，滚动加载更多）
+- [x] 文件上传加进度条反馈（XMLHttpRequest 进度条 + 百分比显示）
+- [ ] AI 分析选项精准度提升（非标准字段名时的模糊匹配）
+- [x] 错误提示优化（HTTP 401/413/429/500 对应中文提示）
+
+### P3 - 代码质量
+- [ ] 拆分 atlas.ts（>1500行）为 upload.ts / chat.ts / report.ts
+- [ ] 清理 Telegram 相关依赖包

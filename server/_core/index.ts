@@ -3,6 +3,7 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
+import rateLimit from "express-rate-limit";
 import { registerChatRoutes } from "./chat";
 import { registerAtlasRoutes } from "../atlas";
 import { registerHrRoutes } from "../hr";
@@ -35,12 +36,35 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
+// ── Rate Limiters ─────────────────────────────────────────────────────────────────
+// AI chat: 20 requests per minute per IP
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "请求过于频繁，请稍候再试（每分钟最多20次）" },
+  skip: (req) => req.path.includes("/api/openclaw/"), // OpenClaw agent is exempt
+});
+
+// File upload: 10 uploads per minute per IP
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "上传过于频繁，请稍候再试（每分钟最多10次）" },
+});
+
 async function startServer() {
   const app = express();
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  // Apply rate limiters to AI-intensive endpoints
+  app.use("/api/atlas/chat", chatLimiter);
+  app.use("/api/atlas/upload", uploadLimiter);
   // Chat API with streaming and tool calling
   registerChatRoutes(app);
   // ATLAS core API (file upload, AI chat, report generation)

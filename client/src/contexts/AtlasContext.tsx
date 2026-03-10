@@ -44,6 +44,7 @@ export interface UploadedFile {
   dfInfo?: DataFrameInfo;
   status: "uploading" | "ready" | "error";
   uploadedAt: Date;
+  uploadProgress?: number; // 0-100, only meaningful when status === "uploading"
 }
 
 export interface TableSheet {

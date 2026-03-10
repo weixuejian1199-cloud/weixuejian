@@ -64,6 +64,11 @@ export default function MainWorkspace() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  // Pagination: show last N messages, load more on demand
+  const PAGE_SIZE = 20;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  // Reset visible count when task changes
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [activeTaskId]);
 
   const handleStop = useCallback(() => {
     if (abortControllerRef.current) {
@@ -104,10 +109,12 @@ export default function MainWorkspace() {
     }
 
     const tempId = nanoid();
-    addUploadedFile({ id: tempId, name: file.name, size: file.size, status: "uploading", uploadedAt: new Date() });
+    addUploadedFile({ id: tempId, name: file.name, size: file.size, status: "uploading", uploadedAt: new Date(), uploadProgress: 0 });
 
     try {
-      const result = await uploadFile(file);
+      const result = await uploadFile(file, (percent) => {
+        updateUploadedFile(tempId, { uploadProgress: percent });
+      });
 
       updateUploadedFile(tempId, {
         status: "ready",
@@ -471,18 +478,53 @@ export default function MainWorkspace() {
                 className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full group/chip"
                 style={{
                   position: "relative",
-                  background: f.status === "ready" ? "rgba(52,211,153,0.1)" : "rgba(91,140,255,0.1)",
-                  color: f.status === "ready" ? "var(--atlas-success)" : "var(--atlas-accent)",
-                  border: `1px solid ${f.status === "ready" ? "rgba(52,211,153,0.2)" : "rgba(91,140,255,0.2)"}`,
+                  overflow: "hidden",
+                  background: f.status === "error"
+                    ? "rgba(239,68,68,0.1)"
+                    : f.status === "ready"
+                    ? "rgba(52,211,153,0.1)"
+                    : "rgba(91,140,255,0.1)",
+                  color: f.status === "error"
+                    ? "#ef4444"
+                    : f.status === "ready"
+                    ? "var(--atlas-success)"
+                    : "var(--atlas-accent)",
+                  border: `1px solid ${
+                    f.status === "error"
+                      ? "rgba(239,68,68,0.3)"
+                      : f.status === "ready"
+                      ? "rgba(52,211,153,0.2)"
+                      : "rgba(91,140,255,0.2)"
+                  }`,
                 }}
               >
+                {/* Progress bar background for uploading state */}
+                {f.status === "uploading" && typeof f.uploadProgress === "number" && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: `${f.uploadProgress}%`,
+                      background: "rgba(91,140,255,0.15)",
+                      transition: "width 0.3s ease",
+                      pointerEvents: "none",
+                    }}
+                  />
+                )}
                 {f.status === "uploading"
-                  ? <Loader2 size={9} className="animate-spin" />
-                  : <FileSpreadsheet size={9} />
+                  ? <Loader2 size={9} className="animate-spin" style={{ flexShrink: 0 }} />
+                  : f.status === "error"
+                  ? <X size={9} style={{ flexShrink: 0 }} />
+                  : <FileSpreadsheet size={9} style={{ flexShrink: 0 }} />
                 }
-                <span className="max-w-[100px] truncate">{f.name}</span>
+                <span className="max-w-[100px] truncate" style={{ position: "relative" }}>{f.name}</span>
+                {f.status === "uploading" && typeof f.uploadProgress === "number" && (
+                  <span style={{ opacity: 0.85, flexShrink: 0, position: "relative" }}>{f.uploadProgress}%</span>
+                )}
                 {f.status === "ready" && f.dfInfo && (
-                  <span style={{ opacity: 0.7 }}>{f.dfInfo.row_count.toLocaleString()}行</span>
+                  <span style={{ opacity: 0.7, flexShrink: 0 }}>{f.dfInfo.row_count.toLocaleString()}行</span>
                 )}
                 {f.status !== "uploading" && (
                   <button
@@ -535,22 +577,45 @@ export default function MainWorkspace() {
         }>
           {messages.length === 0 ? (
             <EmptyState onUpload={() => fileInputRef.current?.click()} onQuickAsk={(q) => handleSend(q)} />
-          ) : (
-            messages.map((msg, idx) => {
-              const isLastAssistant =
-                msg.role === "assistant" &&
-                idx === messages.length - 1;
-              return (
-                <MessageBubble
-                  key={msg.id}
-                  message={msg}
-                  onDownload={handleDownload}
-                  onQuickAction={isLastAssistant && !msg.isStreaming ? handleQuickAction : undefined}
-                  isLastAssistant={isLastAssistant}
-                />
-              );
-            })
-          )}
+          ) : (() => {
+            const startIdx = Math.max(0, messages.length - visibleCount);
+            const visibleMessages = messages.slice(startIdx);
+            const hasMore = startIdx > 0;
+            return (
+              <>
+                {hasMore && (
+                  <div className="flex justify-center py-2">
+                    <button
+                      onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+                      className="text-xs px-3 py-1.5 rounded-lg transition-all"
+                      style={{
+                        background: "var(--atlas-surface)",
+                        border: "1px solid var(--atlas-border)",
+                        color: "var(--atlas-text-2)",
+                      }}
+                    >
+                      ↑ 加载更早的 {startIdx} 条消息
+                    </button>
+                  </div>
+                )}
+                {visibleMessages.map((msg, relIdx) => {
+                  const idx = startIdx + relIdx;
+                  const isLastAssistant =
+                    msg.role === "assistant" &&
+                    idx === messages.length - 1;
+                  return (
+                    <MessageBubble
+                      key={msg.id}
+                      message={msg}
+                      onDownload={handleDownload}
+                      onQuickAction={isLastAssistant && !msg.isStreaming ? handleQuickAction : undefined}
+                      isLastAssistant={isLastAssistant}
+                    />
+                  );
+                })}
+              </>
+            );
+          })()}
           <div ref={messagesEndRef} />
         </div>
       </div>

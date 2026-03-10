@@ -49,23 +49,62 @@ export interface GenerateReportResponse {
 
 // ── Upload ────────────────────────────────────────────────────────────────────
 
-export async function uploadFile(file: File): Promise<UploadResponse> {
-  const form = new FormData();
-  form.append("file", file);
+export async function uploadFile(
+  file: File,
+  onProgress?: (percent: number) => void
+): Promise<UploadResponse> {
+  return new Promise((resolve, reject) => {
+    const form = new FormData();
+    form.append("file", file);
 
-  const res = await fetch("/api/atlas/upload", {
-    method: "POST",
-    body: form,
-    credentials: "include",
+    const xhr = new XMLHttpRequest();
+    xhr.withCredentials = true;
+
+    // Upload progress
+    if (onProgress) {
+      xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 100);
+          onProgress(percent);
+        }
+      });
+    }
+
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText));
+        } catch {
+          reject(new Error("服务器返回了无效的响应格式"));
+        }
+      } else {
+        let msg = `HTTP ${xhr.status}`;
+        try {
+          const err = JSON.parse(xhr.responseText);
+          msg = err.error || msg;
+        } catch {}
+        // User-friendly error messages
+        if (xhr.status === 413) msg = "文件太大，请上传 50MB 以内的文件";
+        else if (xhr.status === 415) msg = "不支持的文件格式，请上传 Excel 或 CSV 文件";
+        else if (xhr.status === 401) msg = "登录已过期，请重新登录";
+        else if (xhr.status === 429) msg = "请求过于频繁，请稍后再试";
+        else if (xhr.status >= 500) msg = "服务器处理失败，请稍后重试";
+        reject(new Error(msg));
+      }
+    });
+
+    xhr.addEventListener("error", () => {
+      reject(new Error("网络连接失败，请检查网络后重试"));
+    });
+
+    xhr.addEventListener("timeout", () => {
+      reject(new Error("上传超时，请检查网络或尝试上传较小的文件"));
+    });
+
+    xhr.timeout = 120_000; // 2 minutes
+    xhr.open("POST", "/api/atlas/upload");
+    xhr.send(form);
   });
-
-  if (!res.ok) {
-    let msg = `HTTP ${res.status}`;
-    try { const err = await res.json(); msg = err.error || msg; } catch {}
-    throw new Error(msg);
-  }
-
-  return res.json();
 }
 
 // ── Chat (streaming) ──────────────────────────────────────────────────────────
@@ -101,6 +140,11 @@ export async function chatStream(opts: ChatStreamOptions): Promise<void> {
     if (!res.ok) {
       let msg = `HTTP ${res.status}`;
       try { const err = await res.json(); msg = err.error || msg; } catch {}
+      // User-friendly error messages for chat
+      if (res.status === 401) msg = "登录已过期，请点击登录按鈕重新登录";
+      else if (res.status === 429) msg = "请求过于频繁（每分钟最多 20 条），请稍后再试";
+      else if (res.status === 413) msg = "消息内容过长，请精简描述需求";
+      else if (res.status >= 500) msg = "服务器处理异常，请稍后重试或刷新页面";
       throw new Error(msg);
     }
 
@@ -165,6 +209,9 @@ export async function generateReport(
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
     try { const err = await res.json(); msg = err.error || msg; } catch {}
+    if (res.status === 401) msg = "登录已过期，请重新登录";
+    else if (res.status === 429) msg = "请求过于频繁，请稍后再试";
+    else if (res.status >= 500) msg = "报告生成失败，请稍后重试";
     throw new Error(msg);
   }
 

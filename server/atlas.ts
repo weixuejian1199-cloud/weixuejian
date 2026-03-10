@@ -28,7 +28,6 @@ import { getSession, createSession, updateSession, createReport, updateReport, g
 import { authenticateRequest } from "./_core/auth";
 import { isOpenClawEnabled, callOpenClaw, callOpenClawStream, getPresignedUrlsForSessions } from "./openclaw";
 import { pushAtlasMsgToOpenClaw, pushQwenReplyToOpenClaw } from "./im/wsServer";
-import { notifyTelegramNewTask } from "./openclawPolling";
 import { openclawTasks, chatConversations, chatMessages, personalTemplates } from "../drizzle/schema";
 
 // Optional auth middleware: injects req.userId if session cookie is valid
@@ -985,65 +984,9 @@ ${dataTable}
 - 如果是分析类回复，可推荐「找出前10名」「对比上月数据」等
 - <suggestions> 标签内只放 JSON 数组，不要有其他文字
 - 这个块不会显示给用户，前端会自动解析成按钮
-- **正文质量优先，不要为了生成追问而拖长正文**`;
-
+-- **正文质量优先，不要为了生成追问而拖长正文**`;
       const totalRows = data.length;
-
-      // ── Telegram async task routing ────────────────────────────────────────
-      // If Telegram is configured, ALL tasks are pushed to Telegram for human/AI processing.
-      // No dependency on OpenClaw API Key.
-      if (false /* DISABLED: tasks now go directly to AI */ && ENV.telegramBotToken && ENV.telegramChatId) {
-        console.log("[Atlas] Routing to Telegram async task");
-        try {
-          // Get presigned S3 URLs for all session files
-          const sessionDataKeys = allSessionIds.map(id => `atlas-data/${id}-data.json`);
-          const fileUrls = await getPresignedUrlsForSessions(sessionDataKeys);
-          const fileNames = validSessions.map(s => s!.originalName);
-
-          const userId = (req as any).userId ?? 0;
-          const numericUserId = typeof userId === 'number' ? userId : 0;
-          const taskId = nanoid();
-
-          // 1. Insert task record into DB (status = pending)
-          const db = await getDb();
-          if (db) {
-            await db!.insert(openclawTasks).values({
-              id: taskId,
-              userId: numericUserId,
-              externalUserId: String(userId),
-              message,
-              fileUrls: fileUrls as any,
-              fileNames: fileNames as any,
-              status: "pending",
-            });
-            console.log(`[Atlas] Created Telegram task ${taskId}`);
-          }
-
-          // 2. Push task to Telegram (fire-and-forget)
-          notifyTelegramNewTask({
-            id: taskId,
-            message,
-            fileUrls,
-            fileNames,
-            userId: numericUserId,
-            externalUserId: String(userId),
-          }).catch(e => console.warn("[Atlas] Telegram notify failed:", e));
-
-          // 3. Return JSON response with task_id so frontend can poll
-          res.setHeader("Content-Type", "application/json");
-          res.json({
-            type: "telegram_task",
-            task_id: taskId,
-            message: `✅ 任务已提交，正在处理中...\n\n📋 任务 ID：${taskId}\n📁 文件：${fileNames.join("、") || "无附件"}\n💬 需求：${message.slice(0, 100)}${message.length > 100 ? "..." : ""}\n\n⏳ 处理完成后结果将自动显示，通常需要 1-5 分钟，请稍候。`,
-          });
-          return;
-        } catch (telegramErr: any) {
-          console.error("[Atlas] Telegram task creation failed, falling back to Qwen:", telegramErr.message);
-          // Fall through to Qwen on error
-        }
-      }
-
-      // ── OpenClaw SSE streaming (if configured) ──────────────────────────
+      // ── OpenClaw SSE streamingg (if configured) ──────────────────────────
       if (isOpenClawEnabled()) {
         console.log("[Atlas] Routing to OpenClaw SSE channel");
         try {
