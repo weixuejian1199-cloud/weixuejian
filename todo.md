@@ -771,8 +771,3 @@
 ### 任务 4：WPS 兼容性迁移（P2，工资条模块先行）
 - [x] 安装 exceljs，迁移 generatePayslipExcel 使用 exceljs 生成工资条
 - [x] 验证 WPS 打开格式正常（列宽、字体、边框）
-
-## 严重 Bug 修复（2026-03-11 测试反馈）
-
-- [x] 🔴 大文件上传失败：storagePut 改为后台异步上传（不阻塞主流程）+ AbortController 90s 超时 + 大数据集截断至 50k 行
-- [x] 🔴 三文件并发全部失败：handleFiles 改为 for...of 串行队列（await processFile 逐个处理，避免并发 S3/AI 过载）

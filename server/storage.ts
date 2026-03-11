@@ -67,45 +67,20 @@ function buildAuthHeaders(apiKey: string): HeadersInit {
   return { Authorization: `Bearer ${apiKey}` };
 }
 
-/**
- * Upload data to S3 via Manus storage proxy.
- * Includes AbortController timeout (default 90s) to prevent hanging on large files.
- */
 export async function storagePut(
   relKey: string,
   data: Buffer | Uint8Array | string,
-  contentType = "application/octet-stream",
-  timeoutMs = 90_000
+  contentType = "application/octet-stream"
 ): Promise<{ key: string; url: string }> {
   const { baseUrl, apiKey } = getStorageConfig();
   const key = normalizeKey(relKey);
   const uploadUrl = buildUploadUrl(baseUrl, key);
   const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
-
-  // AbortController to enforce upload timeout
-  const controller = new AbortController();
-  const timer = setTimeout(() => {
-    controller.abort();
-  }, timeoutMs);
-
-  let response: Response;
-  try {
-    response = await fetch(uploadUrl, {
-      method: "POST",
-      headers: buildAuthHeaders(apiKey),
-      body: formData,
-      signal: controller.signal,
-    });
-  } catch (err: any) {
-    clearTimeout(timer);
-    if (err?.name === "AbortError") {
-      throw new Error(
-        `Storage upload timed out after ${timeoutMs / 1000}s for key: ${key}`
-      );
-    }
-    throw err;
-  }
-  clearTimeout(timer);
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: buildAuthHeaders(apiKey),
+    body: formData,
+  });
 
   if (!response.ok) {
     const message = await response.text().catch(() => response.statusText);
