@@ -174,10 +174,15 @@ export default function MainWorkspace() {
       // 分析阶段：30% → 50% → 70% → 85% → 92%
       currentProgress = 30;
       updateLastMessage("", { isAnalyzing: true, analyzeProgress: 30 });
+      // FIX: Guard flag to prevent progress timers from overwriting the final result.
+      // Root cause: analysisSteps at 2800ms and 4200ms fire AFTER showResult (1500ms),
+      // calling updateLastMessage("", ...) which clears content and drops outlierDetails.
+      let resultShown = false;
       const analysisSteps = [50, 70, 85, 92];
       const analysisDelays = [600, 1500, 2800, 4200];
       analysisSteps.forEach((pct, i) => {
         const t = setTimeout(() => {
+          if (resultShown) return; // Guard: don't overwrite final result
           currentProgress = pct;
           updateLastMessage("", { isAnalyzing: true, analyzeProgress: pct });
         }, analysisDelays[i]);
@@ -219,6 +224,7 @@ export default function MainWorkspace() {
 
       // 分析结果出来后，清除所有定时器，替换为真实内容
       const showResult = () => {
+        resultShown = true; // Set flag before clearing timers to prevent race condition
         progressTimers.forEach(t => { clearTimeout(t); clearInterval(t as any); });
         const analysisText = result.ai_analysis ||
           `这是一份数据文件，共 ${result.df_info.row_count} 行、${result.df_info.col_count} 列。`;
