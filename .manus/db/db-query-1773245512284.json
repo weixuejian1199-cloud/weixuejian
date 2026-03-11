@@ -1,0 +1,90 @@
+{
+  "query": "SELECT id, filename, createdAt, updatedAt, \n  JSON_EXTRACT(dfInfo, '$.groupByField') as groupByField,\n  JSON_EXTRACT(dfInfo, '$.row_count') as row_count\nFROM sessions \nORDER BY createdAt DESC \nLIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute SELECT id, filename, createdAt, updatedAt, \n  JSON_EXTRACT(dfInfo, '$.groupByField') as groupByField,\n  JSON_EXTRACT(dfInfo, '$.row_count') as row_count\nFROM sessions \nORDER BY createdAt DESC \nLIMIT 10;",
+  "rows": [
+    {
+      "id": "Xc2wHDNypDCmTHZMc5dx6",
+      "filename": "爱比爱尼-2026.1-抖店 - 副本.xlsx",
+      "createdAt": "2026-03-11 16:05:23",
+      "updatedAt": "2026-03-11 16:05:25",
+      "groupByField": "NULL",
+      "row_count": "1356"
+    },
+    {
+      "id": "P0SBwKA97U5x3I66EPb2a",
+      "filename": "时皙-2026.1-抖店 - 副本.xlsx",
+      "createdAt": "2026-03-11 16:01:43",
+      "updatedAt": "2026-03-11 16:01:45",
+      "groupByField": "NULL",
+      "row_count": "1383"
+    },
+    {
+      "id": "HeQolZO-MgO6zy-n6W9bH",
+      "filename": "爱比爱尼-2026.1-抖店 - 副本.xlsx",
+      "createdAt": "2026-03-11 16:01:34",
+      "updatedAt": "2026-03-11 16:01:36",
+      "groupByField": "NULL",
+      "row_count": "1356"
+    },
+    {
+      "id": "tQcoiBY8tohnzX6bB2X0v",
+      "filename": "时皙-2026.1-抖店 - 副本.xlsx",
+      "createdAt": "2026-03-11 15:59:44",
+      "updatedAt": "2026-03-11 15:59:46",
+      "groupByField": "NULL",
+      "row_count": "1383"
+    },
+    {
+      "id": "MzQxuOIwpjWMGVhnjxFfP",
+      "filename": "爱比爱尼-2026.1-抖店 - 副本.xlsx",
+      "createdAt": "2026-03-11 15:59:40",
+      "updatedAt": "2026-03-11 15:59:45",
+      "groupByField": "NULL",
+      "row_count": "1356"
+    },
+    {
+      "id": "_A4x0PlkfwVvp8JW0_8Hv",
+      "filename": "时皙-2026.1-抖店 - 副本.xlsx",
+      "createdAt": "2026-03-11 15:58:27",
+      "updatedAt": "2026-03-11 15:58:29",
+      "groupByField": "NULL",
+      "row_count": "1383"
+    },
+    {
+      "id": "I7YpBFXIZgrUO5ebT_Jgo",
+      "filename": "爱比爱尼-2026.1-抖店 - 副本.xlsx",
+      "createdAt": "2026-03-11 15:58:17",
+      "updatedAt": "2026-03-11 15:58:19",
+      "groupByField": "NULL",
+      "row_count": "1356"
+    },
+    {
+      "id": "Ow_tbTR2sHy1_wV_dxsaR",
+      "filename": "爱比爱尼-2026.1-抖店 - 副本.xlsx",
+      "createdAt": "2026-03-11 15:57:52",
+      "updatedAt": "2026-03-11 15:57:54",
+      "groupByField": "NULL",
+      "row_count": "1356"
+    },
+    {
+      "id": "UgykwpWxYXIXHbRiayopM",
+      "filename": "时皙-2026.1-抖店 - 副本.xlsx",
+      "createdAt": "2026-03-11 15:57:41",
+      "updatedAt": "2026-03-11 15:57:44",
+      "groupByField": "NULL",
+      "row_count": "1383"
+    },
+    {
+      "id": "e9IkBZ_kt3u1LLr7xLQ73",
+      "filename": "爱比爱尼-2026.1-抖店 - 副本.xlsx",
+      "createdAt": "2026-03-11 15:57:41",
+      "updatedAt": "2026-03-11 15:57:42",
+      "groupByField": "NULL",
+      "row_count": "1356"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tfilename\tcreatedAt\tupdatedAt\tgroupByField\trow_count\nXc2wHDNypDCmTHZMc5dx6\t爱比爱尼-2026.1-抖店 - 副本.xlsx\t2026-03-11 16:05:23\t2026-03-11 16:05:25\tNULL\t1356\nP0SBwKA97U5x3I66EPb2a\t时皙-2026.1-抖店 - 副本.xlsx\t2026-03-11 16:01:43\t2026-03-11 16:01:45\tNULL\t1383\nHeQolZO-MgO6zy-n6W9bH\t爱比爱尼-2026.1-抖店 - 副本.xlsx\t2026-03-11 16:01:34\t2026-03-11 16:01:36\tNULL\t1356\ntQcoiBY8tohnzX6bB2X0v\t时皙-2026.1-抖店 - 副本.xlsx\t2026-03-11 15:59:44\t2026-03-11 15:59:46\tNULL\t1383\nMzQxuOIwpjWMGVhnjxFfP\t爱比爱尼-2026.1-抖店 - 副本.xlsx\t2026-03-11 15:59:40\t2026-03-11 15:59:45\tNULL\t1356\n_A4x0PlkfwVvp8JW0_8Hv\t时皙-2026.1-抖店 - 副本.xlsx\t2026-03-11 15:58:27\t2026-03-11 15:58:29\tNULL\t1383\nI7YpBFXIZgrUO5ebT_Jgo\t爱比爱尼-2026.1-抖店 - 副本.xlsx\t2026-03-11 15:58:17\t2026-03-11 15:58:19\tNULL\t1356\nOw_tbTR2sHy1_wV_dxsaR\t爱比爱尼-2026.1-抖店 - 副本.xlsx\t2026-03-11 15:57:52\t2026-03-11 15:57:54\tNULL\t1356\nUgykwpWxYXIXHbRiayopM\t时皙-2026.1-抖店 - 副本.xlsx\t2026-03-11 15:57:41\t2026-03-11 15:57:44\tNULL\t1383\ne9IkBZ_kt3u1LLr7xLQ73\t爱比爱尼-2026.1-抖店 - 副本.xlsx\t2026-03-11 15:57:41\t2026-03-11 15:57:42\tNULL\t1356\n",
+  "stderr": "",
+  "execution_time_ms": 78
+}

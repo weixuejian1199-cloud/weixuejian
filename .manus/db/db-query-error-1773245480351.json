@@ -1,0 +1,8 @@
+{
+  "query": "SELECT id, filename, created_at, updated_at, \n  JSON_EXTRACT(df_info, '$.groupByField') as groupByField,\n  JSON_EXTRACT(df_info, '$.row_count') as row_count\nFROM atlas_sessions \nORDER BY created_at DESC \nLIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute SELECT id, filename, created_at, updated_at, \n  JSON_EXTRACT(df_info, '$.groupByField') as groupByField,\n  JSON_EXTRACT(df_info, '$.row_count') as row_count\nFROM atlas_sessions \nORDER BY created_at DESC \nLIMIT 10;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1146 (42S02) at line 1: Table 'cryfqh5qgudysywqurqonj.atlas_sessions' doesn't exist"
+  ]
+}

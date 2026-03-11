@@ -1,0 +1,50 @@
+{
+  "query": "SELECT id, originalName, createdAt,\n  JSON_EXTRACT(dfInfo, '$.groupByField') as groupByField,\n  JSON_EXTRACT(dfInfo, '$.row_count') as row_count,\n  JSON_LENGTH(JSON_EXTRACT(dfInfo, '$.fields')) as field_count\nFROM sessions \nORDER BY createdAt DESC \nLIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute SELECT id, originalName, createdAt,\n  JSON_EXTRACT(dfInfo, '$.groupByField') as groupByField,\n  JSON_EXTRACT(dfInfo, '$.row_count') as row_count,\n  JSON_LENGTH(JSON_EXTRACT(dfInfo, '$.fields')) as field_count\nFROM sessions \nORDER BY createdAt DESC \nLIMIT 5;",
+  "rows": [
+    {
+      "id": "BTyGYNr5oa4l6E3YoVAFf",
+      "originalName": "test_influencer.xlsx",
+      "createdAt": "2026-03-11 16:21:58",
+      "groupByField": "\"达人昵称\"",
+      "row_count": "1000",
+      "field_count": "2"
+    },
+    {
+      "id": "bmIkJYMaaXVyiYrk1su67",
+      "originalName": "test_influencer.xlsx",
+      "createdAt": "2026-03-11 16:21:29",
+      "groupByField": "\"达人昵称\"",
+      "row_count": "1000",
+      "field_count": "3"
+    },
+    {
+      "id": "Xc2wHDNypDCmTHZMc5dx6",
+      "originalName": "爱比爱尼-2026.1-抖店 - 副本.xlsx",
+      "createdAt": "2026-03-11 16:05:23",
+      "groupByField": "NULL",
+      "row_count": "1356",
+      "field_count": "78"
+    },
+    {
+      "id": "P0SBwKA97U5x3I66EPb2a",
+      "originalName": "时皙-2026.1-抖店 - 副本.xlsx",
+      "createdAt": "2026-03-11 16:01:43",
+      "groupByField": "NULL",
+      "row_count": "1383",
+      "field_count": "74"
+    },
+    {
+      "id": "HeQolZO-MgO6zy-n6W9bH",
+      "originalName": "爱比爱尼-2026.1-抖店 - 副本.xlsx",
+      "createdAt": "2026-03-11 16:01:34",
+      "groupByField": "NULL",
+      "row_count": "1356",
+      "field_count": "78"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\toriginalName\tcreatedAt\tgroupByField\trow_count\tfield_count\nBTyGYNr5oa4l6E3YoVAFf\ttest_influencer.xlsx\t2026-03-11 16:21:58\t\"达人昵称\"\t1000\t2\nbmIkJYMaaXVyiYrk1su67\ttest_influencer.xlsx\t2026-03-11 16:21:29\t\"达人昵称\"\t1000\t3\nXc2wHDNypDCmTHZMc5dx6\t爱比爱尼-2026.1-抖店 - 副本.xlsx\t2026-03-11 16:05:23\tNULL\t1356\t78\nP0SBwKA97U5x3I66EPb2a\t时皙-2026.1-抖店 - 副本.xlsx\t2026-03-11 16:01:43\tNULL\t1383\t74\nHeQolZO-MgO6zy-n6W9bH\t爱比爱尼-2026.1-抖店 - 副本.xlsx\t2026-03-11 16:01:34\tNULL\t1356\t78\n",
+  "stderr": "",
+  "execution_time_ms": 80
+}

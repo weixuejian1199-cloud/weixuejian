@@ -546,6 +546,68 @@ function detectScenario(fields: FieldInfo[]): ScenarioResult {
   };
 }
 
+// ── Server-side dimension field detection (mirrors parseFile.ts V14.2 logic) ──────────────────
+// Used by /upload-parsed to re-detect groupByField when frontend sends null/undefined
+// (e.g., when browser is running cached old version of parseFile.ts)
+const SERVER_AMOUNT_FIELD_PATTERNS = [
+  "金额", "优惠", "费用", "佣金", "补贴", "承担", "支付", "单价",
+  "price", "amount", "money", "fee", "cost",
+];
+const SERVER_DIMENSION_TIERS: Array<{ tier: number; keywords: string[] }> = [
+  { tier: 1, keywords: ["达人昵称", "主播昵称", "达人名称", "主播名称", "达人ID", "主播ID", "达人", "主播"] },
+  { tier: 2, keywords: ["昵称"] },
+  { tier: 3, keywords: ["姓名", "员工姓名", "用户名", "名字"] },
+  { tier: 4, keywords: ["店铺名称", "店铺", "商家名称", "商家"] },
+  { tier: 5, keywords: ["商品名称", "商品", "SKU", "品牌"] },
+];
+function serverIsAmountField(fieldName: string): boolean {
+  const lower = fieldName.toLowerCase();
+  return SERVER_AMOUNT_FIELD_PATTERNS.some((p) => fieldName.includes(p) || lower.includes(p.toLowerCase()));
+}
+function serverDetectGroupByField(
+  fields: Array<{ name: string; type: string }>
+): string | null {
+  const result: Array<{ field: string; tier: number }> = [];
+  const seen = new Set<string>();
+  for (const { tier, keywords } of SERVER_DIMENSION_TIERS) {
+    for (const kw of keywords) {
+      const exactMatches = fields.filter((f) => !seen.has(f.name) && f.name === kw);
+      const containsMatches = fields.filter((f) => !seen.has(f.name) && f.name !== kw && f.name.includes(kw));
+      for (const f of [...exactMatches, ...containsMatches]) {
+        if (seen.has(f.name)) continue;
+        // Must be text type
+        if (f.type === "numeric") continue;
+        // Must not be an amount/fee field
+        if (serverIsAmountField(f.name)) continue;
+        result.push({ field: f.name, tier });
+        seen.add(f.name);
+      }
+    }
+  }
+  return result.length > 0 ? result[0].field : null;
+}
+function serverComputeGroupedTopN(
+  rows: Record<string, unknown>[],
+  numericField: string,
+  groupField: string,
+  sourceFilename: string,
+  topN = 20
+): Array<{ label: string; sum: number; source?: string }> {
+  const groupSums = new Map<string, number>();
+  for (const row of rows) {
+    const groupVal = row[groupField];
+    const numVal = Number(row[numericField]);
+    if (groupVal === null || groupVal === undefined || groupVal === "") continue;
+    if (isNaN(numVal)) continue;
+    const key = String(groupVal);
+    groupSums.set(key, (groupSums.get(key) ?? 0) + numVal);
+  }
+  return Array.from(groupSums.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, topN)
+    .map(([label, sum]) => ({ label, sum, source: sourceFilename }));
+}
+
 // ── Key metrics computation (pure code, no AI, 100% stable) ──────────────────
 
 interface KeyMetric {
@@ -2734,10 +2796,27 @@ ${sampleRows}
           ...(f.groupedTop5 !== undefined ? { groupedTop5: f.groupedTop5 } : {}),
           ...(f.groupByField !== undefined ? { groupByField: f.groupByField } : {}),
         })),
-        preview: (parsed.preview || []).slice(0, 5),
+        preview: (parsed.preview || []).slice(0, 500),
         ...(parsed.groupByField !== undefined ? { groupByField: parsed.groupByField } : {}),
         ...(parsed.allGroupByFields !== undefined ? { allGroupByFields: parsed.allGroupByFields } : {}),
       };
+      // Server-side fallback: if frontend didn't send groupByField (old cached code),
+      // re-detect it server-side using the same V14.2 rules
+      if (!dfInfo.groupByField) {
+        const serverGroupByField = serverDetectGroupByField(dfInfo.fields);
+        if (serverGroupByField) {
+          console.log(`[Atlas] upload-parsed: frontend groupByField=null, server detected: ${serverGroupByField}`);
+          dfInfo.groupByField = serverGroupByField;
+          // Also compute groupedTop5 for all numeric fields using the server-detected groupByField
+          const previewRows = parsed.preview || [];
+          for (const field of dfInfo.fields) {
+            if (field.type === "numeric" && !field.groupedTop5) {
+              field.groupedTop5 = serverComputeGroupedTopN(previewRows, field.name, serverGroupByField, originalname);
+              field.groupByField = serverGroupByField;
+            }
+          }
+        }
+      }
 
       await createSession({
         id: sessionId,

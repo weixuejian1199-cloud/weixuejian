@@ -297,7 +297,6 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
   const allGroupByFields = detectAllGroupByFields(headers, headerTypes);
   // Primary groupBy field = highest priority tier (null if no qualifying text field found)
   const groupByField = allGroupByFields.length > 0 ? allGroupByFields[0].field : null;
-
   const fields: ParsedField[] = headers.map((h) => {
     const sampleVals = sampleForType.map((r) => r[h]);
     const type = headerTypes[h];
@@ -344,3 +343,4 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     allGroupByFields: allGroupByFields.length > 0 ? allGroupByFields : undefined,
   };
 }
+
