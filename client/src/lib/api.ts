@@ -34,6 +34,12 @@ export interface UploadResponse {
   ai_analysis: string;
   suggested_actions?: SuggestedAction[];
   quality_issues?: string[];  // P0-B: data quality hints
+  outlier_details?: Array<{  // P0-B UI: structured outlier details for clickable warning
+    fieldName: string;
+    median: number;
+    threshold: number;
+    outlierRows: Array<{ rowIndex: number; value: number }>;
+  }>;
 }
 
 export interface GenerateReportResponse {

@@ -232,6 +232,7 @@ export default function MainWorkspace() {
           isStreaming: false,
           suggestedActions: finalSuggestions,
           qualityIssues: result.quality_issues?.length ? result.quality_issues : undefined,
+          outlierDetails: result.outlier_details?.length ? result.outlier_details : undefined,
         });
       };
       // 最短展示 1.5s 动画后显示结果
@@ -1529,6 +1530,8 @@ function MessageBubble({
   const [copied, setCopied] = useState(false);
   const [showTable, setShowTable] = useState(true);
   const [showThinking, setShowThinking] = useState(false);
+  // P0-B UI: track which outlier field's detail panel is expanded (null = collapsed)
+  const [expandedOutlierField, setExpandedOutlierField] = useState<string | null>(null);
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
     setCopied(true);
@@ -1634,30 +1637,103 @@ function MessageBubble({
             {message.qualityIssues.map((issue, idx) => {
               const isWarning = issue.startsWith('⚠️');
               const isSuccess = issue.startsWith('✅');
+              // P0-B UI: detect outlier warning and find matching detail
+              const isOutlierWarning = isWarning && issue.includes('异常高值预警');
+              const outlierDetails = (message as any).outlierDetails as Array<{
+                fieldName: string; median: number; threshold: number;
+                outlierRows: Array<{ rowIndex: number; value: number }>;
+              }> | undefined;
               return (
-                <div
-                  key={idx}
-                  className="flex items-start gap-2 px-3 py-2 rounded-xl"
+                <div key={idx} className="flex flex-col rounded-xl overflow-hidden"
                   style={{
-                    fontSize: '12.5px',
-                    lineHeight: '1.6',
-                    background: isWarning
-                      ? 'rgba(245,158,11,0.08)'
-                      : isSuccess
-                      ? 'rgba(34,197,94,0.08)'
-                      : 'rgba(99,102,241,0.08)',
+                    background: isWarning ? 'rgba(245,158,11,0.08)' : isSuccess ? 'rgba(34,197,94,0.08)' : 'rgba(99,102,241,0.08)',
                     border: `1px solid ${isWarning ? 'rgba(245,158,11,0.25)' : isSuccess ? 'rgba(34,197,94,0.25)' : 'rgba(99,102,241,0.25)'}`,
-                    color: isWarning
-                      ? 'rgb(180,120,20)'
-                      : isSuccess
-                      ? 'rgb(22,163,74)'
-                      : 'var(--atlas-text-2)',
                   }}
                 >
-                  <span style={{ flexShrink: 0, marginTop: '1px' }}>
-                    {isWarning ? '⚠️' : isSuccess ? '✅' : 'ℹ️'}
-                  </span>
-                  <span>{issue.replace(/^[⚠️✅ℹ️]+\s*/, '')}</span>
+                  {/* Main row */}
+                  <div className="flex items-start gap-2 px-3 py-2"
+                    style={{ fontSize: '12.5px', lineHeight: '1.6', color: isWarning ? 'rgb(180,120,20)' : isSuccess ? 'rgb(22,163,74)' : 'var(--atlas-text-2)' }}
+                  >
+                    <span style={{ flexShrink: 0, marginTop: '1px' }}>
+                      {isWarning ? '⚠️' : isSuccess ? '✅' : 'ℹ️'}
+                    </span>
+                    <span className="flex-1">{issue.replace(/^[⚠️✅ℹ️]+\s*/, '')}</span>
+                    {/* P0-B UI: clickable expand button for outlier warnings with details */}
+                    {isOutlierWarning && outlierDetails && outlierDetails.length > 0 && (
+                      <button
+                        onClick={() => setExpandedOutlierField(prev => prev === `issue-${idx}` ? null : `issue-${idx}`)}
+                        className="flex items-center gap-1 ml-1 px-2 py-0.5 rounded-lg text-xs font-medium transition-all"
+                        style={{
+                          background: 'rgba(245,158,11,0.15)',
+                          color: 'rgb(180,120,20)',
+                          border: '1px solid rgba(245,158,11,0.3)',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span>查看详情</span>
+                        <ChevronDown
+                          size={12}
+                          style={{ transform: expandedOutlierField === `issue-${idx}` ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+                        />
+                      </button>
+                    )}
+                  </div>
+                  {/* P0-B UI: expandable outlier detail panel */}
+                  {isOutlierWarning && expandedOutlierField === `issue-${idx}` && outlierDetails && outlierDetails.length > 0 && (
+                    <div className="px-3 pb-3 flex flex-col gap-2"
+                      style={{ borderTop: '1px solid rgba(245,158,11,0.15)' }}
+                    >
+                      {outlierDetails.map((detail) => {
+                        const fmtV = (n: number) => n >= 10000 ? `${(n / 10000).toFixed(1)}万` : n.toLocaleString();
+                        return (
+                          <div key={detail.fieldName} className="mt-2">
+                            <div className="flex items-center gap-2 mb-1.5"
+                              style={{ fontSize: '12px', color: 'rgb(180,120,20)', fontWeight: 600 }}
+                            >
+                              <span>📊 {detail.fieldName}</span>
+                              <span style={{ fontWeight: 400, color: 'rgb(160,100,10)' }}>
+                                中位数 {fmtV(detail.median)} · 阈值 {fmtV(detail.threshold)}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {detail.outlierRows.map((row) => (
+                                <span key={row.rowIndex}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg"
+                                  style={{
+                                    fontSize: '11.5px',
+                                    background: 'rgba(245,158,11,0.12)',
+                                    border: '1px solid rgba(245,158,11,0.25)',
+                                    color: 'rgb(160,80,0)',
+                                  }}
+                                >
+                                  <span style={{ color: 'rgb(140,100,20)' }}>R{row.rowIndex}</span>
+                                  <span style={{ fontWeight: 600 }}>{fmtV(row.value)}</span>
+                                </span>
+                              ))}
+                            </div>
+                            {detail.outlierRows.length >= 20 && (
+                              <p style={{ fontSize: '11px', color: 'rgb(160,120,40)', marginTop: '4px' }}>
+                                仅显示前 20 条异常记录
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                      <button
+                        onClick={() => onQuickAction?.(`展示 ${outlierDetails.map(d => d.fieldName).join('、')} 字段中的异常高值记录，帮我核查这些数据是否准确`)}
+                        className="mt-1 self-start px-3 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+                        style={{
+                          background: 'rgba(245,158,11,0.18)',
+                          color: 'rgb(160,80,0)',
+                          border: '1px solid rgba(245,158,11,0.35)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        🔍 让 AI 帮我核查这些异常数据
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}

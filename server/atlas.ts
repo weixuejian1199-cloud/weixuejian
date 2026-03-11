@@ -877,20 +877,39 @@ export function registerAtlasRoutes(app: Express) {
         const mappingDesc = mappingEntries.map(([o, c]) => `「${o}」→「${c}」`).join('、');
         qualityIssues.push(`字段识别提示：已自动将 ${mappingDesc} 对齐为标准字段名，计算结果不受影响`);
       }
-      // P0-B: Outlier detection (values > avg * 5 in numeric fields)
+      // P0-B: Outlier detection (values > median * 5 in numeric fields)
+      // BUG FIX: Use median instead of mean as baseline — mean is skewed by outliers
+      // themselves, which raises the threshold and makes extreme values undetectable.
+      // e.g. [8000,7500,8200,7800,99999999] → mean=20M, mean*5=100M > 99999999 → missed!
+      // With median=8000, median*5=40000 < 99999999 → correctly detected.
       const numericFieldsForOutlier = dfInfo.fields.filter(f => f.type === "numeric");
       const outlierWarnings: string[] = [];
+      // P0-B UI: structured outlier details for clickable frontend detail view
+      const outlierDetails: Array<{
+        fieldName: string;
+        median: number;
+        threshold: number;
+        outlierRows: Array<{ rowIndex: number; value: number }>;
+      }> = [];
       for (const field of numericFieldsForOutlier.slice(0, 6)) {
-        const vals = workingData
-          .map(row => Number(row[field.name]))
-          .filter(v => !isNaN(v) && v > 0);
-        if (vals.length < 3) continue;
-        const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
-        const outlierVals = vals.filter(v => v > avg * 5);
-        if (outlierVals.length > 0 && avg > 0) {
-          const maxVal = Math.max(...outlierVals);
+        const valsWithIndex = workingData
+          .map((row, i) => ({ val: Number(row[field.name]), rowIndex: i + 2 })) // +2: header row + 1-based
+          .filter(x => !isNaN(x.val) && x.val > 0);
+        if (valsWithIndex.length < 3) continue;
+        const sortedVals = [...valsWithIndex.map(x => x.val)].sort((a, b) => a - b);
+        const median = sortedVals[Math.floor(sortedVals.length / 2)];
+        const threshold = median * 5;
+        const outlierItems = valsWithIndex.filter(x => x.val > threshold);
+        if (outlierItems.length > 0 && median > 0) {
+          const maxVal = Math.max(...outlierItems.map(x => x.val));
           const fmtV = (n: number) => n >= 10000 ? `${(n/10000).toFixed(1)}万` : n.toFixed(0);
-          outlierWarnings.push(`${field.name}(最高值${fmtV(maxVal)}，约为均值${fmtV(avg)}的${Math.round(maxVal/avg)}倍)`);
+          outlierWarnings.push(`${field.name}(最高值${fmtV(maxVal)}，约为中位数${fmtV(median)}的${Math.round(maxVal/median)}倍)`);
+          outlierDetails.push({
+            fieldName: field.name,
+            median,
+            threshold,
+            outlierRows: outlierItems.slice(0, 20).map(x => ({ rowIndex: x.rowIndex, value: x.val })),
+          });
         }
       }
       if (outlierWarnings.length > 0) {
@@ -1062,6 +1081,7 @@ export function registerAtlasRoutes(app: Express) {
         ai_analysis: aiAnalysis,
         suggested_actions: suggestedActions,
         quality_issues: qualityIssues, // P0-B: expose for frontend UI hint block
+        outlier_details: outlierDetails.length > 0 ? outlierDetails : undefined, // P0-B UI: structured details for clickable warning
       });
     } catch (err: any) {
       console.error("[Atlas] Upload error:", err);
