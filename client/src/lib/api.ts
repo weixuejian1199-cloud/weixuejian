@@ -180,7 +180,7 @@ export async function chunkedUpload(
     const chunk = file.slice(start, end);
 
     const form = new FormData();
-    form.append("file", chunk, file.name);
+    form.append("chunk", chunk, file.name);
     form.append("uploadId", uploadId);
     form.append("chunkIndex", String(i));
     form.append("totalChunks", String(totalChunks));
