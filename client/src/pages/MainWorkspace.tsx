@@ -18,7 +18,7 @@ import {
 import { Streamdown } from "streamdown";
 import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTableRenderer";
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
-import { uploadFile, pollUploadStatus, chatStream, generateReport, getDownloadUrl, type SuggestedAction } from "@/lib/api";
+import { smartUpload, pollUploadStatus, chatStream, generateReport, getDownloadUrl, type SuggestedAction } from "@/lib/api";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
@@ -164,7 +164,7 @@ export default function MainWorkspace() {
 
     try {
       // Phase 1: upload file (0% → 30%)
-      const uploadResult = await uploadFile(file, (percent) => {
+      const uploadResult = await smartUpload(file, (percent) => {
         updateUploadedFile(tempId, { uploadProgress: percent });
         // 上传进度映射到 5%-30% 区间
         const mappedProgress = Math.round(5 + (percent / 100) * 25);

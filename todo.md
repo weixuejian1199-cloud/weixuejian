@@ -774,7 +774,13 @@
 
 ## 异步处理模式（解决大文件超时）
 
-- [ ] 🔴 server/atlas.ts：upload 接收文件后立即返回 session_id（status=uploading），后台 setImmediate 异步执行解析+S3+AI
-- [ ] 🔴 server/atlas.ts：新增 GET /api/atlas/status/:sessionId 接口，返回处理状态和完整结果
-- [ ] 🔴 client/src/lib/api.ts：新增 pollUploadStatus 轮询函数（每2秒，超时5分钟）
-- [ ] 🔴 client/src/pages/MainWorkspace.tsx：processFile 改为上传后轮询，进度条显示"处理中"
+- [x] 🔴 server/atlas.ts：upload 接收文件后立即返回 session_id（status=uploading），后台 setImmediate 异步执行解析+S3+AI
+- [x] 🔴 server/atlas.ts：新增 GET /api/atlas/status/:sessionId 接口，返回处理状态和完整结果
+- [x] 🔴 client/src/lib/api.ts：新增 pollUploadStatus 轮询函数（每2秒，超时5分钟）
+- [x] 🔴 client/src/pages/MainWorkspace.tsx：processFile 改为上传后轮询，进度条显示"处理中"
+
+## 分块上传（解决 Cloudflare 30s 传输超时）
+
+- [x] 后端新增 POST /api/atlas/upload-chunk：接收 1MB 分块，收齐后触发后台处理
+- [x] 前端 api.ts：新增 chunkedUpload（文件>5MB 切块上传）和 smartUpload（自动选择策略）
+- [x] 前端 MainWorkspace.tsx：改用 smartUpload，大文件自动分块，小文件走原流程

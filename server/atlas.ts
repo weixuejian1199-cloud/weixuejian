@@ -821,71 +821,73 @@ export function registerAtlasRoutes(app: Express) {
       const safeFilename = originalname.replace(/[/\\<>:"'|?*\x00-\x1f]/g, "_").slice(0, 200);
       const sessionId = nanoid();
       const fileKey = `atlas-uploads/${sessionId}-${Date.now()}.${ext}`;
+      const userId = (req as any).userId || 0;
+      const fileSizeKb = Math.ceil(buffer.length / 1024);
 
-      // 1. Upload original file to S3
-      const { url: fileUrl } = await storagePut(fileKey, buffer, mimetype);
-
-      // 2. Parse data
-      let data: Record<string, unknown>[];
-      let sheetNames: string[] | undefined;
-      if (ext === "csv") {
-        data = parseCsvBuffer(buffer);
-      } else {
-        const parsed = parseExcelBuffer(buffer, originalname);
-        data = parsed.data;
-        sheetNames = parsed.sheetNames;
-      }
-
-      const dfInfo = buildDataFrameInfo(data, sheetNames);
-
-      // 2b. Normalize field names (P1-A: synonym mapping, non-destructive)
-      // Determine required fields based on scenario hint from field names
-      const scenarioHint = detectScenario(dfInfo.fields);
-      const requiredByScenario: Record<string, string[]> = {
-        payroll:    ["基本工资", "员工姓名"],
-        attendance: ["员工姓名", "出勤天数"],
-        sales:      ["总销售额"],
-        dividend:   ["员工姓名"],
-      };
-      const requiredFields = requiredByScenario[scenarioHint.type] || [];
-      const { normalizedData, injectedFields, fieldMapping } = normalizeFieldNames(data, requiredFields);
-      // Use normalized data for all downstream processing
-      const workingData = normalizedData;
-
-      // 3. Create session record in DB immediately (status=uploading)
+      // 1. Create session record immediately (status=uploading) — no blocking S3/parse
       await createSession({
         id: sessionId,
-        userId: (req as any).userId || 0,
+        userId,
         filename: fileKey,
         originalName: originalname,
         fileKey,
-        fileUrl,
-        fileSizeKb: Math.ceil(buffer.length / 1024),
-        rowCount: dfInfo.row_count,
-        colCount: dfInfo.col_count,
-        dfInfo: dfInfo as any,
+        fileUrl: "", // will be updated after S3 upload in background
+        fileSizeKb,
+        rowCount: 0,
+        colCount: 0,
+        dfInfo: {} as any,
         isMerged: 0,
-        status: "uploading", // will be updated to "ready" after async processing
+        status: "uploading",
       });
 
-      // 4. Return immediately — client can start polling /api/atlas/status/:sessionId
+      // 2. Return immediately — client starts polling /api/atlas/status/:sessionId
       res.json({
         session_id: sessionId,
         filename: originalname,
-        file_url: fileUrl,
+        file_url: "",
         status: "processing",
-        df_info: {
-          row_count: dfInfo.row_count,
-          col_count: dfInfo.col_count,
-          fields: dfInfo.fields,
-          preview: dfInfo.preview,
-        },
+        df_info: { row_count: 0, col_count: 0, fields: [], preview: [] },
       });
 
-      // 5. Continue processing in background (non-blocking)
+      // 3. All heavy work (S3 upload + parse + AI) runs in background (non-blocking)
       setImmediate(async () => {
         try {
-          // 5a. Persist parsed data to S3 (for AI chat — survives restarts)
+          // 3a. Upload original file to S3
+          const { url: fileUrl } = await storagePut(fileKey, buffer, mimetype);
+          await updateSession(sessionId, { fileUrl }).catch(() => {});
+
+          // 3b. Parse data
+          let data: Record<string, unknown>[];
+          let sheetNames: string[] | undefined;
+          if (ext === "csv") {
+            data = parseCsvBuffer(buffer);
+          } else {
+            const parsed = parseExcelBuffer(buffer, originalname);
+            data = parsed.data;
+            sheetNames = parsed.sheetNames;
+          }
+          const dfInfo = buildDataFrameInfo(data, sheetNames);
+
+          // 3c. Normalize field names (P1-A: synonym mapping, non-destructive)
+          const scenarioHint = detectScenario(dfInfo.fields);
+          const requiredByScenario: Record<string, string[]> = {
+            payroll:    ["基本工资", "员工姓名"],
+            attendance: ["员工姓名", "出勤天数"],
+            sales:      ["总销售额"],
+            dividend:   ["员工姓名"],
+          };
+          const requiredFields = requiredByScenario[scenarioHint.type] || [];
+          const { normalizedData, injectedFields, fieldMapping } = normalizeFieldNames(data, requiredFields);
+          const workingData = normalizedData;
+
+          // 3d. Update session with parsed info
+          await updateSession(sessionId, {
+            rowCount: dfInfo.row_count,
+            colCount: dfInfo.col_count,
+            dfInfo: dfInfo as any,
+          }).catch(() => {});
+
+          // 3e. Persist parsed data to S3 (for AI chat — survives restarts)
           await storeSessionData(sessionId, workingData);
 
           // 5b. Detect scenario + compute key metrics (pure code, no AI dependency)
@@ -2077,6 +2079,253 @@ ${sampleRows}
     } catch (err: any) {
       console.error("[Atlas] Merge error:", err);
       res.status(500).json({ error: err.message || "合并失败" });
+    }
+  });
+
+  // ── POST /api/atlas/upload-chunk ─────────────────────────────────────────────
+  // Chunked upload: receives 1MB slices, assembles in memory, triggers background
+  // processing on last chunk. Bypasses Cloudflare 30s timeout.
+  const chunkStore = new Map<string, {
+    chunks: (Buffer | undefined)[];
+    totalChunks: number;
+    filename: string;
+    mimetype: string;
+    sessionId: string;
+    userId: number;
+  }>();
+
+  // Clean up stale chunk stores every 10 minutes
+  setInterval(() => {
+    chunkStore.clear();
+  }, 10 * 60_000);
+
+  app.post("/api/atlas/upload-chunk", optionalAuth, upload.single("chunk"), async (req: Request, res: Response) => {
+    try {
+      const { uploadId, chunkIndex, totalChunks, filename } = req.body as {
+        uploadId: string;
+        chunkIndex: string;
+        totalChunks: string;
+        filename: string;
+      };
+      const chunkIdx = parseInt(chunkIndex, 10);
+      const total = parseInt(totalChunks, 10);
+
+      if (!uploadId || isNaN(chunkIdx) || isNaN(total) || !req.file) {
+        res.status(400).json({ error: "Missing required chunk fields" });
+        return;
+      }
+
+      // Initialize store for this uploadId on first chunk
+      if (!chunkStore.has(uploadId)) {
+        const sessionId = nanoid();
+        const userId = (req as any).userId || 0;
+        const ext = (filename || "file").split(".").pop()?.toLowerCase() || "xlsx";
+        const fileKey = `atlas-uploads/${sessionId}-${Date.now()}.${ext}`;
+        const safeFilename = (filename || "file").replace(/[\/\\<>:"'|?*\x00-\x1f]/g, "_").slice(0, 200);
+        // Create session record immediately so polling can start
+        await createSession({
+          id: sessionId,
+          userId,
+          filename: fileKey,
+          originalName: safeFilename,
+          fileKey,
+          fileUrl: "",
+          fileSizeKb: 0,
+          rowCount: 0,
+          colCount: 0,
+          dfInfo: {} as any,
+          isMerged: 0,
+          status: "uploading",
+        });
+        chunkStore.set(uploadId, {
+          chunks: new Array(total).fill(undefined),
+          totalChunks: total,
+          filename: safeFilename,
+          mimetype: req.file.mimetype || "application/octet-stream",
+          sessionId,
+          userId,
+        });
+      }
+
+      const entry = chunkStore.get(uploadId)!;
+      entry.chunks[chunkIdx] = req.file.buffer;
+
+      const receivedCount = entry.chunks.filter(Boolean).length;
+      const isComplete = receivedCount === total;
+
+      if (!isComplete) {
+        // Acknowledge chunk, client sends next one
+        res.json({ received: chunkIdx, total, session_id: entry.sessionId, status: "uploading" });
+        return;
+      }
+
+      // All chunks received — merge buffers
+      const buffer = Buffer.concat(entry.chunks as Buffer[]);
+      const { sessionId, filename: originalname, mimetype: mimeType, userId } = entry;
+      chunkStore.delete(uploadId); // free memory immediately
+
+      const ext = originalname.split(".").pop()?.toLowerCase() || "xlsx";
+      const fileKey = `atlas-uploads/${sessionId}-${Date.now()}.${ext}`;
+      const fileSizeKb = Math.ceil(buffer.length / 1024);
+      await updateSession(sessionId, { filename: fileKey, fileKey, fileSizeKb }).catch(() => {});
+
+      // Return immediately — client starts polling
+      res.json({
+        session_id: sessionId,
+        filename: originalname,
+        file_url: "",
+        status: "processing",
+        df_info: { row_count: 0, col_count: 0, fields: [], preview: [] },
+      });
+
+      // Background processing (identical logic to /upload)
+      setImmediate(async () => {
+        try {
+          const { url: fileUrl } = await storagePut(fileKey, buffer, mimeType);
+          await updateSession(sessionId, { fileUrl }).catch(() => {});
+
+          let data: Record<string, unknown>[];
+          let sheetNames: string[] | undefined;
+          if (ext === "csv") {
+            data = parseCsvBuffer(buffer);
+          } else {
+            const parsed = parseExcelBuffer(buffer, originalname);
+            data = parsed.data;
+            sheetNames = parsed.sheetNames;
+          }
+          const dfInfo = buildDataFrameInfo(data, sheetNames);
+          const scenarioHint = detectScenario(dfInfo.fields);
+          const requiredByScenario: Record<string, string[]> = {
+            payroll:    ["基本工资", "员工姓名"],
+            attendance: ["员工姓名", "出勤天数"],
+            sales:      ["总销售额"],
+            dividend:   ["员工姓名"],
+          };
+          const requiredFields = requiredByScenario[scenarioHint.type] || [];
+          const { normalizedData, injectedFields, fieldMapping } = normalizeFieldNames(data, requiredFields);
+          const workingData = normalizedData;
+
+          await updateSession(sessionId, { rowCount: dfInfo.row_count, colCount: dfInfo.col_count, dfInfo: dfInfo as any }).catch(() => {});
+          await storeSessionData(sessionId, workingData);
+
+          const scenario = detectScenario(dfInfo.fields);
+          const keyMetrics = computeKeyMetrics(workingData, scenario, dfInfo);
+          const fieldSummary = dfInfo.fields.slice(0, 15).map(f =>
+            `${f.name}(${f.type}, ${f.unique_count}个唯一值, 示例:${f.sample.slice(0, 3).join("/")})`
+          ).join(", ");
+          const metricsSummary = keyMetrics.map(m => `${m.name}: ${m.value}`).join("、");
+
+          // Quality checks
+          const qualityIssues: string[] = [];
+          const highNullFields = dfInfo.fields.filter(f => f.null_count > dfInfo.row_count * 0.3);
+          if (highNullFields.length > 0) qualityIssues.push(`缺失值警告：${highNullFields.map(f => `${f.name}(${f.null_count}个空值)`).join('、')}`);
+          if (injectedFields.length > 0) qualityIssues.push(`字段容错提示：${injectedFields.join('、')}字段在数据中缺失，已自动按 0 处理`);
+          const mappingEntries = Object.entries(fieldMapping);
+          if (mappingEntries.length > 0) qualityIssues.push(`字段识别提示：已自动将 ${mappingEntries.map(([o, c]) => `「${o}」→「${c}」`).join('、')} 对齐为标准字段名`);
+
+          // Outlier detection
+          const outlierDetails: Array<{ fieldName: string; median: number; threshold: number; outlierRows: Array<{ rowIndex: number; value: number }> }> = [];
+          const outlierWarnings: string[] = [];
+          for (const field of dfInfo.fields.filter(f => f.type === "numeric").slice(0, 6)) {
+            const valsWithIndex = workingData.map((row, i) => ({ val: Number(row[field.name]), rowIndex: i + 2 })).filter(x => !isNaN(x.val) && x.val > 0);
+            if (valsWithIndex.length < 3) continue;
+            const sortedVals = [...valsWithIndex.map(x => x.val)].sort((a, b) => a - b);
+            const median = sortedVals[Math.floor(sortedVals.length / 2)];
+            const threshold = median * 5;
+            const outlierItems = valsWithIndex.filter(x => x.val > threshold);
+            if (outlierItems.length > 0 && median > 0) {
+              const maxVal = Math.max(...outlierItems.map(x => x.val));
+              const fmtV = (n: number) => n >= 10000 ? `${(n/10000).toFixed(1)}万` : n.toFixed(0);
+              outlierWarnings.push(`${field.name}(最高值${fmtV(maxVal)}，约为中位数${fmtV(median)}的${Math.round(maxVal/median)}倍)`);
+              outlierDetails.push({ fieldName: field.name, median, threshold, outlierRows: outlierItems.slice(0, 20).map(x => ({ rowIndex: x.rowIndex, value: x.val })) });
+            }
+          }
+          if (outlierWarnings.length > 0) qualityIssues.push(`⚠️ 异常高值预警：${outlierWarnings.join('；')}，建议核实数据准确性`);
+
+          const numericFields = dfInfo.fields.filter(f => f.type === "numeric").map(f => f.name);
+          const fieldListStr = dfInfo.fields.slice(0, 4).map(f => f.name).join('、') + (dfInfo.fields.length > 4 ? '等' : '');
+          const qualityHint = qualityIssues.length > 0 ? '（并加一句质量提醒）' : '';
+          const hasSales = scenario.type === "sales";
+          const hasPayroll = scenario.type === "payroll";
+          const hasAttendance = scenario.type === "attendance";
+          const hasDividend = scenario.type === "dividend";
+          const hasStore = scenario.groupFields.some(f => /门店|店铺|store|shop/.test(f.toLowerCase()));
+          const hasDate = scenario.dateFields.length > 0;
+          const hasName = scenario.groupFields.some(f => /姓名|名字|员工|name|staff/.test(f.toLowerCase()));
+
+          const fallbackTable = { title: `${originalname} 关键指标`, columns: ["指标名称", "指标值"], rows: keyMetrics.map(m => [m.name, String(m.value)]), highlight: 1, sortBy: -1, sortDir: "desc" };
+          const fallbackTableStr = "```atlas-table\n" + JSON.stringify(fallbackTable, null, 2) + "\n```";
+          const uploadSystemPrompt = [
+            '你是 ATLAS，一个专业的智能数据分析助手。用户刚刚上传了文件，你必须立刻输出以下内容：',
+            '', '**第一部分：一句话识别**（不超过30字）',
+            `格式：「这是一份[${scenario.name}]，共${dfInfo.row_count}行、${dfInfo.col_count}列。」${qualityHint}`,
+            '', '**第二部分：关键指标表**', '必须输出以下 atlas-table 格式（严格遵守）：',
+            '', '\`\`\`atlas-table', '{',
+            `  "title": "[${originalname}] 关键指标",`,
+            '  "columns": ["指标名称", "指标值", "说明"],',
+            '  "rows": [',
+            `    ["数据总行数", "${dfInfo.row_count}", "有效数据行"],`,
+            `    ["字段数", "${dfInfo.col_count}", "包括: ${fieldListStr}"],`,
+            `    // 在此基础上，根据实际数据补充 5-6 个最重要的业务指标（已计算值：${metricsSummary}）`,
+            '  ],', '  "highlight": 1,', '  "sortBy": -1,', '  "sortDir": "desc"', '}', '\`\`\`',
+            '', '**第三部分：3个分析方向**（带字段名）',
+            '格式：【①】具体操作（如「按门店汇总销售额排名」）',
+            '', `数据场景：${scenario.name}，置信度：${(scenario.confidence * 100).toFixed(0)}%`,
+            `主要数值字段：${scenario.primaryFields.join('、') || '无'}`,
+            `分组字段：${scenario.groupFields.join('、') || '无'}`,
+            `已计算指标：${metricsSummary}`,
+            '', '注意：', '- rows 中的注释行必须删除，只保留真实数据行',
+            '- 指标值直接用已计算的真实数值，不要编造',
+            '- 输出不超过150字，不要有任何前置序言',
+          ].join('\n');
+
+          let aiAnalysis = "";
+          try {
+            const openai = createLLM();
+            const result = await streamText({
+              model: openai.chat(selectModel(dfInfo.row_count)),
+              system: uploadSystemPrompt,
+              messages: [{ role: "user", content: `文件名：${originalname}，共 ${dfInfo.row_count} 行 ${dfInfo.col_count} 列。字段：${fieldSummary}。${qualityIssues.length > 0 ? '数据质量：' + qualityIssues.join('；') : '数据质量良好'}。已计算指标：${metricsSummary}` }],
+              maxOutputTokens: 800,
+            });
+            aiAnalysis = await result.text;
+            if (!aiAnalysis.includes("atlas-table")) {
+              const intro = aiAnalysis.split("\n")[0] || `这是一份${scenario.name}，共${dfInfo.row_count}行、${dfInfo.col_count}列。`;
+              aiAnalysis = `${intro}\n\n${fallbackTableStr}`;
+            }
+          } catch (e) {
+            const qualityNote = qualityIssues.length > 0 ? `\n\n⚠️ 数据质量提醒：${qualityIssues.join('；')}` : '';
+            aiAnalysis = `这是一份**${scenario.name}**，共 ${dfInfo.row_count.toLocaleString()} 行、${dfInfo.col_count} 列。${qualityNote}\n\n${fallbackTableStr}`;
+          }
+
+          const suggestedActions: Array<{ label: string; prompt: string; icon: string }> = [];
+          if (hasPayroll || (hasName && numericFields.length > 0)) suggestedActions.push({ icon: "📝", label: "生成工资条", prompt: `__PAYSLIP_INLINE__${sessionId}` });
+          if (hasDividend) { const divField = numericFields.find(f => /分红|奖金|奖/.test(f)) || numericFields[0] || "奖金"; suggestedActions.push({ icon: "💰", label: "分红明细表", prompt: `帮我按${divField}从高到低生成分红明细表` }); suggestedActions.push({ icon: "🏆", label: "Top10 排名", prompt: `帮我找出${divField}最高的前10名和最低的后10名` }); }
+          if (hasSales) { const salesField = numericFields.find(f => /销售|金额|gmv|revenue/.test(f.toLowerCase())) || numericFields[0] || "销售额"; suggestedActions.push({ icon: "📊", label: "销售汇总表", prompt: `帮我汇总销售数据，显示${salesField}、订单数和关键指标` }); if (hasStore) suggestedActions.push({ icon: "🏦", label: "门店排名", prompt: `帮我按门店分组汇总${salesField}，对比各门店表现并排名` }); }
+          if (hasAttendance) suggestedActions.push({ icon: "📅", label: "考勤汇总", prompt: `__ATTENDANCE_INLINE__${sessionId}` });
+          if (hasDate && !hasSales) suggestedActions.push({ icon: "📈", label: "趋势分析", prompt: "帮我按时间分析数据趋势，看看有什么规律" });
+          if (suggestedActions.length < 2) { if (numericFields.length > 0) suggestedActions.push({ icon: "📊", label: "生成汇总表", prompt: `帮我汇总${numericFields.slice(0, 3).join('、')}等关键指标` }); else suggestedActions.push({ icon: "📊", label: "生成汇总表", prompt: "帮我生成数据汇总表，包含关键指标和统计" }); suggestedActions.push({ icon: "🔍", label: "全面分析", prompt: "帮我全面分析这份数据，找出关键规律、异常值和可优化方向" }); }
+          suggestedActions.push({ icon: "✨", label: "自定义需求", prompt: "" });
+
+          const finalResult = {
+            session_id: sessionId, filename: originalname, file_url: fileUrl, status: "ready",
+            df_info: { row_count: dfInfo.row_count, col_count: dfInfo.col_count, fields: dfInfo.fields, preview: dfInfo.preview },
+            ai_analysis: aiAnalysis, suggested_actions: suggestedActions, quality_issues: qualityIssues,
+            outlier_details: outlierDetails.length > 0 ? outlierDetails : undefined,
+            field_mapping_hint: mappingEntries.length > 0 ? mappingEntries.map(([original, canonical]) => ({ original, canonical })) : undefined,
+          };
+          await storeUploadResult(sessionId, finalResult);
+          await updateSession(sessionId, { status: "ready" });
+          console.log(`[Atlas] Chunked upload background processing complete for session ${sessionId}`);
+        } catch (bgErr: any) {
+          console.error(`[Atlas] Chunked upload background processing failed:`, bgErr);
+          const failedSessionId = chunkStore.get(uploadId)?.sessionId || "";
+          await updateSession(failedSessionId, { status: "error" }).catch(() => {});
+        }
+      });
+    } catch (err: any) {
+      console.error("[Atlas] Upload chunk error:", err);
+      res.status(500).json({ error: err.message || "Chunk upload failed" });
     }
   });
 

@@ -161,6 +161,78 @@ export async function uploadFile(
   });
 }
 
+// ── Chunked Upload (files > 5MB, bypasses 30s Cloudflare timeout) ────────────────
+
+const CHUNK_SIZE = 1 * 1024 * 1024; // 1MB per chunk
+const LARGE_FILE_THRESHOLD_BYTES = 5 * 1024 * 1024; // 5MB
+
+export async function chunkedUpload(
+  file: File,
+  onProgress?: (percent: number) => void
+): Promise<UploadResponse> {
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  const uploadId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  let sessionId: string | null = null;
+
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, file.size);
+    const chunk = file.slice(start, end);
+
+    const form = new FormData();
+    form.append("file", chunk, file.name);
+    form.append("uploadId", uploadId);
+    form.append("chunkIndex", String(i));
+    form.append("totalChunks", String(totalChunks));
+    form.append("filename", file.name);
+    form.append("mimetype", file.type || "application/octet-stream");
+    if (sessionId) form.append("sessionId", sessionId);
+
+    const res = await fetch("/api/atlas/upload-chunk", {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try { const err = await res.json(); msg = err.error || msg; } catch {}
+      if (res.status === 413) msg = "文件太大，请上传 50MB 以内的文件";
+      else if (res.status === 401) msg = "登录已过期，请重新登录";
+      else if (res.status >= 500) msg = "服务器处理失败，请稍后重试";
+      throw new Error(msg);
+    }
+
+    const data = await res.json();
+    if (data.session_id) sessionId = data.session_id;
+
+    // Report progress: chunk upload = 0% → 30%
+    if (onProgress) {
+      const percent = Math.round(((i + 1) / totalChunks) * 30);
+      onProgress(percent);
+    }
+
+    // Last chunk: server returns session_id + status=processing
+    if (i === totalChunks - 1) {
+      return data as UploadResponse;
+    }
+  }
+
+  throw new Error("分块上传失败：未收到完整响应");
+}
+
+// ── Smart Upload: auto-select chunked or direct based on file size ────────────────
+
+export async function smartUpload(
+  file: File,
+  onProgress?: (percent: number) => void
+): Promise<UploadResponse> {
+  if (file.size > LARGE_FILE_THRESHOLD_BYTES) {
+    return chunkedUpload(file, onProgress);
+  }
+  return uploadFile(file, onProgress);
+}
+
 // ── Chat (streaming) ──────────────────────────────────────────────────────────
 
 export interface ChatStreamOptions {
