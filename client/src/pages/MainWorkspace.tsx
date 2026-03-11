@@ -321,6 +321,15 @@ export default function MainWorkspace() {
     const msg = (text || input).trim();
     if (!msg || isGenerating) return;
 
+    // If no active task exists, create one first so messages have a task to attach to.
+    // createNewTask() sets activeTaskId in React state, but the current closure still
+    // sees the stale null value. We defer the actual send by 50ms to let the state flush.
+    if (!activeTaskId) {
+      createNewTask();
+      setTimeout(() => handleSend(text, isQuickAction), 50);
+      return;
+    }
+
     setInput("");
     setIsGenerating(true);
     setPendingActions([]); // Clear pending actions when user sends
@@ -519,7 +528,7 @@ export default function MainWorkspace() {
       setIsGenerating(false);
       setIsProcessing(false);
     }
-  }, [input, isGenerating, hasFiles, readyFiles, messages, addMessage, updateLastMessage, setIsProcessing, addReport, parseSuggestions, parseInlineOptions, conversationId, setConversationId]);
+  }, [input, isGenerating, hasFiles, readyFiles, messages, addMessage, updateLastMessage, setIsProcessing, addReport, parseSuggestions, parseInlineOptions, conversationId, setConversationId, activeTaskId, createNewTask]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }

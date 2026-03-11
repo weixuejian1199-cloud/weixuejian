@@ -842,3 +842,7 @@
 - [x] statsContext 中 sum/avg/max/min 展示改为 toFixed(2)
 - [x] 多文件 statsLines 和跨文件汇总 total 展示改为 toFixed(2)
 - [x] computeKeyMetrics 中 fmtAmount 的 yuanStr 去掉 Math.round(n)，改为 n.toFixed(2) 保留 2 位小数
+
+## Bug 修复（V14.1）
+
+- [x] 修复首次打开页面发送消息失败：handleSend 在 activeTaskId 为 null 时自动调用 createNewTask() 并延迟 50ms 重试，确保消息有任务可挂载
