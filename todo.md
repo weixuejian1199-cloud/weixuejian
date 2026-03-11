@@ -792,3 +792,8 @@
 - [x] 前端 client/src/lib/api.ts：新增 uploadParsed 函数（POST JSON 到 /upload-parsed）
 - [x] 前端 client/src/pages/MainWorkspace.tsx：processFile 改为先本地解析再发 JSON，移除 progressTimers/uploadPhaseTimer 残留引用
 - [x] tsc 0 errors，vitest 104/104 全通过
+
+## Bug 修复：前端解析方案数据不准确
+
+- [x] 修复 /upload-parsed 端点：computeKeyMetrics 使用预览数据（500行）而非全量统计，导致“数据总行数”显示 500 而非真实 46906
+- [x] 修复 AI 关键指标表：sum/avg/max/min 应来自前端传来的全量 fields 统计，而非 workingData 计算

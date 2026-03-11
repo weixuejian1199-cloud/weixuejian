@@ -540,16 +540,26 @@ interface KeyMetric {
   type: "sum" | "avg" | "max" | "min" | "count" | "top" | "pct";
 }
 
+interface PrecomputedFieldStat {
+  name: string;
+  sum?: number;
+  avg?: number;
+  max?: number;
+  min?: number;
+}
+
 function computeKeyMetrics(
   data: Record<string, unknown>[],
   scenario: ScenarioResult,
-  dfInfo: DataFrameInfo
+  dfInfo: DataFrameInfo,
+  precomputedStats?: PrecomputedFieldStat[]
 ): KeyMetric[] {
   const metrics: KeyMetric[] = [];
   const numericFields = dfInfo.fields.filter(f => f.type === "numeric");
 
-  // Always add row count
-  metrics.push({ name: "数据总行数", value: data.length, field: "_count", type: "count" });
+  // Always add row count — use dfInfo.row_count (full count) when available, else data.length
+  const totalRowCount = dfInfo.row_count > 0 ? dfInfo.row_count : data.length;
+  metrics.push({ name: "数据总行数", value: totalRowCount, field: "_count", type: "count" });
 
   // For each primary numeric field, compute sum / avg / max / min
   const targetFields = scenario.primaryFields.length > 0
@@ -562,23 +572,40 @@ function computeKeyMetrics(
     return n % 1 === 0 ? n.toString() : n.toFixed(2);
   };
 
-  for (const fieldName of targetFields) {
-    const rawValues = data
-      .map(row => row[fieldName])
-      .filter(v => v !== null && v !== undefined && v !== "");
-    const decimalValues: Decimal[] = [];
-    for (const v of rawValues) {
-      try { decimalValues.push(new Decimal(String(v))); } catch { /* skip non-numeric */ }
-    }
-    if (decimalValues.length === 0) continue;
+  // Build a quick lookup map for precomputed stats (from frontend full-dataset scan)
+  const statsMap = new Map<string, PrecomputedFieldStat>();
+  if (precomputedStats) {
+    for (const s of precomputedStats) statsMap.set(s.name, s);
+  }
 
-    // Precise sum using Decimal.js
-    const decSum = decimalValues.reduce((acc, d) => acc.plus(d), new Decimal(0));
-    const sum = decSum.toNumber();
-    const avg = decSum.dividedBy(decimalValues.length).toNumber();
-    const numVals = decimalValues.map(d => d.toNumber());
-    const max = Math.max(...numVals);
-    const min = Math.min(...numVals);
+  for (const fieldName of targetFields) {
+    const precomp = statsMap.get(fieldName);
+    let sum: number, avg: number, max: number, min: number;
+
+    if (precomp && precomp.sum !== undefined && precomp.avg !== undefined &&
+        precomp.max !== undefined && precomp.min !== undefined) {
+      // Use frontend-computed full-dataset stats (accurate for all rows)
+      sum = precomp.sum;
+      avg = precomp.avg;
+      max = precomp.max;
+      min = precomp.min;
+    } else {
+      // Fallback: compute from available data rows (preview subset)
+      const rawValues = data
+        .map(row => row[fieldName])
+        .filter(v => v !== null && v !== undefined && v !== "");
+      const decimalValues: Decimal[] = [];
+      for (const v of rawValues) {
+        try { decimalValues.push(new Decimal(String(v))); } catch { /* skip non-numeric */ }
+      }
+      if (decimalValues.length === 0) continue;
+      const decSum = decimalValues.reduce((acc, d) => acc.plus(d), new Decimal(0));
+      sum = decSum.toNumber();
+      avg = decSum.dividedBy(decimalValues.length).toNumber();
+      const numVals = decimalValues.map(d => d.toNumber());
+      max = Math.max(...numVals);
+      min = Math.min(...numVals);
+    }
 
     metrics.push({ name: `${fieldName}合计`, value: fmtNum(sum), field: fieldName, type: "sum" });
     metrics.push({ name: `${fieldName}均値`, value: fmtNum(avg), field: fieldName, type: "avg" });
@@ -2511,7 +2538,11 @@ ${sampleRows}
           }).catch(() => {});
 
           const scenario = detectScenario(dfInfo.fields);
-          const keyMetrics = computeKeyMetrics(normalizedData, scenario, dfInfo);
+          // Pass frontend-computed full-dataset stats so metrics are accurate for all rows
+          const precomputedStats: PrecomputedFieldStat[] = parsed.fields
+            .filter(f => f.sum !== undefined)
+            .map(f => ({ name: f.name, sum: f.sum, avg: f.avg, max: f.max, min: f.min }));
+          const keyMetrics = computeKeyMetrics(normalizedData, scenario, dfInfo, precomputedStats);
 
           // Compact field summary: stats only (much smaller prompt than sending rows)
           const fieldSummary = dfInfo.fields.slice(0, 15).map(f => {
