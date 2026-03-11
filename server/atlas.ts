@@ -2420,6 +2420,258 @@ ${sampleRows}
     }
   });
 
+  // ── POST /api/atlas/upload-parsed ─────────────────────────────────────────────────────────
+  // Receives frontend-parsed data (JSON). Skips server-side XLSX parsing entirely.
+  app.post("/api/atlas/upload-parsed", optionalAuth, async (req: Request, res: Response) => {
+    try {
+      interface FrontendParsedField {
+        name: string;
+        type: "numeric" | "text" | "datetime";
+        dtype: string;
+        null_count: number;
+        unique_count: number;
+        sample: (string | number)[];
+        sum?: number;
+        min?: number;
+        max?: number;
+        avg?: number;
+      }
+      const parsed = req.body as {
+        filename: string;
+        totalRowCount: number;
+        colCount: number;
+        fields: FrontendParsedField[];
+        preview: Record<string, unknown>[];
+      };
+
+      if (!parsed || !parsed.filename || !parsed.fields) {
+        res.status(400).json({ error: "Invalid parsed data" });
+        return;
+      }
+
+      const sessionId = nanoid();
+      const userId = (req as any).userId || 0;
+      const originalname = parsed.filename;
+
+      const dfInfo: DataFrameInfo = {
+        row_count: parsed.totalRowCount,
+        col_count: parsed.colCount,
+        fields: parsed.fields.map(f => ({
+          name: f.name,
+          type: f.type,
+          dtype: f.dtype,
+          null_count: f.null_count,
+          unique_count: f.unique_count,
+          sample: f.sample,
+        })),
+        preview: (parsed.preview || []).slice(0, 5),
+      };
+
+      await createSession({
+        id: sessionId,
+        userId,
+        filename: originalname,
+        originalName: originalname,
+        fileKey: `atlas-parsed/${sessionId}`,
+        fileUrl: "",
+        fileSizeKb: 0,
+        rowCount: parsed.totalRowCount,
+        colCount: parsed.colCount,
+        dfInfo: dfInfo as any,
+        isMerged: 0,
+        status: "uploading",
+      });
+
+      res.json({
+        session_id: sessionId,
+        filename: originalname,
+        file_url: "",
+        status: "processing",
+        df_info: dfInfo,
+      });
+
+      setImmediate(async () => {
+        try {
+          const workingData = parsed.preview || [];
+          const scenarioHint = detectScenario(dfInfo.fields);
+          const requiredByScenario: Record<string, string[]> = {
+            payroll:    ["\u57fa\u672c\u5de5\u8d44", "\u5458\u5de5\u59d3\u540d"],
+            attendance: ["\u5458\u5de5\u59d3\u540d", "\u51fa\u52e4\u5929\u6570"],
+            sales:      ["\u603b\u9500\u552e\u989d"],
+            dividend:   ["\u5458\u5de5\u59d3\u540d"],
+          };
+          const requiredFields = requiredByScenario[scenarioHint.type] || [];
+          const { normalizedData, fieldMapping } = normalizeFieldNames(workingData, requiredFields);
+
+          await storeSessionData(sessionId, normalizedData);
+          await updateSession(sessionId, {
+            rowCount: dfInfo.row_count,
+            colCount: dfInfo.col_count,
+            dfInfo: dfInfo as any,
+          }).catch(() => {});
+
+          const scenario = detectScenario(dfInfo.fields);
+          const keyMetrics = computeKeyMetrics(normalizedData, scenario, dfInfo);
+
+          // Compact field summary: stats only (much smaller prompt than sending rows)
+          const fieldSummary = dfInfo.fields.slice(0, 15).map(f => {
+            const fe = parsed.fields.find(pf => pf.name === f.name);
+            const statsStr = fe?.sum !== undefined
+              ? `sum=${fe.sum >= 10000 ? (fe.sum / 10000).toFixed(1) + '\u4e07' : fe.sum.toFixed(0)},avg=${fe.avg?.toFixed(0)},max=${fe.max?.toFixed(0)}`
+              : `${f.unique_count}\u4e2a\u552f\u4e00\u503c`;
+            return `${f.name}(${f.type},${statsStr})`;
+          }).join(", ");
+
+          const qualityIssues: string[] = [];
+          const nullFields = dfInfo.fields.filter(f => f.null_count > 0);
+          if (nullFields.length > 0) {
+            const highNullFields = nullFields.filter(f => f.null_count / dfInfo.row_count > 0.05);
+            if (highNullFields.length > 0) {
+              qualityIssues.push(`\u7f3a\u5931\u503c\u8b66\u544a\uff1a${highNullFields.map(f => `${f.name}(${f.null_count}\u4e2a\u7a7a\u503c)`).join('\u3001')}`);
+            }
+          }
+          const mappingEntries = Object.entries(fieldMapping);
+          if (mappingEntries.length > 0) {
+            qualityIssues.push(`\u5b57\u6bb5\u8bc6\u522b\u63d0\u793a\uff1a\u5df2\u81ea\u52a8\u5c06 ${mappingEntries.map(([o, c]) => `\u300c${o}\u300d\u2192\u300c${c}\u300d`).join('\u3001')} \u5bf9\u9f50\u4e3a\u6807\u51c6\u5b57\u6bb5\u540d`);
+          }
+
+          const numericFields = dfInfo.fields.filter(f => f.type === "numeric").map(f => f.name);
+          const metricsSummary = keyMetrics.map(m => `${m.name}: ${m.value}`).join("\u3001");
+
+          const hasSales2 = scenario.type === "sales";
+          const hasPayroll2 = scenario.type === "payroll";
+          const hasAttendance2 = scenario.type === "attendance";
+          const hasDividend2 = scenario.type === "dividend";
+          const hasStore2 = scenario.groupFields.some(f => /\u95e8\u5e97|\u5e97\u94fa|store|shop/.test(f.toLowerCase()));
+          const hasName2 = scenario.groupFields.some(f => /\u59d3\u540d|\u540d\u5b57|\u5458\u5de5|name|staff/.test(f.toLowerCase()));
+
+          const fallbackTable = {
+            title: `${originalname} \u5173\u952e\u6307\u6807`,
+            columns: ["\u6307\u6807\u540d\u79f0", "\u6307\u6807\u503c"],
+            rows: keyMetrics.map(m => [m.name, String(m.value)]),
+            highlight: 1, sortBy: -1, sortDir: "desc",
+          };
+          const fallbackTableStr = "```atlas-table\n" + JSON.stringify(fallbackTable, null, 2) + "\n```";
+
+          const fieldListStr = dfInfo.fields.slice(0, 4).map(f => f.name).join('\u3001') + (dfInfo.fields.length > 4 ? '\u7b49' : '');
+          const qualityHint = qualityIssues.length > 0 ? '\uff08\u5e76\u52a0\u4e00\u53e5\u8d28\u91cf\u63d0\u9192\uff09' : '';
+
+          const uploadSystemPrompt = [
+            '\u4f60\u662f ATLAS\uff0c\u4e00\u4e2a\u4e13\u4e1a\u7684\u667a\u80fd\u6570\u636e\u5206\u6790\u52a9\u624b\u3002\u7528\u6237\u521a\u521a\u4e0a\u4f20\u4e86\u6587\u4ef6\uff0c\u4f60\u5fc5\u987b\u7acb\u523b\u8f93\u51fa\u4ee5\u4e0b\u5185\u5bb9\uff1a',
+            '',
+            `**\u7b2c\u4e00\u90e8\u5206\uff1a\u4e00\u53e5\u8bdd\u8bc6\u522b**\uff08\u4e0d\u8d85\u8fc730\u5b57\uff09`,
+            `\u683c\u5f0f\uff1a\u300c\u8fd9\u662f\u4e00\u4efd[${scenario.name}]\uff0c\u5171${dfInfo.row_count}\u884c\u3001${dfInfo.col_count}\u5217\u3002\u300d${qualityHint}`,
+            '',
+            '**\u7b2c\u4e8c\u90e8\u5206\uff1a\u5173\u952e\u6307\u6807\u8868**',
+            '\u5fc5\u987b\u8f93\u51fa\u4ee5\u4e0b atlas-table \u683c\u5f0f\uff08\u4e25\u683c\u9075\u5b88\uff09\uff1a',
+            '',
+            '```atlas-table',
+            '{',
+            `  "title": "[${originalname}] \u5173\u952e\u6307\u6807",`,
+            '  "columns": ["\u6307\u6807\u540d\u79f0", "\u6307\u6807\u503c", "\u8bf4\u660e"],',
+            '  "rows": [',
+            `    ["\u6570\u636e\u603b\u884c\u6570", "${dfInfo.row_count}", "\u6709\u6548\u6570\u636e\u884c"],`,
+            `    ["\u5b57\u6bb5\u6570", "${dfInfo.col_count}", "\u5305\u62ec: ${fieldListStr}"],`,
+            `    // \u5728\u6b64\u57fa\u7840\u4e0a\uff0c\u6839\u636e\u5b9e\u9645\u6570\u636e\u8865\u5145 5-6 \u4e2a\u6700\u91cd\u8981\u7684\u4e1a\u52a1\u6307\u6807\uff08\u5df2\u8ba1\u7b97\u503c\uff1a${metricsSummary}\uff09`,
+            '  ],',
+            '  "highlight": 1,',
+            '  "sortBy": -1,',
+            '  "sortDir": "desc"',
+            '}',
+            '```',
+            '',
+            '**\u7b2c\u4e09\u90e8\u5206\uff1a3\u4e2a\u5206\u6790\u65b9\u5411**\uff08\u5e26\u5b57\u6bb5\u540d\uff09',
+            '\u683c\u5f0f\uff1a\u3010\u2460\u3011\u5177\u4f53\u64cd\u4f5c',
+            '',
+            `\u6570\u636e\u573a\u666f\uff1a${scenario.name}\uff0c\u7f6e\u4fe1\u5ea6\uff1a${(scenario.confidence * 100).toFixed(0)}%`,
+            `\u4e3b\u8981\u6570\u503c\u5b57\u6bb5\uff1a${scenario.primaryFields.join('\u3001') || '\u65e0'}`,
+            `\u5206\u7ec4\u5b57\u6bb5\uff1a${scenario.groupFields.join('\u3001') || '\u65e0'}`,
+            `\u5df2\u8ba1\u7b97\u6307\u6807\uff1a${metricsSummary}`,
+            '',
+            '\u6ce8\u610f\uff1a',
+            '- rows \u4e2d\u7684\u6ce8\u91ca\u884c\u5fc5\u987b\u5220\u9664\uff0c\u53ea\u4fdd\u7559\u771f\u5b9e\u6570\u636e\u884c',
+            '- \u6307\u6807\u503c\u76f4\u63a5\u7528\u5df2\u8ba1\u7b97\u7684\u771f\u5b9e\u6570\u503c\uff0c\u4e0d\u8981\u7f16\u9020',
+            '- \u8f93\u51fa\u4e0d\u8d85\u8fc7150\u5b57\uff0c\u4e0d\u8981\u6709\u4efb\u4f55\u524d\u7f6e\u5e8f\u8a00',
+          ].join('\n');
+
+          let aiAnalysis = "";
+          try {
+            const openai = createLLM();
+            const aiAbortController = new AbortController();
+            const aiTimeoutId = setTimeout(() => aiAbortController.abort(), 45_000);
+            const result = await streamText({
+              model: openai.chat("qwen3-max"),
+              system: uploadSystemPrompt,
+              messages: [{
+                role: "user",
+                content: `\u6587\u4ef6\u540d\uff1a${originalname}\uff0c\u5171 ${dfInfo.row_count} \u884c ${dfInfo.col_count} \u5217\u3002\u5b57\u6bb5\uff1a${fieldSummary}\u3002${qualityIssues.length > 0 ? '\u6570\u636e\u8d28\u91cf\uff1a' + qualityIssues.join('\uff1b') : '\u6570\u636e\u8d28\u91cf\u826f\u597d'}\u3002\u5df2\u8ba1\u7b97\u6307\u6807\uff1a${metricsSummary}`,
+              }],
+              maxOutputTokens: 600,
+              abortSignal: aiAbortController.signal,
+            });
+            aiAnalysis = await result.text;
+            clearTimeout(aiTimeoutId);
+            if (!aiAnalysis.includes("atlas-table")) {
+              const intro = aiAnalysis.split("\n")[0] || `\u8fd9\u662f\u4e00\u4efd${scenario.name}\uff0c\u5171${dfInfo.row_count}\u884c\u3001${dfInfo.col_count}\u5217\u3002`;
+              aiAnalysis = `${intro}\n\n${fallbackTableStr}`;
+            }
+          } catch (e) {
+            console.warn("[Atlas] upload-parsed AI failed, using fallback:", e);
+            aiAnalysis = `\u8fd9\u662f\u4e00\u4efd**${scenario.name}**\uff0c\u5171 ${dfInfo.row_count.toLocaleString()} \u884c\u3001${dfInfo.col_count} \u5217\u3002\n\n${fallbackTableStr}`;
+          }
+
+          const suggestedActions: Array<{ label: string; prompt: string; icon: string }> = [];
+          if (hasPayroll2 || (hasName2 && numericFields.length > 0)) {
+            suggestedActions.push({ icon: "\ud83d\udcdd", label: "\u751f\u6210\u5de5\u8d44\u6761", prompt: `__PAYSLIP_INLINE__${sessionId}` });
+          }
+          if (hasDividend2) {
+            const divField = numericFields.find(f => /\u5206\u7ea2|\u5956\u91d1|\u5956/.test(f)) || numericFields[0] || "\u5956\u91d1";
+            suggestedActions.push({ icon: "\ud83d\udcb0", label: "\u5206\u7ea2\u660e\u7ec6\u8868", prompt: `\u5e2e\u6211\u6309${divField}\u4ece\u9ad8\u5230\u4f4e\u751f\u6210\u5206\u7ea2\u660e\u7ec6\u8868` });
+          }
+          if (hasSales2) {
+            const salesField = numericFields.find(f => /\u9500\u552e|\u91d1\u989d|gmv|revenue/.test(f.toLowerCase())) || numericFields[0] || "\u9500\u552e\u989d";
+            suggestedActions.push({ icon: "\ud83d\udcca", label: "\u9500\u552e\u6c47\u603b\u8868", prompt: `\u5e2e\u6211\u6c47\u603b\u9500\u552e\u6570\u636e\uff0c\u663e\u793a${salesField}\u3001\u8ba2\u5355\u6570\u548c\u5173\u952e\u6307\u6807` });
+            if (hasStore2) {
+              suggestedActions.push({ icon: "\ud83c\udfe6", label: "\u95e8\u5e97\u6392\u540d", prompt: `\u5e2e\u6211\u6309\u95e8\u5e97\u5206\u7ec4\u6c47\u603b${salesField}\uff0c\u5bf9\u6bd4\u5404\u95e8\u5e97\u8868\u73b0\u5e76\u6392\u540d` });
+            }
+          }
+          if (hasAttendance2) {
+            suggestedActions.push({ icon: "\ud83d\udcc5", label: "\u8003\u52e4\u6c47\u603b", prompt: `__ATTENDANCE_INLINE__${sessionId}` });
+          }
+          if (suggestedActions.length < 2) {
+            if (numericFields.length > 0) {
+              suggestedActions.push({ icon: "\ud83d\udcca", label: "\u751f\u6210\u6c47\u603b\u8868", prompt: `\u5e2e\u6211\u6c47\u603b${numericFields.slice(0, 3).join('\u3001')}\u7b49\u5173\u952e\u6307\u6807` });
+            } else {
+              suggestedActions.push({ icon: "\ud83d\udcca", label: "\u751f\u6210\u6c47\u603b\u8868", prompt: "\u5e2e\u6211\u751f\u6210\u6570\u636e\u6c47\u603b\u8868\uff0c\u5305\u542b\u5173\u952e\u6307\u6807\u548c\u7edf\u8ba1" });
+            }
+            suggestedActions.push({ icon: "\ud83d\udd0d", label: "\u5168\u9762\u5206\u6790", prompt: "\u5e2e\u6211\u5168\u9762\u5206\u6790\u8fd9\u4efd\u6570\u636e\uff0c\u627e\u51fa\u5173\u952e\u89c4\u5f8b\u3001\u5f02\u5e38\u503c\u548c\u53ef\u4f18\u5316\u65b9\u5411" });
+          }
+          suggestedActions.push({ icon: "\u2728", label: "\u81ea\u5b9a\u4e49\u9700\u6c42", prompt: "" });
+
+          const finalResult = {
+            session_id: sessionId,
+            filename: originalname,
+            file_url: "",
+            status: "ready",
+            df_info: dfInfo,
+            ai_analysis: aiAnalysis,
+            suggested_actions: suggestedActions,
+            quality_issues: qualityIssues,
+          };
+          await storeUploadResult(sessionId, finalResult);
+          await updateSession(sessionId, { status: "ready" });
+          console.log(`[Atlas] upload-parsed complete: ${sessionId}, rows=${dfInfo.row_count}`);
+        } catch (bgErr: any) {
+          console.error(`[Atlas] upload-parsed background failed:`, bgErr);
+          await updateSession(sessionId, { status: "error" }).catch(() => {});
+        }
+      });
+    } catch (err: any) {
+      console.error("[Atlas] upload-parsed error:", err);
+      res.status(500).json({ error: err.message || "Upload failed" });
+    }
+  });
+
   // ── GET /api/atlas/status/:sessionId ───────────────────────────────────────────────────────────────────────────────────
   // Poll upload processing status. Returns full result when ready.
   app.get("/api/atlas/status/:sessionId", optionalAuth, async (req: Request, res: Response) => {

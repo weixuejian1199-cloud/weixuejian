@@ -18,7 +18,8 @@ import {
 import { Streamdown } from "streamdown";
 import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTableRenderer";
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
-import { smartUpload, pollUploadStatus, chatStream, generateReport, getDownloadUrl, type SuggestedAction } from "@/lib/api";
+import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, uploadParsed, type SuggestedAction } from "@/lib/api";
+import { parseFile } from "@/lib/parseFile";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
@@ -150,32 +151,28 @@ export default function MainWorkspace() {
       updateMessageById(assistantMsgId, content, extra, taskId);
 
     // 进度定时器引用（用于清理）
-    const progressTimers: ReturnType<typeof setTimeout>[] = [];
     let currentProgress = 5;
 
-    // 上传阶段：5% → 30%（随文件上传真实进度推进）
-    const uploadPhaseTimer = setInterval(() => {
-      if (currentProgress < 28) {
-        currentProgress = Math.min(currentProgress + 3, 28);
-        updateMyMsg("", { isAnalyzing: true, analyzeProgress: currentProgress });
-      }
-    }, 400);
-    progressTimers.push(uploadPhaseTimer as any);
-
     try {
-      // Phase 1: upload file (0% → 30%)
-      const uploadResult = await smartUpload(file, (percent) => {
-        updateUploadedFile(tempId, { uploadProgress: percent });
-        // 上传进度映射到 5%-30% 区间
-        const mappedProgress = Math.round(5 + (percent / 100) * 25);
+      // Phase 1: 前端本地解析 Excel/CSV（0% → 30%，利用用户本地 CPU）
+      updateMyMsg("", { isAnalyzing: true, analyzeProgress: 8 });
+      updateUploadedFile(tempId, { uploadProgress: 5 });
+
+      const parsed = await parseFile(file);
+
+      currentProgress = 20;
+      updateMyMsg("", { isAnalyzing: true, analyzeProgress: 20 });
+      updateUploadedFile(tempId, { uploadProgress: 20 });
+
+      // Phase 1b: 将解析结果发给服务器（只传 JSON，不传原始文件）
+      const uploadResult = await uploadParsed(parsed, (percent) => {
+        const mappedProgress = Math.round(20 + (percent / 100) * 10);
         if (mappedProgress > currentProgress) {
           currentProgress = mappedProgress;
           updateMyMsg("", { isAnalyzing: true, analyzeProgress: currentProgress });
+          updateUploadedFile(tempId, { uploadProgress: mappedProgress });
         }
       });
-
-      // 上传完成，清除上传阶段定时器
-      clearInterval(uploadPhaseTimer);
 
       // Phase 2: poll for async processing result (30% → 100%)
       currentProgress = 30;
@@ -186,7 +183,7 @@ export default function MainWorkspace() {
       // Otherwise poll the status endpoint until ready
       let result;
       if (uploadResult.ai_analysis) {
-        // Sync result (small file processed inline)
+        // Sync result (processed inline)
         result = uploadResult;
       } else {
         // Async result: poll status endpoint
@@ -234,10 +231,9 @@ export default function MainWorkspace() {
         setPendingActions(DEFAULT_ACTIONS);
       }
 
-      // 分析结果出来后，清除所有定时器，替换为真实内容
+      // 分析结果出来后，替换为真实内容
       const showResult = () => {
-        resultShown = true; // Set flag before clearing timers to prevent race condition
-        progressTimers.forEach(t => { clearTimeout(t); clearInterval(t as any); });
+        resultShown = true;
         const analysisText = result.ai_analysis ||
           `这是一份数据文件，共 ${result.df_info.row_count} 行、${result.df_info.col_count} 列。`;
         const { cleanText, suggestions } = parseSuggestionsHelper(analysisText);
@@ -259,9 +255,7 @@ export default function MainWorkspace() {
       setTimeout(showResult, 1500);
 
     } catch (err: any) {
-      // 清除所有定时器
-      progressTimers.forEach(t => { clearTimeout(t); clearInterval(t as any); });
-      clearInterval(uploadPhaseTimer);
+      // 清理（前端解析模式无定时器）
       // 移除进度条消息（替换为错误提示）
       updateMyMsg(`上传失败：${(err as any).message || "请重试"}`, {
         isAnalyzing: false,

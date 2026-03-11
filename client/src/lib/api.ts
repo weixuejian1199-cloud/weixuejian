@@ -3,6 +3,7 @@
  * Connects to Express backend at /api/atlas/*
  * All endpoints are same-origin (no CORS issues)
  */
+import type { ParsedFileData } from "./parseFile";
 
 export interface FieldInfo {
   name: string;
@@ -233,6 +234,36 @@ export async function smartUpload(
     return chunkedUpload(file, onProgress);
   }
   return uploadFile(file, onProgress);
+}
+
+// ── Upload Parsed (frontend-parsed data, no server XLSX processing) ──────────
+
+export async function uploadParsed(
+  parsed: ParsedFileData,
+  onProgress?: (percent: number) => void
+): Promise<UploadResponse> {
+  if (onProgress) onProgress(10);
+
+  const res = await fetch("/api/atlas/upload-parsed", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(parsed),
+  });
+
+  if (onProgress) onProgress(30);
+
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try { const err = await res.json(); msg = err.error || msg; } catch {}
+    if (res.status === 401) msg = "登录已过期，请重新登录";
+    else if (res.status >= 500) msg = "服务器处理失败，请稍后重试";
+    throw new Error(msg);
+  }
+
+  const data = await res.json();
+  if (onProgress) onProgress(30);
+  return data as UploadResponse;
 }
 
 // ── Chat (streaming) ──────────────────────────────────────────────────────────

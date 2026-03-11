@@ -784,3 +784,11 @@
 - [x] 后端新增 POST /api/atlas/upload-chunk：接收 1MB 分块，收齐后触发后台处理
 - [x] 前端 api.ts：新增 chunkedUpload（文件>5MB 切块上传）和 smartUpload（自动选择策略）
 - [x] 前端 MainWorkspace.tsx：改用 smartUpload，大文件自动分块，小文件走原流程
+
+## 前端解析方案（彻底解决大文件超时）
+
+- [x] 前端 client/src/lib/parseFile.ts：浏览器本地解析 Excel/CSV（全量扫描统计 + 仅保留前500行预览）
+- [x] 后端 server/atlas.ts：新增 POST /api/atlas/upload-parsed 端点（接收前端预解析 JSON，跳过服务端 XLSX 解析）
+- [x] 前端 client/src/lib/api.ts：新增 uploadParsed 函数（POST JSON 到 /upload-parsed）
+- [x] 前端 client/src/pages/MainWorkspace.tsx：processFile 改为先本地解析再发 JSON，移除 progressTimers/uploadPhaseTimer 残留引用
+- [x] tsc 0 errors，vitest 104/104 全通过
