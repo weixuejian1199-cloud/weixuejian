@@ -587,7 +587,7 @@ function computeKeyMetrics(
   const fmtAmount = (n: number): string => {
     const wan = n / 10000;
     const wanStr = `${wan.toFixed(2)} 万`;
-    const yuanStr = `(${Math.round(n).toLocaleString()} 元)`;
+    const yuanStr = `(${n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} 元)`;
     return `${wanStr} ${yuanStr}`;
   };
 
@@ -1579,7 +1579,7 @@ export function registerAtlasRoutes(app: Express) {
           }
           if (vals.length === 0 && f.sum === undefined) return null;
           const sorted = [...vals].sort((a, b) => b - a);
-          return { name: f.name, sum: Math.round(sum), avg: Math.round(avg), max, min, zeros, outliers, count: dfInfo.row_count || vals.length, top3: sorted.slice(0, 3) };
+          return { name: f.name, sum, avg, max, min, zeros, outliers, count: dfInfo.row_count || vals.length, top3: sorted.slice(0, 3) };
         })
         .filter(Boolean);
 
@@ -1641,10 +1641,10 @@ export function registerAtlasRoutes(app: Express) {
 ══ 全量统计摘要（基于 ${dfInfo.row_count.toLocaleString()} 行全量数据，非样本）══
 重要约束：当用户询问总量/合计/均値/最大/最小等聚合指标时，必须直接引用以下全量统计値，禁止对样本行重新计算。
 ${topPerformers.map(s => [
-  `${s!.name}总计: ${s!.sum.toLocaleString()}`,
-  `${s!.name}均値: ${s!.avg.toLocaleString()}`,
-  `${s!.name}最大: ${s!.max.toLocaleString()}`,
-  `${s!.name}最小: ${s!.min.toLocaleString()}`,
+  `${s!.name}总计: ${s!.sum.toFixed(2)}`,
+  `${s!.name}均値: ${s!.avg.toFixed(2)}`,
+  `${s!.name}最大: ${s!.max.toFixed(2)}`,
+  `${s!.name}最小: ${s!.min.toFixed(2)}`,
   `${s!.name}零値或空白: ${s!.zeros}个`,
   `${s!.name}异常高値(>均化3倍): ${s!.outliers}个`,
   s!.top5IsFullData && s!.top5!.length > 0
@@ -1762,7 +1762,7 @@ ${isMultiFile ? (() => {
     );
     const allStats = relevantStats.length > 0 ? relevantStats : pfp.numericStats.slice(0, 5);
     const statsLines = allStats.map(ns =>
-      `${ns.name}合计: ${ns.sum.toLocaleString()}\n${ns.name}均值: ${ns.avg.toLocaleString()}\n${ns.name}最大: ${ns.max.toLocaleString()}\n${ns.name}最小: ${ns.min.toLocaleString()}`
+      `${ns.name}合计: ${ns.sum.toFixed(2)}\n${ns.name}均値: ${ns.avg.toFixed(2)}\n${ns.name}最大: ${ns.max.toFixed(2)}\n${ns.name}最小: ${ns.min.toFixed(2)}`
     ).join('\n');
     const sampleData = pfp.data.slice(0, 3);
     const sampleHeaders = pfp.dfInfo.fields.slice(0, 8).map((f: FieldInfo) => f.name);
@@ -1794,7 +1794,7 @@ ${sampleTable}`;
       return acc + (ns?.sum ?? 0);
     }, 0);
     const totalRows = perFileProfiles.reduce((acc, pfp) => acc + pfp.rowCount, 0);
-    totals.push(`${fieldName}合计(全部文件): ${total.toLocaleString()}`);
+    totals.push(`${fieldName}合计(全部文件): ${total.toFixed(2)}`);
     if (totals.length === 1) totals.push(`总行数(全部文件): ${totalRows.toLocaleString()}`);
   }
   return sections.join('\n\n') + (totals.length > 0 ? `\n\n══ 跨文件汇总 ══\n${totals.join('\n')}` : '');

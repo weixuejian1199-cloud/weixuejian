@@ -835,3 +835,10 @@
 - [x] 任务 C：每个文件独立构建 perFileProfile（独立加载 dfInfo + S3 data + numericStats + groupedTop5Map），禁止复用第一个文件数据
 - [x] 任务 D：多文件时断言 fileIds 互不相同，不满足则返回 500 错误
 - [x] 任务 E：多文件时 system prompt 为每个文件独立输出 dataset_profile[序号] 段，包含 source_file_id/source_file_name/source_row_count/全量统计摘要/sample_rows，并输出跨文件汇总段
+
+## 口径 B 统一（全链路保留原始精确值，2位小数展示）
+
+- [x] chat 端点 numericStats：去掉 Math.round(sum) 和 Math.round(avg)，保留原始浮点値
+- [x] statsContext 中 sum/avg/max/min 展示改为 toFixed(2)
+- [x] 多文件 statsLines 和跨文件汇总 total 展示改为 toFixed(2)
+- [x] computeKeyMetrics 中 fmtAmount 的 yuanStr 去掉 Math.round(n)，改为 n.toFixed(2) 保留 2 位小数
