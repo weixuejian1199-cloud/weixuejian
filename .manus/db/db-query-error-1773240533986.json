@@ -1,0 +1,8 @@
+{
+  "query": "\nSELECT id, original_name, row_count, col_count, created_at,\n       JSON_LENGTH(JSON_EXTRACT(df_info, '$.fields')) as field_count\nFROM sessions\nWHERE original_name LIKE '%爱比爱尼%' OR original_name LIKE '%时皙%' OR original_name LIKE '%时暫%' OR original_name LIKE '%时哲%'\nORDER BY created_at DESC\nLIMIT 20;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute \nSELECT id, original_name, row_count, col_count, created_at,\n       JSON_LENGTH(JSON_EXTRACT(df_info, '$.fields')) as field_count\nFROM sessions\nWHERE original_name LIKE '%爱比爱尼%' OR original_name LIKE '%时皙%' OR original_name LIKE '%时暫%' OR original_name LIKE '%时哲%'\nORDER BY created_at DESC\nLIMIT 20;\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 2: Unknown column 'original_name' in 'where clause'"
+  ]
+}

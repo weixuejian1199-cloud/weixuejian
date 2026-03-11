@@ -20,7 +20,7 @@ export interface ColumnStat {
   top5Heap: Array<{ value: number; rowIndex: number }>;
 }
 
-// Grouped top5 entry: group label + aggregated sum from full dataset
+// Grouped topN entry: group label + aggregated sum from full dataset
 export interface GroupedTop5Entry {
   label: string;   // e.g. "达人昵称" value
   sum: number;     // aggregated sum of the numeric field for this group
@@ -41,7 +41,7 @@ export interface ParsedField {
   avg?: number;
   // top5: value-descending, each entry is { value, rowIndex } — from full dataset (row-level)
   top5?: Array<{ value: number; rowIndex: number }>;
-  // groupedTop5: GROUP BY dimension field, SUM numeric field, TOP5 by sum — from full dataset
+  // groupedTop5: GROUP BY dimension field, SUM numeric field, TOP20 by sum — from full dataset
   groupedTop5?: GroupedTop5Entry[];
   // which dimension field was used for groupedTop5
   groupByField?: string;
@@ -56,37 +56,126 @@ export interface ParsedFileData {
   sampleRows: Record<string, unknown>[]; // first 20 rows for AI prompt
   // The dimension field used for groupedTop5 (e.g. "达人昵称")
   groupByField?: string;
+  // All detected dimension fields by priority tier (for multi-dim grouping)
+  allGroupByFields?: Array<{ field: string; tier: number }>;
 }
 
 const PREVIEW_ROWS = 500;
 const SAMPLE_ROWS = 20;
-
-// Keywords used to identify dimension/grouping fields for TopN aggregation
-const GROUP_FIELD_KEYWORDS = ["达人", "昵称", "姓名", "店铺", "商品", "SKU", "品牌"];
+// Store top 20 for grouping so AI can return Top10/Top20 accurately
+const GROUPED_TOP_N = 20;
 
 /**
- * Detect the best grouping dimension field from headers.
- * Returns the first header that contains any GROUP_FIELD_KEYWORDS.
- * Returns null if no reliable dimension field found.
+ * Priority-tiered dimension field detection.
+ *
+ * Rules (applied in order):
+ * 1. Candidate field MUST be text type (not numeric/amount/fee/price etc.)
+ * 2. Field name must NOT contain amount/fee/price patterns (金额/优惠/费用/佣金/补贴/承担/支付/单价)
+ * 3. After filtering, rank by tier:
+ *    Tier 1 (达人/主播 — influencer): exact "达人昵称" > "主播昵称" > "达人名称" > "主播名称" > "达人ID" > "主播ID" > other 达人/主播
+ *    Tier 2 (昵称 — nickname): "昵称"
+ *    Tier 3 (姓名/人员): "姓名", "员工姓名", "用户名", "名字"
+ *    Tier 4 (店铺/商家): "店铺名称", "店铺", "商家名称", "商家"
+ *    Tier 5 (商品/SKU/品牌): "商品名称", "商品", "SKU", "品牌"
+ * 4. NO fallback: if no qualifying field found, return null — never infer from product/store names
  */
-function detectGroupByField(headers: string[]): string | null {
-  for (const h of headers) {
-    for (const kw of GROUP_FIELD_KEYWORDS) {
-      if (h.includes(kw)) return h;
-    }
-  }
-  return null;
+
+/** Patterns that indicate a field is a monetary/fee amount — must NOT be used as group-by dimension */
+const AMOUNT_FIELD_PATTERNS = [
+  "金额", "优惠", "费用", "佣金", "补贴", "承担", "支付", "单价",
+  "price", "amount", "money", "fee", "cost",
+];
+
+/** Numeric-type keywords that disqualify a field as a dimension */
+const NUMERIC_TYPE_KEYWORDS = [
+  "numeric", "number", "float", "double", "decimal",
+  "amount", "price", "money", "fee", "int", "integer", "bigint",
+];
+
+/**
+ * Returns true if the field name matches an amount/fee pattern and should be excluded from grouping.
+ */
+function isAmountField(fieldName: string): boolean {
+  const lower = fieldName.toLowerCase();
+  return AMOUNT_FIELD_PATTERNS.some((p) => fieldName.includes(p) || lower.includes(p.toLowerCase()));
 }
 
 /**
- * Compute GROUP BY + SUM top5 for a numeric field, grouped by a dimension field.
- * Returns top5 entries sorted by aggregated sum descending.
+ * Returns true if the detected dtype indicates a numeric/monetary column.
  */
-function computeGroupedTop5(
+function isNumericDtype(dtype: string): boolean {
+  const lower = dtype.toLowerCase();
+  return NUMERIC_TYPE_KEYWORDS.some((k) => lower.includes(k));
+}
+
+const DIMENSION_TIERS: Array<{ tier: number; keywords: string[] }> = [
+  // Tier 1: influencer fields — ordered by specificity (exact match preferred)
+  { tier: 1, keywords: ["达人昵称", "主播昵称", "达人名称", "主播名称", "达人ID", "主播ID", "达人", "主播"] },
+  { tier: 2, keywords: ["昵称"] },
+  { tier: 3, keywords: ["姓名", "员工姓名", "用户名", "名字"] },
+  { tier: 4, keywords: ["店铺名称", "店铺", "商家名称", "商家"] },
+  { tier: 5, keywords: ["商品名称", "商品", "SKU", "品牌"] },
+];
+
+/**
+ * Detect all valid dimension fields from headers.
+ * fieldTypes maps header name → detected type ("numeric" | "text" | "datetime").
+ *
+ * Filtering rules (MUST pass ALL):
+ * 1. Field type must be "text" or "datetime" (not "numeric")
+ * 2. Field name must NOT match AMOUNT_FIELD_PATTERNS
+ *
+ * Returns fields sorted by tier (ascending = higher priority).
+ */
+function detectAllGroupByFields(
+  headers: string[],
+  fieldTypes?: Record<string, "numeric" | "text" | "datetime">
+): Array<{ field: string; tier: number }> {
+  const result: Array<{ field: string; tier: number }> = [];
+  const seen = new Set<string>();
+
+  for (const { tier, keywords } of DIMENSION_TIERS) {
+    for (const kw of keywords) {
+      // Within each tier, prefer exact match first, then contains
+      const exactMatches = headers.filter((h) => !seen.has(h) && h === kw);
+      const containsMatches = headers.filter((h) => !seen.has(h) && h !== kw && h.includes(kw));
+      for (const h of [...exactMatches, ...containsMatches]) {
+        if (seen.has(h)) continue;
+        // Rule 1: must be text type (if type info available)
+        if (fieldTypes && fieldTypes[h] === "numeric") continue;
+        // Rule 2: field name must not contain amount/fee patterns
+        if (isAmountField(h)) continue;
+        result.push({ field: h, tier });
+        seen.add(h);
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * Returns the highest-priority valid dimension field, or null if none qualify.
+ * Never falls back to store/product names when looking for influencer fields.
+ */
+function detectGroupByField(
+  headers: string[],
+  fieldTypes?: Record<string, "numeric" | "text" | "datetime">
+): string | null {
+  const all = detectAllGroupByFields(headers, fieldTypes);
+  return all.length > 0 ? all[0].field : null;
+}
+
+/**
+ * Compute GROUP BY + SUM topN for a numeric field, grouped by a dimension field.
+ * Returns topN entries sorted by aggregated sum descending.
+ * Default topN = 20 so callers can slice to any smaller N (Top5, Top10, Top20).
+ */
+function computeGroupedTopN(
   rows: Record<string, unknown>[],
   numericField: string,
   groupField: string,
-  sourceFilename: string
+  sourceFilename: string,
+  topN = GROUPED_TOP_N
 ): GroupedTop5Entry[] {
   const groupSums: Map<string, number> = new Map();
   for (const row of rows) {
@@ -97,10 +186,10 @@ function computeGroupedTop5(
     const key = String(groupVal);
     groupSums.set(key, (groupSums.get(key) ?? 0) + numVal);
   }
-  // Sort by sum descending, take top 5
+  // Sort by sum descending, take topN
   const sorted = Array.from(groupSums.entries())
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
+    .slice(0, topN);
   return sorted.map(([label, sum]) => ({ label, sum, source: sourceFilename }));
 }
 
@@ -196,12 +285,22 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
 
   // Detect column types using first 200 rows sample
   const sampleForType = rows.slice(0, 200);
-  // Detect dimension field for groupedTop5
-  const groupByField = detectGroupByField(headers);
+
+  // First pass: detect all column types so we can filter out numeric fields from groupBy
+  const headerTypes: Record<string, "numeric" | "text" | "datetime"> = {};
+  for (const h of headers) {
+    const sampleVals = sampleForType.map((r) => r[h]);
+    headerTypes[h] = detectType(sampleVals);
+  }
+
+  // Detect dimension fields with priority tiers — pass type map to filter out numeric fields
+  const allGroupByFields = detectAllGroupByFields(headers, headerTypes);
+  // Primary groupBy field = highest priority tier (null if no qualifying text field found)
+  const groupByField = allGroupByFields.length > 0 ? allGroupByFields[0].field : null;
 
   const fields: ParsedField[] = headers.map((h) => {
     const sampleVals = sampleForType.map((r) => r[h]);
-    const type = detectType(sampleVals);
+    const type = headerTypes[h];
     const stat = stats[h];
     const isNumeric = type === "numeric";
 
@@ -221,9 +320,9 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
       field.avg = stat.sum / stat.count;
       // top5 sorted descending by value (full dataset, row-level)
       field.top5 = [...stat.top5Heap].sort((a, b) => b.value - a.value);
-      // groupedTop5: GROUP BY dimension field, SUM this numeric field, TOP5 by sum
+      // groupedTopN: GROUP BY primary dimension field, SUM this numeric field, TOP20 by sum
       if (groupByField) {
-        field.groupedTop5 = computeGroupedTop5(rows, h, groupByField, file.name);
+        field.groupedTop5 = computeGroupedTopN(rows, h, groupByField, file.name);
         field.groupByField = groupByField;
       }
     }
@@ -242,5 +341,6 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     preview,
     sampleRows,
     groupByField: groupByField ?? undefined,
+    allGroupByFields: allGroupByFields.length > 0 ? allGroupByFields : undefined,
   };
 }

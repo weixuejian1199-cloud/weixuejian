@@ -179,6 +179,10 @@ interface DataFrameInfo {
   col_count: number;
   fields: FieldInfo[];
   preview: Record<string, unknown>[];
+  // Primary dimension field used for groupedTop5 (e.g. "达人昵称")
+  groupByField?: string;
+  // All detected dimension fields with priority tiers (tier 1=达人, tier 2=昵称, tier 3=姓名, tier 4=店铺, tier 5=商品)
+  allGroupByFields?: Array<{ field: string; tier: number }>;
 }
 
 function inferType(values: unknown[]): "numeric" | "text" | "datetime" {
@@ -2700,6 +2704,7 @@ ${sampleRows}
         fields: FrontendParsedField[];
         preview: Record<string, unknown>[];
         groupByField?: string;
+        allGroupByFields?: Array<{ field: string; tier: number }>;
       };
 
       if (!parsed || !parsed.filename || !parsed.fields) {
@@ -2730,6 +2735,8 @@ ${sampleRows}
           ...(f.groupByField !== undefined ? { groupByField: f.groupByField } : {}),
         })),
         preview: (parsed.preview || []).slice(0, 5),
+        ...(parsed.groupByField !== undefined ? { groupByField: parsed.groupByField } : {}),
+        ...(parsed.allGroupByFields !== undefined ? { allGroupByFields: parsed.allGroupByFields } : {}),
       };
 
       await createSession({
