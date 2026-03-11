@@ -29,7 +29,8 @@ import { getSession, createSession, updateSession, createReport, updateReport, g
 import { authenticateRequest } from "./_core/auth";
 import { isOpenClawEnabled, callOpenClaw, callOpenClawStream, getPresignedUrlsForSessions } from "./openclaw";
 import { pushAtlasMsgToOpenClaw, pushQwenReplyToOpenClaw } from "./im/wsServer";
-import { openclawTasks, chatConversations, chatMessages, personalTemplates } from "../drizzle/schema";
+import { openclawTasks, chatConversations, chatMessages, personalTemplates, sessions } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
 
 // ── In-memory Rate Limiter ───────────────────────────────────────────────────
 // Limits /api/atlas/chat to 20 requests per user per minute
@@ -800,8 +801,21 @@ export function registerAtlasRoutes(app: Express) {
       const sessionId = nanoid();
       const fileKey = `atlas-uploads/${sessionId}-${Date.now()}.${ext}`;
 
-      // 1. Upload original file to S3
-      const { url: fileUrl } = await storagePut(fileKey, buffer, mimetype);
+      // 1. Upload original file to S3 — run in background to avoid blocking main flow
+      // Large files (15MB+) can take 10-30s to upload; we don't need the URL before AI analysis
+      let fileUrl = `pending:${fileKey}`; // placeholder until background upload completes
+      storagePut(fileKey, buffer, mimetype)
+        .then(async ({ url }) => {
+          // Update session record with real URL once upload finishes
+          fileUrl = url;
+          try {
+            const db = await getDb();
+            if (db) await db.update(sessions).set({ fileUrl: url }).where(eq(sessions.id, sessionId));
+          } catch (e) {
+            console.warn("[Atlas] Background S3 URL update failed:", e);
+          }
+        })
+        .catch((e) => console.warn("[Atlas] Background S3 upload failed:", e));
 
       // 2. Parse data
       let data: Record<string, unknown>[];
@@ -831,7 +845,15 @@ export function registerAtlasRoutes(app: Express) {
       const workingData = normalizedData;
 
       // 3. Persist parsed data to S3 (for AI chat — survives restarts)
-      await storeSessionData(sessionId, workingData);
+      // For large files, truncate stored rows to MAX_STORED_ROWS to reduce S3 upload size/time
+      const MAX_STORED_ROWS = 50_000;
+      const dataToStore = workingData.length > MAX_STORED_ROWS
+        ? workingData.slice(0, MAX_STORED_ROWS)
+        : workingData;
+      if (workingData.length > MAX_STORED_ROWS) {
+        console.warn(`[Atlas] Large file truncated for storage: ${workingData.length} → ${MAX_STORED_ROWS} rows (session ${sessionId})`);
+      }
+      await storeSessionData(sessionId, dataToStore);
 
       // 4. Create session record in DB (dfInfo stored in JSON column)
       await createSession({
@@ -840,7 +862,7 @@ export function registerAtlasRoutes(app: Express) {
         filename: fileKey,
         originalName: originalname,
         fileKey,
-        fileUrl,
+        fileUrl: fileUrl, // may be placeholder if background upload not yet done
         fileSizeKb: Math.ceil(buffer.length / 1024),
         rowCount: dfInfo.row_count,
         colCount: dfInfo.col_count,

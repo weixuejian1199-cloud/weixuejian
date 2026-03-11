@@ -265,12 +265,16 @@ export default function MainWorkspace() {
     }
   }, [addUploadedFile, updateUploadedFile, addMessage, updateMessageById, setIsGenerating, activeTaskId, tasks, updateTask]);
 
-  const handleFiles = useCallback((files: FileList | File[]) => {
+  const handleFiles = useCallback(async (files: FileList | File[]) => {
     // Ensure we have an active task
     // Note: createNewTask() returns the new task ID synchronously (before React re-renders)
     // We pass it explicitly to processFile to avoid the stale activeTaskId closure issue
     const taskId = activeTaskId || createNewTask();
-    Array.from(files).forEach(file => processFile(file, taskId));
+    // Serial queue: process files one at a time to avoid concurrent S3/AI overload.
+    // Concurrent uploads can exhaust rate limits and cause all uploads to fail simultaneously.
+    for (const file of Array.from(files)) {
+      await processFile(file, taskId);
+    }
   }, [processFile, activeTaskId, createNewTask]);
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
