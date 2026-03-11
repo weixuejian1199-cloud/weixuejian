@@ -804,3 +804,18 @@
 - [x] /upload-parsed 端点 AI prompt：样本行段前加说明“仅用于理解字段含义，禁止对样本求和得出总量”
 - [x] /upload-parsed 端点 AI prompt：system prompt 补充规则“询问总量/合计/均値/最大/最小时，优先直接引用全量统计値，不得基于样本重新推算”
 - [x] chat 端点 numericStats：改为优先使用 dfInfo.fields 中的全量统计（sum/avg/max/min），而非对 500 行 data 重新计算
+
+## ATLAS V1.1 规范实现
+
+### 第一批 P0+P1
+- [x] 前端 parseFile：新增全量 top5 计算（每个数値字段取値最大的前5行，含行索引和値），存入 parsed.fields[].top5
+- [x] 服务端 /upload-parsed：dfInfo.fields 持久化 top5 数据
+- [x] 服务端 chat 端点：topPerformers 改用 dfInfo.fields 中的全量 top5，无全量 top5 时不展示排名
+- [x] 金额类指标统一双单位格式：computeKeyMetrics 返回値改为 "202.50 万 (2,024,968 元)" 格式
+- [x] 指标卡渲染：AtlasTableRenderer 支持 source 字段，底部显示数据来源提示
+- [x] 指标卡新增数据来源提示：fallbackTable 和 AI 生成的 atlas-table 均包含 source 字段
+- [x] AI prompt 中的数値格式也改为双单位（dataset_profile 中的金额字段）
+
+### 第二批 P2
+- [x] chat 端点 prompt：统计摘要段命名改为 dataset_profile，样本行段命名改为 sample_rows
+- [x] /upload-parsed 端点 prompt：同步命名规范

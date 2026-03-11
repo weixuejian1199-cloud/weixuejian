@@ -10,6 +10,7 @@ interface AtlasTableData {
   highlight?: number; // column index to highlight
   sortBy?: number;    // default sort column index
   sortDir?: "asc" | "desc";
+  source?: string;    // data source note, e.g. "基于 46,906 行全量数据统计"
 }
 
 interface AtlasTableRendererProps {
@@ -226,8 +227,17 @@ function AtlasTableView({ data, onAdjust }: { data: AtlasTableData; onAdjust?: (
             onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.15)"}
             onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.08)"}
           >
-            ✏️ 调整一下
-          </button>
+            ✏️ 调整一下</button>
+        )}
+        {!onAdjust && data.source && (
+          <span className="ml-auto text-xs" style={{ color: "var(--atlas-text-3)", opacity: 0.7 }}>
+            📊 {data.source}
+          </span>
+        )}
+        {onAdjust && data.source && (
+          <span className="text-xs" style={{ color: "var(--atlas-text-3)", opacity: 0.7 }}>
+            📊 {data.source}
+          </span>
         )}
       </div>
     </motion.div>

@@ -16,6 +16,8 @@ export interface ColumnStat {
   count: number; // non-null numeric count
   nullCount: number;
   uniqueValues: Set<string>; // for text columns, track unique count (cap at 1000)
+  // top5 heap: keep the 5 largest values seen so far (value + rowIndex)
+  top5Heap: Array<{ value: number; rowIndex: number }>;
 }
 
 export interface ParsedField {
@@ -25,11 +27,13 @@ export interface ParsedField {
   null_count: number;
   unique_count: number;
   sample: (string | number)[];
-  // numeric stats (only for numeric columns)
+  // numeric stats (only for numeric columns) — all computed from FULL dataset
   sum?: number;
   min?: number;
   max?: number;
   avg?: number;
+  // top5: value-descending, each entry is { value, rowIndex } — from full dataset
+  top5?: Array<{ value: number; rowIndex: number }>;
 }
 
 export interface ParsedFileData {
@@ -99,10 +103,11 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
   // Build per-column stats by scanning ALL rows
   const stats: Record<string, ColumnStat> = {};
   for (const h of headers) {
-    stats[h] = { sum: 0, min: Infinity, max: -Infinity, count: 0, nullCount: 0, uniqueValues: new Set() };
+    stats[h] = { sum: 0, min: Infinity, max: -Infinity, count: 0, nullCount: 0, uniqueValues: new Set(), top5Heap: [] };
   }
 
-  for (const row of rows) {
+  for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+    const row = rows[rowIdx];
     for (const h of headers) {
       const v = row[h];
       const stat = stats[h];
@@ -115,6 +120,15 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
           if (n < stat.min) stat.min = n;
           if (n > stat.max) stat.max = n;
           stat.count++;
+          // Maintain top5 heap (keep largest 5)
+          const heap = stat.top5Heap;
+          if (heap.length < 5) {
+            heap.push({ value: n, rowIndex: rowIdx });
+            if (heap.length === 5) heap.sort((a, b) => a.value - b.value); // min-heap order
+          } else if (n > heap[0].value) {
+            heap[0] = { value: n, rowIndex: rowIdx };
+            heap.sort((a, b) => a.value - b.value);
+          }
         } else {
           if (stat.uniqueValues.size < 1000) {
             stat.uniqueValues.add(String(v));
@@ -146,6 +160,8 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
       field.min = stat.min;
       field.max = stat.max;
       field.avg = stat.sum / stat.count;
+      // top5 sorted descending by value (full dataset)
+      field.top5 = [...stat.top5Heap].sort((a, b) => b.value - a.value);
     }
 
     return field;
