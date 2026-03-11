@@ -143,6 +143,12 @@ const upload = multer({
   },
 });
 
+// ── Multer for chunk uploads (no fileFilter — chunks are raw binary) ──────────
+const uploadChunk = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB per chunk
+});
+
 // ── Data parsing helpers ──────────────────────────────────────────────────────
 
 interface FieldInfo {
@@ -2099,7 +2105,7 @@ ${sampleRows}
     chunkStore.clear();
   }, 10 * 60_000);
 
-  app.post("/api/atlas/upload-chunk", optionalAuth, upload.single("chunk"), async (req: Request, res: Response) => {
+  app.post("/api/atlas/upload-chunk", optionalAuth, uploadChunk.single("chunk"), async (req: Request, res: Response) => {
     try {
       const { uploadId, chunkIndex, totalChunks, filename } = req.body as {
         uploadId: string;
