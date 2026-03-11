@@ -113,12 +113,12 @@ function createLLM(rowCount?: number) {
 }
 
 // Select model based on row count
+// NOTE: kimi-k2.5 is NOT used for initial upload analysis — it has 60-120s TTFT which causes
+// frontend polling timeouts. qwen3-max handles up to 50k rows fine for the 800-token analysis prompt.
 function selectModel(rowCount?: number): string {
   if (DASHSCOPE_API_KEY) {
-    // Use kimi-k2.5 for large files (>=10000 rows) for better long-context handling
-    if (rowCount && rowCount >= LARGE_FILE_THRESHOLD) {
-      return "kimi-k2.5";
-    }
+    // Always use qwen3-max for upload analysis (fast TTFT, sufficient context for 800-token output)
+    // kimi-k2.5 is reserved for future deep-analysis chat where long context is truly needed
     return "qwen3-max-2026-01-23";
   }
   // Fallback to Manus Forge model
@@ -1071,6 +1071,9 @@ export function registerAtlasRoutes(app: Express) {
           let aiAnalysis = "";
           try {
             const openai = createLLM();
+            // 45s timeout: qwen3-max typically responds in 5-15s; abort if exceeded to avoid frontend timeout
+            const aiAbortController = new AbortController();
+            const aiTimeoutId = setTimeout(() => aiAbortController.abort(), 45_000);
             const result = await streamText({
               model: openai.chat(selectModel(dfInfo.row_count)),
               system: uploadSystemPrompt,
@@ -1079,8 +1082,10 @@ export function registerAtlasRoutes(app: Express) {
                 content: `文件名：${originalname}，共 ${dfInfo.row_count} 行 ${dfInfo.col_count} 列。字段：${fieldSummary}。${qualityIssues.length > 0 ? '数据质量：' + qualityIssues.join('；') : '数据质量良好'}。已计算指标：${metricsSummary}`,
               }],
               maxOutputTokens: 800,
+              abortSignal: aiAbortController.signal,
             });
             aiAnalysis = await result.text;
+            clearTimeout(aiTimeoutId);
             if (!aiAnalysis.includes("atlas-table")) {
               console.warn("[Atlas] AI analysis missing atlas-table, using fallback");
               const intro = aiAnalysis.split("\n")[0] || `这是一份${scenario.name}，共${dfInfo.row_count}行、${dfInfo.col_count}列。`;
@@ -2329,13 +2334,18 @@ ${sampleRows}
           let aiAnalysis = "";
           try {
             const openai = createLLM();
+            // 45s timeout: qwen3-max typically responds in 5-15s; abort if exceeded to avoid frontend timeout
+            const aiAbortController = new AbortController();
+            const aiTimeoutId = setTimeout(() => aiAbortController.abort(), 45_000);
             const result = await streamText({
               model: openai.chat(selectModel(dfInfo.row_count)),
               system: uploadSystemPrompt,
               messages: [{ role: "user", content: `文件名：${originalname}，共 ${dfInfo.row_count} 行 ${dfInfo.col_count} 列。字段：${fieldSummary}。${qualityIssues.length > 0 ? '数据质量：' + qualityIssues.join('；') : '数据质量良好'}。已计算指标：${metricsSummary}` }],
               maxOutputTokens: 800,
+              abortSignal: aiAbortController.signal,
             });
             aiAnalysis = await result.text;
+            clearTimeout(aiTimeoutId);
             if (!aiAnalysis.includes("atlas-table")) {
               const intro = aiAnalysis.split("\n")[0] || `这是一份${scenario.name}，共${dfInfo.row_count}行、${dfInfo.col_count}列。`;
               aiAnalysis = `${intro}\n\n${fallbackTableStr}`;

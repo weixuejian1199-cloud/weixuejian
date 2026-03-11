@@ -80,10 +80,12 @@ export async function pollUploadStatus(
       throw new Error(data.error || "文件处理失败，请重试");
     }
 
-    // Still processing — advance progress bar slowly (35% → 92%)
-    if (onProgress && progress < 92) {
-      progress = Math.min(progress + 3, 92);
-      onProgress(progress);
+    // Still processing — advance progress bar slowly (35% → 98%)
+    // Slow down near the end to avoid appearing "stuck" at 92%
+    if (onProgress && progress < 98) {
+      const increment = progress < 80 ? 4 : progress < 92 ? 2 : 0.5;
+      progress = Math.min(progress + increment, 98);
+      onProgress(Math.round(progress));
     }
     await new Promise(r => setTimeout(r, POLL_INTERVAL));
   }
