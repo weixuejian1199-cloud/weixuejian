@@ -225,17 +225,26 @@ function parseExcelBuffer(buffer: Buffer, filename: string): { data: Record<stri
 }
 
 // Async wrapper: runs XLSX.read in a worker thread so the main event loop is never blocked.
-// This prevents Cloudflare 503 timeouts when processing large files (15MB+).
+// Memory-optimized: returns only first 200 rows + full-scan column statistics.
 // Worker script is pre-compiled to xlsxWorker.mjs (works in both dev and prod).
+type XlsxWorkerResult = {
+  data: Record<string, unknown>[];  // first 200 rows
+  sheetNames: string[];
+  totalRowCount: number;            // accurate full count
+  columnStats: Record<string, {
+    sum: number; min: number; max: number;
+    count: number; nullCount: number; uniqueCount: number;
+    isNumeric: boolean; sample: (string | number)[];
+  }>;
+  parseTimeMs: number;
+};
+
 function parseExcelBufferAsync(
   buffer: Buffer,
   filename: string
-): Promise<{ data: Record<string, unknown>[]; sheetNames: string[] }> {
+): Promise<XlsxWorkerResult> {
   return new Promise((resolve, reject) => {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    // xlsxWorker.mjs is pre-compiled from xlsxWorker.ts via esbuild
-    // In dev: server/xlsxWorker.mjs
-    // In prod: dist/xlsxWorker.mjs (copied by build script)
     const workerScript = path.resolve(__dirname, "xlsxWorker.mjs");
 
     const worker = new Worker(workerScript, {
@@ -245,11 +254,11 @@ function parseExcelBufferAsync(
       },
     });
 
-    worker.on("message", (result: { data: Record<string, unknown>[]; sheetNames: string[]; error?: string }) => {
+    worker.on("message", (result: XlsxWorkerResult & { error?: string }) => {
       if (result.error) {
         reject(new Error(result.error));
       } else {
-        resolve({ data: result.data, sheetNames: result.sheetNames });
+        resolve(result);
       }
     });
 
@@ -270,12 +279,32 @@ function parseCsvBuffer(buffer: Buffer): Record<string, unknown>[] {
   return result.data;
 }
 
-function buildDataFrameInfo(data: Record<string, unknown>[], sheetNames?: string[]): DataFrameInfo {
+function buildDataFrameInfo(
+  data: Record<string, unknown>[],
+  sheetNames?: string[],
+  totalRowCount?: number,
+  columnStats?: XlsxWorkerResult["columnStats"]
+): DataFrameInfo {
   if (data.length === 0) {
     return { row_count: 0, col_count: 0, fields: [], preview: [] };
   }
   const columns = Object.keys(data[0]);
+  const effectiveRowCount = totalRowCount ?? data.length;
   const fields: FieldInfo[] = columns.map(col => {
+    // Prefer full-scan stats from worker; fall back to computing from preview rows
+    if (columnStats && columnStats[col]) {
+      const st = columnStats[col];
+      const type = st.isNumeric ? "numeric" : "text";
+      return {
+        name: col,
+        type,
+        dtype: type === "numeric" ? "float64" : "object",
+        null_count: st.nullCount,
+        unique_count: st.uniqueCount,
+        sample: st.isNumeric ? st.sample.map(Number) : st.sample.map(String),
+      };
+    }
+    // Fallback: compute from preview rows
     const values = data.map(row => row[col]);
     const nonNull = values.filter(v => v !== null && v !== undefined && v !== "");
     const unique = new Set(nonNull.map(String)).size;
@@ -291,7 +320,7 @@ function buildDataFrameInfo(data: Record<string, unknown>[], sheetNames?: string
     };
   });
   return {
-    row_count: data.length,
+    row_count: effectiveRowCount,
     col_count: columns.length,
     fields,
     preview: data.slice(0, 5),
@@ -911,8 +940,11 @@ export function registerAtlasRoutes(app: Express) {
             const parsed = await parseExcelBufferAsync(buffer, originalname);
             data = parsed.data;
             sheetNames = parsed.sheetNames;
+            // Pass full-scan stats so row_count and field stats are accurate
+            (data as any).__xlsxMeta = { totalRowCount: parsed.totalRowCount, columnStats: parsed.columnStats };
           }
-          const dfInfo = buildDataFrameInfo(data, sheetNames);
+          const xlsxMeta = (data as any).__xlsxMeta;
+          const dfInfo = buildDataFrameInfo(data, sheetNames, xlsxMeta?.totalRowCount, xlsxMeta?.columnStats);
 
           // 3c. Normalize field names (P1-A: synonym mapping, non-destructive)
           const scenarioHint = detectScenario(dfInfo.fields);
@@ -2244,8 +2276,10 @@ ${sampleRows}
             const parsed = await parseExcelBufferAsync(buffer, originalname);
             data = parsed.data;
             sheetNames = parsed.sheetNames;
+            (data as any).__xlsxMeta = { totalRowCount: parsed.totalRowCount, columnStats: parsed.columnStats };
           }
-          const dfInfo = buildDataFrameInfo(data, sheetNames);
+          const xlsxMeta = (data as any).__xlsxMeta;
+          const dfInfo = buildDataFrameInfo(data, sheetNames, xlsxMeta?.totalRowCount, xlsxMeta?.columnStats);
           const scenarioHint = detectScenario(dfInfo.fields);
           const requiredByScenario: Record<string, string[]> = {
             payroll:    ["基本工资", "员工姓名"],
