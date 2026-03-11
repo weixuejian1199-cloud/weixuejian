@@ -865,6 +865,8 @@ export function registerAtlasRoutes(app: Express) {
           // 3b. Parse data
           let data: Record<string, unknown>[];
           let sheetNames: string[] | undefined;
+          // Yield event loop before CPU-intensive XLSX parse so status polls can respond (prevents 503)
+          await new Promise(r => setImmediate(r));
           if (ext === "csv") {
             data = parseCsvBuffer(buffer);
           } else {
@@ -872,6 +874,7 @@ export function registerAtlasRoutes(app: Express) {
             data = parsed.data;
             sheetNames = parsed.sheetNames;
           }
+          await new Promise(r => setImmediate(r));
           const dfInfo = buildDataFrameInfo(data, sheetNames);
 
           // 3c. Normalize field names (P1-A: synonym mapping, non-destructive)
@@ -2192,6 +2195,8 @@ ${sampleRows}
 
           let data: Record<string, unknown>[];
           let sheetNames: string[] | undefined;
+          // Yield event loop before CPU-intensive XLSX parse so status polls can respond (prevents 503)
+          await new Promise(r => setImmediate(r));
           if (ext === "csv") {
             data = parseCsvBuffer(buffer);
           } else {
@@ -2199,6 +2204,7 @@ ${sampleRows}
             data = parsed.data;
             sheetNames = parsed.sheetNames;
           }
+          await new Promise(r => setImmediate(r));
           const dfInfo = buildDataFrameInfo(data, sheetNames);
           const scenarioHint = detectScenario(dfInfo.fields);
           const requiredByScenario: Record<string, string[]> = {
