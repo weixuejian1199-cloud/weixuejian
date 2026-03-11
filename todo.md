@@ -797,3 +797,10 @@
 
 - [x] 修复 /upload-parsed 端点：computeKeyMetrics 使用预览数据（500行）而非全量统计，导致“数据总行数”显示 500 而非真实 46906
 - [x] 修复 AI 关键指标表：sum/avg/max/min 应来自前端传来的全量 fields 统计，而非 workingData 计算
+
+## Bug 修复：AI 对话仍基于样本行求和（而非全量统计）
+
+- [x] /upload-parsed 端点 AI prompt：全量统计摘要改为结构化键値输出（字段名: 数値，每行一条）
+- [x] /upload-parsed 端点 AI prompt：样本行段前加说明“仅用于理解字段含义，禁止对样本求和得出总量”
+- [x] /upload-parsed 端点 AI prompt：system prompt 补充规则“询问总量/合计/均値/最大/最小时，优先直接引用全量统计値，不得基于样本重新推算”
+- [x] chat 端点 numericStats：改为优先使用 dfInfo.fields 中的全量统计（sum/avg/max/min），而非对 500 行 data 重新计算

@@ -161,6 +161,11 @@ interface FieldInfo {
   null_count: number;
   unique_count: number;
   sample: (string | number)[];
+  // Full-dataset statistics (populated by /upload-parsed from frontend scan)
+  sum?: number;
+  avg?: number;
+  max?: number;
+  min?: number;
 }
 
 interface DataFrameInfo {
@@ -1442,16 +1447,27 @@ export function registerAtlasRoutes(app: Express) {
         .filter((f: FieldInfo) => f.type === 'numeric')
         .map((f: FieldInfo) => {
           const vals = data.map(row => Number(row[f.name])).filter(v => !isNaN(v) && v !== 0);
-          if (vals.length === 0) return null;
-          const sum = vals.reduce((a, b) => a + b, 0);
-          const avg = sum / vals.length;
-          const max = Math.max(...vals);
-          const min = Math.min(...vals);
-          const sorted = [...vals].sort((a, b) => b - a);
           const zeros = data.filter(row => !row[f.name] || Number(row[f.name]) === 0).length;
-          // Detect outliers: values > avg * 3
-          const outliers = vals.filter(v => v > avg * 3).length;
-          return { name: f.name, sum: Math.round(sum), avg: Math.round(avg), max, min, zeros, outliers, count: vals.length, top3: sorted.slice(0, 3) };
+          // Prefer full-dataset stats from dfInfo (stored by /upload-parsed from frontend scan)
+          // Fall back to computing from preview rows if not available
+          let sum: number, avg: number, max: number, min: number, outliers: number;
+          if (f.sum !== undefined && f.avg !== undefined && f.max !== undefined && f.min !== undefined) {
+            sum = f.sum;
+            avg = f.avg;
+            max = f.max;
+            min = f.min;
+            outliers = vals.filter(v => v > avg * 3).length;
+          } else {
+            if (vals.length === 0) return null;
+            sum = vals.reduce((a, b) => a + b, 0);
+            avg = sum / vals.length;
+            max = Math.max(...vals);
+            min = Math.min(...vals);
+            outliers = vals.filter(v => v > avg * 3).length;
+          }
+          if (vals.length === 0 && f.sum === undefined) return null;
+          const sorted = [...vals].sort((a, b) => b - a);
+          return { name: f.name, sum: Math.round(sum), avg: Math.round(avg), max, min, zeros, outliers, count: dfInfo.row_count || vals.length, top3: sorted.slice(0, 3) };
         })
         .filter(Boolean);
 
@@ -1477,8 +1493,18 @@ export function registerAtlasRoutes(app: Express) {
       }).filter(Boolean);
 
       const statsContext = numericStats.length > 0 ? `
-真实统计数据（已计算，基于全部${data.length}行数据）：
-${topPerformers.map(s => `- ${s!.name}: 总和=${s!.sum.toLocaleString()}, 均値=${s!.avg.toLocaleString()}, 最高=${s!.max.toLocaleString()}, 最低=${s!.min.toLocaleString()}, 零値或空白=${s!.zeros}个, 异常高値(>3倍均値)=${s!.outliers}个, 前5名: ${s!.top5?.join(' / ')}`).join('\n')}
+══ 全量统计摘要（基于 ${dfInfo.row_count.toLocaleString()} 行全量数据，非样本）══
+重要约束：当用户询问总量/合计/均値/最大/最小等聚合指标时，必须直接引用以下全量统计値，禁止对样本行重新计算。
+${topPerformers.map(s => [
+  `${s!.name}总计: ${s!.sum.toLocaleString()}`,
+  `${s!.name}均値: ${s!.avg.toLocaleString()}`,
+  `${s!.name}最大: ${s!.max.toLocaleString()}`,
+  `${s!.name}最小: ${s!.min.toLocaleString()}`,
+  `${s!.name}零値或空白: ${s!.zeros}个`,
+  `${s!.name}异常高値(>均化3倍): ${s!.outliers}个`,
+  `${s!.name}前5名: ${s!.top5?.join(' / ')}`,
+].join('\n')).join('\n')}
+══ 全量统计摘要结束 ══
 ` : '';
 
       const categoryContext = categoricalFields.length > 0 ? `
@@ -1586,7 +1612,8 @@ ${categoricalFields.map(c => `- ${c.name}: ${c.uniqueCount}个不同分组, 示�
 ${fieldSummary}
 ${statsContext}${categoryContext}${fieldAliasContext}
 
-数据样本（前${maxRows}行，用于理解数据结构；完整统计已在上方）：
+数据样本（仅前${maxRows}行，仅用于理解字段含义和数据结构，不代表全量数据）：
+❗❗ 禁止对以下样本行求和得出总量。总量/合计/均値/最大/最小必须使用上方「全量统计摘要」中的数值。
 ${dataTable}
 
 ══ 核心交付规则（最高优先级）══
@@ -2490,6 +2517,8 @@ ${sampleRows}
           null_count: f.null_count,
           unique_count: f.unique_count,
           sample: f.sample,
+          // Persist full-dataset stats so chat endpoint can use them without recomputing from preview
+          ...(f.sum !== undefined ? { sum: f.sum, avg: f.avg, max: f.max, min: f.min } : {}),
         })),
         preview: (parsed.preview || []).slice(0, 5),
       };
@@ -2544,7 +2573,17 @@ ${sampleRows}
             .map(f => ({ name: f.name, sum: f.sum, avg: f.avg, max: f.max, min: f.min }));
           const keyMetrics = computeKeyMetrics(normalizedData, scenario, dfInfo, precomputedStats);
 
-          // Compact field summary: stats only (much smaller prompt than sending rows)
+          // Structured full-dataset stats summary for AI prompt
+          const numericFieldStats = dfInfo.fields
+            .filter(f => f.type === "numeric" && f.sum !== undefined)
+            .slice(0, 10)
+            .map(f => [
+              `${f.name}总计: ${f.sum!.toLocaleString()}`,
+              `${f.name}均値: ${f.avg !== undefined ? f.avg.toFixed(2) : 'N/A'}`,
+              `${f.name}最大: ${f.max !== undefined ? f.max.toLocaleString() : 'N/A'}`,
+              `${f.name}最小: ${f.min !== undefined ? f.min.toLocaleString() : 'N/A'}`,
+            ].join('\n'))
+            .join('\n');
           const fieldSummary = dfInfo.fields.slice(0, 15).map(f => {
             const fe = parsed.fields.find(pf => pf.name === f.name);
             const statsStr = fe?.sum !== undefined
@@ -2635,7 +2674,13 @@ ${sampleRows}
               system: uploadSystemPrompt,
               messages: [{
                 role: "user",
-                content: `\u6587\u4ef6\u540d\uff1a${originalname}\uff0c\u5171 ${dfInfo.row_count} \u884c ${dfInfo.col_count} \u5217\u3002\u5b57\u6bb5\uff1a${fieldSummary}\u3002${qualityIssues.length > 0 ? '\u6570\u636e\u8d28\u91cf\uff1a' + qualityIssues.join('\uff1b') : '\u6570\u636e\u8d28\u91cf\u826f\u597d'}\u3002\u5df2\u8ba1\u7b97\u6307\u6807\uff1a${metricsSummary}`,
+                content: [
+                `\u6587\u4ef6\u540d\uff1a${originalname}\uff0c\u5171 ${dfInfo.row_count.toLocaleString()} \u884c ${dfInfo.col_count} \u5217\u3002`,
+                `\u5b57\u6bb5\u5217\u8868\uff1a${fieldSummary}`,
+                numericFieldStats ? `\n\u2550\u2550 \u5168\u91cf\u7edf\u8ba1\u6458\u8981\uff08\u57fa\u4e8e ${dfInfo.row_count.toLocaleString()} \u884c\u5168\u91cf\u6570\u636e\uff0c\u975e\u6837\u672c\uff09\u2550\u2550\n\u91cd\u8981\u7ea6\u675f\uff1a\u8be2\u95ee\u603b\u91cf/\u5408\u8ba1/\u5747\u5024/\u6700\u5927/\u6700\u5c0f\u65f6\uff0c\u5fc5\u987b\u76f4\u63a5\u5f15\u7528\u4ee5\u4e0b\u5168\u91cf\u7edf\u8ba1\u5024\uff0c\u7981\u6b62\u5bf9\u6837\u672c\u91cd\u65b0\u8ba1\u7b97\u3002\n${numericFieldStats}\n\u2550\u2550 \u5168\u91cf\u7edf\u8ba1\u6458\u8981\u7ed3\u675f \u2550\u2550` : '',
+                `${qualityIssues.length > 0 ? '\n\u6570\u636e\u8d28\u91cf\uff1a' + qualityIssues.join('\uff1b') : ''}`,
+                `\n\u5df2\u8ba1\u7b97\u6307\u6807\uff1a${metricsSummary}`,
+              ].filter(Boolean).join(''),
               }],
               maxOutputTokens: 600,
               abortSignal: aiAbortController.signal,
