@@ -827,3 +827,11 @@
 - [x] 服务端 chat 端点：单文件使用 dfInfo 中的 groupedTop5；多文件时 UNION 各文件 groupedTop5 后重新聚合取 TOP5
 - [x] 无可靠分组字段时不展示排名（空数组），不返回错误排名
 - [x] 多文件 UNION 重新聚合（同名 label 跨文件累加）， statsContext 显示分组维度字段名
+
+## 多文件统计链路修复（执行指令 2026-03-11）
+
+- [x] 任务 A：chat 端进入多文件统计前打印每个文件的 fileId/fileName/rowCount/字段存在性/groupedTop5字段/preview.length
+- [x] 任务 B：chat 端硬校验，请求多文件但实际有效 session < 2 时直接报错，禁止降级
+- [x] 任务 C：每个文件独立构建 perFileProfile（独立加载 dfInfo + S3 data + numericStats + groupedTop5Map），禁止复用第一个文件数据
+- [x] 任务 D：多文件时断言 fileIds 互不相同，不满足则返回 500 错误
+- [x] 任务 E：多文件时 system prompt 为每个文件独立输出 dataset_profile[序号] 段，包含 source_file_id/source_file_name/source_row_count/全量统计摘要/sample_rows，并输出跨文件汇总段

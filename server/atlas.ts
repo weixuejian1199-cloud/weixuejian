@@ -1420,29 +1420,114 @@ export function registerAtlasRoutes(app: Express) {
         res.status(404).json({ error: "Session not found. Please re-upload the file." });
         return;
       }
-      // Use first session as primary, merge context from others
+
+      // ── Task A: Log every file's key fields for diagnostics ─────────────────
+      console.log(`[Atlas/chat] Received ${validSessions.length} session(s) for message: "${message.slice(0, 60)}"`);
+      for (const s of validSessions) {
+        const di = s!.dfInfo as DataFrameInfo | null;
+        const hasProductAmt = di?.fields.some((f: FieldInfo) => f.name.includes('商品金额')) ?? false;
+        const hasOrderAmt   = di?.fields.some((f: FieldInfo) => f.name.includes('应付金额') || f.name.includes('订单金额')) ?? false;
+        const groupedKeys   = di?.fields.filter((f: FieldInfo) => f.groupedTop5 && f.groupedTop5.length > 0).map((f: FieldInfo) => f.name) ?? [];
+        const sampleLen     = di?.preview?.length ?? 0;
+        console.log(`  [File] id=${s!.id} | name=${s!.originalName} | db.rowCount=${s!.rowCount} | dfInfo.row_count=${di?.row_count ?? 'N/A'} | 商品金额字段=${hasProductAmt} | 应付金额字段=${hasOrderAmt} | groupedTop5字段=${groupedKeys.join(',')||'无'} | preview.length=${sampleLen}`);
+      }
+
+      // ── Task B: Hard guard — refuse to fake multi-file stats with single file ─
+      const isMultiFile = allSessionIds.length > 1;
+      if (isMultiFile && validSessions.length < 2) {
+        console.error(`[Atlas/chat] HARD GUARD: requested ${allSessionIds.length} files but only ${validSessions.length} valid sessions found`);
+        res.status(400).json({ error: `当前仅收到 ${validSessions.length} 个文件，禁止执行多文件统计。请确认所有文件已正确上传。` });
+        return;
+      }
+
+      // ── Task C: Build per-file independent context (never reuse file[0] for all) ─
+      interface PerFileProfile {
+        fileId: string;
+        fileName: string;
+        rowCount: number;
+        colCount: number;
+        dfInfo: DataFrameInfo;
+        data: Record<string, unknown>[];
+        numericStats: Array<{ name: string; sum: number; avg: number; max: number; min: number; zeros: number; outliers: number; count: number }>;
+        groupedTop5Map: Map<string, Array<{ label: string; sum: number }>>;
+        groupByFieldMap: Map<string, string>;
+      }
+
+      const perFileProfiles: PerFileProfile[] = [];
+      for (const s of validSessions) {
+        const di = s!.dfInfo as DataFrameInfo | null;
+        if (!di) {
+          console.warn(`[Atlas/chat] Skipping session ${s!.id} (${s!.originalName}): dfInfo is null`);
+          continue;
+        }
+        const fileData = await loadSessionData(s!.id);
+        if (!fileData) {
+          console.warn(`[Atlas/chat] Skipping session ${s!.id} (${s!.originalName}): S3 data not found`);
+          continue;
+        }
+        // Build numericStats from dfInfo full-dataset stats (NOT from 500-row preview)
+        const ns = di.fields
+          .filter((f: FieldInfo) => f.type === 'numeric')
+          .map((f: FieldInfo) => {
+            if (f.sum === undefined || f.avg === undefined || f.max === undefined || f.min === undefined) return null;
+            const previewVals = fileData.map(row => Number(row[f.name])).filter(v => !isNaN(v) && v !== 0);
+            const zeros = fileData.filter(row => !row[f.name] || Number(row[f.name]) === 0).length;
+            const outliers = previewVals.filter(v => v > f.avg! * 3).length;
+            return { name: f.name, sum: f.sum, avg: f.avg, max: f.max, min: f.min, zeros, outliers, count: di.row_count };
+          })
+          .filter(Boolean) as PerFileProfile['numericStats'];
+
+        // Build groupedTop5 map
+        const g5Map = new Map<string, Array<{ label: string; sum: number }>>();
+        const gbMap = new Map<string, string>();
+        for (const f of di.fields) {
+          if (f.groupedTop5 && f.groupedTop5.length > 0) {
+            g5Map.set(f.name, f.groupedTop5);
+            if (f.groupByField) gbMap.set(f.name, f.groupByField);
+          }
+        }
+
+        perFileProfiles.push({
+          fileId: s!.id,
+          fileName: s!.originalName,
+          rowCount: di.row_count,
+          colCount: di.col_count,
+          dfInfo: di,
+          data: fileData,
+          numericStats: ns,
+          groupedTop5Map: g5Map,
+          groupByFieldMap: gbMap,
+        });
+        console.log(`[Atlas/chat] Built perFileProfile: id=${s!.id} | name=${s!.originalName} | rowCount=${di.row_count} | numericStats=${ns.length}个字段`);
+      }
+
+      if (perFileProfiles.length === 0) {
+        res.status(404).json({ error: "所有文件数据均已过期，请重新上传。" });
+        return;
+      }
+
+      // ── Task D: Assert uniqueness before building prompt ─────────────────────
+      if (isMultiFile) {
+        const fileIds = perFileProfiles.map(p => p.fileId);
+        const uniqueIds = new Set(fileIds);
+        if (uniqueIds.size !== fileIds.length) {
+          console.error(`[Atlas/chat] ASSERTION FAILED: duplicate fileIds in perFileProfiles: ${fileIds.join(',')}`);
+          res.status(500).json({ error: "内部错误：文件ID重复，无法执行多文件统计。" });
+          return;
+        }
+        const rowCounts = perFileProfiles.map(p => p.rowCount);
+        console.log(`[Atlas/chat] Multi-file assertion passed: ${perFileProfiles.map(p => `${p.fileName}(${p.rowCount}行)`).join(' | ')}`);
+        console.log(`[Atlas/chat] Expected total rows: ${rowCounts.reduce((a, b) => a + b, 0)}`);
+      }
+
+      // ── Backward-compat aliases (used by single-file path below) ─────────────
+      const primaryProfile = perFileProfiles[0];
       const sessionRecord = validSessions[0]!;
-      const dfInfo = sessionRecord.dfInfo as DataFrameInfo | null;
-      const filename = validSessions.length > 1
-        ? validSessions.map(s => s!.originalName).join("、")
-        : sessionRecord.originalName;
-
-      if (!dfInfo) {
-        res.status(404).json({ error: "Session data not found. Please re-upload the file." });
-        return;
-      }
-
-      // ── Multi-file: collect all dfInfos for cross-file groupedTop5 UNION ─────
-      const allDfInfos: DataFrameInfo[] = validSessions
-        .map(s => s!.dfInfo as DataFrameInfo | null)
-        .filter(Boolean) as DataFrameInfo[];
-
-      // Load parsed data from S3 (use first valid session)
-      const data = await loadSessionData(allSessionIds[0]);
-      if (!data) {
-        res.status(404).json({ error: "Session data expired. Please re-upload the file." });
-        return;
-      }
+      const dfInfo = primaryProfile.dfInfo;
+      const filename = isMultiFile
+        ? perFileProfiles.map(p => p.fileName).join('\u3001')
+        : primaryProfile.fileName;
+      const data = primaryProfile.data;
 
       // Build data context for AI
       const fieldSummary = dfInfo.fields.slice(0, 20).map((f: FieldInfo) =>
@@ -1511,10 +1596,10 @@ export function registerAtlasRoutes(app: Express) {
 
         // Collect groupedTop5 from ALL sessions for this field (multi-file UNION)
         const allGroupedEntries: Array<{ label: string; sum: number; source?: string }> = [];
-        for (const di of allDfInfos) {
-          const fi = di.fields.find((f: FieldInfo) => f.name === s.name);
-          if (fi?.groupedTop5 && fi.groupedTop5.length > 0) {
-            allGroupedEntries.push(...fi.groupedTop5);
+        for (const pfp of perFileProfiles) {
+          const entries = pfp.groupedTop5Map.get(s.name);
+          if (entries && entries.length > 0) {
+            allGroupedEntries.push(...entries);
           }
         }
 
@@ -1523,10 +1608,10 @@ export function registerAtlasRoutes(app: Express) {
         let groupByFieldName: string | undefined;
 
         if (allGroupedEntries.length > 0) {
-          // Detect groupByField name from first available field
-          for (const di of allDfInfos) {
-            const fi = di.fields.find((f: FieldInfo) => f.name === s.name);
-            if (fi?.groupByField) { groupByFieldName = fi.groupByField; break; }
+          // Detect groupByField name from first available profile
+          for (const pfp of perFileProfiles) {
+            const gb = pfp.groupByFieldMap.get(s.name);
+            if (gb) { groupByFieldName = gb; break; }
           }
           // Re-aggregate: sum by label across files
           const unionMap = new Map<string, number>();
@@ -1668,7 +1753,52 @@ ${categoricalFields.map(c => `- ${c.name}: ${c.uniqueCount}个不同分组, 示�
 - 对比查询：　1月和2月的销售额对比」→ 按月份筛选，对比两个时期
 - 趋势查询：「最近3个月的增长趋势」→ 按时间排序，计算环比增长率
 
-══ dataset_profile ══
+${isMultiFile ? (() => {
+  // ── Task E: Multi-file — each file gets its own dataset_profile section ──
+  const sections = perFileProfiles.map((pfp, idx) => {
+    const keyNumericFields = ['商品金额', '订单应付金额', '订单金额', '销售额', '金额'];
+    const relevantStats = pfp.numericStats.filter(ns =>
+      keyNumericFields.some(kw => ns.name.includes(kw))
+    );
+    const allStats = relevantStats.length > 0 ? relevantStats : pfp.numericStats.slice(0, 5);
+    const statsLines = allStats.map(ns =>
+      `${ns.name}合计: ${ns.sum.toLocaleString()}\n${ns.name}均值: ${ns.avg.toLocaleString()}\n${ns.name}最大: ${ns.max.toLocaleString()}\n${ns.name}最小: ${ns.min.toLocaleString()}`
+    ).join('\n');
+    const sampleData = pfp.data.slice(0, 3);
+    const sampleHeaders = pfp.dfInfo.fields.slice(0, 8).map((f: FieldInfo) => f.name);
+    const sampleTable = [
+      sampleHeaders.join(' | '),
+      ...sampleData.map(row => sampleHeaders.map(h => { const v = row[h]; return v === null || v === undefined ? '' : String(v); }).join(' | '))
+    ].join('\n');
+    return `══ dataset_profile[${idx + 1}] ══
+source_file_id: ${pfp.fileId}
+source_file_name: ${pfp.fileName}
+source_row_count: ${pfp.rowCount}
+列数: ${pfp.colCount}
+
+全量统计摘要（基于 ${pfp.rowCount.toLocaleString()} 行全量数据，非样本）：
+⚠️ 以下统计值来自全量数据，回答时必须直接引用，禁止对 sample_rows 重新计算。
+${statsLines}
+
+══ sample_rows[${idx + 1}] ══（仅用于理解字段含义，禁止对此求和）
+${sampleTable}`;
+  });
+  // Compute cross-file totals for key fields
+  const allFieldNames2 = Array.from(new Set(perFileProfiles.flatMap(p => p.numericStats.map(ns => ns.name))));
+  const totals: string[] = [];
+  for (const fieldName of allFieldNames2) {
+    const keyNumericFields = ['商品金额', '订单应付金额', '订单金额', '销售额', '金额'];
+    if (!keyNumericFields.some(kw => fieldName.includes(kw))) continue;
+    const total = perFileProfiles.reduce((acc, pfp) => {
+      const ns = pfp.numericStats.find(s => s.name === fieldName);
+      return acc + (ns?.sum ?? 0);
+    }, 0);
+    const totalRows = perFileProfiles.reduce((acc, pfp) => acc + pfp.rowCount, 0);
+    totals.push(`${fieldName}合计(全部文件): ${total.toLocaleString()}`);
+    if (totals.length === 1) totals.push(`总行数(全部文件): ${totalRows.toLocaleString()}`);
+  }
+  return sections.join('\n\n') + (totals.length > 0 ? `\n\n══ 跨文件汇总 ══\n${totals.join('\n')}` : '');
+})() : `══ dataset_profile ══
 文件：${filename}（全量 ${dfInfo.row_count.toLocaleString()} 行 × ${dfInfo.col_count} 列）
 字段说明：
 ${fieldSummary}
@@ -1677,7 +1807,7 @@ ${statsContext}${categoryContext}${fieldAliasContext}
 ══ sample_rows ══
 以下 ${maxRows} 行仅用于理解字段含义和数据结构，不代表全量数据。
 ❗❗ 禁止对以下样本行求和得出总量。总量/合计/均値/最大/最小必须使用 dataset_profile 中的全量统计値。
-${dataTable}
+${dataTable}`}
 
 ══ 核心交付规则（最高优先级）══
 
