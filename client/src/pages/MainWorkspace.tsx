@@ -517,14 +517,122 @@ export default function MainWorkspace() {
     toast.success("开始下载");
   };
 
+  // P1-B: Inline payslip generation from quick-action button (no page jump)
+  const handleInlinePayslip = useCallback(async (sessionId: string) => {
+    const period = new Date().toISOString().slice(0, 7);
+    addMessage({ role: "user", content: "生成工资条" });
+    addMessage({ role: "assistant", content: "", isStreaming: true, thinkingSteps: ["识别字段映射", "计算个税", "生成工资条"] });
+    setIsGenerating(true);
+    try {
+      const res = await fetch("/api/hr/payslip/from-atlas-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ sessionId, period }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "生成失败");
+      }
+      const data = await res.json();
+      const fmt = (n: number) => n.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const summaryText = [
+        `✅ 工资条已生成，共 **${data.employeeCount}** 人`,
+        ``,
+        `| 指标 | 金额 |`,
+        `|------|------|`,
+        `| 应发工资总额 | ¥${fmt(data.summary.totalPayroll)} |`,
+        `| 实发工资总额 | ¥${fmt(data.summary.totalNetPay)} |`,
+        `| 个税总额 | ¥${fmt(data.summary.totalTax)} |`,
+        `| 人均实发 | ¥${fmt(data.summary.avgSalary)} |`,
+        ``,
+        `工资期间：${data.period}`,
+      ].join("\n");
+      updateLastMessage(summaryText, {
+        isStreaming: false,
+        download_url: data.downloadUrl,
+        report_filename: `工资条-${data.period}.xlsx`,
+        suggestedActions: [
+          { icon: "📅", label: "查看考勤汇总", prompt: "帮我汇总考勤数据" },
+          { icon: "📊", label: "继续分析", prompt: "对工资数据进行进一步分析" },
+          { icon: "✨", label: "自定义需求", prompt: "" },
+        ],
+      });
+      toast.success(`工资条已生成，共 ${data.employeeCount} 人`);
+    } catch (err: any) {
+      updateLastMessage(`生成失败：${err.message || "未知错误"}
+
+请检查文件格式或重新上传。`, { isStreaming: false });
+      toast.error(err.message || "生成失败");
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [addMessage, updateLastMessage, setIsProcessing]);
+
+  // P1-B: Inline attendance summary from quick-action button (no page jump)
+  const handleInlineAttendance = useCallback(async (sessionId: string) => {
+    addMessage({ role: "user", content: "考勤汇总" });
+    addMessage({ role: "assistant", content: "", isStreaming: true, thinkingSteps: ["识别打卡记录", "分析迟到早退", "生成汇总表"] });
+    setIsGenerating(true);
+    try {
+      const res = await fetch("/api/hr/attendance/from-atlas-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ sessionId }),
+      });
+      if (!res.ok) {
+        // Fallback: send as chat message
+        updateLastMessage("", { isStreaming: false });
+        setIsGenerating(false);
+        handleSend("帮我汇总考勤数据，统计出勤天数、迟到次数和早退记录", true);
+        return;
+      }
+      const data = await res.json();
+      const summaryText = [
+        `✅ 考勤汇总已生成，共 **${data.employeeCount}** 人`,
+        ``,
+        `| 指标 | 数据 |`,
+        `|------|------|`,
+        `| 出勤率 | ${(data.summary.attendanceRate * 100).toFixed(1)}% |`,
+        `| 迟到次数 | ${data.summary.lateCount} 次 |`,
+        `| 旷工次数 | ${data.summary.absentCount} 次 |`,
+        `| 早退次数 | ${data.summary.earlyLeaveCount} 次 |`,
+      ].join("\n");
+      updateLastMessage(summaryText, {
+        isStreaming: false,
+        download_url: data.downloadUrl,
+        report_filename: `考勤汇总.xlsx`,
+        suggestedActions: FOLLOWUP_ACTIONS,
+      });
+      toast.success(`考勤汇总已生成`);
+    } catch (err: any) {
+      updateLastMessage(`生成失败：${err.message || "未知错误"}
+
+请检查文件格式或重新上传。`, { isStreaming: false });
+      toast.error(err.message || "生成失败");
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [addMessage, updateLastMessage, setIsProcessing, handleSend]);
+
   const handleQuickAction = useCallback((prompt: string) => {
     if (!prompt) {
       // "自定义需求" — focus input
       textareaRef.current?.focus();
       return;
     }
+    // P1-B: Detect inline HR flow prefixes
+    if (prompt.startsWith("__PAYSLIP_INLINE__")) {
+      handleInlinePayslip(prompt.replace("__PAYSLIP_INLINE__", ""));
+      return;
+    }
+    if (prompt.startsWith("__ATTENDANCE_INLINE__")) {
+      handleInlineAttendance(prompt.replace("__ATTENDANCE_INLINE__", ""));
+      return;
+    }
     handleSend(prompt, true);
-  }, [handleSend]);
+  }, [handleSend, handleInlinePayslip, handleInlineAttendance]);
 
   // -- Render
   return (

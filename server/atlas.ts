@@ -21,6 +21,7 @@ import * as XLSX from "xlsx";
 import Papa from "papaparse";
 import { streamText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
+import Decimal from "decimal.js";
 import { ENV } from "./_core/env";
 import { createPatchedFetch } from "./_core/patchedFetch";
 import { storagePut, storageGet } from "./storage";
@@ -252,6 +253,128 @@ function buildDataFrameInfo(data: Record<string, unknown>[], sheetNames?: string
   };
 }
 
+// ── Field normalization (P1-A: synonym mapping + missing-field tolerance) ──────
+/**
+ * Normalize field names across rows using a synonym map.
+ * Also injects missing standard fields as 0 so downstream aggregation never fails.
+ */
+const FIELD_SYNONYM_MAP: Record<string, string[]> = {
+  // ── 销售/电商 ──
+  "总销售额":  ["销售额", "销售金额", "订单金额", "收入", "实收", "流水", "GMV", "gmv", "revenue", "sales", "amount", "营业额"],
+  "手续费":    ["平台手续费", "服务费", "技术服务费", "平台费", "佣金", "commission", "fee"],
+  "退款金额":  ["退款", "退货金额", "退单金额", "退货", "refund", "return_amount"],
+  "订单数":    ["订单量", "笔数", "件数", "orders", "order_count", "count"],
+  "客单价":    ["人均消费", "平均单价", "AOV", "aov", "avg_order"],
+  "门店名称":  ["店铺名称", "店名", "渠道", "平台", "store", "shop", "channel"],
+  // ── 工资/HR ──
+  "基本工资":  ["底薪", "固定工资", "月薪", "标准工资", "base_salary", "base", "基础工资"],
+  "绩效工资":  ["绩效", "绩效奖金", "KPI奖金", "季度奖", "performance", "bonus_perf"],
+  "奖金":      ["奖励", "提成", "bonus", "incentive"],
+  "扣款":      ["扣除", "罚款", "缺勤扣款", "违规扣款", "deduction", "deduct"],
+  "社保公积金":["五险一金", "社保", "公积金", "insurance", "social_insurance"],
+  "应发工资":  ["应发", "税前工资", "gross_salary", "gross"],
+  "实发工资":  ["实发", "税后工资", "net_salary", "net", "到手工资"],
+  "员工姓名":  ["姓名", "名字", "员工", "人员", "name", "staff", "employee"],
+  "部门":      ["dept", "department", "所属部门"],
+  // ── 考勤 ──
+  "出勤天数":  ["实际出勤", "出勤", "上班天数", "工作天数", "attendance_days"],
+  "迟到次数":  ["迟到", "late_count", "late"],
+  "早退次数":  ["早退", "early_leave"],
+  "旷工天数":  ["旷工", "缺勤", "absent", "absence"],
+  // ── 财务 ──
+  "借方金额":  ["借方", "debit", "借"],
+  "贷方金额":  ["贷方", "credit", "贷"],
+  "科目名称":  ["科目", "会计科目", "account", "subject"],
+};
+
+// Reverse map: synonym → canonical (built once at module load)
+const SYNONYM_TO_CANONICAL: Record<string, string> = {};
+for (const [canonical, synonyms] of Object.entries(FIELD_SYNONYM_MAP)) {
+  for (const syn of synonyms) {
+    SYNONYM_TO_CANONICAL[syn] = canonical;
+    SYNONYM_TO_CANONICAL[syn.toLowerCase()] = canonical;
+  }
+}
+
+// ── P2-A: Finance debit-credit balance check (Decimal.js precision) ────────────────
+// Returns balance discrepancy; isBalanced=true if diff <= 0.01 (rounding tolerance).
+function checkDebitCreditBalance(
+  data: Record<string, unknown>[],
+  debitField: string,
+  creditField: string
+): { isBalanced: boolean; discrepancy: string; debitTotal: string; creditTotal: string } {
+  let debitTotal = new Decimal(0);
+  let creditTotal = new Decimal(0);
+  for (const row of data) {
+    const d = row[debitField];
+    const c = row[creditField];
+    if (d !== undefined && d !== null && d !== "") {
+      try { debitTotal = debitTotal.plus(new Decimal(String(d))); } catch { /* skip non-numeric */ }
+    }
+    if (c !== undefined && c !== null && c !== "") {
+      try { creditTotal = creditTotal.plus(new Decimal(String(c))); } catch { /* skip non-numeric */ }
+    }
+  }
+  const discrepancy = debitTotal.minus(creditTotal).abs();
+  const isBalanced = discrepancy.lessThanOrEqualTo(new Decimal("0.01"));
+  return {
+    isBalanced,
+    discrepancy: discrepancy.toFixed(2),
+    debitTotal: debitTotal.toFixed(2),
+    creditTotal: creditTotal.toFixed(2),
+  };
+}
+
+function normalizeFieldNames(
+  data: Record<string, unknown>[],
+  requiredFields?: string[]
+): {
+  normalizedData: Record<string, unknown>[];
+  injectedFields: string[];
+  fieldMapping: Record<string, string>; // original → canonical
+} {
+  if (data.length === 0) return { normalizedData: data, injectedFields: [], fieldMapping: {} };
+
+  const originalKeys = Object.keys(data[0]);
+  const fieldMapping: Record<string, string> = {};
+
+  // Build mapping: original field name → canonical name
+  for (const key of originalKeys) {
+    const canonical = SYNONYM_TO_CANONICAL[key] || SYNONYM_TO_CANONICAL[key.toLowerCase()];
+    if (canonical && canonical !== key) {
+      fieldMapping[key] = canonical;
+    }
+  }
+
+  // Remap rows: add canonical alias alongside original (non-destructive)
+  const normalizedData = data.map(row => {
+    const newRow: Record<string, unknown> = { ...row };
+    for (const [orig, canon] of Object.entries(fieldMapping)) {
+      if (!(canon in newRow)) {
+        newRow[canon] = row[orig];
+      }
+    }
+    return newRow;
+  });
+
+  // Inject missing required fields as 0 (tolerance for incomplete multi-file merges)
+  const injectedFields: string[] = [];
+  if (requiredFields && requiredFields.length > 0) {
+    const existingKeys = new Set([
+      ...originalKeys,
+      ...Object.values(fieldMapping),
+    ]);
+    for (const req of requiredFields) {
+      if (!existingKeys.has(req)) {
+        normalizedData.forEach(row => { row[req] = 0; });
+        injectedFields.push(req);
+      }
+    }
+  }
+
+  return { normalizedData, injectedFields, fieldMapping };
+}
+
 // ── Business scenario detection ─────────────────────────────────────────────
 
 interface ScenarioResult {
@@ -359,47 +482,59 @@ function computeKeyMetrics(
     ? scenario.primaryFields.slice(0, 4)
     : numericFields.slice(0, 3).map(f => f.name);
 
+  // P2-B: Use Decimal.js for precise sum/avg to avoid floating-point errors
+  const fmtNum = (n: number) => {
+    if (Math.abs(n) >= 10000) return `${(n / 10000).toFixed(2)}万`;
+    return n % 1 === 0 ? n.toString() : n.toFixed(2);
+  };
+
   for (const fieldName of targetFields) {
-    const values = data
-      .map(row => Number(row[fieldName]))
-      .filter(v => !isNaN(v) && isFinite(v));
-    if (values.length === 0) continue;
+    const rawValues = data
+      .map(row => row[fieldName])
+      .filter(v => v !== null && v !== undefined && v !== "");
+    const decimalValues: Decimal[] = [];
+    for (const v of rawValues) {
+      try { decimalValues.push(new Decimal(String(v))); } catch { /* skip non-numeric */ }
+    }
+    if (decimalValues.length === 0) continue;
 
-    const sum = values.reduce((a, b) => a + b, 0);
-    const avg = sum / values.length;
-    const max = Math.max(...values);
-    const min = Math.min(...values);
+    // Precise sum using Decimal.js
+    const decSum = decimalValues.reduce((acc, d) => acc.plus(d), new Decimal(0));
+    const sum = decSum.toNumber();
+    const avg = decSum.dividedBy(decimalValues.length).toNumber();
+    const numVals = decimalValues.map(d => d.toNumber());
+    const max = Math.max(...numVals);
+    const min = Math.min(...numVals);
 
-    // Format numbers
-    const fmt = (n: number) => {
-      if (Math.abs(n) >= 10000) return `${(n / 10000).toFixed(2)}万`;
-      return n % 1 === 0 ? n.toString() : n.toFixed(2);
-    };
-
-    metrics.push({ name: `${fieldName}合计`, value: fmt(sum), field: fieldName, type: "sum" });
-    metrics.push({ name: `${fieldName}均值`, value: fmt(avg), field: fieldName, type: "avg" });
-    metrics.push({ name: `${fieldName}最高`, value: fmt(max), field: fieldName, type: "max" });
-    metrics.push({ name: `${fieldName}最低`, value: fmt(min), field: fieldName, type: "min" });
+    metrics.push({ name: `${fieldName}合计`, value: fmtNum(sum), field: fieldName, type: "sum" });
+    metrics.push({ name: `${fieldName}均値`, value: fmtNum(avg), field: fieldName, type: "avg" });
+    metrics.push({ name: `${fieldName}最高`, value: fmtNum(max), field: fieldName, type: "max" });
+    metrics.push({ name: `${fieldName}最低`, value: fmtNum(min), field: fieldName, type: "min" });
 
     if (metrics.length >= 9) break;
   }
 
-  // Add group-level top3 if we have a group field
+  // Add group-level top3 if we have a group field (also using Decimal.js)
   if (scenario.groupFields.length > 0 && scenario.primaryFields.length > 0) {
     const groupField = scenario.groupFields[0];
     const valueField = scenario.primaryFields[0];
-    const groupMap = new Map<string, number>();
+    const groupMap = new Map<string, Decimal>();
     for (const row of data) {
       const key = String(row[groupField] ?? "");
       if (!key) continue;
-      const val = Number(row[valueField]);
-      if (!isNaN(val)) {
-        groupMap.set(key, (groupMap.get(key) || 0) + val);
-      }
+      const rawVal = row[valueField];
+      if (rawVal === null || rawVal === undefined || rawVal === "") continue;
+      try {
+        const d = new Decimal(String(rawVal));
+        groupMap.set(key, (groupMap.get(key) ?? new Decimal(0)).plus(d));
+      } catch { /* skip non-numeric */ }
     }
     if (groupMap.size > 0) {
-      const sorted = Array.from(groupMap.entries()).sort((a, b) => b[1] - a[1]);
-      const top3 = sorted.slice(0, 3).map(([k, v]) => `${k}(${v >= 10000 ? (v / 10000).toFixed(1) + '万' : v.toFixed(0)})`).join("、");
+      const sorted = Array.from(groupMap.entries()).sort((a, b) => b[1].comparedTo(a[1]));
+      const top3 = sorted.slice(0, 3).map(([k, d]) => {
+        const v = d.toNumber();
+        return `${k}(${v >= 10000 ? (v / 10000).toFixed(1) + '万' : v.toFixed(0)})`;
+      }).join("、");
       metrics.push({ name: `${valueField}Top3`, value: top3, field: groupField, type: "top" });
     }
   }
@@ -681,8 +816,22 @@ export function registerAtlasRoutes(app: Express) {
 
       const dfInfo = buildDataFrameInfo(data, sheetNames);
 
+      // 2b. Normalize field names (P1-A: synonym mapping, non-destructive)
+      // Determine required fields based on scenario hint from field names
+      const scenarioHint = detectScenario(dfInfo.fields);
+      const requiredByScenario: Record<string, string[]> = {
+        payroll:    ["基本工资", "员工姓名"],
+        attendance: ["员工姓名", "出勤天数"],
+        sales:      ["总销售额"],
+        dividend:   ["员工姓名"],
+      };
+      const requiredFields = requiredByScenario[scenarioHint.type] || [];
+      const { normalizedData, injectedFields, fieldMapping } = normalizeFieldNames(data, requiredFields);
+      // Use normalized data for all downstream processing
+      const workingData = normalizedData;
+
       // 3. Persist parsed data to S3 (for AI chat — survives restarts)
-      await storeSessionData(sessionId, data);
+      await storeSessionData(sessionId, workingData);
 
       // 4. Create session record in DB (dfInfo stored in JSON column)
       await createSession({
@@ -702,7 +851,7 @@ export function registerAtlasRoutes(app: Express) {
 
       // 5. Detect scenario + compute key metrics (pure code, no AI dependency)
       const scenario = detectScenario(dfInfo.fields);
-      const keyMetrics = computeKeyMetrics(data, scenario, dfInfo);
+      const keyMetrics = computeKeyMetrics(workingData, scenario, dfInfo);
 
       // Build field summary for AI context
       const fieldSummary = dfInfo.fields.slice(0, 15).map(f =>
@@ -716,6 +865,28 @@ export function registerAtlasRoutes(app: Express) {
         const highNullFields = nullFields.filter(f => f.null_count / dfInfo.row_count > 0.05);
         if (highNullFields.length > 0) {
           qualityIssues.push(`缺失值警告：${highNullFields.map(f => `${f.name}(${f.null_count}个空值)`).join('、')}`);
+        }
+      }
+      // P1-A: Report injected fields (missing required fields auto-filled with 0)
+      if (injectedFields.length > 0) {
+        qualityIssues.push(`字段容错提示：${injectedFields.join('、')}字段在数据中缺失，已自动按 0 处理，计算结果不受影响`);
+      }
+      // P1-A: Report field mappings applied
+      const mappingEntries = Object.entries(fieldMapping);
+      if (mappingEntries.length > 0) {
+        console.log(`[Atlas P1-A] Field mappings applied: ${mappingEntries.map(([o, c]) => `${o}→${c}`).join(', ')}`);
+      }
+      // P2-A: Finance debit-credit balance check
+      const hasDebit = workingData.length > 0 && ("借方金额" in workingData[0] || "debit" in workingData[0]);
+      const hasCredit = workingData.length > 0 && ("贷方金额" in workingData[0] || "credit" in workingData[0]);
+      if (hasDebit && hasCredit) {
+        const debitField = "借方金额" in workingData[0] ? "借方金额" : "debit";
+        const creditField = "贷方金额" in workingData[0] ? "贷方金额" : "credit";
+        const balanceCheck = checkDebitCreditBalance(workingData, debitField, creditField);
+        if (!balanceCheck.isBalanced) {
+          qualityIssues.push(`⚠️ 借贷不平警告：借方合计 ${balanceCheck.debitTotal}，贷方合计 ${balanceCheck.creditTotal}，差异 ${balanceCheck.discrepancy}，请检查数据完整性`);
+        } else {
+          qualityIssues.push(`✅ 借贷平衡校验通过：借方 ${balanceCheck.debitTotal}，贷方 ${balanceCheck.creditTotal}`);
         }
       }
 
@@ -824,8 +995,8 @@ export function registerAtlasRoutes(app: Express) {
 
       // Build precise suggested actions with actual field names
       if (hasPayroll || (hasName && numericFields.length > 0)) {
-        const payField = numericFields.find(f => /工资|薪资|底薪/.test(f)) || numericFields[0] || "工资";
-        suggestedActions.push({ icon: "📝", label: "生成工资条", prompt: `帮我根据这份数据生成工资条，包含姓名、${payField}明细和实发金额` });
+        // P1-B: Use special prefix to trigger inline payslip flow in MainWorkspace (no page jump)
+        suggestedActions.push({ icon: "📝", label: "生成工资条", prompt: `__PAYSLIP_INLINE__${sessionId}` });
       }
       if (hasDividend) {
         const divField = numericFields.find(f => /分红|奖金|奖/.test(f)) || numericFields[0] || "奖金";
@@ -840,7 +1011,8 @@ export function registerAtlasRoutes(app: Express) {
         }
       }
       if (hasAttendance) {
-        suggestedActions.push({ icon: "📅", label: "考勤汇总", prompt: "帮我汇总考勤数据，统计出勤天数、迟到次数和早退记录" });
+        // P1-B: Use special prefix to trigger inline attendance flow in MainWorkspace (no page jump)
+        suggestedActions.push({ icon: "📅", label: "考勤汇总", prompt: `__ATTENDANCE_INLINE__${sessionId}` });
       }
       if (hasDate && !hasSales) {
         suggestedActions.push({ icon: "📈", label: "趋势分析", prompt: "帮我按时间分析数据趋势，看看有什么规律" });

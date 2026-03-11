@@ -703,3 +703,19 @@
 - [x] 左侧栏宽度从 240px 改为 360px（30%）
 - [x] 双击任务标题进入编辑状态，Enter/失焦保存，Esc 取消
 - [x] 字体大小统一为 14px（与 Manus 一致）
+
+## AI 能力升级 v2.0（审核通过）
+
+### Phase 1（本周）
+- [x] P1-A：atlas.ts 新增 normalizeFieldNames() 字段标准化函数（同义词映射 + 缺失字段补 0）
+- [x] P1-A：缺失字段容错后在 qualityIssues 中明确告知用户
+- [x] P1-B：工资条快捷按钮在对话框内完成（不跳转 HR 页面）
+- [x] P1-B：考勤快捷按钮在对话框内完成（不跳转 HR 页面）
+- [x] P1-B：从文件名自动提取工资期间（2026年3月/202603/2026-03 等格式）
+
+### Phase 2（下周）
+- [x] P2-A：atlas.ts 新增 finance 场景，代码级借贷平衡校验
+- [x] P2-B：引入 decimal.js 替换金额相关 Number 运算（消除浮点误差）
+- [x] P2-C：hr.ts detectPayslipFields 扩展同义词（固定工资/月薪/KPI奖金等）
+- [x] P2-D：hr.ts 考勤加班时长 + 加班费计算（可配置倍率）
+- [x] P2-E：MainWorkspace 对话框上方常驻 HR 快捷按钮区（工资条/考勤入口）

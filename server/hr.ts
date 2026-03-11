@@ -143,17 +143,17 @@ async function detectPayslipFields(headers: string[]): Promise<{
   } catch (e) {
     console.warn("[HR] Field detection failed:", e);
   }
-  // Fallback: simple keyword matching
+  // Fallback: simple keyword matching (P2-C: expanded synonyms)
   const find = (keywords: string[]) =>
     headers.find(h => keywords.some(k => h.toLowerCase().includes(k))) ?? "";
   return {
-    nameCol: find(["姓名", "name", "员工"]),
-    emailCol: find(["邮箱", "email", "mail"]),
-    baseSalaryCol: find(["基本工资", "底薪", "基础工资", "base"]),
-    bonusCol: find(["奖金", "绩效", "提成", "bonus"]),
-    deductionCol: find(["扣款", "罚款", "扣除", "deduct"]),
-    insuranceCol: find(["五险", "社保", "insurance", "公积金"]),
-    deptCol: find(["部门", "dept", "department"]),
+    nameCol:       find(["姓名", "name", "员工", "人员", "staff", "employee"]),
+    emailCol:      find(["邮箱", "email", "mail", "邮件"]),
+    baseSalaryCol: find(["基本工资", "底薪", "基础工资", "固定工资", "月薪", "标准工资", "base", "base_salary"]),
+    bonusCol:      find(["奖金", "绩效", "提成", "绩效工资", "绩效奖金", "KPI", "kpi", "季度奖", "bonus", "incentive", "performance"]),
+    deductionCol:  find(["扣款", "罚款", "扣除", "缺勤扣款", "违规扣款", "deduct", "deduction"]),
+    insuranceCol:  find(["五险", "社保", "insurance", "公积金", "五险一金", "社保公积金"]),
+    deptCol:       find(["部门", "dept", "department", "所属部门"]),
   };
 }
 
@@ -185,15 +185,15 @@ async function detectAttendanceFields(headers: string[]): Promise<{
   } catch (e) {
     console.warn("[HR] Attendance field detection failed:", e);
   }
-  const find = (keywords: string[]) =>
+  const find2 = (keywords: string[]) =>
     headers.find(h => keywords.some(k => h.toLowerCase().includes(k))) ?? "";
   return {
-    nameCol: find(["姓名", "name", "员工"]),
-    dateCol: find(["日期", "date", "时间"]),
-    checkInCol: find(["上班", "签到", "打卡", "check_in", "checkin", "上班时间"]),
-    checkOutCol: find(["下班", "签退", "check_out", "checkout", "下班时间"]),
-    deptCol: find(["部门", "dept"]),
-    statusCol: find(["状态", "status", "考勤"]),
+    nameCol:     find2(["姓名", "name", "员工", "人员", "staff", "employee"]),
+    dateCol:     find2(["日期", "date", "时间", "考勤日期"]),
+    checkInCol:  find2(["上班", "签到", "打卡", "上班打卡", "check_in", "checkin", "上班时间", "入厂时间"]),
+    checkOutCol: find2(["下班", "签退", "下班打卡", "check_out", "checkout", "下班时间", "出厂时间"]),
+    deptCol:     find2(["部门", "dept", "department", "所属部门"]),
+    statusCol:   find2(["状态", "status", "考勤", "考勤状态"]),
   };
 }
 
@@ -588,6 +588,115 @@ export function registerHrRoutes(app: Express) {
     }
   });
 
+  // ── POST /api/hr/payslip/from-atlas-session (P1-B: inline payslip from existing atlas session) ──
+  // Accepts an atlas sessionId, fetches the file from S3, runs full payslip generation inline.
+  // This avoids re-uploading the file when user clicks "生成工资条" from the chat quick-action.
+  app.post("/api/hr/payslip/from-atlas-session", async (req: Request, res: Response) => {
+    try {
+      const { sessionId, period } = req.body as { sessionId: string; period?: string };
+      if (!sessionId) { res.status(400).json({ error: "sessionId 必填" }); return; }
+
+      // 1. Load atlas session from DB to get fileKey
+      const { getSession } = await import("./db");
+      const session = await getSession(sessionId);
+      if (!session || !session.fileKey) { res.status(404).json({ error: "会话不存在或文件已过期" }); return; }
+
+      // 2. Fetch file from S3
+      const { url: fileUrl } = await storageGet(session.fileKey);
+      const fileRes = await fetch(fileUrl);
+      if (!fileRes.ok) { res.status(404).json({ error: "文件已过期，请重新上传" }); return; }
+      const arrayBuf = await fileRes.arrayBuffer();
+      const buffer = Buffer.from(arrayBuf);
+      const filename = session.originalName || session.filename;
+
+      // 3. Parse data
+      const data = parseFile(buffer, filename);
+      if (data.length === 0) { res.status(400).json({ error: "文件为空或格式不正确" }); return; }
+      const headers = Object.keys(data[0]);
+
+      // 4. Auto-detect field mapping
+      const fieldMap = await detectPayslipFields(headers);
+
+      // 5. Create HR payslip record
+      const id = nanoid();
+      const userId = (req as any).userId || 0;
+      await createHrPayslip({
+        id,
+        userId,
+        filename,
+        fileKey: session.fileKey,
+        fileUrl: fileUrl,
+        fileSizeKb: Math.ceil(buffer.length / 1024),
+        employeeCount: data.length,
+        fieldMap: fieldMap as any,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        status: "ready",
+      });
+
+      // 6. Generate payslip
+      const employees = data.map(row => {
+        const name = String(row[fieldMap.nameCol] ?? "").trim();
+        const dept = String(row[fieldMap.deptCol] ?? "").trim();
+        const baseSalary = parseFloat(String(row[fieldMap.baseSalaryCol] ?? "0")) || 0;
+        const bonus = parseFloat(String(row[fieldMap.bonusCol] ?? "0")) || 0;
+        const deduction = parseFloat(String(row[fieldMap.deductionCol] ?? "0")) || 0;
+        const insurance = fieldMap.insuranceCol
+          ? parseFloat(String(row[fieldMap.insuranceCol] ?? "")) || undefined
+          : undefined;
+        const email = String(row[fieldMap.emailCol] ?? "").trim();
+        const grossSalary = baseSalary + bonus - deduction;
+        const tax = calcTax({ grossSalary, insurance });
+        return { name, dept, email, baseSalary, bonus, deduction, insurance: tax.insurance, tax };
+      }).filter(e => e.name);
+
+      if (employees.length === 0) {
+        res.status(400).json({ error: "未找到有效员工数据，请检查字段映射" });
+        return;
+      }
+
+      // 7. Generate Excel
+      const excelBuffer = generatePayslipExcel(employees);
+      const reportKey = `hr-payslip-reports/${id}-${Date.now()}.xlsx`;
+      const { url: reportUrl } = await storagePut(reportKey, excelBuffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
+      // 8. Summary stats
+      const totalPayroll = employees.reduce((s, e) => s + e.tax.grossSalary, 0);
+      const totalNetPay = employees.reduce((s, e) => s + e.tax.netSalary, 0);
+      const totalTax = employees.reduce((s, e) => s + e.tax.incomeTax, 0);
+      const avgSalary = Math.round(totalNetPay / employees.length);
+      const summary = { totalPayroll, totalNetPay, totalTax, avgSalary };
+
+      await updateHrPayslip(id, {
+        fieldMap: fieldMap as any,
+        period,
+        employeeCount: employees.length,
+        summary: summary as any,
+        reportFileKey: reportKey,
+        reportFileUrl: reportUrl,
+        status: "ready",
+      });
+
+      const previewData = employees.slice(0, 10).map(e => ({
+        name: e.name, dept: e.dept, email: e.email,
+        grossSalary: e.tax.grossSalary, insurance: e.tax.insurance,
+        incomeTax: e.tax.incomeTax, netSalary: e.tax.netSalary,
+      }));
+
+      res.json({
+        id,
+        downloadUrl: reportUrl,
+        employeeCount: employees.length,
+        summary,
+        preview: previewData,
+        fieldMap,
+        period: period || new Date().toISOString().slice(0, 7),
+      });
+    } catch (err: any) {
+      console.error("[HR] Payslip from-atlas-session error:", err);
+      res.status(500).json({ error: err.message || "Generation failed" });
+    }
+  });
+
   // ── GET /api/hr/payslip/download/:id ────────────────────────────────────
 
   app.get("/api/hr/payslip/download/:id", async (req: Request, res: Response) => {
@@ -711,9 +820,80 @@ export function registerHrRoutes(app: Express) {
       console.error("[HR] Attendance analyze error:", err);
       res.status(500).json({ error: err.message || "Analysis failed" });
     }
+  }); // end attendance/analyze
+
+  // ── POST /api/hr/attendance/from-atlas-session (P1-B: inline attendance from existing atlas session) ──
+  app.post("/api/hr/attendance/from-atlas-session", async (req: Request, res: Response) => {
+    try {
+      const { sessionId } = req.body as { sessionId: string };
+      if (!sessionId) { res.status(400).json({ error: "sessionId 必填" }); return; }
+
+      // 1. Load atlas session from DB to get fileKey
+      const { getSession } = await import("./db");
+      const session = await getSession(sessionId);
+      if (!session || !session.fileKey) { res.status(404).json({ error: "会话不存在或文件已过期" }); return; }
+
+      // 2. Fetch file from S3
+      const { url: fileUrl } = await storageGet(session.fileKey);
+      const fileRes = await fetch(fileUrl);
+      if (!fileRes.ok) { res.status(404).json({ error: "文件已过期，请重新上传" }); return; }
+      const arrayBuf = await fileRes.arrayBuffer();
+      const buffer = Buffer.from(arrayBuf);
+      const filename = session.originalName || session.filename;
+
+      // 3. Parse data
+      const data = parseFile(buffer, filename);
+      if (data.length === 0) { res.status(400).json({ error: "文件为空或格式不正确" }); return; }
+      const headers = Object.keys(data[0]);
+
+      // 4. Auto-detect field mapping
+      const fieldMap = await detectAttendanceFields(headers);
+
+      // 5. Create HR attendance record
+      const id = nanoid();
+      const userId = (req as any).userId || 0;
+      await createHrAttendance({
+        id,
+        userId,
+        filename,
+        fileKey: session.fileKey,
+        fileUrl: fileUrl,
+        fileSizeKb: Math.ceil(buffer.length / 1024),
+        rowCount: data.length,
+        fieldMap: fieldMap as any,
+        status: "ready",
+      });
+
+      // 6. Analyze attendance
+      const { records, summary, byEmployee } = analyzeAttendance(data, fieldMap);
+
+      // 7. Generate Excel
+      const excelBuffer = generateAttendanceExcel(byEmployee, records, summary);
+      const reportKey = `hr-attendance-reports/${id}-${Date.now()}.xlsx`;
+      const { url: reportUrl } = await storagePut(reportKey, excelBuffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
+      await updateHrAttendance(id, {
+        fieldMap: fieldMap as any,
+        summary: summary as any,
+        reportFileKey: reportKey,
+        reportFileUrl: reportUrl,
+        status: "ready",
+      });
+
+      const employeeCount = Object.keys(byEmployee).length;
+      res.json({
+        id,
+        downloadUrl: reportUrl,
+        employeeCount,
+        summary,
+      });
+    } catch (err: any) {
+      console.error("[HR] Attendance from-atlas-session error:", err);
+      res.status(500).json({ error: err.message || "Analysis failed" });
+    }
   });
 
-  // ── GET /api/hr/attendance/download/:id ─────────────────────────────────
+  // ── GET /api/hr/attendance/download/:id ───────────────────────────────────────
 
   app.get("/api/hr/attendance/download/:id", async (req: Request, res: Response) => {
     try {
