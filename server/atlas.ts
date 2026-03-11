@@ -168,6 +168,10 @@ interface FieldInfo {
   min?: number;
   // Full-dataset top5 (value-descending), each entry: { value, rowIndex }
   top5?: Array<{ value: number; rowIndex: number }>;
+  // Grouped top5: GROUP BY dimension field, SUM numeric field, TOP5 by sum — from full dataset
+  groupedTop5?: Array<{ label: string; sum: number; source?: string }>;
+  // Which dimension field was used for groupedTop5
+  groupByField?: string;
 }
 
 interface DataFrameInfo {
@@ -1428,6 +1432,11 @@ export function registerAtlasRoutes(app: Express) {
         return;
       }
 
+      // ── Multi-file: collect all dfInfos for cross-file groupedTop5 UNION ─────
+      const allDfInfos: DataFrameInfo[] = validSessions
+        .map(s => s!.dfInfo as DataFrameInfo | null)
+        .filter(Boolean) as DataFrameInfo[];
+
       // Load parsed data from S3 (use first valid session)
       const data = await loadSessionData(allSessionIds[0]);
       if (!data) {
@@ -1495,27 +1504,51 @@ export function registerAtlasRoutes(app: Express) {
         .map((f: FieldInfo) => ({ name: f.name, uniqueCount: f.unique_count, samples: f.sample.slice(0, 5) }));
 
       // Find top performers per numeric field
-      // Rule: MUST use dfInfo.fields full-dataset top5; NEVER rank from 500-row preview
-      const nameField = headers.find(h => /姓名|昵称|名字|用户|会员|name|user/i.test(h));
+      // Rule: MUST use groupedTop5 (aggregated by dimension field) from dfInfo; NEVER rank from 500-row preview
+      // Multi-file: UNION all groupedTop5 entries, re-aggregate by label, take TOP5
       const topPerformers = numericStats.map(s => {
         if (!s) return null;
-        const fieldInfo = dfInfo.fields.find((f: FieldInfo) => f.name === s.name);
-        let top5Labels: string[];
-        if (fieldInfo?.top5 && fieldInfo.top5.length > 0) {
-          // Use full-dataset top5 from dfInfo (accurate)
-          top5Labels = fieldInfo.top5.map(entry => {
-            const rowData = data[entry.rowIndex]; // rowIndex may exceed preview; use value only if row unavailable
-            const label = rowData && nameField ? `${rowData[nameField]}(${entry.value.toLocaleString()})` : entry.value.toLocaleString();
-            return label;
-          });
-        } else {
-          // No full-dataset top5 available — omit rather than show inaccurate sample ranking
-          top5Labels = [];
+
+        // Collect groupedTop5 from ALL sessions for this field (multi-file UNION)
+        const allGroupedEntries: Array<{ label: string; sum: number; source?: string }> = [];
+        for (const di of allDfInfos) {
+          const fi = di.fields.find((f: FieldInfo) => f.name === s.name);
+          if (fi?.groupedTop5 && fi.groupedTop5.length > 0) {
+            allGroupedEntries.push(...fi.groupedTop5);
+          }
         }
+
+        let top5Labels: string[];
+        let top5IsFullData = false;
+        let groupByFieldName: string | undefined;
+
+        if (allGroupedEntries.length > 0) {
+          // Detect groupByField name from first available field
+          for (const di of allDfInfos) {
+            const fi = di.fields.find((f: FieldInfo) => f.name === s.name);
+            if (fi?.groupByField) { groupByFieldName = fi.groupByField; break; }
+          }
+          // Re-aggregate: sum by label across files
+          const unionMap = new Map<string, number>();
+          for (const entry of allGroupedEntries) {
+            unionMap.set(entry.label, (unionMap.get(entry.label) ?? 0) + entry.sum);
+          }
+          const sorted = Array.from(unionMap.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5);
+          top5Labels = sorted.map(([label, sum]) => `${label}(${sum.toLocaleString()})`);
+          top5IsFullData = true;
+        } else {
+          // No groupedTop5 available — omit rather than show inaccurate sample ranking
+          top5Labels = [];
+          top5IsFullData = false;
+        }
+
         return {
           ...s,
           top5: top5Labels,
-          top5IsFullData: !!(fieldInfo?.top5 && fieldInfo.top5.length > 0),
+          top5IsFullData,
+          groupByField: groupByFieldName,
         };
       }).filter(Boolean);
 
@@ -1530,7 +1563,7 @@ ${topPerformers.map(s => [
   `${s!.name}零値或空白: ${s!.zeros}个`,
   `${s!.name}异常高値(>均化3倍): ${s!.outliers}个`,
   s!.top5IsFullData && s!.top5!.length > 0
-    ? `${s!.name}前5名（全量数据）: ${s!.top5!.join(' / ')}`
+    ? `${s!.name}前5名（按${(s as any).groupByField || '分组维度'}聚合，全量数据）: ${s!.top5!.join(' / ')}`
     : null,
 ].filter(Boolean).join('\n')).join('\n')}
 ══ 全量统计摘要结束 ══
@@ -2509,6 +2542,11 @@ ${sampleRows}
   // Receives frontend-parsed data (JSON). Skips server-side XLSX parsing entirely.
   app.post("/api/atlas/upload-parsed", optionalAuth, async (req: Request, res: Response) => {
     try {
+      interface FrontendGroupedTop5Entry {
+        label: string;
+        sum: number;
+        source?: string;
+      }
       interface FrontendParsedField {
         name: string;
         type: "numeric" | "text" | "datetime";
@@ -2521,6 +2559,9 @@ ${sampleRows}
         max?: number;
         avg?: number;
         top5?: Array<{ value: number; rowIndex: number }>;
+        // Grouped top5: GROUP BY dimension field, SUM numeric field, TOP5 by sum
+        groupedTop5?: FrontendGroupedTop5Entry[];
+        groupByField?: string;
       }
       const parsed = req.body as {
         filename: string;
@@ -2528,6 +2569,7 @@ ${sampleRows}
         colCount: number;
         fields: FrontendParsedField[];
         preview: Record<string, unknown>[];
+        groupByField?: string;
       };
 
       if (!parsed || !parsed.filename || !parsed.fields) {
@@ -2553,6 +2595,9 @@ ${sampleRows}
           ...(f.sum !== undefined ? { sum: f.sum, avg: f.avg, max: f.max, min: f.min } : {}),
           // Persist full-dataset top5 (value-descending) for accurate TopN in chat
           ...(f.top5 !== undefined ? { top5: f.top5 } : {}),
+          // Persist grouped top5 (GROUP BY dimension field, SUM numeric field) for accurate aggregated TopN
+          ...(f.groupedTop5 !== undefined ? { groupedTop5: f.groupedTop5 } : {}),
+          ...(f.groupByField !== undefined ? { groupByField: f.groupByField } : {}),
         })),
         preview: (parsed.preview || []).slice(0, 5),
       };

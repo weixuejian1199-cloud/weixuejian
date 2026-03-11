@@ -20,6 +20,13 @@ export interface ColumnStat {
   top5Heap: Array<{ value: number; rowIndex: number }>;
 }
 
+// Grouped top5 entry: group label + aggregated sum from full dataset
+export interface GroupedTop5Entry {
+  label: string;   // e.g. "达人昵称" value
+  sum: number;     // aggregated sum of the numeric field for this group
+  source?: string; // source filename (for multi-file UNION)
+}
+
 export interface ParsedField {
   name: string;
   type: "numeric" | "text" | "datetime";
@@ -32,8 +39,12 @@ export interface ParsedField {
   min?: number;
   max?: number;
   avg?: number;
-  // top5: value-descending, each entry is { value, rowIndex } — from full dataset
+  // top5: value-descending, each entry is { value, rowIndex } — from full dataset (row-level)
   top5?: Array<{ value: number; rowIndex: number }>;
+  // groupedTop5: GROUP BY dimension field, SUM numeric field, TOP5 by sum — from full dataset
+  groupedTop5?: GroupedTop5Entry[];
+  // which dimension field was used for groupedTop5
+  groupByField?: string;
 }
 
 export interface ParsedFileData {
@@ -43,10 +54,55 @@ export interface ParsedFileData {
   fields: ParsedField[];
   preview: Record<string, unknown>[]; // first 500 rows
   sampleRows: Record<string, unknown>[]; // first 20 rows for AI prompt
+  // The dimension field used for groupedTop5 (e.g. "达人昵称")
+  groupByField?: string;
 }
 
 const PREVIEW_ROWS = 500;
 const SAMPLE_ROWS = 20;
+
+// Keywords used to identify dimension/grouping fields for TopN aggregation
+const GROUP_FIELD_KEYWORDS = ["达人", "昵称", "姓名", "店铺", "商品", "SKU", "品牌"];
+
+/**
+ * Detect the best grouping dimension field from headers.
+ * Returns the first header that contains any GROUP_FIELD_KEYWORDS.
+ * Returns null if no reliable dimension field found.
+ */
+function detectGroupByField(headers: string[]): string | null {
+  for (const h of headers) {
+    for (const kw of GROUP_FIELD_KEYWORDS) {
+      if (h.includes(kw)) return h;
+    }
+  }
+  return null;
+}
+
+/**
+ * Compute GROUP BY + SUM top5 for a numeric field, grouped by a dimension field.
+ * Returns top5 entries sorted by aggregated sum descending.
+ */
+function computeGroupedTop5(
+  rows: Record<string, unknown>[],
+  numericField: string,
+  groupField: string,
+  sourceFilename: string
+): GroupedTop5Entry[] {
+  const groupSums: Map<string, number> = new Map();
+  for (const row of rows) {
+    const groupVal = row[groupField];
+    const numVal = Number(row[numericField]);
+    if (groupVal === null || groupVal === undefined || groupVal === "") continue;
+    if (isNaN(numVal)) continue;
+    const key = String(groupVal);
+    groupSums.set(key, (groupSums.get(key) ?? 0) + numVal);
+  }
+  // Sort by sum descending, take top 5
+  const sorted = Array.from(groupSums.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+  return sorted.map(([label, sum]) => ({ label, sum, source: sourceFilename }));
+}
 
 function detectType(values: unknown[]): "numeric" | "text" | "datetime" {
   const nonNull = values.filter((v) => v !== null && v !== undefined && v !== "");
@@ -140,6 +196,9 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
 
   // Detect column types using first 200 rows sample
   const sampleForType = rows.slice(0, 200);
+  // Detect dimension field for groupedTop5
+  const groupByField = detectGroupByField(headers);
+
   const fields: ParsedField[] = headers.map((h) => {
     const sampleVals = sampleForType.map((r) => r[h]);
     const type = detectType(sampleVals);
@@ -160,8 +219,13 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
       field.min = stat.min;
       field.max = stat.max;
       field.avg = stat.sum / stat.count;
-      // top5 sorted descending by value (full dataset)
+      // top5 sorted descending by value (full dataset, row-level)
       field.top5 = [...stat.top5Heap].sort((a, b) => b.value - a.value);
+      // groupedTop5: GROUP BY dimension field, SUM this numeric field, TOP5 by sum
+      if (groupByField) {
+        field.groupedTop5 = computeGroupedTop5(rows, h, groupByField, file.name);
+        field.groupByField = groupByField;
+      }
     }
 
     return field;
@@ -177,5 +241,6 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     fields,
     preview,
     sampleRows,
+    groupByField: groupByField ?? undefined,
   };
 }

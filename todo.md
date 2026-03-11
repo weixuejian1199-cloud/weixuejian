@@ -819,3 +819,11 @@
 ### 第二批 P2
 - [x] chat 端点 prompt：统计摘要段命名改为 dataset_profile，样本行段命名改为 sample_rows
 - [x] /upload-parsed 端点 prompt：同步命名规范
+
+## TopN 聚合排名（方案 C）
+
+- [x] 前端 parseFile：识别分组字段（关键词：达人/昵称/姓名/店铺/商品/SKU/品牌），计算 groupedTop5（GROUP BY + SUM，含来源文件名）
+- [x] 服务端 /upload-parsed：FrontendParsedField/FieldInfo 接口新增 groupedTop5/groupByField 字段，持久化到 dfInfo
+- [x] 服务端 chat 端点：单文件使用 dfInfo 中的 groupedTop5；多文件时 UNION 各文件 groupedTop5 后重新聚合取 TOP5
+- [x] 无可靠分组字段时不展示排名（空数组），不返回错误排名
+- [x] 多文件 UNION 重新聚合（同名 label 跨文件累加）， statsContext 显示分组维度字段名
