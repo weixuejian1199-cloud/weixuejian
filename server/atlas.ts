@@ -18,6 +18,9 @@ import type { Express, Request, Response, NextFunction } from "express";
 import multer from "multer";
 import { nanoid } from "nanoid";
 import * as XLSX from "xlsx";
+import { Worker } from "worker_threads";
+import path from "path";
+import { fileURLToPath } from "url";
 import Papa from "papaparse";
 import { streamText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
@@ -219,6 +222,42 @@ function parseExcelBuffer(buffer: Buffer, filename: string): { data: Record<stri
   );
 
   return { data, sheetNames };
+}
+
+// Async wrapper: runs XLSX.read in a worker thread so the main event loop is never blocked.
+// This prevents Cloudflare 503 timeouts when processing large files (15MB+).
+// Worker script is pre-compiled to xlsxWorker.mjs (works in both dev and prod).
+function parseExcelBufferAsync(
+  buffer: Buffer,
+  filename: string
+): Promise<{ data: Record<string, unknown>[]; sheetNames: string[] }> {
+  return new Promise((resolve, reject) => {
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    // xlsxWorker.mjs is pre-compiled from xlsxWorker.ts via esbuild
+    // In dev: server/xlsxWorker.mjs
+    // In prod: dist/xlsxWorker.mjs (copied by build script)
+    const workerScript = path.resolve(__dirname, "xlsxWorker.mjs");
+
+    const worker = new Worker(workerScript, {
+      workerData: {
+        buffer: buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
+        filename,
+      },
+    });
+
+    worker.on("message", (result: { data: Record<string, unknown>[]; sheetNames: string[]; error?: string }) => {
+      if (result.error) {
+        reject(new Error(result.error));
+      } else {
+        resolve({ data: result.data, sheetNames: result.sheetNames });
+      }
+    });
+
+    worker.on("error", (err) => reject(err));
+    worker.on("exit", (code) => {
+      if (code !== 0) reject(new Error(`XLSX worker exited with code ${code}`));
+    });
+  });
 }
 
 function parseCsvBuffer(buffer: Buffer): Record<string, unknown>[] {
@@ -863,18 +902,16 @@ export function registerAtlasRoutes(app: Express) {
           await updateSession(sessionId, { fileUrl }).catch(() => {});
 
           // 3b. Parse data
+          // Use worker thread for XLSX so the main event loop is never blocked (prevents 503 on large files)
           let data: Record<string, unknown>[];
           let sheetNames: string[] | undefined;
-          // Yield event loop before CPU-intensive XLSX parse so status polls can respond (prevents 503)
-          await new Promise(r => setImmediate(r));
           if (ext === "csv") {
             data = parseCsvBuffer(buffer);
           } else {
-            const parsed = parseExcelBuffer(buffer, originalname);
+            const parsed = await parseExcelBufferAsync(buffer, originalname);
             data = parsed.data;
             sheetNames = parsed.sheetNames;
           }
-          await new Promise(r => setImmediate(r));
           const dfInfo = buildDataFrameInfo(data, sheetNames);
 
           // 3c. Normalize field names (P1-A: synonym mapping, non-destructive)
@@ -2193,18 +2230,16 @@ ${sampleRows}
           const { url: fileUrl } = await storagePut(fileKey, buffer, mimeType);
           await updateSession(sessionId, { fileUrl }).catch(() => {});
 
+          // Use worker thread for XLSX so the main event loop is never blocked (prevents 503 on large files)
           let data: Record<string, unknown>[];
           let sheetNames: string[] | undefined;
-          // Yield event loop before CPU-intensive XLSX parse so status polls can respond (prevents 503)
-          await new Promise(r => setImmediate(r));
           if (ext === "csv") {
             data = parseCsvBuffer(buffer);
           } else {
-            const parsed = parseExcelBuffer(buffer, originalname);
+            const parsed = await parseExcelBufferAsync(buffer, originalname);
             data = parsed.data;
             sheetNames = parsed.sheetNames;
           }
-          await new Promise(r => setImmediate(r));
           const dfInfo = buildDataFrameInfo(data, sheetNames);
           const scenarioHint = detectScenario(dfInfo.fields);
           const requiredByScenario: Record<string, string[]> = {
