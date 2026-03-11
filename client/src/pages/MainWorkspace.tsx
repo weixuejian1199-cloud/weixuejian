@@ -61,7 +61,7 @@ const FOLLOWUP_ACTIONS: SuggestedAction[] = [
 export default function MainWorkspace() {
   const {
     uploadedFiles, addUploadedFile, updateUploadedFile, removeUploadedFile, clearFiles,
-    messages, addMessage, updateLastMessage, clearMessages,
+    messages, addMessage, updateLastMessage, updateMessageById, clearMessages,
     isProcessing, setIsProcessing,
     addReport,
     activeTaskId, createNewTask, updateTask,
@@ -136,13 +136,18 @@ export default function MainWorkspace() {
 
     // ★ 文件选择后立即插入进度条消息（覆盖上传+分析全过程）
     addMessage({ role: "user", content: `[自动分析] ${file.name}`, isHidden: true } as any, taskId);
-    addMessage({
+    // Capture the assistant message ID to enable per-message updates (fixes concurrent upload race condition)
+    const assistantMsgId = addMessage({
       role: "assistant",
       content: "",
       isAnalyzing: true,
       analyzeProgress: 5,
       isStreaming: false,
     } as any, taskId);
+
+    // Helper: update THIS file's assistant message by ID (not the last message)
+    const updateMyMsg = (content: string, extra?: Partial<Message>) =>
+      updateMessageById(assistantMsgId, content, extra, taskId);
 
     // 进度定时器引用（用于清理）
     const progressTimers: ReturnType<typeof setTimeout>[] = [];
@@ -152,7 +157,7 @@ export default function MainWorkspace() {
     const uploadPhaseTimer = setInterval(() => {
       if (currentProgress < 28) {
         currentProgress = Math.min(currentProgress + 3, 28);
-        updateLastMessage("", { isAnalyzing: true, analyzeProgress: currentProgress });
+        updateMyMsg("", { isAnalyzing: true, analyzeProgress: currentProgress });
       }
     }, 400);
     progressTimers.push(uploadPhaseTimer as any);
@@ -164,7 +169,7 @@ export default function MainWorkspace() {
         const mappedProgress = Math.round(5 + (percent / 100) * 25);
         if (mappedProgress > currentProgress) {
           currentProgress = mappedProgress;
-          updateLastMessage("", { isAnalyzing: true, analyzeProgress: currentProgress });
+          updateMyMsg("", { isAnalyzing: true, analyzeProgress: currentProgress });
         }
       });
 
@@ -173,10 +178,10 @@ export default function MainWorkspace() {
 
       // 分析阶段：30% → 50% → 70% → 85% → 92%
       currentProgress = 30;
-      updateLastMessage("", { isAnalyzing: true, analyzeProgress: 30 });
+      updateMyMsg("", { isAnalyzing: true, analyzeProgress: 30 });
       // FIX: Guard flag to prevent progress timers from overwriting the final result.
-      // Root cause: analysisSteps at 2800ms and 4200ms fire AFTER showResult (1500ms),
-      // calling updateLastMessage("", ...) which clears content and drops outlierDetails.
+      // Root cause: analysisSteps at 2800ms and 4200ms fire AFTER showResult (1500ms).
+      // Now using updateMessageById instead of updateLastMessage to prevent cross-file interference.
       let resultShown = false;
       const analysisSteps = [50, 70, 85, 92];
       const analysisDelays = [600, 1500, 2800, 4200];
@@ -184,7 +189,7 @@ export default function MainWorkspace() {
         const t = setTimeout(() => {
           if (resultShown) return; // Guard: don't overwrite final result
           currentProgress = pct;
-          updateLastMessage("", { isAnalyzing: true, analyzeProgress: pct });
+          updateMyMsg("", { isAnalyzing: true, analyzeProgress: pct });
         }, analysisDelays[i]);
         progressTimers.push(t);
       });
@@ -232,13 +237,15 @@ export default function MainWorkspace() {
         const finalSuggestions = suggestions.length > 0
           ? suggestions
           : (result.suggested_actions || DEFAULT_ACTIONS);
-        updateLastMessage(cleanText, {
+        // Use updateMessageById to update THIS file's message precisely
+        updateMyMsg(cleanText, {
           isAnalyzing: false,
           analyzeProgress: 100,
           isStreaming: false,
           suggestedActions: finalSuggestions,
           qualityIssues: result.quality_issues?.length ? result.quality_issues : undefined,
           outlierDetails: result.outlier_details?.length ? result.outlier_details : undefined,
+          fieldMappingHint: result.field_mapping_hint?.length ? result.field_mapping_hint : undefined, // P0-C
         });
       };
       // 最短展示 1.5s 动画后显示结果
@@ -249,14 +256,14 @@ export default function MainWorkspace() {
       progressTimers.forEach(t => { clearTimeout(t); clearInterval(t as any); });
       clearInterval(uploadPhaseTimer);
       // 移除进度条消息（替换为错误提示）
-      updateLastMessage(`上传失败：${(err as any).message || "请重试"}`, {
+      updateMyMsg(`上传失败：${(err as any).message || "请重试"}`, {
         isAnalyzing: false,
         analyzeProgress: 0,
       });
       updateUploadedFile(tempId, { status: "error" });
       toast.error(`${file.name} 上传失败：${err.message}`);
     }
-  }, [addUploadedFile, updateUploadedFile, addMessage, updateLastMessage, setIsGenerating, activeTaskId, tasks, updateTask]);
+  }, [addUploadedFile, updateUploadedFile, addMessage, updateMessageById, setIsGenerating, activeTaskId, tasks, updateTask]);
 
   const handleFiles = useCallback((files: FileList | File[]) => {
     // Ensure we have an active task
@@ -704,7 +711,12 @@ export default function MainWorkspace() {
     if (prompt === "__MERGE_INLINE__") {
       const files = readyFiles.filter(f => f.sessionId);
       if (files.length < 2) {
-        handleSend("我有多家门店的数据，帮我合并汇总到一张表", true);
+        const count = files.length;
+        if (count === 0) {
+          toast.info("请先上传至少 2 个文件，再使用多门店合并功能");
+        } else {
+          toast.info(`当前只有 1 个文件，请再上传至少 1 个其他门店的文件`);
+        }
         return;
       }
       const platformKeywords = ["淘宝", "天猫", "京东", "拼多多", "抖音", "快手", "1688", "闲鱼", "苏宁", "唯品会", "小红书"];
@@ -1008,8 +1020,8 @@ export default function MainWorkspace() {
         </div>
       </div>
 
-      {/* Quick action pills — always visible below input */}
-      {!isGenerating && messages.length === 0 && (
+      {/* Quick action pills — visible when no messages OR when files are ready */}
+      {!isGenerating && (messages.length === 0 || hasFiles) && (
         <div className="flex-shrink-0 pb-3">
           <div className="w-full max-w-4xl mx-auto px-6">
             <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
@@ -1636,6 +1648,34 @@ function MessageBubble({
               )}
             </AnimatePresence>
           </motion.div>
+        )}
+        {/* P0-C: Field mapping hint block — blue info bar */}
+        {message.fieldMappingHint && message.fieldMappingHint.length > 0 && (
+          <div className="mb-2 flex flex-col gap-1">
+            <div
+              className="flex items-start gap-2 px-3 py-2 rounded-xl"
+              style={{
+                background: 'rgba(59,130,246,0.08)',
+                border: '1px solid rgba(59,130,246,0.22)',
+                fontSize: '12.5px',
+                lineHeight: '1.6',
+                color: 'rgb(37,99,235)',
+              }}
+            >
+              <span style={{ flexShrink: 0, marginTop: '1px' }}>ℹ️</span>
+              <span className="flex-1">
+                <span style={{ fontWeight: 600 }}>已自动识别字段：</span>
+                {message.fieldMappingHint.map((m, i) => (
+                  <span key={i}>
+                    {i > 0 && <span style={{ color: 'rgba(37,99,235,0.5)', margin: '0 4px' }}>·</span>}
+                    <span style={{ background: 'rgba(59,130,246,0.12)', borderRadius: '4px', padding: '0 4px' }}>「{m.original}」</span>
+                    <span style={{ margin: '0 3px', opacity: 0.6 }}>→</span>
+                    <span style={{ background: 'rgba(59,130,246,0.12)', borderRadius: '4px', padding: '0 4px' }}>「{m.canonical}」</span>
+                  </span>
+                ))}
+              </span>
+            </div>
+          </div>
         )}
         {/* P0-B: Quality issues hint block */}
         {message.qualityIssues && message.qualityIssues.length > 0 && (

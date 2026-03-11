@@ -26,6 +26,7 @@ interface UploadResult {
   id: string;
   headers: string[];
   fieldMap: AttendanceFieldMap;
+  tableFormat: "detail" | "summary"; // P0-A: 考勤汇总格式识别
   preview: Record<string, unknown>[];
   rowCount: number;
 }
@@ -124,6 +125,7 @@ export default function AttendancePage({ onBack }: { onBack?: () => void }) {
           body: JSON.stringify({
             id: data.id,
             fieldMap: data.fieldMap,
+            tableFormat: data.tableFormat, // P0-A: 传递格式类型，避免服务端重新检测
             period,
             workStartHour: startH + startM / 60,
             workEndHour: endH + endM / 60,
@@ -177,6 +179,7 @@ export default function AttendancePage({ onBack }: { onBack?: () => void }) {
         body: JSON.stringify({
           id: uploadResult.id,
           fieldMap,
+          tableFormat: uploadResult.tableFormat, // P0-A: 传递格式类型
           period,
           workStartHour: startH + startM / 60,
           workEndHour: endH + endM / 60,

@@ -40,6 +40,10 @@ export interface UploadResponse {
     threshold: number;
     outlierRows: Array<{ rowIndex: number; value: number }>;
   }>;
+  field_mapping_hint?: Array<{  // P0-C: structured field mapping for UI hint block
+    original: string;
+    canonical: string;
+  }>;
 }
 
 export interface GenerateReportResponse {

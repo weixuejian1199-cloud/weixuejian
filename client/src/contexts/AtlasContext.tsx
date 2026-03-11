@@ -76,6 +76,10 @@ export interface Message {
     threshold: number;
     outlierRows: Array<{ rowIndex: number; value: number }>;
   }>;
+  fieldMappingHint?: Array<{  // P0-C: field mapping hint (e.g. 「月薪」→「基本工资」)
+    original: string;
+    canonical: string;
+  }>;
 }
 
 export interface ReportRecord {
@@ -187,8 +191,9 @@ interface AtlasContextType {
 
   // Current task's messages (scoped to activeTaskId)
   messages: Message[];
-  addMessage: (msg: Omit<Message, "id" | "timestamp">, targetTaskId?: string) => void;
+  addMessage: (msg: Omit<Message, "id" | "timestamp">, targetTaskId?: string) => string;
   updateLastMessage: (content: string, extra?: Partial<Message>) => void;
+  updateMessageById: (msgId: string, content: string, extra?: Partial<Message>, targetTaskId?: string) => void;
   clearMessages: () => void;
 
   // Processing
@@ -448,7 +453,7 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
 
   // ── Per-task messages ────────────────────────────────────────────────────
 
-  const addMessage = useCallback((msg: Omit<Message, "id" | "timestamp">, targetTaskId?: string) => {
+  const addMessage = useCallback((msg: Omit<Message, "id" | "timestamp">, targetTaskId?: string): string => {
     const newMsg: Message = { ...msg, id: genId(), timestamp: new Date() };
     const tid = targetTaskId ?? activeTaskId;
     setTasks(prev => prev.map(t =>
@@ -456,6 +461,7 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
         ? { ...t, messages: [...t.messages, newMsg] }
         : t
     ));
+    return newMsg.id;
   }, [activeTaskId]);
 
   const updateLastMessage = useCallback((content: string, extra?: Partial<Message>) => {
@@ -466,6 +472,20 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
       // If extra explicitly sets isStreaming, use it; otherwise default to false
       const isStreamingVal = extra && 'isStreaming' in extra ? extra.isStreaming : false;
       msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], content, ...extra, isStreaming: isStreamingVal };
+      return { ...t, messages: msgs };
+    }));
+  }, [activeTaskId]);
+
+  // Update a specific message by ID (fixes concurrent file upload race condition)
+  const updateMessageById = useCallback((msgId: string, content: string, extra?: Partial<Message>, targetTaskId?: string) => {
+    const tid = targetTaskId ?? activeTaskId;
+    setTasks(prev => prev.map(t => {
+      if (t.id !== tid) return t;
+      const idx = t.messages.findIndex(m => m.id === msgId);
+      if (idx === -1) return t;
+      const msgs = [...t.messages];
+      const isStreamingVal = extra && 'isStreaming' in extra ? extra.isStreaming : false;
+      msgs[idx] = { ...msgs[idx], content, ...extra, isStreaming: isStreamingVal };
       return { ...t, messages: msgs };
     }));
   }, [activeTaskId]);
@@ -571,7 +591,7 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
       showLoginModal, setShowLoginModal,
       tasks, addTask, updateTask, deleteTask, renameTask, createNewTask,
       uploadedFiles, addUploadedFile, updateUploadedFile, removeUploadedFile, clearFiles,
-      messages, addMessage, updateLastMessage, clearMessages,
+      messages, addMessage, updateLastMessage, updateMessageById, clearMessages,
       isProcessing, setIsProcessing,
       reports, addReport,
       templates, addTemplate, updateTemplate, removeTemplate, pinTemplate,

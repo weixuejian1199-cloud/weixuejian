@@ -13,6 +13,7 @@ import type { Express, Request, Response } from "express";
 import multer from "multer";
 import { nanoid } from "nanoid";
 import * as XLSX from "xlsx";
+import ExcelJS from "exceljs"; // P2: WPS-compatible Excel generation
 import Decimal from "decimal.js";
 import Papa from "papaparse";
 import { createOpenAI } from "@ai-sdk/openai";
@@ -479,6 +480,127 @@ function generatePayslipExcel(employees: Array<{
   return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
 }
 
+
+// P2: WPS-compatible payslip generator using ExcelJS
+// generatePayslipExcelWPS — same data structure, proper OOXML styles for WPS
+async function generatePayslipExcelWPS(employees: Array<{
+  name: string; dept: string; baseSalary: number; bonus: number;
+  deduction: number; insurance: number; tax: TaxResult;
+}>): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "ATLAS";
+  wb.created = new Date();
+
+  const headerFill: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
+  const headerFont: Partial<ExcelJS.Font> = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+  const headerAlign: Partial<ExcelJS.Alignment> = { horizontal: "center", vertical: "middle" };
+  const lightBlueFill: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8F4FD" } };
+  const thinBorder: Partial<ExcelJS.Borders> = {
+    top: { style: "thin", color: { argb: "FFCCCCCC" } },
+    left: { style: "thin", color: { argb: "FFCCCCCC" } },
+    bottom: { style: "thin", color: { argb: "FFCCCCCC" } },
+    right: { style: "thin", color: { argb: "FFCCCCCC" } },
+  };
+  const moneyFmt = '#,##0.00';
+
+  // Sheet 1: 工资汇总
+  const ws1 = wb.addWorksheet("工资汇总");
+  ws1.columns = [
+    { header: "姓名",         key: "name",          width: 12 },
+    { header: "部门",         key: "dept",          width: 12 },
+    { header: "应发工资",     key: "gross",         width: 14 },
+    { header: "奖金/绩效",   key: "bonus",         width: 14 },
+    { header: "扣款",         key: "deduction",     width: 12 },
+    { header: "五险一金",     key: "insurance",     width: 14 },
+    { header: "应纳税所得额", key: "taxableIncome", width: 16 },
+    { header: "个人所得税",   key: "incomeTax",     width: 14 },
+    { header: "实发工资",     key: "netSalary",     width: 14 },
+  ];
+  ws1.getRow(1).eachCell(cell => {
+    cell.fill = headerFill; cell.font = headerFont;
+    cell.alignment = headerAlign; cell.border = thinBorder;
+  });
+  ws1.getRow(1).height = 22;
+  for (const e of employees) {
+    const row = ws1.addRow({
+      name: e.name, dept: e.dept,
+      gross: e.tax.grossSalary, bonus: e.bonus, deduction: e.deduction,
+      insurance: e.tax.insurance, taxableIncome: e.tax.taxableIncome,
+      incomeTax: e.tax.incomeTax, netSalary: e.tax.netSalary,
+    });
+    for (let c = 3; c <= 9; c++) { row.getCell(c).numFmt = moneyFmt; row.getCell(c).border = thinBorder; }
+    row.getCell(1).border = thinBorder; row.getCell(2).border = thinBorder;
+    row.height = 18;
+  }
+
+  // Sheet 2: 个人工资条
+  const ws2 = wb.addWorksheet("个人工资条");
+  ws2.columns = [
+    { key: "a", width: 18 }, { key: "b", width: 16 },
+    { key: "c", width: 18 }, { key: "d", width: 16 },
+  ];
+  for (const e of employees) {
+    const titleRow = ws2.addRow([`员工工资条 — ${e.name}`, "", "", ""]);
+    ws2.mergeCells(`A${titleRow.number}:D${titleRow.number}`);
+    titleRow.getCell(1).fill = headerFill;
+    titleRow.getCell(1).font = { ...headerFont, size: 12 };
+    titleRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+    titleRow.height = 24;
+    const subHeader = ws2.addRow(["项目", "金额（元）", "项目", "金额（元）"]);
+    subHeader.eachCell(cell => {
+      cell.fill = lightBlueFill; cell.font = { bold: true, size: 10 };
+      cell.alignment = { horizontal: "center" }; cell.border = thinBorder;
+    });
+    const dataRows: [string, number, string, number][] = [
+      ["基本工资",  e.baseSalary,       "五险一金（个人）", e.tax.insurance],
+      ["奖金/绩效", e.bonus,            "个人所得税",     e.tax.incomeTax],
+      ["扣款",      e.deduction,        "应纳税所得额",   e.tax.taxableIncome],
+      ["应发工资",  e.tax.grossSalary,  "实发工资",       e.tax.netSalary],
+    ];
+    for (const [la, va, lb, vb] of dataRows) {
+      const r = ws2.addRow([la, va, lb, vb]);
+      r.getCell(1).border = thinBorder;
+      r.getCell(2).numFmt = moneyFmt; r.getCell(2).border = thinBorder;
+      r.getCell(3).border = thinBorder;
+      r.getCell(4).numFmt = moneyFmt; r.getCell(4).border = thinBorder;
+      r.height = 18;
+    }
+    ws2.addRow([]); ws2.addRow([]);
+  }
+
+  // Sheet 3: 个税明细
+  const ws3 = wb.addWorksheet("个税明细");
+  ws3.columns = [
+    { header: "姓名",         key: "name",          width: 12 },
+    { header: "应发工资",     key: "gross",         width: 14 },
+    { header: "五险一金",     key: "insurance",     width: 14 },
+    { header: "起征点",       key: "threshold",     width: 10 },
+    { header: "应纳税所得额", key: "taxableIncome", width: 16 },
+    { header: "适用税率",     key: "rate",          width: 12 },
+    { header: "个税",         key: "incomeTax",     width: 12 },
+    { header: "实发工资",     key: "netSalary",     width: 14 },
+  ];
+  ws3.getRow(1).eachCell(cell => {
+    cell.fill = lightBlueFill; cell.font = { bold: true, size: 11 };
+    cell.alignment = { horizontal: "center" }; cell.border = thinBorder;
+  });
+  ws3.getRow(1).height = 22;
+  for (const e of employees) {
+    const bracket = TAX_BRACKETS.find(b => e.tax.taxableIncome <= b.limit) || TAX_BRACKETS[TAX_BRACKETS.length - 1];
+    const row = ws3.addRow({
+      name: e.name, gross: e.tax.grossSalary, insurance: e.tax.insurance,
+      threshold: 5000, taxableIncome: e.tax.taxableIncome,
+      rate: `${(bracket.rate * 100).toFixed(0)}%`,
+      incomeTax: e.tax.incomeTax, netSalary: e.tax.netSalary,
+    });
+    [2, 3, 4, 5, 7, 8].forEach(c => { row.getCell(c).numFmt = moneyFmt; });
+    row.eachCell(cell => { cell.border = thinBorder; });
+    row.height = 18;
+  }
+
+  const arrayBuffer = await wb.xlsx.writeBuffer();
+  return Buffer.from(arrayBuffer);
+}
 // ── Generate attendance Excel ─────────────────────────────────────────────────
 
 function generateAttendanceExcel(
@@ -629,7 +751,7 @@ export function registerHrRoutes(app: Express) {
       if (employees.length === 0) { res.status(400).json({ error: "未找到有效员工数据，请检查字段映射" }); return; }
 
       // Generate Excel
-      const excelBuffer = generatePayslipExcel(employees);
+      const excelBuffer = await generatePayslipExcelWPS(employees);
 
       // Upload to S3
       const reportKey = `hr-payslip-reports/${id}-${Date.now()}.xlsx`;
@@ -741,7 +863,7 @@ export function registerHrRoutes(app: Express) {
       }
 
       // 7. Generate Excel
-      const excelBuffer = generatePayslipExcel(employees);
+      const excelBuffer = await generatePayslipExcelWPS(employees);
       const reportKey = `hr-payslip-reports/${id}-${Date.now()}.xlsx`;
       const { url: reportUrl } = await storagePut(reportKey, excelBuffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 

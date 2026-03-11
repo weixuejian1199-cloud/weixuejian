@@ -1082,6 +1082,9 @@ export function registerAtlasRoutes(app: Express) {
         suggested_actions: suggestedActions,
         quality_issues: qualityIssues, // P0-B: expose for frontend UI hint block
         outlier_details: outlierDetails.length > 0 ? outlierDetails : undefined, // P0-B UI: structured details for clickable warning
+        field_mapping_hint: mappingEntries.length > 0 // P0-C: structured field mapping for UI hint block
+          ? mappingEntries.map(([original, canonical]) => ({ original, canonical }))
+          : undefined,
       });
     } catch (err: any) {
       console.error("[Atlas] Upload error:", err);
