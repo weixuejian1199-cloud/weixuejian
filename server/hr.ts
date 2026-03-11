@@ -13,6 +13,7 @@ import type { Express, Request, Response } from "express";
 import multer from "multer";
 import { nanoid } from "nanoid";
 import * as XLSX from "xlsx";
+import Decimal from "decimal.js";
 import Papa from "papaparse";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
@@ -91,27 +92,31 @@ export function calcTax(opts: {
   bonus?: number;
   insurance?: number; // if not provided, estimate as 10.5% of gross
 }): TaxResult {
-  const gross = Math.max(0, opts.grossSalary + (opts.bonus ?? 0));
+  // P1-B: Use Decimal.js to eliminate floating-point errors
+  const gross = Decimal.max(0, new Decimal(opts.grossSalary).plus(opts.bonus ?? 0));
   // Estimate insurance if not provided: 养老8% + 医疗2% + 失业0.5% = 10.5%
   const insurance = opts.insurance !== undefined
-    ? Math.max(0, opts.insurance)
-    : Math.round(gross * 0.105);
-  const threshold = 5000;
-  const taxableIncome = Math.max(0, gross - insurance - threshold);
-
-  let incomeTax = 0;
+    ? Decimal.max(0, new Decimal(opts.insurance))
+    : gross.mul('0.105').toDecimalPlaces(0, Decimal.ROUND_HALF_UP);
+  const threshold = new Decimal(5000);
+  const taxableIncome = Decimal.max(0, gross.minus(insurance).minus(threshold));
+  let incomeTax = new Decimal(0);
   for (const bracket of TAX_BRACKETS) {
-    if (taxableIncome <= bracket.limit) {
-      incomeTax = Math.round(taxableIncome * bracket.rate - bracket.deduction);
+    if (taxableIncome.lte(bracket.limit)) {
+      incomeTax = taxableIncome.mul(bracket.rate).minus(bracket.deduction).toDecimalPlaces(0, Decimal.ROUND_HALF_UP);
       break;
     }
   }
-  incomeTax = Math.max(0, incomeTax);
-  const netSalary = Math.round(gross - insurance - incomeTax);
-
-  return { grossSalary: gross, insurance, taxableIncome, incomeTax, netSalary };
+  incomeTax = Decimal.max(0, incomeTax);
+  const netSalary = gross.minus(insurance).minus(incomeTax).toDecimalPlaces(0, Decimal.ROUND_HALF_UP);
+  return {
+    grossSalary: gross.toNumber(),
+    insurance: insurance.toNumber(),
+    taxableIncome: taxableIncome.toNumber(),
+     incomeTax: incomeTax.toNumber(),
+    netSalary: netSalary.toNumber(),
+  };
 }
-
 // ── AI field detection ────────────────────────────────────────────────────────
 
 async function detectPayslipFields(headers: string[]): Promise<{
@@ -147,14 +152,95 @@ async function detectPayslipFields(headers: string[]): Promise<{
   const find = (keywords: string[]) =>
     headers.find(h => keywords.some(k => h.toLowerCase().includes(k))) ?? "";
   return {
-    nameCol:       find(["姓名", "name", "员工", "人员", "staff", "employee"]),
-    emailCol:      find(["邮箱", "email", "mail", "邮件"]),
-    baseSalaryCol: find(["基本工资", "底薪", "基础工资", "固定工资", "月薪", "标准工资", "base", "base_salary"]),
-    bonusCol:      find(["奖金", "绩效", "提成", "绩效工资", "绩效奖金", "KPI", "kpi", "季度奖", "bonus", "incentive", "performance"]),
-    deductionCol:  find(["扣款", "罚款", "扣除", "缺勤扣款", "违规扣款", "deduct", "deduction"]),
-    insuranceCol:  find(["五险", "社保", "insurance", "公积金", "五险一金", "社保公积金"]),
-    deptCol:       find(["部门", "dept", "department", "所属部门"]),
+    nameCol:       find(["姓名", "name", "员工", "员工姓名", "员工名", "人员", "人员姓名", "staff", "employee", "emp_name"]),
+    emailCol:      find(["邮箱", "email", "mail", "邮件", "电子邮件", "电子邮箱"]),
+    baseSalaryCol: find(["基本工资", "底薪", "基础工资", "固定工资", "月薪", "标准工资", "岗位工资", "合同工资", "应发基本", "base", "base_salary", "basic_salary"]),
+    bonusCol:      find(["奖金", "绩效", "提成", "绩效工资", "绩效奖金", "KPI", "kpi", "季度奖", "年终奖", "全勤奖", "项目奖金", "销售提成", "超额提成", "bonus", "incentive", "performance", "commission"]),
+    deductionCol:  find(["扣款", "罚款", "扣除", "缺勤扣款", "违规扣款", "事假扣款", "病假扣款", "迟到扣款", "应扣合计", "deduct", "deduction", "penalty"]),
+    insuranceCol:  find(["五险", "社保", "insurance", "公积金", "五险一金", "社保公积金", "个人社保", "个人公积金", "社保扣款", "公积金扣款"]),
+    deptCol:       find(["部门", "dept", "department", "所属部门", "归属部门", "团队", "组别", "科室"]),
   };
+}
+
+// 判断考勤表格式：明细格式（每天一行，有打卡时间）还是汇总格式（每人一行，有出勤天数）
+function detectAttendanceFormat(headers: string[]): "detail" | "summary" {
+  const lh = headers.map(h => h.toLowerCase());
+  const hasSummaryFields = lh.some(h =>
+    ["出勤", "应出勤", "实出勤", "出勤天数", "应勤", "实勤",
+     "迟到次数", "旷工次数", "旷工天数", "早退次数",
+     "absent_days", "late_count", "present_days"].some(k => h.includes(k))
+  );
+  const hasDetailFields = lh.some(h =>
+    ["上班时间", "下班时间", "打卡", "签到", "签退", "check_in", "check_out",
+     "入厂", "出厂"].some(k => h.includes(k))
+  );
+  if (hasSummaryFields && !hasDetailFields) return "summary";
+  return "detail";
+}
+
+interface AttendanceSummaryFieldMap {
+  nameCol: string; deptCol: string;
+  presentDaysCol: string; absentDaysCol: string;
+  lateDaysCol: string; earlyLeaveDaysCol: string; overtimeHoursCol: string;
+}
+
+function detectAttendanceSummaryFields(headers: string[]): AttendanceSummaryFieldMap {
+  const find = (keywords: string[]) =>
+    headers.find(h => keywords.some(k => h.toLowerCase().includes(k))) ?? "";
+  return {
+    nameCol:          find(["姓名", "name", "员工", "人员", "staff"]),
+    deptCol:          find(["部门", "dept", "department"]),
+    presentDaysCol:   find(["实出勤", "出勤天数", "实勤", "出勤", "present", "应出勤"]),
+    absentDaysCol:    find(["旷工", "缺勤", "absent", "旷工天数", "缺勤天数"]),
+    lateDaysCol:      find(["迟到", "late", "迟到次数", "迟到天数"]),
+    earlyLeaveDaysCol:find(["早退", "early", "早退次数", "早退天数"]),
+    overtimeHoursCol: find(["加班", "overtime", "加班时长", "加班小时"]),
+  };
+}
+
+function analyzeAttendanceSummary(
+  data: Record<string, unknown>[],
+  fieldMap: AttendanceSummaryFieldMap
+): {
+  records: AttendanceRecord[];
+  summary: { totalEmployees: number; totalDays: number; attendanceRate: number; lateCount: number; absentCount: number; earlyLeaveCount: number; overtimeHours: number };
+  byEmployee: Record<string, { name: string; dept: string; presentDays: number; lateDays: number; absentDays: number; earlyLeaveDays: number; overtimeHours: number }>;
+} {
+  const byEmployee: Record<string, { name: string; dept: string; presentDays: number; lateDays: number; absentDays: number; earlyLeaveDays: number; overtimeHours: number }> = {};
+  for (const row of data) {
+    const name = String(row[fieldMap.nameCol] ?? "").trim();
+    if (!name) continue;
+    const dept = String(row[fieldMap.deptCol] ?? "").trim();
+    const toNum = (col: string) => { const v = parseFloat(String(row[col] ?? "0")); return isNaN(v) ? 0 : v; };
+    byEmployee[name] = {
+      name, dept,
+      presentDays:    toNum(fieldMap.presentDaysCol),
+      absentDays:     toNum(fieldMap.absentDaysCol),
+      lateDays:       toNum(fieldMap.lateDaysCol),
+      earlyLeaveDays: toNum(fieldMap.earlyLeaveDaysCol),
+      overtimeHours:  toNum(fieldMap.overtimeHoursCol),
+    };
+  }
+  const employees = Object.values(byEmployee);
+  const totalPresent = employees.reduce((s, e) => s + e.presentDays, 0);
+  const totalAbsent  = employees.reduce((s, e) => s + e.absentDays, 0);
+  const summary = {
+    totalEmployees: employees.length,
+    totalDays: totalPresent + totalAbsent,
+    attendanceRate: totalPresent + totalAbsent > 0
+      ? Math.round(totalPresent / (totalPresent + totalAbsent) * 100) : 100,
+    lateCount:       employees.reduce((s, e) => s + e.lateDays, 0),
+    absentCount:     totalAbsent,
+    earlyLeaveCount: employees.reduce((s, e) => s + e.earlyLeaveDays, 0),
+    overtimeHours:   Math.round(employees.reduce((s, e) => s + e.overtimeHours, 0) * 10) / 10,
+  };
+  // Build synthetic records (one per employee, no date/time detail)
+  const records: AttendanceRecord[] = employees.map(e => ({
+    name: e.name, date: "", checkIn: "", checkOut: "", dept: e.dept,
+    status: e.absentDays > 0 ? "absent" : e.lateDays > 0 ? "late" : "normal",
+    lateMinutes: e.lateDays * 60, overtimeMinutes: Math.round(e.overtimeHours * 60),
+  }));
+  return { records, summary, byEmployee };
 }
 
 async function detectAttendanceFields(headers: string[]): Promise<{
@@ -733,7 +819,10 @@ export function registerHrRoutes(app: Express) {
       if (data.length === 0) { res.status(400).json({ error: "文件为空或格式不正确" }); return; }
 
       const headers = Object.keys(data[0]);
-      const fieldMap = await detectAttendanceFields(headers);
+      const tableFormat = detectAttendanceFormat(headers); // "detail" | "summary"
+      const fieldMap = tableFormat === "summary"
+        ? detectAttendanceSummaryFields(headers)
+        : await detectAttendanceFields(headers);
       const preview = data.slice(0, 5);
 
       const userId = (req as any).userId || 0;
@@ -749,7 +838,7 @@ export function registerHrRoutes(app: Express) {
         status: "analyzing",
       });
 
-      res.json({ id, headers, fieldMap, preview, rowCount: data.length });
+      res.json({ id, headers, fieldMap, tableFormat, preview, rowCount: data.length });
     } catch (err: any) {
       console.error("[HR] Attendance upload error:", err);
       res.status(500).json({ error: err.message || "Upload failed" });
@@ -760,9 +849,10 @@ export function registerHrRoutes(app: Express) {
 
   app.post("/api/hr/attendance/analyze", async (req: Request, res: Response) => {
     try {
-      const { id, fieldMap, period, workStartHour, workEndHour } = req.body as {
+      const { id, fieldMap, tableFormat, period, workStartHour, workEndHour } = req.body as {
         id: string;
-        fieldMap: { nameCol: string; dateCol: string; checkInCol: string; checkOutCol: string; deptCol: string; statusCol: string };
+        fieldMap: Record<string, string>;
+        tableFormat?: "detail" | "summary";
         period?: string;
         workStartHour?: number;
         workEndHour?: number;
@@ -777,9 +867,11 @@ export function registerHrRoutes(app: Express) {
       const arrayBuf = await fileRes.arrayBuffer();
       const data = parseFile(Buffer.from(arrayBuf), record.filename);
 
-      const { records, summary, byEmployee } = analyzeAttendance(
-        data, fieldMap, workStartHour ?? 9, workEndHour ?? 18,
-      );
+      // P0-A: 根据格式选择对应的分析函数
+      const fmt = tableFormat ?? detectAttendanceFormat(Object.keys(data[0] ?? {}));
+      const { records, summary, byEmployee } = fmt === "summary"
+        ? analyzeAttendanceSummary(data, fieldMap as unknown as AttendanceSummaryFieldMap)
+        : analyzeAttendance(data, fieldMap as any, workStartHour ?? 9, workEndHour ?? 18);
 
       // Generate Excel report
       const excelBuffer = generateAttendanceExcel(byEmployee, records, summary);

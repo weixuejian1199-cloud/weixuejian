@@ -231,6 +231,7 @@ export default function MainWorkspace() {
           analyzeProgress: 100,
           isStreaming: false,
           suggestedActions: finalSuggestions,
+          qualityIssues: result.quality_issues?.length ? result.quality_issues : undefined,
         });
       };
       // 最短展示 1.5s 动画后显示结果
@@ -517,6 +518,67 @@ export default function MainWorkspace() {
     toast.success("开始下载");
   };
 
+  // P1-C: Merge dialog state
+  const [showMergeDialog, setShowMergeDialog] = useState(false);
+  const [mergeNames, setMergeNames] = useState<Record<string, string>>({});
+  const [isMerging, setIsMerging] = useState(false);
+
+  // P1-C: Inline multi-file merge
+  const handleInlineMerge = useCallback(async () => {
+    const files = readyFiles.filter(f => f.sessionId);
+    if (files.length < 2) return;
+    setShowMergeDialog(false);
+    setIsMerging(true);
+    addMessage({ role: "user", content: "合并多门店数据" });
+    addMessage({ role: "assistant", content: "", isStreaming: true, thinkingSteps: ["读取文件数据", "添加来源平台列", "生成合并Excel"] });
+    setIsGenerating(true);
+    try {
+      const session_ids = files.map(f => f.sessionId!);
+      const platform_names: Record<string, string> = {};
+      files.forEach(f => {
+        if (mergeNames[f.id]) platform_names[f.sessionId!] = mergeNames[f.id];
+      });
+      const res = await fetch("/api/atlas/merge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ session_ids, platform_names }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "合并失败");
+      }
+      const data = await res.json();
+      const summaryLines = [
+        `✅ 数据合并完成，共 **${data.totalRows}** 行`,
+        ``,
+        `| 文件 | 来源平台 | 行数 |`,
+        `|------|---------|------|`,
+        ...(data.files || []).map((f: { name: string; platform: string; rowCount: number }) =>
+          `| ${f.name} | ${f.platform} | ${f.rowCount} |`
+        ),
+      ].join("\n");
+      updateLastMessage(summaryLines, {
+        isStreaming: false,
+        thinkingSteps: undefined,
+        download_url: data.downloadUrl,
+        report_filename: `合并数据_${new Date().toISOString().slice(0, 10)}.xlsx`,
+        suggestedActions: [
+          { icon: "📊", label: "生成汇总报表", prompt: "帮我把合并后的数据生成汇总报表" },
+          { icon: "🔍", label: "各平台对比", prompt: "帮我对比各平台的销售数据" },
+          { icon: "✨", label: "自定义需求", prompt: "" },
+        ],
+      });
+      toast.success(`合并完成，共 ${data.totalRows} 行`);
+    } catch (err: any) {
+      updateLastMessage(`❌ 合并失败：${err.message}`, { isStreaming: false, thinkingSteps: undefined });
+      toast.error(err.message || "合并失败");
+    } finally {
+      setIsGenerating(false);
+      setIsMerging(false);
+    }
+  }, [readyFiles, mergeNames, addMessage, updateLastMessage, setIsGenerating]);
+
   // P1-B: Inline payslip generation from quick-action button (no page jump)
   const handleInlinePayslip = useCallback(async (sessionId: string) => {
     const period = new Date().toISOString().slice(0, 7);
@@ -631,8 +693,26 @@ export default function MainWorkspace() {
       handleInlineAttendance(prompt.replace("__ATTENDANCE_INLINE__", ""));
       return;
     }
+    // P1-C: Multi-file merge
+    if (prompt === "__MERGE_INLINE__") {
+      const files = readyFiles.filter(f => f.sessionId);
+      if (files.length < 2) {
+        handleSend("我有多家门店的数据，帮我合并汇总到一张表", true);
+        return;
+      }
+      const platformKeywords = ["淘宝", "天猫", "京东", "拼多多", "抖音", "快手", "1688", "闲鱼", "苏宁", "唯品会", "小红书"];
+      const initial: Record<string, string> = {};
+      files.forEach(f => {
+        const base = f.name.replace(/\.[^.]+$/, "");
+        const found = platformKeywords.find(k => base.includes(k));
+        initial[f.id] = found || base;
+      });
+      setMergeNames(initial);
+      setShowMergeDialog(true);
+      return;
+    }
     handleSend(prompt, true);
-  }, [handleSend, handleInlinePayslip, handleInlineAttendance]);
+  }, [handleSend, handleInlinePayslip, handleInlineAttendance, readyFiles]);
 
   // -- Render
   return (
@@ -928,7 +1008,7 @@ export default function MainWorkspace() {
             <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
               {[
                 { icon: "📊", label: "生成汇总报表", q: "帮我把上传的数据汇总生成报表" },
-                { icon: "🏪", label: "多门店数据合并", q: "我有多家门店的数据，帮我合并汇总到一张表" },
+                { icon: "🏪", label: "多门店数据合并", q: "__MERGE_INLINE__" },
                 { icon: "💰", label: "生成工资条", q: "帮我生成工资条" },
                 { icon: "📈", label: "销售数据分析", q: "帮我分析销售数据，找出趋势和排名" },
                 { icon: "💸", label: "计算分红", q: "帮我计算分红明细" },
@@ -937,8 +1017,12 @@ export default function MainWorkspace() {
                 <button
                   key={i}
                   onClick={() => {
-                    setInput(pill.q);
-                    setTimeout(() => textareaRef.current?.focus(), 50);
+                    if (pill.q === "__MERGE_INLINE__") {
+                      handleQuickAction("__MERGE_INLINE__");
+                    } else {
+                      setInput(pill.q);
+                      setTimeout(() => textareaRef.current?.focus(), 50);
+                    }
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs whitespace-nowrap flex-shrink-0 transition-all"
                   style={{
@@ -1082,6 +1166,90 @@ export default function MainWorkspace() {
           </div>
         </div>
       )}
+
+      {/* P1-C: Merge Confirmation Dialog */}
+      <AnimatePresence>
+        {showMergeDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 flex items-center justify-center"
+            style={{ background: "rgba(0,0,0,0.6)" }}
+            onClick={e => { if (e.target === e.currentTarget) setShowMergeDialog(false); }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              transition={{ duration: 0.18 }}
+              className="rounded-2xl p-6 w-full max-w-md mx-4"
+              style={{
+                background: "var(--atlas-surface)",
+                border: "1px solid var(--atlas-border-2)",
+                boxShadow: "0 24px 60px rgba(0,0,0,0.5)",
+              }}
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <span style={{ fontSize: 20 }}>🏪</span>
+                <h3 className="font-semibold text-base" style={{ color: "var(--atlas-text)" }}>多门店数据合并</h3>
+              </div>
+              <p className="text-sm mb-4" style={{ color: "var(--atlas-text-2)" }}>
+                将为每个文件添加「来源平台」列，可修改平台名称：
+              </p>
+              <div className="space-y-2 mb-5">
+                {readyFiles.filter(f => f.sessionId).map(f => (
+                  <div key={f.id} className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs truncate mb-1" style={{ color: "var(--atlas-text-3)" }}>{f.name}</div>
+                      <input
+                        type="text"
+                        value={mergeNames[f.id] || ""}
+                        onChange={e => setMergeNames(prev => ({ ...prev, [f.id]: e.target.value }))}
+                        placeholder="平台名称"
+                        className="w-full rounded-lg px-3 py-1.5 text-sm outline-none"
+                        style={{
+                          background: "var(--atlas-elevated)",
+                          border: "1px solid var(--atlas-border)",
+                          color: "var(--atlas-text)",
+                        }}
+                        onFocus={e => (e.currentTarget.style.borderColor = "rgba(91,140,255,0.5)")}
+                        onBlur={e => (e.currentTarget.style.borderColor = "var(--atlas-border)")}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setShowMergeDialog(false)}
+                  className="px-4 py-2 rounded-lg text-sm transition-all"
+                  style={{
+                    background: "var(--atlas-elevated)",
+                    border: "1px solid var(--atlas-border)",
+                    color: "var(--atlas-text-2)",
+                  }}
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleInlineMerge}
+                  disabled={isMerging}
+                  className="px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5"
+                  style={{
+                    background: "var(--atlas-accent)",
+                    color: "#fff",
+                    opacity: isMerging ? 0.7 : 1,
+                  }}
+                >
+                  {isMerging && <Loader2 size={12} className="animate-spin" />}
+                  开始合并
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Drag overlay */}
       <AnimatePresence>
@@ -1459,6 +1627,41 @@ function MessageBubble({
               )}
             </AnimatePresence>
           </motion.div>
+        )}
+        {/* P0-B: Quality issues hint block */}
+        {message.qualityIssues && message.qualityIssues.length > 0 && (
+          <div className="mb-2 flex flex-col gap-1">
+            {message.qualityIssues.map((issue, idx) => {
+              const isWarning = issue.startsWith('⚠️');
+              const isSuccess = issue.startsWith('✅');
+              return (
+                <div
+                  key={idx}
+                  className="flex items-start gap-2 px-3 py-2 rounded-xl"
+                  style={{
+                    fontSize: '12.5px',
+                    lineHeight: '1.6',
+                    background: isWarning
+                      ? 'rgba(245,158,11,0.08)'
+                      : isSuccess
+                      ? 'rgba(34,197,94,0.08)'
+                      : 'rgba(99,102,241,0.08)',
+                    border: `1px solid ${isWarning ? 'rgba(245,158,11,0.25)' : isSuccess ? 'rgba(34,197,94,0.25)' : 'rgba(99,102,241,0.25)'}`,
+                    color: isWarning
+                      ? 'rgb(180,120,20)'
+                      : isSuccess
+                      ? 'rgb(22,163,74)'
+                      : 'var(--atlas-text-2)',
+                  }}
+                >
+                  <span style={{ flexShrink: 0, marginTop: '1px' }}>
+                    {isWarning ? '⚠️' : isSuccess ? '✅' : 'ℹ️'}
+                  </span>
+                  <span>{issue.replace(/^[⚠️✅ℹ️]+\s*/, '')}</span>
+                </div>
+              );
+            })}
+          </div>
         )}
         {/* Message bubble */}
         <div

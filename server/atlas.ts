@@ -871,10 +871,30 @@ export function registerAtlasRoutes(app: Express) {
       if (injectedFields.length > 0) {
         qualityIssues.push(`字段容错提示：${injectedFields.join('、')}字段在数据中缺失，已自动按 0 处理，计算结果不受影响`);
       }
-      // P1-A: Report field mappings applied
+      // P0-B: Field mapping UI hint (show which fields were renamed)
       const mappingEntries = Object.entries(fieldMapping);
       if (mappingEntries.length > 0) {
-        console.log(`[Atlas P1-A] Field mappings applied: ${mappingEntries.map(([o, c]) => `${o}→${c}`).join(', ')}`);
+        const mappingDesc = mappingEntries.map(([o, c]) => `「${o}」→「${c}」`).join('、');
+        qualityIssues.push(`字段识别提示：已自动将 ${mappingDesc} 对齐为标准字段名，计算结果不受影响`);
+      }
+      // P0-B: Outlier detection (values > avg * 5 in numeric fields)
+      const numericFieldsForOutlier = dfInfo.fields.filter(f => f.type === "numeric");
+      const outlierWarnings: string[] = [];
+      for (const field of numericFieldsForOutlier.slice(0, 6)) {
+        const vals = workingData
+          .map(row => Number(row[field.name]))
+          .filter(v => !isNaN(v) && v > 0);
+        if (vals.length < 3) continue;
+        const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+        const outlierVals = vals.filter(v => v > avg * 5);
+        if (outlierVals.length > 0 && avg > 0) {
+          const maxVal = Math.max(...outlierVals);
+          const fmtV = (n: number) => n >= 10000 ? `${(n/10000).toFixed(1)}万` : n.toFixed(0);
+          outlierWarnings.push(`${field.name}(最高值${fmtV(maxVal)}，约为均值${fmtV(avg)}的${Math.round(maxVal/avg)}倍)`);
+        }
+      }
+      if (outlierWarnings.length > 0) {
+        qualityIssues.push(`⚠️ 异常高值预警：${outlierWarnings.join('；')}，建议核实数据准确性`);
       }
       // P2-A: Finance debit-credit balance check
       const hasDebit = workingData.length > 0 && ("借方金额" in workingData[0] || "debit" in workingData[0]);
@@ -1041,6 +1061,7 @@ export function registerAtlasRoutes(app: Express) {
         },
         ai_analysis: aiAnalysis,
         suggested_actions: suggestedActions,
+        quality_issues: qualityIssues, // P0-B: expose for frontend UI hint block
       });
     } catch (err: any) {
       console.error("[Atlas] Upload error:", err);
@@ -1940,4 +1961,71 @@ ${sampleRows}
       if (!res.headersSent) res.status(500).json({ error: err.message });
     }
   });
+  // POST /api/atlas/merge (P1-C) - merge multiple sessions into one Excel
+  app.post("/api/atlas/merge", optionalAuth, async (req: Request, res: Response) => {
+    try {
+      const { session_ids, platform_names } = req.body as {
+        session_ids: string[];
+        platform_names?: Record<string, string>;
+      };
+      if (!session_ids?.length || session_ids.length < 2) {
+        res.status(400).json({ error: "至少需要 2 个文件才能合并" });
+        return;
+      }
+      const sessionRecords = await Promise.all(session_ids.map((id: string) => getSession(id)));
+      const valid = sessionRecords.map((s, i) => ({ session: s, id: session_ids[i] })).filter(x => x.session);
+      if (valid.length < 2) {
+        res.status(404).json({ error: "部分文件已过期，请重新上传" });
+        return;
+      }
+      const allRows: Record<string, unknown>[] = [];
+      const fileStats: Array<{ name: string; platform: string; rowCount: number }> = [];
+      const platformKeywords = ["淘宝","天猫","京东","拼多多","抖音","快手","1688","闲鱼","苏宁","唯品会","小红书"];
+      for (const { session, id } of valid) {
+        const data = await loadSessionData(id);
+        if (!data) continue;
+        const filename = (session as { originalName?: string } | undefined)?.originalName ?? id;
+        const baseName = filename.replace(/\.[^.]+$/, "");
+        let platform = platform_names?.[id] || "";
+        if (!platform) {
+          const found = platformKeywords.find(k => baseName.includes(k));
+          platform = found || baseName;
+        }
+        const rowsWithSource = data.map(row => ({ ...row, "来源平台": platform }));
+        allRows.push(...rowsWithSource);
+        fileStats.push({ name: filename, platform, rowCount: data.length });
+      }
+      if (allRows.length === 0) {
+        res.status(400).json({ error: "所有文件数据均为空" });
+        return;
+      }
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(allRows);
+      XLSX.utils.book_append_sheet(wb, ws, "合并数据");
+      const summaryData: unknown[][] = [
+        ["文件名", "来源平台", "数据行数"],
+        ...fileStats.map(f => [f.name, f.platform, f.rowCount]),
+        ["合计", "", allRows.length],
+      ];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), "合并概览");
+      const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+      const reportId = nanoid();
+      const { url: reportUrl } = await storagePut(
+        "atlas-merged-reports/" + reportId + ".xlsx",
+        buffer,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      res.json({
+        downloadUrl: reportUrl,
+        reportId,
+        totalRows: allRows.length,
+        files: fileStats,
+        message: "已合并 " + valid.length + " 个文件，共 " + allRows.length + " 行数据",
+      });
+    } catch (err: any) {
+      console.error("[Atlas] Merge error:", err);
+      res.status(500).json({ error: err.message || "合并失败" });
+    }
+  });
+
 }

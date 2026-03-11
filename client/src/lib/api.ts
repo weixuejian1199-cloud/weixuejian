@@ -33,6 +33,7 @@ export interface UploadResponse {
   df_info: DataFrameInfo;
   ai_analysis: string;
   suggested_actions?: SuggestedAction[];
+  quality_issues?: string[];  // P0-B: data quality hints
 }
 
 export interface GenerateReportResponse {

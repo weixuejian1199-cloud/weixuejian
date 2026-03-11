@@ -69,6 +69,7 @@ export interface Message {
   isHidden?: boolean;  // Hidden messages (auto-triggered, not shown in UI)
   isAnalyzing?: boolean;  // Show analysis progress animation
   analyzeProgress?: number;  // 0-100, simulated analysis progress
+  qualityIssues?: string[];  // P0-B: data quality hints shown above AI reply
 }
 
 export interface ReportRecord {

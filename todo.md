@@ -719,3 +719,18 @@
 - [x] P2-C：hr.ts detectPayslipFields 扩展同义词（固定工资/月薪/KPI奖金等）
 - [x] P2-D：hr.ts 考勤加班时长 + 加班费计算（可配置倍率）
 - [x] P2-E：MainWorkspace 对话框上方常驻 HR 快捷按钮区（工资条/考勤入口）
+
+## Phase 3 开发任务（审核通过）
+
+### P0 紧急修复
+- [ ] P0-A：考勤汇总格式兼容（detectAttendanceFields 新增 tableFormat + analyzeAttendanceSummary 函数）
+- [ ] P0-B：异常高值预警（atlas.ts qualityIssues 接入 outliers 检测结果）
+- [ ] P0-C：字段映射 UI 提示（后端返回 field_mapping，前端 MainWorkspace 展示提示块）
+
+### P1 高优
+- [ ] P1-A：同义词库扩展（电商平台专用字段词汇）
+- [ ] P1-B：工资计算 Decimal 全覆盖（hr.ts generatePayslipExcel 税后工资/扣款）
+- [x] P1-C：多文件合并接口（/api/atlas/merge）+ 前端文件名识别平台 + 确认弹框
+
+### P2 次优
+- [ ] P2：exceljs 迁移（工资条 → 验证 → 考勤 → atlas 报表，WPS 兼容）
