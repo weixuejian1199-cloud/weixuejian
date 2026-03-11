@@ -18,7 +18,7 @@ import {
 import { Streamdown } from "streamdown";
 import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTableRenderer";
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
-import { uploadFile, chatStream, generateReport, getDownloadUrl, type SuggestedAction } from "@/lib/api";
+import { uploadFile, pollUploadStatus, chatStream, generateReport, getDownloadUrl, type SuggestedAction } from "@/lib/api";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
@@ -163,7 +163,8 @@ export default function MainWorkspace() {
     progressTimers.push(uploadPhaseTimer as any);
 
     try {
-      const result = await uploadFile(file, (percent) => {
+      // Phase 1: upload file (0% → 30%)
+      const uploadResult = await uploadFile(file, (percent) => {
         updateUploadedFile(tempId, { uploadProgress: percent });
         // 上传进度映射到 5%-30% 区间
         const mappedProgress = Math.round(5 + (percent / 100) * 25);
@@ -176,23 +177,29 @@ export default function MainWorkspace() {
       // 上传完成，清除上传阶段定时器
       clearInterval(uploadPhaseTimer);
 
-      // 分析阶段：30% → 50% → 70% → 85% → 92%
+      // Phase 2: poll for async processing result (30% → 100%)
       currentProgress = 30;
       updateMyMsg("", { isAnalyzing: true, analyzeProgress: 30 });
-      // FIX: Guard flag to prevent progress timers from overwriting the final result.
-      // Root cause: analysisSteps at 2800ms and 4200ms fire AFTER showResult (1500ms).
-      // Now using updateMessageById instead of updateLastMessage to prevent cross-file interference.
       let resultShown = false;
-      const analysisSteps = [50, 70, 85, 92];
-      const analysisDelays = [600, 1500, 2800, 4200];
-      analysisSteps.forEach((pct, i) => {
-        const t = setTimeout(() => {
-          if (resultShown) return; // Guard: don't overwrite final result
-          currentProgress = pct;
-          updateMyMsg("", { isAnalyzing: true, analyzeProgress: pct });
-        }, analysisDelays[i]);
-        progressTimers.push(t);
-      });
+
+      // If upload already returned full result (sync mode), use it directly
+      // Otherwise poll the status endpoint until ready
+      let result;
+      if (uploadResult.ai_analysis) {
+        // Sync result (small file processed inline)
+        result = uploadResult;
+      } else {
+        // Async result: poll status endpoint
+        result = await pollUploadStatus(
+          uploadResult.session_id,
+          (pct) => {
+            if (!resultShown) {
+              currentProgress = pct;
+              updateMyMsg("", { isAnalyzing: true, analyzeProgress: pct });
+            }
+          }
+        );
+      }
 
       updateUploadedFile(tempId, {
         status: "ready",

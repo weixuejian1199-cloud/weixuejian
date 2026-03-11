@@ -1,0 +1,24 @@
+{
+  "query": "SELECT id, name, keyPrefix, isActive, createdAt FROM admin_api_keys ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute SELECT id, name, keyPrefix, isActive, createdAt FROM admin_api_keys ORDER BY id;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "OpenClaw Admin Key",
+      "keyPrefix": "atlas_admin_338403",
+      "isActive": "0",
+      "createdAt": "2026-03-08 05:49:00"
+    },
+    {
+      "id": "30001",
+      "name": "admin-key-2026-03-11",
+      "keyPrefix": "atlas_admin_9d4272",
+      "isActive": "1",
+      "createdAt": "2026-03-11 04:56:20"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tkeyPrefix\tisActive\tcreatedAt\n1\tOpenClaw Admin Key\tatlas_admin_338403\t0\t2026-03-08 05:49:00\n30001\tadmin-key-2026-03-11\tatlas_admin_9d4272\t1\t2026-03-11 04:56:20\n",
+  "stderr": "",
+  "execution_time_ms": 60
+}

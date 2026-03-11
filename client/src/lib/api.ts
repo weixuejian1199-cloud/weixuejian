@@ -30,6 +30,7 @@ export interface UploadResponse {
   session_id: string;
   filename: string;
   file_url: string;
+  status?: "processing" | "ready" | "error";
   df_info: DataFrameInfo;
   ai_analysis: string;
   suggested_actions?: SuggestedAction[];
@@ -44,6 +45,48 @@ export interface UploadResponse {
     original: string;
     canonical: string;
   }>;
+}
+
+// ── Poll Upload Status ───────────────────────────────────────────────────────────────────────────────────
+// Polls /api/atlas/status/:sessionId until status=ready or error.
+// Calls onProgress(35..92) while waiting, resolves with full UploadResponse.
+export async function pollUploadStatus(
+  sessionId: string,
+  onProgress?: (percent: number) => void,
+  signal?: AbortSignal
+): Promise<UploadResponse> {
+  const POLL_INTERVAL = 2000; // 2s
+  const MAX_WAIT_MS = 5 * 60 * 1000; // 5 minutes
+  const start = Date.now();
+  let progress = 35; // start from 35% (upload done)
+
+  while (true) {
+    if (signal?.aborted) throw new Error("上传已取消");
+    if (Date.now() - start > MAX_WAIT_MS) throw new Error("处理超时，请重试");
+
+    const res = await fetch(`/api/atlas/status/${sessionId}`, { credentials: "include", signal });
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try { const err = await res.json(); msg = err.error || msg; } catch {}
+      throw new Error(msg);
+    }
+    const data = await res.json();
+
+    if (data.status === "ready" && data.ai_analysis) {
+      if (onProgress) onProgress(100);
+      return data as UploadResponse;
+    }
+    if (data.status === "error") {
+      throw new Error(data.error || "文件处理失败，请重试");
+    }
+
+    // Still processing — advance progress bar slowly (35% → 92%)
+    if (onProgress && progress < 92) {
+      progress = Math.min(progress + 3, 92);
+      onProgress(progress);
+    }
+    await new Promise(r => setTimeout(r, POLL_INTERVAL));
+  }
 }
 
 export interface GenerateReportResponse {

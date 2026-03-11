@@ -771,3 +771,10 @@
 ### 任务 4：WPS 兼容性迁移（P2，工资条模块先行）
 - [x] 安装 exceljs，迁移 generatePayslipExcel 使用 exceljs 生成工资条
 - [x] 验证 WPS 打开格式正常（列宽、字体、边框）
+
+## 异步处理模式（解决大文件超时）
+
+- [ ] 🔴 server/atlas.ts：upload 接收文件后立即返回 session_id（status=uploading），后台 setImmediate 异步执行解析+S3+AI
+- [ ] 🔴 server/atlas.ts：新增 GET /api/atlas/status/:sessionId 接口，返回处理状态和完整结果
+- [ ] 🔴 client/src/lib/api.ts：新增 pollUploadStatus 轮询函数（每2秒，超时5分钟）
+- [ ] 🔴 client/src/pages/MainWorkspace.tsx：processFile 改为上传后轮询，进度条显示"处理中"

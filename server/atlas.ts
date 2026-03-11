@@ -547,6 +547,28 @@ function computeKeyMetrics(
 // This survives server restarts.
 
 const DATA_KEY = (sessionId: string) => `atlas-data/${sessionId}-data.json`;
+const RESULT_KEY = (sessionId: string) => `atlas-data/${sessionId}-result.json`;
+
+// Store the final upload result (ai_analysis + suggested_actions etc.) to S3
+async function storeUploadResult(sessionId: string, result: Record<string, unknown>): Promise<void> {
+  try {
+    await storagePut(RESULT_KEY(sessionId), JSON.stringify(result), "application/json");
+  } catch (e) {
+    console.error("[Atlas] storeUploadResult failed:", e);
+  }
+}
+
+// Load the final upload result from S3
+async function loadUploadResult(sessionId: string): Promise<Record<string, unknown> | null> {
+  try {
+    const { url } = await storageGet(RESULT_KEY(sessionId));
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await res.json() as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
 
 async function storeSessionData(sessionId: string, data: Record<string, unknown>[]): Promise<void> {
   await storagePut(DATA_KEY(sessionId), JSON.stringify(data), "application/json");
@@ -830,13 +852,10 @@ export function registerAtlasRoutes(app: Express) {
       // Use normalized data for all downstream processing
       const workingData = normalizedData;
 
-      // 3. Persist parsed data to S3 (for AI chat — survives restarts)
-      await storeSessionData(sessionId, workingData);
-
-      // 4. Create session record in DB (dfInfo stored in JSON column)
+      // 3. Create session record in DB immediately (status=uploading)
       await createSession({
         id: sessionId,
-        userId: (req as any).userId || 0, // userId injected by auth middleware if available
+        userId: (req as any).userId || 0,
         filename: fileKey,
         originalName: originalname,
         fileKey,
@@ -846,246 +865,256 @@ export function registerAtlasRoutes(app: Express) {
         colCount: dfInfo.col_count,
         dfInfo: dfInfo as any,
         isMerged: 0,
-        status: "ready",
+        status: "uploading", // will be updated to "ready" after async processing
       });
 
-      // 5. Detect scenario + compute key metrics (pure code, no AI dependency)
-      const scenario = detectScenario(dfInfo.fields);
-      const keyMetrics = computeKeyMetrics(workingData, scenario, dfInfo);
-
-      // Build field summary for AI context
-      const fieldSummary = dfInfo.fields.slice(0, 15).map(f =>
-        `${f.name}(${f.type}, ${f.unique_count}个唯一值, 示例:${f.sample.slice(0, 3).join("/")})`
-      ).join(", ");
-
-      // Detect data quality issues for AI context
-      const qualityIssues: string[] = [];
-      const nullFields = dfInfo.fields.filter(f => f.null_count > 0);
-      if (nullFields.length > 0) {
-        const highNullFields = nullFields.filter(f => f.null_count / dfInfo.row_count > 0.05);
-        if (highNullFields.length > 0) {
-          qualityIssues.push(`缺失值警告：${highNullFields.map(f => `${f.name}(${f.null_count}个空值)`).join('、')}`);
-        }
-      }
-      // P1-A: Report injected fields (missing required fields auto-filled with 0)
-      if (injectedFields.length > 0) {
-        qualityIssues.push(`字段容错提示：${injectedFields.join('、')}字段在数据中缺失，已自动按 0 处理，计算结果不受影响`);
-      }
-      // P0-B: Field mapping UI hint (show which fields were renamed)
-      const mappingEntries = Object.entries(fieldMapping);
-      if (mappingEntries.length > 0) {
-        const mappingDesc = mappingEntries.map(([o, c]) => `「${o}」→「${c}」`).join('、');
-        qualityIssues.push(`字段识别提示：已自动将 ${mappingDesc} 对齐为标准字段名，计算结果不受影响`);
-      }
-      // P0-B: Outlier detection (values > median * 5 in numeric fields)
-      // BUG FIX: Use median instead of mean as baseline — mean is skewed by outliers
-      // themselves, which raises the threshold and makes extreme values undetectable.
-      // e.g. [8000,7500,8200,7800,99999999] → mean=20M, mean*5=100M > 99999999 → missed!
-      // With median=8000, median*5=40000 < 99999999 → correctly detected.
-      const numericFieldsForOutlier = dfInfo.fields.filter(f => f.type === "numeric");
-      const outlierWarnings: string[] = [];
-      // P0-B UI: structured outlier details for clickable frontend detail view
-      const outlierDetails: Array<{
-        fieldName: string;
-        median: number;
-        threshold: number;
-        outlierRows: Array<{ rowIndex: number; value: number }>;
-      }> = [];
-      for (const field of numericFieldsForOutlier.slice(0, 6)) {
-        const valsWithIndex = workingData
-          .map((row, i) => ({ val: Number(row[field.name]), rowIndex: i + 2 })) // +2: header row + 1-based
-          .filter(x => !isNaN(x.val) && x.val > 0);
-        if (valsWithIndex.length < 3) continue;
-        const sortedVals = [...valsWithIndex.map(x => x.val)].sort((a, b) => a - b);
-        const median = sortedVals[Math.floor(sortedVals.length / 2)];
-        const threshold = median * 5;
-        const outlierItems = valsWithIndex.filter(x => x.val > threshold);
-        if (outlierItems.length > 0 && median > 0) {
-          const maxVal = Math.max(...outlierItems.map(x => x.val));
-          const fmtV = (n: number) => n >= 10000 ? `${(n/10000).toFixed(1)}万` : n.toFixed(0);
-          outlierWarnings.push(`${field.name}(最高值${fmtV(maxVal)}，约为中位数${fmtV(median)}的${Math.round(maxVal/median)}倍)`);
-          outlierDetails.push({
-            fieldName: field.name,
-            median,
-            threshold,
-            outlierRows: outlierItems.slice(0, 20).map(x => ({ rowIndex: x.rowIndex, value: x.val })),
-          });
-        }
-      }
-      if (outlierWarnings.length > 0) {
-        qualityIssues.push(`⚠️ 异常高值预警：${outlierWarnings.join('；')}，建议核实数据准确性`);
-      }
-      // P2-A: Finance debit-credit balance check
-      const hasDebit = workingData.length > 0 && ("借方金额" in workingData[0] || "debit" in workingData[0]);
-      const hasCredit = workingData.length > 0 && ("贷方金额" in workingData[0] || "credit" in workingData[0]);
-      if (hasDebit && hasCredit) {
-        const debitField = "借方金额" in workingData[0] ? "借方金额" : "debit";
-        const creditField = "贷方金额" in workingData[0] ? "贷方金额" : "credit";
-        const balanceCheck = checkDebitCreditBalance(workingData, debitField, creditField);
-        if (!balanceCheck.isBalanced) {
-          qualityIssues.push(`⚠️ 借贷不平警告：借方合计 ${balanceCheck.debitTotal}，贷方合计 ${balanceCheck.creditTotal}，差异 ${balanceCheck.discrepancy}，请检查数据完整性`);
-        } else {
-          qualityIssues.push(`✅ 借贷平衡校验通过：借方 ${balanceCheck.debitTotal}，贷方 ${balanceCheck.creditTotal}`);
-        }
-      }
-
-      const numericFields = dfInfo.fields.filter(f => f.type === "numeric").map(f => f.name);
-
-      // Build metrics summary for AI
-      const metricsSummary = keyMetrics.map(m => `${m.name}: ${m.value}`).join("、");
-
-      // Build suggested actions based on scenario
-      const hasSales2 = scenario.type === "sales";
-      const hasPayroll2 = scenario.type === "payroll";
-      const hasAttendance2 = scenario.type === "attendance";
-      const hasDividend2 = scenario.type === "dividend";
-      const hasStore2 = scenario.groupFields.some(f => /门店|店铺|store|shop/.test(f.toLowerCase()));
-      const hasDate2 = scenario.dateFields.length > 0;
-      const hasName2 = scenario.groupFields.some(f => /姓名|名字|员工|name|staff/.test(f.toLowerCase()));
-
-      // Build pure-code fallback atlas-table for key metrics
-      const fallbackTable = {
-        title: `${originalname} 关键指标`,
-        columns: ["指标名称", "指标值"],
-        rows: keyMetrics.map(m => [m.name, String(m.value)]),
-        highlight: 1,
-        sortBy: -1,
-        sortDir: "desc",
-      };
-      const fallbackTableStr = "```atlas-table\n" + JSON.stringify(fallbackTable, null, 2) + "\n```";
-
-      // Build system prompt for upload analysis (avoid backtick nesting by using string concat)
-      const fieldListStr = dfInfo.fields.slice(0, 4).map(f => f.name).join('、') + (dfInfo.fields.length > 4 ? '等' : '');
-      const qualityHint = qualityIssues.length > 0 ? '（并加一句质量提醒）' : '';
-      const uploadSystemPrompt = [
-        '你是 ATLAS，一个专业的智能数据分析助手。用户刚刚上传了文件，你必须立刻输出以下内容：',
-        '',
-        '**第一部分：一句话识别**（不超过30字）',
-        `格式：「这是一份[${scenario.name}]，共${dfInfo.row_count}行、${dfInfo.col_count}列。」${qualityHint}`,
-        '',
-        '**第二部分：关键指标表**',
-        '必须输出以下 atlas-table 格式（严格遵守）：',
-        '',
-        '\`\`\`atlas-table',
-        '{',
-        `  "title": "[${originalname}] 关键指标",`,
-        '  "columns": ["指标名称", "指标值", "说明"],',
-        '  "rows": [',
-        `    ["数据总行数", "${dfInfo.row_count}", "有效数据行"],`,
-        `    ["字段数", "${dfInfo.col_count}", "包括: ${fieldListStr}"],`,
-        `    // 在此基础上，根据实际数据补充 5-6 个最重要的业务指标（已计算值：${metricsSummary}）`,
-        '  ],',
-        '  "highlight": 1,',
-        '  "sortBy": -1,',
-        '  "sortDir": "desc"',
-        '}',
-        '\`\`\`',
-        '',
-        '**第三部分：3个分析方向**（带字段名）',
-        '格式：【①】具体操作（如「按门店汇总销售额排名」）',
-        '',
-        `数据场景：${scenario.name}，置信度：${(scenario.confidence * 100).toFixed(0)}%`,
-        `主要数值字段：${scenario.primaryFields.join('、') || '无'}`,
-        `分组字段：${scenario.groupFields.join('、') || '无'}`,
-        `已计算指标：${metricsSummary}`,
-        '',
-        '注意：',
-        '- rows 中的注释行必须删除，只保留真实数据行',
-        '- 指标值直接用已计算的真实数值，不要编造',
-        '- 输出不超过150字，不要有任何前置序言',
-      ].join('\n');
-
-      let aiAnalysis = "";
-      try {
-        const openai = createLLM();
-        const result = await streamText({
-          model: openai.chat(selectModel(dfInfo.row_count)),
-          system: uploadSystemPrompt,
-          messages: [{
-            role: "user",
-            content: `文件名：${originalname}，共 ${dfInfo.row_count} 行 ${dfInfo.col_count} 列。字段：${fieldSummary}。${qualityIssues.length > 0 ? '数据质量：' + qualityIssues.join('；') : '数据质量良好'}。已计算指标：${metricsSummary}`,
-          }],
-          maxOutputTokens: 800,
-        });
-        aiAnalysis = await result.text;
-        // Validate: if AI didn't output atlas-table, use fallback
-        if (!aiAnalysis.includes("atlas-table")) {
-          console.warn("[Atlas] AI analysis missing atlas-table, using fallback");
-          const intro = aiAnalysis.split("\n")[0] || `这是一份${scenario.name}，共${dfInfo.row_count}行、${dfInfo.col_count}列。`;
-          aiAnalysis = `${intro}\n\n${fallbackTableStr}`;
-        }
-      } catch (e) {
-        console.warn("[Atlas] AI analysis failed, using pure-code fallback:", e);
-        const qualityNote = qualityIssues.length > 0 ? `\n\n⚠️ 数据质量提醒：${qualityIssues.join('；')}` : '';
-        aiAnalysis = `这是一份**${scenario.name}**，共 ${dfInfo.row_count.toLocaleString()} 行、${dfInfo.col_count} 列。${qualityNote}\n\n${fallbackTableStr}`;
-      }
-
-      // Generate smart suggested actions based on field names
-      const suggestedActions: Array<{ label: string; prompt: string; icon: string }> = [];
-
-      // Reuse pre-computed flags from above
-      const hasSales = hasSales2;
-      const hasPayroll = hasPayroll2;
-      const hasAttendance = hasAttendance2;
-      const hasDividend = hasDividend2;
-      const hasStore = hasStore2;
-      const hasDate = hasDate2;
-      const hasName = hasName2;
-
-      // Build precise suggested actions with actual field names
-      if (hasPayroll || (hasName && numericFields.length > 0)) {
-        // P1-B: Use special prefix to trigger inline payslip flow in MainWorkspace (no page jump)
-        suggestedActions.push({ icon: "📝", label: "生成工资条", prompt: `__PAYSLIP_INLINE__${sessionId}` });
-      }
-      if (hasDividend) {
-        const divField = numericFields.find(f => /分红|奖金|奖/.test(f)) || numericFields[0] || "奖金";
-        suggestedActions.push({ icon: "💰", label: "分红明细表", prompt: `帮我按${divField}从高到低生成分红明细表` });
-        suggestedActions.push({ icon: "🏆", label: "Top10 排名", prompt: `帮我找出${divField}最高的前10名和最低的后10名` });
-      }
-      if (hasSales) {
-        const salesField = numericFields.find(f => /销售|金额|gmv|revenue/.test(f.toLowerCase())) || numericFields[0] || "销售额";
-        suggestedActions.push({ icon: "📊", label: "销售汇总表", prompt: `帮我汇总销售数据，显示${salesField}、订单数和关键指标` });
-        if (hasStore) {
-          suggestedActions.push({ icon: "🏦", label: "门店排名", prompt: `帮我按门店分组汇总${salesField}，对比各门店表现并排名` });
-        }
-      }
-      if (hasAttendance) {
-        // P1-B: Use special prefix to trigger inline attendance flow in MainWorkspace (no page jump)
-        suggestedActions.push({ icon: "📅", label: "考勤汇总", prompt: `__ATTENDANCE_INLINE__${sessionId}` });
-      }
-      if (hasDate && !hasSales) {
-        suggestedActions.push({ icon: "📈", label: "趋势分析", prompt: "帮我按时间分析数据趋势，看看有什么规律" });
-      }
-
-      // Always add generic options if not enough
-      if (suggestedActions.length < 2) {
-        if (numericFields.length > 0) {
-          suggestedActions.push({ icon: "📊", label: "生成汇总表", prompt: `帮我汇总${numericFields.slice(0, 3).join('、')}等关键指标` });
-        } else {
-          suggestedActions.push({ icon: "📊", label: "生成汇总表", prompt: "帮我生成数据汇总表，包含关键指标和统计" });
-        }
-        suggestedActions.push({ icon: "🔍", label: "全面分析", prompt: "帮我全面分析这份数据，找出关键规律、异常值和可优化方向" });
-      }
-      suggestedActions.push({ icon: "✨", label: "自定义需求", prompt: "" }); // empty prompt = open input
-
+      // 4. Return immediately — client can start polling /api/atlas/status/:sessionId
       res.json({
         session_id: sessionId,
         filename: originalname,
         file_url: fileUrl,
+        status: "processing",
         df_info: {
           row_count: dfInfo.row_count,
           col_count: dfInfo.col_count,
           fields: dfInfo.fields,
           preview: dfInfo.preview,
         },
-        ai_analysis: aiAnalysis,
-        suggested_actions: suggestedActions,
-        quality_issues: qualityIssues, // P0-B: expose for frontend UI hint block
-        outlier_details: outlierDetails.length > 0 ? outlierDetails : undefined, // P0-B UI: structured details for clickable warning
-        field_mapping_hint: mappingEntries.length > 0 // P0-C: structured field mapping for UI hint block
-          ? mappingEntries.map(([original, canonical]) => ({ original, canonical }))
-          : undefined,
       });
+
+      // 5. Continue processing in background (non-blocking)
+      setImmediate(async () => {
+        try {
+          // 5a. Persist parsed data to S3 (for AI chat — survives restarts)
+          await storeSessionData(sessionId, workingData);
+
+          // 5b. Detect scenario + compute key metrics (pure code, no AI dependency)
+          const scenario = detectScenario(dfInfo.fields);
+          const keyMetrics = computeKeyMetrics(workingData, scenario, dfInfo);
+
+          // Build field summary for AI context
+          const fieldSummary = dfInfo.fields.slice(0, 15).map(f =>
+            `${f.name}(${f.type}, ${f.unique_count}个唯一值, 示例:${f.sample.slice(0, 3).join("/")})`
+          ).join(", ");
+
+          // Detect data quality issues for AI context
+          const qualityIssues: string[] = [];
+          const nullFields = dfInfo.fields.filter(f => f.null_count > 0);
+          if (nullFields.length > 0) {
+            const highNullFields = nullFields.filter(f => f.null_count / dfInfo.row_count > 0.05);
+            if (highNullFields.length > 0) {
+              qualityIssues.push(`缺失值警告：${highNullFields.map(f => `${f.name}(${f.null_count}个空值)`).join('、')}`);
+            }
+          }
+          if (injectedFields.length > 0) {
+            qualityIssues.push(`字段容错提示：${injectedFields.join('、')}字段在数据中缺失，已自动按 0 处理，计算结果不受影响`);
+          }
+          const mappingEntries = Object.entries(fieldMapping);
+          if (mappingEntries.length > 0) {
+            const mappingDesc = mappingEntries.map(([o, c]) => `「${o}」→「${c}」`).join('、');
+            qualityIssues.push(`字段识别提示：已自动将 ${mappingDesc} 对齐为标准字段名，计算结果不受影响`);
+          }
+          const numericFieldsForOutlier = dfInfo.fields.filter(f => f.type === "numeric");
+          const outlierWarnings: string[] = [];
+          const outlierDetails: Array<{
+            fieldName: string;
+            median: number;
+            threshold: number;
+            outlierRows: Array<{ rowIndex: number; value: number }>;
+          }> = [];
+          for (const field of numericFieldsForOutlier.slice(0, 6)) {
+            const valsWithIndex = workingData
+              .map((row, i) => ({ val: Number(row[field.name]), rowIndex: i + 2 }))
+              .filter(x => !isNaN(x.val) && x.val > 0);
+            if (valsWithIndex.length < 3) continue;
+            const sortedVals = [...valsWithIndex.map(x => x.val)].sort((a, b) => a - b);
+            const median = sortedVals[Math.floor(sortedVals.length / 2)];
+            const threshold = median * 5;
+            const outlierItems = valsWithIndex.filter(x => x.val > threshold);
+            if (outlierItems.length > 0 && median > 0) {
+              const maxVal = Math.max(...outlierItems.map(x => x.val));
+              const fmtV = (n: number) => n >= 10000 ? `${(n/10000).toFixed(1)}万` : n.toFixed(0);
+              outlierWarnings.push(`${field.name}(最高值${fmtV(maxVal)}，约为中位数${fmtV(median)}的${Math.round(maxVal/median)}倍)`);
+              outlierDetails.push({
+                fieldName: field.name,
+                median,
+                threshold,
+                outlierRows: outlierItems.slice(0, 20).map(x => ({ rowIndex: x.rowIndex, value: x.val })),
+              });
+            }
+          }
+          if (outlierWarnings.length > 0) {
+            qualityIssues.push(`⚠️ 异常高值预警：${outlierWarnings.join('；')}，建议核实数据准确性`);
+          }
+          const hasDebit = workingData.length > 0 && ("借方金额" in workingData[0] || "debit" in workingData[0]);
+          const hasCredit = workingData.length > 0 && ("贷方金额" in workingData[0] || "credit" in workingData[0]);
+          if (hasDebit && hasCredit) {
+            const debitField = "借方金额" in workingData[0] ? "借方金额" : "debit";
+            const creditField = "贷方金额" in workingData[0] ? "贷方金额" : "credit";
+            const balanceCheck = checkDebitCreditBalance(workingData, debitField, creditField);
+            if (!balanceCheck.isBalanced) {
+              qualityIssues.push(`⚠️ 借贷不平警告：借方合计 ${balanceCheck.debitTotal}，贷方合计 ${balanceCheck.creditTotal}，差异 ${balanceCheck.discrepancy}，请检查数据完整性`);
+            } else {
+              qualityIssues.push(`✅ 借贷平衡校验通过：借方 ${balanceCheck.debitTotal}，贷方 ${balanceCheck.creditTotal}`);
+            }
+          }
+
+          const numericFields = dfInfo.fields.filter(f => f.type === "numeric").map(f => f.name);
+          const metricsSummary = keyMetrics.map(m => `${m.name}: ${m.value}`).join("、");
+
+          const hasSales2 = scenario.type === "sales";
+          const hasPayroll2 = scenario.type === "payroll";
+          const hasAttendance2 = scenario.type === "attendance";
+          const hasDividend2 = scenario.type === "dividend";
+          const hasStore2 = scenario.groupFields.some(f => /门店|店铺|store|shop/.test(f.toLowerCase()));
+          const hasDate2 = scenario.dateFields.length > 0;
+          const hasName2 = scenario.groupFields.some(f => /姓名|名字|员工|name|staff/.test(f.toLowerCase()));
+
+          const fallbackTable = {
+            title: `${originalname} 关键指标`,
+            columns: ["指标名称", "指标值"],
+            rows: keyMetrics.map(m => [m.name, String(m.value)]),
+            highlight: 1,
+            sortBy: -1,
+            sortDir: "desc",
+          };
+          const fallbackTableStr = "```atlas-table\n" + JSON.stringify(fallbackTable, null, 2) + "\n```";
+
+          const fieldListStr = dfInfo.fields.slice(0, 4).map(f => f.name).join('、') + (dfInfo.fields.length > 4 ? '等' : '');
+          const qualityHint = qualityIssues.length > 0 ? '（并加一句质量提醒）' : '';
+          const uploadSystemPrompt = [
+            '你是 ATLAS，一个专业的智能数据分析助手。用户刚刚上传了文件，你必须立刻输出以下内容：',
+            '',
+            '**第一部分：一句话识别**（不超过30字）',
+            `格式：「这是一份[${scenario.name}]，共${dfInfo.row_count}行、${dfInfo.col_count}列。」${qualityHint}`,
+            '',
+            '**第二部分：关键指标表**',
+            '必须输出以下 atlas-table 格式（严格遵守）：',
+            '',
+            '\`\`\`atlas-table',
+            '{',
+            `  "title": "[${originalname}] 关键指标",`,
+            '  "columns": ["指标名称", "指标值", "说明"],',
+            '  "rows": [',
+            `    ["数据总行数", "${dfInfo.row_count}", "有效数据行"],`,
+            `    ["字段数", "${dfInfo.col_count}", "包括: ${fieldListStr}"],`,
+            `    // 在此基础上，根据实际数据补充 5-6 个最重要的业务指标（已计算值：${metricsSummary}）`,
+            '  ],',
+            '  "highlight": 1,',
+            '  "sortBy": -1,',
+            '  "sortDir": "desc"',
+            '}',
+            '\`\`\`',
+            '',
+            '**第三部分：3个分析方向**（带字段名）',
+            '格式：【①】具体操作（如「按门店汇总销售额排名」）',
+            '',
+            `数据场景：${scenario.name}，置信度：${(scenario.confidence * 100).toFixed(0)}%`,
+            `主要数值字段：${scenario.primaryFields.join('、') || '无'}`,
+            `分组字段：${scenario.groupFields.join('、') || '无'}`,
+            `已计算指标：${metricsSummary}`,
+            '',
+            '注意：',
+            '- rows 中的注释行必须删除，只保留真实数据行',
+            '- 指标值直接用已计算的真实数值，不要编造',
+            '- 输出不超过150字，不要有任何前置序言',
+          ].join('\n');
+
+          let aiAnalysis = "";
+          try {
+            const openai = createLLM();
+            const result = await streamText({
+              model: openai.chat(selectModel(dfInfo.row_count)),
+              system: uploadSystemPrompt,
+              messages: [{
+                role: "user",
+                content: `文件名：${originalname}，共 ${dfInfo.row_count} 行 ${dfInfo.col_count} 列。字段：${fieldSummary}。${qualityIssues.length > 0 ? '数据质量：' + qualityIssues.join('；') : '数据质量良好'}。已计算指标：${metricsSummary}`,
+              }],
+              maxOutputTokens: 800,
+            });
+            aiAnalysis = await result.text;
+            if (!aiAnalysis.includes("atlas-table")) {
+              console.warn("[Atlas] AI analysis missing atlas-table, using fallback");
+              const intro = aiAnalysis.split("\n")[0] || `这是一份${scenario.name}，共${dfInfo.row_count}行、${dfInfo.col_count}列。`;
+              aiAnalysis = `${intro}\n\n${fallbackTableStr}`;
+            }
+          } catch (e) {
+            console.warn("[Atlas] AI analysis failed, using pure-code fallback:", e);
+            const qualityNote = qualityIssues.length > 0 ? `\n\n⚠️ 数据质量提醒：${qualityIssues.join('；')}` : '';
+            aiAnalysis = `这是一份**${scenario.name}**，共 ${dfInfo.row_count.toLocaleString()} 行、${dfInfo.col_count} 列。${qualityNote}\n\n${fallbackTableStr}`;
+          }
+
+          const suggestedActions: Array<{ label: string; prompt: string; icon: string }> = [];
+          const hasSales = hasSales2;
+          const hasPayroll = hasPayroll2;
+          const hasAttendance = hasAttendance2;
+          const hasDividend = hasDividend2;
+          const hasStore = hasStore2;
+          const hasDate = hasDate2;
+          const hasName = hasName2;
+
+          if (hasPayroll || (hasName && numericFields.length > 0)) {
+            suggestedActions.push({ icon: "📝", label: "生成工资条", prompt: `__PAYSLIP_INLINE__${sessionId}` });
+          }
+          if (hasDividend) {
+            const divField = numericFields.find(f => /分红|奖金|奖/.test(f)) || numericFields[0] || "奖金";
+            suggestedActions.push({ icon: "💰", label: "分红明细表", prompt: `帮我按${divField}从高到低生成分红明细表` });
+            suggestedActions.push({ icon: "🏆", label: "Top10 排名", prompt: `帮我找出${divField}最高的前10名和最低的后10名` });
+          }
+          if (hasSales) {
+            const salesField = numericFields.find(f => /销售|金额|gmv|revenue/.test(f.toLowerCase())) || numericFields[0] || "销售额";
+            suggestedActions.push({ icon: "📊", label: "销售汇总表", prompt: `帮我汇总销售数据，显示${salesField}、订单数和关键指标` });
+            if (hasStore) {
+              suggestedActions.push({ icon: "🏦", label: "门店排名", prompt: `帮我按门店分组汇总${salesField}，对比各门店表现并排名` });
+            }
+          }
+          if (hasAttendance) {
+            suggestedActions.push({ icon: "📅", label: "考勤汇总", prompt: `__ATTENDANCE_INLINE__${sessionId}` });
+          }
+          if (hasDate && !hasSales) {
+            suggestedActions.push({ icon: "📈", label: "趋势分析", prompt: "帮我按时间分析数据趋势，看看有什么规律" });
+          }
+          if (suggestedActions.length < 2) {
+            if (numericFields.length > 0) {
+              suggestedActions.push({ icon: "📊", label: "生成汇总表", prompt: `帮我汇总${numericFields.slice(0, 3).join('、')}等关键指标` });
+            } else {
+              suggestedActions.push({ icon: "📊", label: "生成汇总表", prompt: "帮我生成数据汇总表，包含关键指标和统计" });
+            }
+            suggestedActions.push({ icon: "🔍", label: "全面分析", prompt: "帮我全面分析这份数据，找出关键规律、异常值和可优化方向" });
+          }
+          suggestedActions.push({ icon: "✨", label: "自定义需求", prompt: "" });
+
+          // 5c. Store final result to S3 for polling
+          const finalResult = {
+            session_id: sessionId,
+            filename: originalname,
+            file_url: fileUrl,
+            status: "ready",
+            df_info: {
+              row_count: dfInfo.row_count,
+              col_count: dfInfo.col_count,
+              fields: dfInfo.fields,
+              preview: dfInfo.preview,
+            },
+            ai_analysis: aiAnalysis,
+            suggested_actions: suggestedActions,
+            quality_issues: qualityIssues,
+            outlier_details: outlierDetails.length > 0 ? outlierDetails : undefined,
+            field_mapping_hint: mappingEntries.length > 0
+              ? mappingEntries.map(([original, canonical]) => ({ original, canonical }))
+              : undefined,
+          };
+          await storeUploadResult(sessionId, finalResult);
+
+          // 5d. Update session status to ready
+          await updateSession(sessionId, { status: "ready" });
+          console.log(`[Atlas] Background processing complete for session ${sessionId}`);
+        } catch (bgErr: any) {
+          console.error(`[Atlas] Background processing failed for session ${sessionId}:`, bgErr);
+          await updateSession(sessionId, { status: "error" }).catch(() => {});
+        }
+      });
+
     } catch (err: any) {
       console.error("[Atlas] Upload error:", err);
       const safeMsg = process.env.NODE_ENV === "production" ? "文件处理失败，请重试" : (err.message || "Upload failed");
@@ -2038,7 +2067,7 @@ ${sampleRows}
         buffer,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
-      res.json({
+       res.json({
         downloadUrl: reportUrl,
         reportId,
         totalRows: allRows.length,
@@ -2051,4 +2080,44 @@ ${sampleRows}
     }
   });
 
+  // ── GET /api/atlas/status/:sessionId ───────────────────────────────────────────────────────────────────────────────────
+  // Poll upload processing status. Returns full result when ready.
+  app.get("/api/atlas/status/:sessionId", optionalAuth, async (req: Request, res: Response) => {
+    try {
+      const { sessionId } = req.params;
+      const session = await getSession(sessionId);
+      if (!session) {
+        res.status(404).json({ error: "Session not found" });
+        return;
+      }
+      if (session.status === "ready") {
+        // Try to load full result from S3
+        const result = await loadUploadResult(sessionId);
+        if (result) {
+          res.json(result);
+          return;
+        }
+        // Fallback: return basic info if result file not found
+        res.json({
+          session_id: sessionId,
+          filename: session.originalName || session.filename,
+          file_url: session.fileUrl,
+          status: "ready",
+          df_info: session.dfInfo || { row_count: session.rowCount, col_count: session.colCount, fields: [], preview: [] },
+          ai_analysis: "数据已就绪，可以开始分析。",
+          suggested_actions: [],
+        });
+        return;
+      }
+      if (session.status === "error") {
+        res.status(500).json({ error: "文件处理失败，请重新上传" });
+        return;
+      }
+      // Still processing (uploading)
+      res.json({ status: "processing", session_id: sessionId });
+    } catch (err: any) {
+      console.error("[Atlas] Status error:", err);
+      res.status(500).json({ error: err.message || "Status check failed" });
+    }
+  });
 }

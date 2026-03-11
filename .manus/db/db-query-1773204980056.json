@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO admin_api_keys (name, keyHash, keyPrefix, isActive, createdAt) VALUES ('admin-key-2026-03-11', 'd40b5465d46c1cc1ad1b4a60639442ef37c0903d114675e526476e7f16b98517', 'atlas_admin_9d4272', 1, NOW());",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute INSERT INTO admin_api_keys (name, keyHash, keyPrefix, isActive, createdAt) VALUES ('admin-key-2026-03-11', 'd40b5465d46c1cc1ad1b4a60639442ef37c0903d114675e526476e7f16b98517', 'atlas_admin_9d4272', 1, NOW());",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 68
+}
