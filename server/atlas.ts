@@ -1564,7 +1564,16 @@ export function registerAtlasRoutes(app: Express) {
           groupedTop5Map: g5Map,
           groupByFieldMap: gbMap,
         });
-        console.log(`[Atlas/chat] Built perFileProfile: id=${s!.id} | name=${s!.originalName} | rowCount=${di.row_count} | numericStats=${ns.length}个字段`);
+        // Detailed groupedTop5 debug log
+        const g5Summary = Array.from(g5Map.entries()).map(([field, entries]) =>
+          `${field}(top${entries.length}:[${entries.slice(0,3).map(e => `${e.label}=${e.sum}`).join(',')}])`
+        ).join(' | ');
+        console.log(`[Atlas/chat] Built perFileProfile: id=${s!.id} | name=${s!.originalName} | rowCount=${di.row_count} | numericStats=${ns.length}个字段 | groupedTop5Map: ${g5Summary || '无'}`);
+        // P1 diagnostic: check if this file has high null rate for groupByField
+        if (di.dataQuality) {
+          const dq = di.dataQuality as Record<string, unknown>;
+          console.log(`[Atlas/chat]   dataQuality: nullRate=${dq.nullRate} | groupByField=${di.groupByField || 'N/A'}`);
+        }
       }
 
       if (perFileProfiles.length === 0) {
@@ -1657,15 +1666,63 @@ export function registerAtlasRoutes(app: Express) {
       // Find top performers per numeric field
       // Rule: MUST use groupedTop5 (aggregated by dimension field) from dfInfo; NEVER rank from 500-row preview
       // Multi-file: UNION all groupedTop5 entries, re-aggregate by label, take TOP5
+
+      // Helper: find the best matching numeric field in a profile for a given field name
+      // Tries exact match first, then semantic match (same keyword pattern)
+      const findMatchingGroupedTop5 = (
+        pfp: { groupedTop5Map: Map<string, Array<{ label: string; sum: number }>>; groupByFieldMap: Map<string, string>; fileName: string },
+        fieldName: string
+      ): { entries: Array<{ label: string; sum: number }>; matchedField: string } | null => {
+        // 1. Exact match
+        const exact = pfp.groupedTop5Map.get(fieldName);
+        if (exact && exact.length > 0) return { entries: exact, matchedField: fieldName };
+        // 2. Semantic match: find a field in this profile whose name contains the same key amount keyword
+        const AMOUNT_KEYWORDS = ["商品金额", "订单金额", "应付金额", "实付金额", "成交金额", "销售金额", "GMV", "收入"];
+        for (const kw of AMOUNT_KEYWORDS) {
+          if (!fieldName.includes(kw)) continue;
+          // Find a field in this profile that also contains the same keyword
+          for (const [pfpField, pfpEntries] of Array.from(pfp.groupedTop5Map.entries())) {
+            if (pfpField.includes(kw) && pfpEntries.length > 0) {
+              return { entries: pfpEntries, matchedField: pfpField };
+            }
+          }
+        }
+        // 3. Fallback: if this profile has any groupedTop5 data at all, use the first available
+        // (only when the primary file has no exact/semantic match — prevents missing files from being skipped)
+        if (pfp.groupedTop5Map.size > 0) {
+          for (const [pfpField, pfpEntries] of Array.from(pfp.groupedTop5Map.entries())) {
+            if (pfpEntries.length > 0) return { entries: pfpEntries, matchedField: pfpField };
+          }
+        }
+        return null;
+      };
+
       const topPerformers = numericStats.map(s => {
         if (!s) return null;
 
         // Collect groupedTop5 from ALL sessions for this field (multi-file UNION)
+        // Use semantic matching to handle different field names across files
         const allGroupedEntries: Array<{ label: string; sum: number; source?: string }> = [];
         for (const pfp of perFileProfiles) {
-          const entries = pfp.groupedTop5Map.get(s.name);
-          if (entries && entries.length > 0) {
-            allGroupedEntries.push(...entries);
+          const match = findMatchingGroupedTop5(pfp, s.name);
+          if (match && match.entries.length > 0) {
+            // P1: Skip files where the groupBy field has extremely high null rate
+            // (these files have no reliable talent data and their file name should not enter the ranking)
+            // Check: if the file's groupedTop5 contains only 1 entry and that entry's label
+            // matches the file name pattern (store name), skip it
+            const fileNameBase = pfp.fileName.replace(/[-_].*$/, '').replace(/\.(xlsx|csv|xls)$/i, '').trim();
+            const entries = match.entries;
+            // Filter out entries where the label looks like a file/store name rather than a talent nickname
+            // Heuristic: if an entry label exactly matches the file's base name, it's a store-level aggregation, not a talent
+            const validEntries = entries.filter(e => {
+              const lbl = e.label.trim();
+              // Skip if label matches the file base name (store name masquerading as talent)
+              if (lbl === fileNameBase || lbl === pfp.fileName.replace(/\.(xlsx|csv|xls)$/i, '').trim()) return false;
+              return true;
+            });
+            if (validEntries.length > 0) {
+              allGroupedEntries.push(...validEntries);
+            }
           }
         }
 

@@ -862,3 +862,8 @@
 - [x] P0: 榜单真正过滤无效值（前端 computeGroupedTopN + 服务端 serverComputeGroupedTopN + chat unionMap 三处同步修复）
 - [x] P1: 修复排名序号乱序（system prompt 强制连续编号规则）
 - [x] P2: 修正 AI 文案（system prompt 禁止描述已被过滤的无效值）
+
+## 多文件达人排名修复
+
+- [ ] P0: 多文件 Top10 真正合并所有文件达人数据（修复 UNION 逻辑）
+- [ ] P1: 消除店铺名/文件名冒充达人昵称入榜（空值率极高的文件跳过达人分组）
