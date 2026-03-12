@@ -235,7 +235,11 @@ function computeGroupedTopN(
     const numVal = Number(row[numericField]);
     if (groupVal === null || groupVal === undefined || groupVal === "") continue;
     if (isNaN(numVal)) continue;
-    const key = String(groupVal);
+    const key = String(groupVal).trim();
+    // Filter out placeholder values (e.g. "-", "—", "N/A", "无") from groupBy ranking
+    if (key === "" || key === "-" || key === "—" || key === "--" || key === "——" ||
+        key === "N/A" || key === "n/a" || key === "NA" || key === "na" ||
+        key === "无" || key === "null" || key === "NULL" || key === "None" || key === "none") continue;
     groupSums.set(key, (groupSums.get(key) ?? 0) + numVal);
   }
   // Sort by sum descending, take topN

@@ -856,3 +856,9 @@
 ## 数据准确性修复（V14.2）
 
 - [x] 修复 detectGroupByField：先过滤（类型为 text + 名称不含金额关键词）再排序再返回，禁止回退到店铺/商品名，无合格达人字段时返回 null
+
+## 页面表现优化（数据核查后续）
+
+- [x] P0: 榜单真正过滤无效值（前端 computeGroupedTopN + 服务端 serverComputeGroupedTopN + chat unionMap 三处同步修复）
+- [x] P1: 修复排名序号乱序（system prompt 强制连续编号规则）
+- [x] P2: 修正 AI 文案（system prompt 禁止描述已被过滤的无效值）

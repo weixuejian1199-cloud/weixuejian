@@ -601,7 +601,11 @@ function serverComputeGroupedTopN(
     const numVal = Number(row[numericField]);
     if (groupVal === null || groupVal === undefined || groupVal === "") continue;
     if (isNaN(numVal)) continue;
-    const key = String(groupVal);
+    const key = String(groupVal).trim();
+    // Filter out placeholder values from groupBy ranking
+    if (key === "" || key === "-" || key === "—" || key === "--" || key === "——" ||
+        key === "N/A" || key === "n/a" || key === "NA" || key === "na" ||
+        key === "无" || key === "null" || key === "NULL" || key === "None" || key === "none") continue;
     groupSums.set(key, (groupSums.get(key) ?? 0) + numVal);
   }
   return Array.from(groupSums.entries())
@@ -1676,9 +1680,13 @@ export function registerAtlasRoutes(app: Express) {
             if (gb) { groupByFieldName = gb; break; }
           }
           // Re-aggregate: sum by label across files
+          // Also filter out placeholder labels that may have been stored in old sessions
+          const PLACEHOLDER_LABELS = new Set(["-", "—", "--", "——", "N/A", "n/a", "NA", "na", "无", "null", "NULL", "None", "none"]);
           const unionMap = new Map<string, number>();
           for (const entry of allGroupedEntries) {
-            unionMap.set(entry.label, (unionMap.get(entry.label) ?? 0) + entry.sum);
+            const lbl = entry.label.trim();
+            if (!lbl || PLACEHOLDER_LABELS.has(lbl)) continue;
+            unionMap.set(lbl, (unionMap.get(lbl) ?? 0) + entry.sum);
           }
           const sorted = Array.from(unionMap.entries())
             .sort((a, b) => b[1] - a[1])
@@ -1902,8 +1910,11 @@ ${dataTable}`}
 - sortBy：默认按哪列排序（列索引，从0开始）
 - sortDir："desc" 降序 / "asc" 升序
 - 所有数值保留2位小数，金额加「元」单位，百分比加「%」
+- 排名列（如有）必须从 1 开始连续编号，严格按 rows 数组顺序填写，禁止出现跳号（如 7、10、9）或重复序号
+- 排名列中禁止出现 "-"、"—"、"N/A"、"无" 等无效占位符
 
 【第三步】表格后面加1-2句简短说明，指出关键发现，如「前3名占总销售额的65%，A店铺遥遥领先。」
+说明文案必须基于表格中实际展示的数据生成，禁止描述已被过滤的无效值（如"-"、"N/A"等占位符不应出现在文案中）
 
 **绝对禁止：**
 - 禁止在给表格之前做长篇分析
