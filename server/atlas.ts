@@ -1924,7 +1924,26 @@ ${sampleTable}`;
     totals.push(`${fieldName}合计(全部文件): ${total.toFixed(2)}`);
     if (totals.length === 1) totals.push(`总行数(全部文件): ${totalRows.toLocaleString()}`);
   }
-  return sections.join('\n\n') + (totals.length > 0 ? `\n\n══ 跨文件汇总 ══\n${totals.join('\n')}` : '');
+  // ── Task F: Inject cross-file topPerformers (merged Top10) into multi-file prompt ──
+  // This was missing in af21a74 refactor — restoring parity with single-file statsContext
+  const topPerformersLines = topPerformers
+    .filter(s => s && s.top5IsFullData && s.top5 && s.top5.length > 0)
+    .map(s => `${s!.name}跨文件合并前${s!.top5!.length}名（按${(s as any).groupByField || '分组维度'}聚合，全量数据，已过滤占位符）: ${s!.top5!.join(' / ')}`)
+    .join('\n');
+
+  const topPerformersSection = topPerformersLines ? `
+
+══ 跨文件达人排名（全量合并，禁止用样本行覆盖此结果）══
+⚠️ 以下排名基于所有文件全量数据 UNION 后重新聚合，是唯一可信的排名来源。
+❌ 严格禁止：对 sample_rows 做 GROUP BY / SUM / COUNT / 去重推断来得出排名。
+❌ 严格禁止：用样本行的计数或求和结果替代此处的全量排名。
+✅ 当用户询问 Top10 / Top5 / 排名 / 达人汇总时，必须且只能引用以下数据：
+${topPerformersLines}
+══ 跨文件达人排名结束 ══` : `
+
+⚠️ 当前文件中未检测到可靠的达人分组字段，无法生成跨文件达人排名。如需达人 Top10，请确认文件中包含"达人昵称"等分组字段。`;
+
+  return sections.join('\n\n') + (totals.length > 0 ? `\n\n══ 跨文件汇总 ══\n${totals.join('\n')}` : '') + topPerformersSection;
 })() : `══ dataset_profile ══
 文件：${filename}（全量 ${dfInfo.row_count.toLocaleString()} 行 × ${dfInfo.col_count} 列）
 字段说明：
