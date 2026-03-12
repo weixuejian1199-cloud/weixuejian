@@ -19,7 +19,7 @@ import { Streamdown } from "streamdown";
 import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTableRenderer";
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
 import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, uploadParsed, type SuggestedAction } from "@/lib/api";
-import { parseFile } from "@/lib/parseFile"; // v14.2-groupby-fix
+import { parseFile, type DataQuality } from "@/lib/parseFile"; // v14.2-groupby-fix
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
@@ -249,6 +249,8 @@ export default function MainWorkspace() {
           qualityIssues: result.quality_issues?.length ? result.quality_issues : undefined,
           outlierDetails: result.outlier_details?.length ? result.outlier_details : undefined,
           fieldMappingHint: result.field_mapping_hint?.length ? result.field_mapping_hint : undefined, // P0-C
+          // Phase 1: 达人昵称字段治理元数据（前端本地计算，随文件解析结果一起写入消息）
+          dataQuality: parsed.dataQuality,
         });
       };
       // 最短展示 1.5s 动画后显示结果
@@ -1659,6 +1661,104 @@ function MessageBubble({
             </AnimatePresence>
           </motion.div>
         )}
+        {/* Phase 1: 达人昵称字段治理提示 UI (F1-2/F1-3/F1-4/F1-5) */}
+        {(message as any).dataQuality && (() => {
+          const dq = (message as any).dataQuality as DataQuality;
+          const nullRate = dq.trigger_snapshot.null_rate;
+          const top1Ratio = dq.trigger_snapshot.top1_ratio;
+          const filteredCount = dq.filtered_invalid_count;
+          const suspectedNames = dq.suspected_product_names || [];
+          const rulesApplied: string[] = dq.rules_applied || [];
+          // F1-4: 空値率警告：> 30% 且 rules_applied 不含 "B1"
+          const showNullRateWarning = nullRate > 0.3 && !rulesApplied.includes('B1');
+          // F1-3: 数据集中度提示： top1_ratio > 0.6
+          const showConcentrationHint = top1Ratio > 0.6;
+          // F1-2: 无效値过滤提示： filtered_invalid_count > 0
+          const showFilterHint = filteredCount > 0;
+          // F1-5: 痑似商品名标记： suspected_product_names.length > 0
+          const showProductNameHint = suspectedNames.length > 0;
+          if (!showNullRateWarning && !showConcentrationHint && !showFilterHint && !showProductNameHint) return null;
+          return (
+            <div className="mb-2 flex flex-col gap-1.5">
+              {/* F1-4: 空値率警告 */}
+              {showNullRateWarning && (
+                <div
+                  className="flex items-start gap-2 px-3 py-2 rounded-xl"
+                  style={{
+                    background: 'rgba(239,68,68,0.07)',
+                    border: '1px solid rgba(239,68,68,0.22)',
+                    fontSize: '12.5px',
+                    lineHeight: '1.6',
+                    color: 'rgb(185,28,28)',
+                  }}
+                >
+                  <span style={{ flexShrink: 0, marginTop: '1px' }}>⚠️</span>
+                  <span className="flex-1">
+                    <span style={{ fontWeight: 600 }}>空値率警告：</span>
+                    原始文件中 <span style={{ fontWeight: 600 }}>{(nullRate * 100).toFixed(1)}%</span> 的行无达人昵称，可能影响 Top 排名准确性。
+                  </span>
+                </div>
+              )}
+              {/* F1-3: 数据集中度提示 */}
+              {showConcentrationHint && (
+                <div
+                  className="flex items-start gap-2 px-3 py-2 rounded-xl"
+                  style={{
+                    background: 'rgba(245,158,11,0.07)',
+                    border: '1px solid rgba(245,158,11,0.22)',
+                    fontSize: '12.5px',
+                    lineHeight: '1.6',
+                    color: 'rgb(146,64,14)',
+                  }}
+                >
+                  <span style={{ flexShrink: 0, marginTop: '1px' }}>ℹ️</span>
+                  <span className="flex-1">
+                    <span style={{ fontWeight: 600 }}>数据高度集中：</span>
+                    当前达人数据中 Top1 占比达 <span style={{ fontWeight: 600 }}>{(top1Ratio * 100).toFixed(1)}%</span>，建议核对数据是否完整。
+                  </span>
+                </div>
+              )}
+              {/* F1-2: 无效値过滤提示 */}
+              {showFilterHint && (
+                <div
+                  className="flex items-start gap-2 px-3 py-2 rounded-xl"
+                  style={{
+                    background: 'rgba(99,102,241,0.07)',
+                    border: '1px solid rgba(99,102,241,0.22)',
+                    fontSize: '12.5px',
+                    lineHeight: '1.6',
+                    color: 'rgb(67,56,202)',
+                  }}
+                >
+                  <span style={{ flexShrink: 0, marginTop: '1px' }}>🔵</span>
+                  <span className="flex-1">
+                    <span style={{ fontWeight: 600 }}>已过滤无效値：</span>
+                    Top 排名中共 <span style={{ fontWeight: 600 }}>{filteredCount}</span> 个占位符展示项（如 "-"、"—"、"N/A"、"无"）已自动过滤。
+                  </span>
+                </div>
+              )}
+              {/* F1-5: 痑似商品名标记 */}
+              {showProductNameHint && (
+                <div
+                  className="flex items-start gap-2 px-3 py-2 rounded-xl"
+                  style={{
+                    background: 'rgba(245,158,11,0.07)',
+                    border: '1px solid rgba(245,158,11,0.22)',
+                    fontSize: '12.5px',
+                    lineHeight: '1.6',
+                    color: 'rgb(146,64,14)',
+                  }}
+                >
+                  <span style={{ flexShrink: 0, marginTop: '1px' }}>⚠️</span>
+                  <span className="flex-1">
+                    <span style={{ fontWeight: 600 }}>痑似商品名：</span>
+                    达人昵称列中检测到 <span style={{ fontWeight: 600 }}>{suspectedNames.length}</span> 个痑似商品描述（如「{suspectedNames[0]?.slice(0, 15)}{suspectedNames[0]?.length > 15 ? '...' : ''}」），建议核对分组字段是否正确。
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
         {/* P0-C: Field mapping hint block — blue info bar */}
         {message.fieldMappingHint && message.fieldMappingHint.length > 0 && (
           <div className="mb-2 flex flex-col gap-1">

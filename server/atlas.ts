@@ -183,6 +183,8 @@ interface DataFrameInfo {
   groupByField?: string;
   // All detected dimension fields with priority tiers (tier 1=达人, tier 2=昵称, tier 3=姓名, tier 4=店铺, tier 5=商品)
   allGroupByFields?: Array<{ field: string; tier: number }>;
+  // Phase 1: 达人昵称字段治理元数据（仅当 groupByField 存在时由前端生成并透传）
+  dataQuality?: Record<string, unknown>;
 }
 
 function inferType(values: unknown[]): "numeric" | "text" | "datetime" {
@@ -2767,6 +2769,8 @@ ${sampleRows}
         preview: Record<string, unknown>[];
         groupByField?: string;
         allGroupByFields?: Array<{ field: string; tier: number }>;
+        // Phase 1: 达人昵称字段治理元数据（前端计算后透传）
+        dataQuality?: Record<string, unknown>;
       };
 
       if (!parsed || !parsed.filename || !parsed.fields) {
@@ -2799,6 +2803,8 @@ ${sampleRows}
         preview: (parsed.preview || []).slice(0, 500),
         ...(parsed.groupByField !== undefined ? { groupByField: parsed.groupByField } : {}),
         ...(parsed.allGroupByFields !== undefined ? { allGroupByFields: parsed.allGroupByFields } : {}),
+        // Phase 1: 透传前端生成的 dataQuality 元数据，存入 dfInfo JSON 列
+        ...(parsed.dataQuality !== undefined ? { dataQuality: parsed.dataQuality } : {}),
       };
       // Server-side fallback: if frontend didn't send groupByField (old cached code),
       // re-detect it server-side using the same V14.2 rules

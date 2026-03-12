@@ -4,6 +4,7 @@
  * Switching activeTaskId instantly restores the full session
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+import type { DataQuality } from "../lib/parseFile";
 
 export type NavItem = "home" | "dashboard" | "templates" | "settings" | "search" | "library" | "invite" | "hr";
 export type Theme = "dark" | "light";
@@ -80,6 +81,8 @@ export interface Message {
     original: string;
     canonical: string;
   }>;
+  // Phase 1: 达人昵称字段治理元数据（仅当文件含 groupByField 时存在）
+  dataQuality?: DataQuality;
 }
 
 export interface ReportRecord {

@@ -47,6 +47,56 @@ export interface ParsedField {
   groupByField?: string;
 }
 
+// ── Phase 1：数据质量元数据 ─────────────────────────────────────────────────
+
+/**
+ * DataQuality：达人昵称字段治理规则产生的元数据。
+ * Phase 1 中 layer_used 始终为 "raw"，rules_applied 始终为 []，
+ * cleaned_groupedTopN 始终为 null（Phase 3 用户确认 forward fill 后才赋值）。
+ */
+export interface DataQuality {
+  /** 当前展示层：Phase 1 固定为 "raw" */
+  layer_used: "raw" | "cleaned";
+  /** 已触发的治理规则列表：Phase 1 固定为 [] */
+  rules_applied: string[];
+  /** 触发快照：用于判断各条件是否触发 */
+  trigger_snapshot: {
+    null_rate: number;          // 空值率，保留 4 位小数
+    unique_count: number;       // 原始唯一值数量（含无效值）
+    top1_ratio: number;         // Top1 金额占比（基于全量 groupedTopN），保留 4 位小数
+    placeholder_count: number;  // 占位符数量（"-" / "—" / "N/A" / "无"）
+  };
+  /** 受影响的行数（无效值行数） */
+  affected_rows: number;
+  /** Raw vs Cleaned 对比摘要：Phase 1 cleaned 字段均为 null */
+  before_vs_after_summary: {
+    raw_groupedTop1_sum: number;
+    cleaned_groupedTop1_sum: number | null;
+    raw_valid_rows: number;
+    cleaned_valid_rows: number | null;
+  };
+  /**
+   * Cleaned 层聚合结果。
+   * Phase 1 固定为 null；Phase 3 用户确认 forward fill 后赋值。
+   * 前端通过此字段是否非 null 来决定是否显示 Raw/Cleaned 切换开关。
+   */
+  cleaned_groupedTopN: GroupedTop5Entry[] | null;
+  /** 操作模式 */
+  operator_mode: "auto_suggested" | "user_enabled" | "user_disabled";
+  /** 原始无效值总数（null + 占位符 + 疑似商品名） */
+  raw_invalid_count: number;
+  /** 渲染层实际过滤的无效值数量（label 命中无效值集合的条目数） */
+  filtered_invalid_count: number;
+  /** 无效值分类明细 */
+  invalid_value_breakdown: {
+    null_or_empty: number;
+    placeholder: number;
+    suspected_product_name: number;
+  };
+  /** 疑似商品名列表，最多 20 条 */
+  suspected_product_names: string[];
+}
+
 export interface ParsedFileData {
   filename: string;
   totalRowCount: number;
@@ -58,6 +108,8 @@ export interface ParsedFileData {
   groupByField?: string;
   // All detected dimension fields by priority tier (for multi-dim grouping)
   allGroupByFields?: Array<{ field: string; tier: number }>;
+  // Phase 1: 达人昵称字段治理元数据（仅当 groupByField 存在时生成）
+  dataQuality?: DataQuality;
 }
 
 const PREVIEW_ROWS = 500;
@@ -193,6 +245,136 @@ function computeGroupedTopN(
   return sorted.map(([label, sum]) => ({ label, sum, source: sourceFilename }));
 }
 
+// ── Phase 1：detectDataQuality ──────────────────────────────────────────────
+
+/**
+ * 无效值判断：null / 空字符串 / trim 后为空 / 精确匹配占位符
+ */
+function isNullOrEmpty(v: unknown): boolean {
+  if (v === null || v === undefined) return true;
+  const s = String(v).trim();
+  return s === "";
+}
+
+const PLACEHOLDER_VALUES = new Set(["-", "—", "N/A", "无"]);
+
+/**
+ * 占位符判断：精确匹配 "-" / "—" / "N/A" / "无"
+ */
+function isPlaceholder(v: unknown): boolean {
+  if (v === null || v === undefined) return false;
+  return PLACEHOLDER_VALUES.has(String(v).trim());
+}
+
+/**
+ * 疑似商品名特征词
+ */
+const PRODUCT_NAME_KEYWORDS = ["【", "专属", "体验装", "ml", "g*", "支", "袋", "箱", "件"];
+
+/**
+ * 疑似商品名判断：长度 > 25 且包含特征词
+ */
+function isSuspectedProductName(v: unknown): boolean {
+  if (v === null || v === undefined) return false;
+  const s = String(v).trim();
+  if (s.length <= 25) return false;
+  return PRODUCT_NAME_KEYWORDS.some((kw) => s.includes(kw));
+}
+
+/**
+ * detectDataQuality：检测 groupByField 列的数据质量，生成 DataQuality 元数据。
+ *
+ * 调用时机：在 computeGroupedTopN 之后（需要 groupedTopN 结果计算 top1_ratio）。
+ * 不修改 rows，不影响 computeGroupedTopN 的输入。
+ *
+ * @param rows         全量行数据
+ * @param groupByField 分组字段名（达人昵称列）
+ * @param groupedTopN  已计算好的 groupedTopN 结果（用于计算 top1_ratio）
+ */
+function detectDataQuality(
+  rows: Record<string, unknown>[],
+  groupByField: string,
+  groupedTopN: GroupedTop5Entry[]
+): DataQuality {
+  const totalRows = rows.length;
+
+  let nullOrEmptyCount = 0;
+  let placeholderCount = 0;
+  let suspectedProductNameCount = 0;
+  const suspectedProductNames: string[] = [];
+  // 用于统计 groupByField 列的唯一值（含无效值）
+  const uniqueRaw = new Set<string>();
+
+  for (const row of rows) {
+    const v = row[groupByField];
+    if (isNullOrEmpty(v)) {
+      nullOrEmptyCount++;
+    } else if (isPlaceholder(v)) {
+      placeholderCount++;
+      uniqueRaw.add(String(v).trim());
+    } else if (isSuspectedProductName(v)) {
+      suspectedProductNameCount++;
+      const s = String(v).trim();
+      uniqueRaw.add(s);
+      if (suspectedProductNames.length < 20 && !suspectedProductNames.includes(s)) {
+        suspectedProductNames.push(s);
+      }
+    } else {
+      uniqueRaw.add(String(v).trim());
+    }
+  }
+
+  const rawInvalidCount = nullOrEmptyCount + placeholderCount + suspectedProductNameCount;
+  const nullRate = totalRows > 0 ? parseFloat((nullOrEmptyCount / totalRows).toFixed(4)) : 0;
+
+  // top1_ratio：Top1 的 sum 占所有 groupedTopN 条目总 sum 的比例
+  const totalSum = groupedTopN.reduce((acc, e) => acc + e.sum, 0);
+  const top1Sum = groupedTopN.length > 0 ? groupedTopN[0].sum : 0;
+  const top1Ratio = totalSum > 0 ? parseFloat((top1Sum / totalSum).toFixed(4)) : 0;
+
+  // filtered_invalid_count：渲染层会过滤掉的条目数
+  // 即 groupedTopN 中 label 属于无效值集合（占位符）的条目数
+  const filteredInvalidCount = groupedTopN.filter(
+    (e) => isPlaceholder(e.label) || isNullOrEmpty(e.label)
+  ).length;
+
+  // raw_groupedTop1_sum：Raw 层 Top1 的 sum（过滤无效 label 后的第一名）
+  const validTopN = groupedTopN.filter(
+    (e) => !isPlaceholder(e.label) && !isNullOrEmpty(e.label)
+  );
+  const rawGroupedTop1Sum = validTopN.length > 0 ? validTopN[0].sum : 0;
+
+  return {
+    layer_used: "raw",
+    rules_applied: [],
+    trigger_snapshot: {
+      null_rate: nullRate,
+      unique_count: uniqueRaw.size,
+      top1_ratio: top1Ratio,
+      placeholder_count: placeholderCount,
+    },
+    affected_rows: rawInvalidCount,
+    before_vs_after_summary: {
+      raw_groupedTop1_sum: rawGroupedTop1Sum,
+      cleaned_groupedTop1_sum: null,
+      raw_valid_rows: totalRows - nullOrEmptyCount,
+      cleaned_valid_rows: null,
+    },
+    cleaned_groupedTopN: null,
+    operator_mode: "auto_suggested",
+    raw_invalid_count: rawInvalidCount,
+    filtered_invalid_count: filteredInvalidCount,
+    invalid_value_breakdown: {
+      null_or_empty: nullOrEmptyCount,
+      placeholder: placeholderCount,
+      suspected_product_name: suspectedProductNameCount,
+    },
+    suspected_product_names: suspectedProductNames,
+  };
+}
+
+// ── 类型导出（供 AtlasContext 和 MainWorkspace 使用）──────────────────────
+
 function detectType(values: unknown[]): "numeric" | "text" | "datetime" {
   const nonNull = values.filter((v) => v !== null && v !== undefined && v !== "");
   if (nonNull.length === 0) return "text";
@@ -297,6 +479,11 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
   const allGroupByFields = detectAllGroupByFields(headers, headerTypes);
   // Primary groupBy field = highest priority tier (null if no qualifying text field found)
   const groupByField = allGroupByFields.length > 0 ? allGroupByFields[0].field : null;
+
+  // ── 计算 groupedTopN（用于 detectDataQuality 的 top1_ratio 计算）──────────
+  // 取第一个数值字段的 groupedTopN 作为代表（通常是主要金额字段）
+  let representativeGroupedTopN: GroupedTop5Entry[] = [];
+
   const fields: ParsedField[] = headers.map((h) => {
     const sampleVals = sampleForType.map((r) => r[h]);
     const type = headerTypes[h];
@@ -323,11 +510,22 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
       if (groupByField) {
         field.groupedTop5 = computeGroupedTopN(rows, h, groupByField, file.name);
         field.groupByField = groupByField;
+        // 用第一个数值字段的 groupedTopN 作为 dataQuality 的代表
+        if (representativeGroupedTopN.length === 0 && field.groupedTop5.length > 0) {
+          representativeGroupedTopN = field.groupedTop5;
+        }
       }
     }
 
     return field;
   });
+
+  // ── Phase 1：生成 dataQuality 元数据 ──────────────────────────────────────
+  // 仅当 groupByField 存在时生成（无分组字段的文件不生成）
+  let dataQuality: DataQuality | undefined;
+  if (groupByField) {
+    dataQuality = detectDataQuality(rows, groupByField, representativeGroupedTopN);
+  }
 
   const preview = rows.slice(0, PREVIEW_ROWS);
   const sampleRows = rows.slice(0, SAMPLE_ROWS);
@@ -341,6 +539,6 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     sampleRows,
     groupByField: groupByField ?? undefined,
     allGroupByFields: allGroupByFields.length > 0 ? allGroupByFields : undefined,
+    dataQuality,
   };
 }
-
