@@ -2971,6 +2971,8 @@ ${sampleRows}
           // Persist grouped top5 (GROUP BY dimension field, SUM numeric field) for accurate aggregated TopN
           ...(f.groupedTop5 !== undefined ? { groupedTop5: f.groupedTop5 } : {}),
           ...(f.groupByField !== undefined ? { groupByField: f.groupByField } : {}),
+          // T7 fix: persist validGroupSum (sum of ALL valid non-placeholder groups) for precise null-nickname amount
+          ...(f.validGroupSum !== undefined ? { validGroupSum: f.validGroupSum } : {}),
         })),
         preview: (parsed.preview || []).slice(0, 500),
         ...(parsed.groupByField !== undefined ? { groupByField: parsed.groupByField } : {}),
