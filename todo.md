@@ -897,3 +897,11 @@
 - [x] 问题1：大文件 preview 降级 - 修复：大文件（>3000行）在 uploadParsed 后自动分批上传全量数据，服务端存储全量行，标签显示正确行数
 - [x] 问题2：大文件全量数据存储 - 修复：新增 /api/atlas/upload-rows 端点，前端分批（2000行/批）POST，服务端追加写入 S3，完成后更新 storedRowCount + canExport
 - [x] 问题3：导出无响应 - 修复：AtlasTableRenderer 导出改为 Blob URL 下载，避免 XLSX.writeFile 在某些环境被拦截
+
+## V14.8 精准回滚大文件上传改动
+
+- [x] parseFile.ts：MAX_FULL_ROWS_INLINE 从 3000 改回 50000，删除 _allRowsRef 赋値逻辑
+- [x] api.ts：删除 uploadRows 函数和 UPLOAD_ROWS_BATCH_SIZE 常量
+- [x] MainWorkspace.tsx：删除分批上传代码块和 uploadRows import
+- [x] atlas.ts：删除 /api/atlas/upload-rows 端点
+- [x] tsc 0 errors，104/104 测试通过

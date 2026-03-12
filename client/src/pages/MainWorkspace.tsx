@@ -18,7 +18,7 @@ import {
 import { Streamdown } from "streamdown";
 import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTableRenderer";
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
-import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, uploadParsed, uploadRows, type SuggestedAction } from "@/lib/api";
+import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, uploadParsed, type SuggestedAction } from "@/lib/api";
 import { parseFile, type DataQuality } from "@/lib/parseFile"; // v14.2-groupby-fix
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -173,46 +173,6 @@ export default function MainWorkspace() {
           updateUploadedFile(tempId, { uploadProgress: mappedProgress });
         }
       });
-
-      // Phase 1c: 大文件全量数据分批上传（当 allRows 存在时，说明行数 ≤ 3000，已内联）
-      // 当 allRows 不存在（行数 > 3000），需要分批上传全量数据到服务端
-      if (!parsed.allRows && parsed.totalRowCount > 0) {
-        // 大文件：需要分批上传全量数据
-        // 重新解析文件以获取全量 rows（parseFile 已在内存中）
-        // 注意：parsed.allRows 为 undefined 时，需要重新解析文件获取全量 rows
-        // 但这会导致重复解析开销。改为：在 parseFile 中始终保留 allRows，只是不内联到 upload-parsed
-        // 此处直接使用 parsed 对象中的 _allRowsRef（如果存在）
-        const rowsToUpload = (parsed as any)._allRowsRef as Record<string, unknown>[] | undefined;
-        if (rowsToUpload && rowsToUpload.length > 0) {
-          updateMyMsg("", { isAnalyzing: true, analyzeProgress: 22 });
-          try {
-            const rowsResult = await uploadRows(uploadResult.session_id, rowsToUpload, (pct) => {
-              const mappedPct = Math.round(22 + (pct / 100) * 6); // 22% → 28%
-              if (mappedPct > currentProgress) {
-                currentProgress = mappedPct;
-                updateMyMsg("", { isAnalyzing: true, analyzeProgress: currentProgress });
-              }
-            });
-            console.info(`[ATLAS] 大文件分批上传完成: ${rowsResult.totalRows} 行`);
-            // 分批上传完成后，更新 canExport 和 storedRowCount
-            // 此时服务端已存储全量数据，行数应与前端一致
-            const isMatch = rowsResult.totalRows === parsed.totalRowCount;
-            updateUploadedFile(tempId, {
-              storedRowCount: rowsResult.totalRows,
-              dataSource: 'allRows(全量-分批)',
-              canExport: isMatch,
-            });
-            if (isMatch) {
-              console.info(`[ATLAS 行数校验] 分批上传后行数一致: ${rowsResult.totalRows} 行，可导出`);
-            } else {
-              console.warn(`[ATLAS 行数校验] 分批上传后行数不一致: 服务端 ${rowsResult.totalRows} vs 前端 ${parsed.totalRowCount}`);
-            }
-          } catch (rowsErr: any) {
-            // 分批上传失败不阻断主流程，只记录日志
-            console.warn(`[ATLAS] 大文件分批上传失败 (不阻断主流程):`, rowsErr);
-          }
-        }
-      }
 
       // Phase 2: poll for async processing result (30% → 100%)
       currentProgress = 30;

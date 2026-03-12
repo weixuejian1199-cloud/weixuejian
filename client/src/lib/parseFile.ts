@@ -793,20 +793,10 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
   const preview = rows.slice(0, PREVIEW_ROWS);
   const sampleRows = rows.slice(0, SAMPLE_ROWS);
 
-  // 修复项 B：分流规则
-  // ≤ 3000 行：内联传输全量数据，服务端直接存 S3（替代 preview 作为业务真源）
-  // > 3000 行：不内联，避免 JSON body 超出部署层反向代理限制（HTTP 413）
-  //   全量 rows 存入 _allRowsRef，前端通过 upload-rows 分批上传到服务端
-  //   全量统计（sum/avg/max/min/groupedTop5/categoryGroupedTop20）仍来自前端预计算，准确性不受影响
-  const MAX_FULL_ROWS_INLINE = 3_000;
+  // 修复项 B：全量数据内联传输（≤ 50000 行）
+  const MAX_FULL_ROWS_INLINE = 50_000;
   const allRows: Record<string, unknown>[] | undefined =
     totalRowCount <= MAX_FULL_ROWS_INLINE ? rows : undefined;
-
-  if (totalRowCount > MAX_FULL_ROWS_INLINE) {
-    console.info(
-      `[ATLAS 分流] ${file.name}: 行数 ${totalRowCount} > ${MAX_FULL_ROWS_INLINE}，内联跳过，将通过 upload-rows 分批上传全量数据`
-    );
-  }
 
   const result: ParsedFileData = {
     filename: file.name,
@@ -821,12 +811,6 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     categoryGroupedTop20: Object.keys(categoryGroupedTop20).length > 0 ? categoryGroupedTop20 : undefined,
     allRows,
   };
-
-  // 大文件：将全量 rows 存入 _allRowsRef，供前端分批上传使用
-  // （不内联到 upload-parsed，避免 HTTP 413）
-  if (totalRowCount > MAX_FULL_ROWS_INLINE) {
-    (result as any)._allRowsRef = rows;
-  }
 
   return result;
 }
