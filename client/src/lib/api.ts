@@ -46,13 +46,9 @@ export interface UploadResponse {
     original: string;
     canonical: string;
   }>;
-  // 修复项 B：实际存储行数，前端用于校验 totalRowCount === storedRowCount
-  stored_row_count?: number;
-  // 数据源标记：'allRows(全量)' | 'preview(降级)'
-  data_source?: string;
 }
 
-// ── Chat (streaming) ─────────────────────────────────────────────────────────────────────────────────────
+// ── Poll Upload Status ───────────────────────────────────────────────────────────────────────────────────
 // Polls /api/atlas/status/:sessionId until status=ready or error.
 // Calls onProgress(35..92) while waiting, resolves with full UploadResponse.
 export async function pollUploadStatus(

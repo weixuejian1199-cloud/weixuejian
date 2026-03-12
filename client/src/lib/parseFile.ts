@@ -36,9 +36,6 @@ export interface CategoryGroupedEntry {
   count: number;   // row count in this category
   sum?: number;    // sum of primary numeric field (optional)
   avg?: number;    // avg of primary numeric field (optional)
-  // 修复项 C：结构化字段元数据（仅在数组第一个元素中存在，用于导出匹配）
-  fieldName?: string;    // 原始字段名（如「收货省份」），辅助信息
-  categoryKey?: string;  // 标准化 key（如 "province"），用于导出强绑定
 }
 
 export interface ParsedField {
@@ -138,9 +135,6 @@ export interface ParsedFileData {
   // Category stats: full-dataset GROUP BY stats for ALL categorical fields
   // Key = field name (e.g. "省份", "支付方式"), Value = top20 entries
   categoryGroupedTop20?: Record<string, CategoryGroupedEntry[]>;
-  // 修复项 B：全量数据行，用于 upload-parsed 存储到 S3（替代 preview 作为业务真源）
-  // 仅当 totalRowCount ≤ MAX_FULL_ROWS_INLINE (3000) 时填充，超出时不内联（避免 HTTP 413）
-  allRows?: Record<string, unknown>[];
 }
 
 const PREVIEW_ROWS = 500;
@@ -306,46 +300,6 @@ const FREE_TEXT_FIELD_KEYWORDS = [
   "remark", "address", "description", "comment", "note",
 ];
 
-/**
- * 修复项 C：字段名关键词 → 标准 category_key 映射表
- * 用于为分类字段分配结构化 key，让前端导出能精确匹配，不依赖 AI 文案命名
- * 匹配顺序：按数组顺序逐个检查，第一个命中的关键词决定 key
- */
-const CATEGORY_KEY_MAP: Array<{ keywords: string[]; key: string }> = [
-  { keywords: ["省", "省份"], key: "province" },
-  { keywords: ["城市", "市"], key: "city" },
-  { keywords: ["地区", "区域", "地域"], key: "region" },
-  { keywords: ["国家"], key: "country" },
-  { keywords: ["支付", "付款", "结算"], key: "payment_method" },
-  { keywords: ["订单状态", "订单类型"], key: "order_status" },
-  { keywords: ["状态"], key: "status" },
-  { keywords: ["类型"], key: "type" },
-  { keywords: ["类别", "品类", "分类"], key: "category" },
-  { keywords: ["渠道"], key: "channel" },
-  { keywords: ["来源"], key: "source" },
-  { keywords: ["平台"], key: "platform" },
-  { keywords: ["门店"], key: "store" },
-  { keywords: ["仓库", "仓"], key: "warehouse" },
-  { keywords: ["等级", "级别"], key: "level" },
-  { keywords: ["性别"], key: "gender" },
-  { keywords: ["标签"], key: "tag" },
-  { keywords: ["行业"], key: "industry" },
-  { keywords: ["部门"], key: "department" },
-  { keywords: ["岗位", "职位"], key: "position" },
-];
-
-/**
- * 修复项 C：根据字段名分配标准 category_key
- * 匹配失败时返回 "field__{fieldName}"（确保唯一性）
- */
-function getCategoryKey(fieldName: string): string {
-  for (const { keywords, key } of CATEGORY_KEY_MAP) {
-    if (keywords.some(kw => fieldName.includes(kw))) return key;
-  }
-  // 匹配失败：使用字段名本身作为 key（加前缀避免与标准 key 冲突）
-  return `field__${fieldName}`;
-}
-
 const MAX_CATEGORY_FIELDS = 20;
 
 /**
@@ -422,22 +376,11 @@ function computeCategoryStats(
       .sort((a, b) => b[1] - a[1])
       .slice(0, GROUPED_TOP_N);
 
-    // 修复项 C：分配标准 category_key，用于前端导出强绑定
-    const categoryKey = getCategoryKey(h);
-    // 使用 category_key 作为 result 的 key，同一 key 可能对应多个字段（如多个包含「省」的字段）
-    // 如果已存在相同 key，附加字段名区分
-    const resultKey = result[categoryKey] ? `${categoryKey}__${h}` : categoryKey;
-
-    result[resultKey] = sorted.map(([label, count], idx) => {
+    result[h] = sorted.map(([label, count]) => {
       const entry: CategoryGroupedEntry = { label, count };
       if (primaryNumericField && sumMap.has(label)) {
         entry.sum = sumMap.get(label)!;
         entry.avg = entry.sum / count;
-      }
-      // 修复项 C：在第一个 entry 中注入字段元数据（前端导出匹配用）
-      if (idx === 0) {
-        entry.fieldName = h;         // 原始字段名（如「收货省份」）
-        entry.categoryKey = resultKey; // 实际使用的 key
       }
       return entry;
     });
@@ -615,20 +558,6 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     rows = XLSX.utils.sheet_to_json(ws, { defval: null });
   }
 
-  // ── 修复项 A：过滤全空行，与服务端 atlas.ts 第248行逻辑对齐 ──
-  // 全空行（如文件末尾空白行、中间分隔行）会导致 totalRowCount 虚高，
-  // 使 categoryGroupedTop20 的 count 校验失效。
-  const rawRowCount = rows.length; // 过滤前原始行数，用于行数差异日志
-  rows = rows.filter(row =>
-    Object.values(row).some(v => v !== null && v !== undefined && v !== "")
-  );
-  const filteredCount = rawRowCount - rows.length;
-  if (filteredCount > 0) {
-    console.info(
-      `[ATLAS 空行过滤] ${file.name}: 原始 ${rawRowCount} 行，过滤 ${filteredCount} 个全空行，有效行数 ${rows.length}`
-    );
-  }
-
   const totalRowCount = rows.length;
   if (totalRowCount === 0) {
     return {
@@ -793,12 +722,7 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
   const preview = rows.slice(0, PREVIEW_ROWS);
   const sampleRows = rows.slice(0, SAMPLE_ROWS);
 
-  // 修复项 B：全量数据内联传输（≤ 50000 行）
-  const MAX_FULL_ROWS_INLINE = 50_000;
-  const allRows: Record<string, unknown>[] | undefined =
-    totalRowCount <= MAX_FULL_ROWS_INLINE ? rows : undefined;
-
-  const result: ParsedFileData = {
+  return {
     filename: file.name,
     totalRowCount,
     colCount,
@@ -809,8 +733,5 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     allGroupByFields: allGroupByFields.length > 0 ? allGroupByFields : undefined,
     dataQuality,
     categoryGroupedTop20: Object.keys(categoryGroupedTop20).length > 0 ? categoryGroupedTop20 : undefined,
-    allRows,
   };
-
-  return result;
 }

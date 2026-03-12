@@ -89,17 +89,8 @@ function AtlasTableView({
     const exportRows = getExportRows();
     const ws = XLSX.utils.aoa_to_sheet([data.columns, ...exportRows]);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, (data.title || '表格').slice(0, 31));
-    // 使用 Blob URL 下载，避免某些环境下 XLSX.writeFile 被拦截
-    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([wbout], { type: 'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${data.title || '表格'}.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+    XLSX.utils.book_append_sheet(wb, ws, data.title.slice(0, 31));
+    XLSX.writeFile(wb, `${data.title}.xlsx`);
   };
 
   const handleExportCsv = () => {
