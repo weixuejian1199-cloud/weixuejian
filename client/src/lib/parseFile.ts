@@ -45,6 +45,9 @@ export interface ParsedField {
   groupedTop5?: GroupedTop5Entry[];
   // which dimension field was used for groupedTop5
   groupByField?: string;
+  // T7: sum of ALL valid (non-placeholder) groups — used to compute null-nickname amount
+  // null_nickname_amount = field.sum - validGroupSum
+  validGroupSum?: number;
 }
 
 // ── Phase 1：数据质量元数据 ─────────────────────────────────────────────────
@@ -228,7 +231,7 @@ function computeGroupedTopN(
   groupField: string,
   sourceFilename: string,
   topN = GROUPED_TOP_N
-): GroupedTop5Entry[] {
+): { entries: GroupedTop5Entry[]; validTotalSum: number } {
   const groupSums: Map<string, number> = new Map();
   for (const row of rows) {
     const groupVal = row[groupField];
@@ -242,11 +245,13 @@ function computeGroupedTopN(
         key === "无" || key === "null" || key === "NULL" || key === "None" || key === "none") continue;
     groupSums.set(key, (groupSums.get(key) ?? 0) + numVal);
   }
+  // Compute total sum of ALL valid groups (not just top N) — used for null-nickname amount
+  const validTotalSum = Array.from(groupSums.values()).reduce((a, b) => a + b, 0);
   // Sort by sum descending, take topN
   const sorted = Array.from(groupSums.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, topN);
-  return sorted.map(([label, sum]) => ({ label, sum, source: sourceFilename }));
+  return { entries: sorted.map(([label, sum]) => ({ label, sum, source: sourceFilename })), validTotalSum };
 }
 
 // ── Phase 1：detectDataQuality ──────────────────────────────────────────────
@@ -512,9 +517,11 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
       field.top5 = [...stat.top5Heap].sort((a, b) => b.value - a.value);
       // groupedTopN: GROUP BY primary dimension field, SUM this numeric field, TOP20 by sum
       if (groupByField) {
-        field.groupedTop5 = computeGroupedTopN(rows, h, groupByField, file.name);
+        const groupedResult = computeGroupedTopN(rows, h, groupByField, file.name);
+        field.groupedTop5 = groupedResult.entries;
+        field.validGroupSum = groupedResult.validTotalSum; // T7: total sum of ALL valid groups
         field.groupByField = groupByField;
-        // 用第一个数值字段的 groupedTopN 作为 dataQuality 的代表
+        // 用第一个数値字段的 groupedTopN 作为 dataQuality 的代表
         if (representativeGroupedTopN.length === 0 && field.groupedTop5.length > 0) {
           representativeGroupedTopN = field.groupedTop5;
         }

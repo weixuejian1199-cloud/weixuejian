@@ -172,6 +172,9 @@ interface FieldInfo {
   groupedTop5?: Array<{ label: string; sum: number; source?: string }>;
   // Which dimension field was used for groupedTop5
   groupByField?: string;
+  // T7: sum of ALL valid (non-placeholder) groups — used to compute null-nickname amount
+  // null_nickname_amount = field.sum - validGroupSum
+  validGroupSum?: number;
 }
 
 interface DataFrameInfo {
@@ -1764,6 +1767,30 @@ export function registerAtlasRoutes(app: Express) {
         };
       }).filter(Boolean);
 
+      // Build null-value context for groupByField (T7 fix: distinguish field-missing vs field-exists-with-nulls)
+      const groupByFieldNullContext = (() => {
+        const dq = dfInfo.dataQuality as Record<string, unknown> | undefined;
+        const gbField = dfInfo.groupByField;
+        if (!gbField) return '';
+        // affected_rows = null_or_empty + placeholder (from dataQuality)
+        const affectedRows = dq ? (Number((dq.affected_rows as number) ?? 0)) : 0;
+        const nullOrEmpty = dq ? Number(((dq.invalid_value_breakdown as any)?.null_or_empty ?? 0)) : 0;
+        const placeholder = dq ? Number(((dq.invalid_value_breakdown as any)?.placeholder ?? 0)) : 0;
+        if (affectedRows === 0) return '';
+        // T7: compute null-nickname amount for single-file using validGroupSum
+        const keyNumericFields = ['商品金额', '订单应付金额', '订单金额', '销售额', '金额'];
+        const nullAmountLines: string[] = [];
+        for (const f of dfInfo.fields) {
+          if (!keyNumericFields.some(kw => f.name.includes(kw))) continue;
+          if (f.sum === undefined) continue;
+          if (f.validGroupSum !== undefined && f.validGroupSum > 0) {
+            const nullAmt = Math.max(0, f.sum - f.validGroupSum);
+            nullAmountLines.push(`- 「${f.name}」中无有效${gbField}的订单金额: ${nullAmt.toFixed(2)}（= 总计${f.sum.toFixed(2)} - 有效${gbField}金额${f.validGroupSum.toFixed(2)}）`);
+          }
+        }
+        return `\n【${gbField}字段空值说明（重要）】\n- 字段「${gbField}」存在于数据中（字段存在，不是缺失）\n- 共有 ${affectedRows} 行的「${gbField}」値为空値或占位符（null/空字符串: ${nullOrEmpty}行，占位符如"-"/"—"/"N/A": ${placeholder}行）\n- 这些行在达人排名中被过滤，但其对应金额仍计入文件总金额\n${nullAmountLines.length > 0 ? nullAmountLines.join('\n') + '\n' : ''}- ⚠️ 禁止说「文件不包含${gbField}字段」——字段存在，只是部分行値为空\n`;
+      })();
+
       const statsContext = numericStats.length > 0 ? `
 ══ 全量统计摘要（基于 ${dfInfo.row_count.toLocaleString()} 行全量数据，非样本）══
 重要约束：当用户询问总量/合计/均値/最大/最小等聚合指标时，必须直接引用以下全量统计値，禁止对样本行重新计算。
@@ -1775,10 +1802,10 @@ ${topPerformers.map(s => [
   `${s!.name}零値或空白: ${s!.zeros}个`,
   `${s!.name}异常高値(>均化3倍): ${s!.outliers}个`,
   s!.top5IsFullData && s!.top5!.length > 0
-    ? `${s!.name}前5名（按${(s as any).groupByField || '分组维度'}聚合，全量数据）: ${s!.top5!.join(' / ')}`
+    ? `${s!.name}前${s!.top5!.length}名（按${(s as any).groupByField || '分组维度'}聚合，全量数据）: ${s!.top5!.join(' / ')}\n⚠️ 排名规则：必须将以上全部 ${s!.top5!.length} 名展示在表格中，不得因金额差异大而只展示 Top1`
     : null,
 ].filter(Boolean).join('\n')).join('\n')}
-══ 全量统计摘要结束 ══
+${groupByFieldNullContext}══ 全量统计摘要结束 ══
 ` : '';
 
       const categoryContext = categoricalFields.length > 0 ? `
@@ -1897,6 +1924,15 @@ ${isMultiFile ? (() => {
       sampleHeaders.join(' | '),
       ...sampleData.map(row => sampleHeaders.map(h => { const v = row[h]; return v === null || v === undefined ? '' : String(v); }).join(' | '))
     ].join('\n');
+    // T7 fix: inject groupByField null-value stats per file
+    const pfpDq = pfp.dfInfo.dataQuality as Record<string, unknown> | undefined;
+    const pfpGbField = pfp.dfInfo.groupByField;
+    const pfpAffectedRows = pfpDq ? Number((pfpDq.affected_rows as number) ?? 0) : 0;
+    const pfpNullOrEmpty = pfpDq ? Number(((pfpDq.invalid_value_breakdown as any)?.null_or_empty ?? 0)) : 0;
+    const pfpPlaceholder = pfpDq ? Number(((pfpDq.invalid_value_breakdown as any)?.placeholder ?? 0)) : 0;
+    const pfpNullContext = (pfpGbField && pfpAffectedRows > 0)
+      ? `\n【${pfpGbField}字段空值说明】字段「${pfpGbField}」存在，共 ${pfpAffectedRows} 行值为空/占位符（null/空: ${pfpNullOrEmpty}行，占位符"-"等: ${pfpPlaceholder}行），这些行在达人排名中被过滤但金额计入总额。禁止说「文件不含${pfpGbField}字段」。`
+      : (pfpGbField ? `\n【${pfpGbField}字段说明】字段「${pfpGbField}」存在，所有行均有有效值。` : '');
     return `══ dataset_profile[${idx + 1}] ══
 source_file_id: ${pfp.fileId}
 source_file_name: ${pfp.fileName}
@@ -1904,8 +1940,8 @@ source_row_count: ${pfp.rowCount}
 列数: ${pfp.colCount}
 
 全量统计摘要（基于 ${pfp.rowCount.toLocaleString()} 行全量数据，非样本）：
-⚠️ 以下统计值来自全量数据，回答时必须直接引用，禁止对 sample_rows 重新计算。
-${statsLines}
+⚠️ 以下统计値来自全量数据，回答时必须直接引用，禁止对 sample_rows 重新计算。
+${statsLines}${pfpNullContext}
 
 ══ sample_rows[${idx + 1}] ══（仅用于理解字段含义，禁止对此求和）
 ${sampleTable}`;
@@ -1928,8 +1964,62 @@ ${sampleTable}`;
   // This was missing in af21a74 refactor — restoring parity with single-file statsContext
   const topPerformersLines = topPerformers
     .filter(s => s && s.top5IsFullData && s.top5 && s.top5.length > 0)
-    .map(s => `${s!.name}跨文件合并前${s!.top5!.length}名（按${(s as any).groupByField || '分组维度'}聚合，全量数据，已过滤占位符）: ${s!.top5!.join(' / ')}`)
+    .map(s => {
+      const n = s!.top5!.length;
+      return `${s!.name}跨文件合并前${n}名（按${(s as any).groupByField || '分组维度'}聚合，全量数据，已过滤占位符）: ${s!.top5!.join(' / ')}\n⚠️ 排名规则：必须将以上全部 ${n} 名展示在表格中，不得因金额差异大而只展示 Top1`;
+    })
     .join('\n');
+
+  // T7 fix: compute cross-file null-nickname amount totals using validGroupSum for precision
+  const nullNicknameLines: string[] = [];
+  const gbFieldsInFiles = perFileProfiles.map(pfp => pfp.dfInfo.groupByField).filter(Boolean);
+  if (gbFieldsInFiles.length > 0) {
+    const gbFieldName = gbFieldsInFiles[0] as string; // e.g. "达人昵称"
+    const perFileNullAmounts: Array<{ fileName: string; nullAmount: number; affectedRows: number; hasValidGroupSum: boolean }> = [];
+    for (const pfp of perFileProfiles) {
+      const pfpDq = pfp.dfInfo.dataQuality as Record<string, unknown> | undefined;
+      const pfpAffectedRows = pfpDq ? Number((pfpDq.affected_rows as number) ?? 0) : 0;
+      if (pfpAffectedRows === 0) continue;
+      // Find the primary amount field for this file
+      const keyNumericFields = ['商品金额', '订单应付金额', '订单金额', '销售额', '金额'];
+      const primaryAmountField = pfp.numericStats.find(ns =>
+        keyNumericFields.some(kw => ns.name.includes(kw))
+      );
+      if (!primaryAmountField) continue;
+      const fileTotal = primaryAmountField.sum;
+      // T7 fix: use validGroupSum (sum of ALL valid non-placeholder groups) for precise null amount
+      // validGroupSum is stored in dfInfo.fields[primaryAmountField.name].validGroupSum
+      const fieldDef = pfp.dfInfo.fields.find((f: FieldInfo) => f.name === primaryAmountField.name);
+      const validGroupSum = fieldDef?.validGroupSum;
+      if (validGroupSum !== undefined && validGroupSum > 0) {
+        // Precise: null_amount = file_total - sum_of_all_valid_groups
+        const nullAmount = Math.max(0, fileTotal - validGroupSum);
+        perFileNullAmounts.push({ fileName: pfp.fileName, nullAmount, affectedRows: pfpAffectedRows, hasValidGroupSum: true });
+      } else {
+        // No validGroupSum: cannot compute null amount accurately (row-count ratio is unreliable)
+        // Just record the affected rows count for context
+        perFileNullAmounts.push({ fileName: pfp.fileName, nullAmount: -1, affectedRows: pfpAffectedRows, hasValidGroupSum: false });
+      }
+    }
+    if (perFileNullAmounts.length > 0) {
+      const preciseFiles = perFileNullAmounts.filter(x => x.hasValidGroupSum);
+      const impreciseFiles = perFileNullAmounts.filter(x => !x.hasValidGroupSum);
+      if (preciseFiles.length > 0) {
+        const totalNullAmount = preciseFiles.reduce((acc, x) => acc + x.nullAmount, 0);
+        const allPrecise = impreciseFiles.length === 0;
+        nullNicknameLines.push(`「${gbFieldName}」为空/占位符的订单金额合计${allPrecise ? '(全部文件)' : '(部分文件精确値)'}: ${totalNullAmount.toFixed(2)}`);
+        for (const x of preciseFiles) {
+          nullNicknameLines.push(`  - ${x.fileName}: ${x.nullAmount.toFixed(2)}（${x.affectedRows}行空/占位符）`);
+        }
+      }
+      if (impreciseFiles.length > 0) {
+        nullNicknameLines.push(`以下文件有空値行但无法精确计算无昵称金额（需重新上传文件）：`);
+        for (const x of impreciseFiles) {
+          nullNicknameLines.push(`  - ${x.fileName}: 共 ${x.affectedRows} 行空/占位符，无法精确计算对应金额`);
+        }
+      }
+    }
+  }
 
   const topPerformersSection = topPerformersLines ? `
 
@@ -1943,7 +2033,9 @@ ${topPerformersLines}
 
 ⚠️ 当前文件中未检测到可靠的达人分组字段，无法生成跨文件达人排名。如需达人 Top10，请确认文件中包含"达人昵称"等分组字段。`;
 
-  return sections.join('\n\n') + (totals.length > 0 ? `\n\n══ 跨文件汇总 ══\n${totals.join('\n')}` : '') + topPerformersSection;
+  const nullNicknameSection = nullNicknameLines.length > 0 ? `\n\n══ 无达人昵称订单金额统计（T7）══\n说明：以下金额来自达人昵称字段为空或占位符的订单（字段存在但值为空），必须按全文件口径回答，不得只统计单个文件。\n${nullNicknameLines.join('\n')}\n══ 无达人昵称金额统计结束 ══` : '';
+
+  return sections.join('\n\n') + (totals.length > 0 ? `\n\n══ 跨文件汇总 ══\n${totals.join('\n')}` : '') + nullNicknameSection + topPerformersSection;
 })() : `══ dataset_profile ══
 文件：${filename}（全量 ${dfInfo.row_count.toLocaleString()} 行 × ${dfInfo.col_count} 列）
 字段说明：

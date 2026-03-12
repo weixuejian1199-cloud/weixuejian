@@ -1,0 +1,26 @@
+{
+  "query": "SELECT id, originalName, rowCount, JSON_EXTRACT(dfInfo, '$.groupByField') as groupByField, JSON_EXTRACT(dfInfo, '$.fields[0].name') as field0_name, JSON_EXTRACT(dfInfo, '$.fields[0].groupedTop5') as field0_groupedTop5 FROM sessions WHERE originalName LIKE '%爱比爱尼%' ORDER BY createdAt DESC LIMIT 2;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute SELECT id, originalName, rowCount, JSON_EXTRACT(dfInfo, '$.groupByField') as groupByField, JSON_EXTRACT(dfInfo, '$.fields[0].name') as field0_name, JSON_EXTRACT(dfInfo, '$.fields[0].groupedTop5') as field0_groupedTop5 FROM sessions WHERE originalName LIKE '%爱比爱尼%' ORDER BY createdAt DESC LIMIT 2;",
+  "rows": [
+    {
+      "id": "Up5RNkF_F4OHD6xAfvq41",
+      "originalName": "爱比爱尼-2026.1-抖店 - 副本.xlsx",
+      "rowCount": "1356",
+      "groupByField": "\"达人昵称\"",
+      "field0_name": "\"主订单编号\"",
+      "field0_groupedTop5": "[{\"label\": \"胡说老王\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 333037673099537000000}, {\"label\": \"胡说老王聊商业经\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 13899729977073084000}, {\"label\": \"老王胡说\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 6950439807281535000}, {\"label\": \"胡说老王・探本溯源\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 6923745622620536000}, {\"label\": \"老王商之道\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 6923547850212278000}]"
+    },
+    {
+      "id": "H11O5z9XsXNl8EnVBycZC",
+      "originalName": "爱比爱尼-2026.1-抖店 - 副本.xlsx",
+      "rowCount": "1356",
+      "groupByField": "\"达人昵称\"",
+      "field0_name": "\"主订单编号\"",
+      "field0_groupedTop5": "[{\"label\": \"胡说老王\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 333037673099537000000}, {\"label\": \"胡说老王聊商业经\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 13899729977073084000}, {\"label\": \"老王胡说\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 6950439807281535000}, {\"label\": \"胡说老王・探本溯源\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 6923745622620536000}, {\"label\": \"老王商之道\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 6923547850212278000}]"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\toriginalName\trowCount\tgroupByField\tfield0_name\tfield0_groupedTop5\nUp5RNkF_F4OHD6xAfvq41\t爱比爱尼-2026.1-抖店 - 副本.xlsx\t1356\t\"达人昵称\"\t\"主订单编号\"\t[{\"label\": \"胡说老王\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 333037673099537000000}, {\"label\": \"胡说老王聊商业经\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 13899729977073084000}, {\"label\": \"老王胡说\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 6950439807281535000}, {\"label\": \"胡说老王・探本溯源\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 6923745622620536000}, {\"label\": \"老王商之道\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 6923547850212278000}]\nH11O5z9XsXNl8EnVBycZC\t爱比爱尼-2026.1-抖店 - 副本.xlsx\t1356\t\"达人昵称\"\t\"主订单编号\"\t[{\"label\": \"胡说老王\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 333037673099537000000}, {\"label\": \"胡说老王聊商业经\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 13899729977073084000}, {\"label\": \"老王胡说\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 6950439807281535000}, {\"label\": \"胡说老王・探本溯源\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 6923745622620536000}, {\"label\": \"老王商之道\", \"source\": \"爱比爱尼-2026.1-抖店 - 副本.xlsx\", \"sum\": 6923547850212278000}]\n",
+  "stderr": "",
+  "execution_time_ms": 121
+}

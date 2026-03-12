@@ -1,0 +1,8 @@
+{
+  "query": "SELECT id, filename, row_count, col_count, created_at, SUBSTRING(df_info, 1, 3000) as df_info_preview FROM sessions WHERE filename LIKE '%爱比爱尼%' ORDER BY created_at DESC LIMIT 2;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute SELECT id, filename, row_count, col_count, created_at, SUBSTRING(df_info, 1, 3000) as df_info_preview FROM sessions WHERE filename LIKE '%爱比爱尼%' ORDER BY created_at DESC LIMIT 2;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'row_count' in 'field list'"
+  ]
+}
