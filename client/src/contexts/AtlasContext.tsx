@@ -52,6 +52,20 @@ export interface UploadedFile {
    * 用于 AtlasTableRenderer 导出时提供完整数据集，避免只导出 AI 展示层的前20行。
    */
   categoryGroupedTop20?: Record<string, Array<{ label: string; count: number; sum?: number; avg?: number }>>;
+  /**
+   * 修复项 B：服务端实际存储行数（来自 upload-parsed 处理完成后返回）
+   * 前端校验：当 storedRowCount !== totalRowCount 时，文件不得进入可导出状态
+   */
+  storedRowCount?: number;
+  /**
+   * 修复项 B：文件是否可导出。
+   * true = 存储行数与前端有效行数一致，导出安全。
+   * false = 行数不一致（如大文件降级到 preview），导出将显示警告。
+   * undefined = 尚未收到服务端校验结果。
+   */
+  canExport?: boolean;
+  /** 数据源标记：'allRows(全量)' | 'preview(降级)' */
+  dataSource?: string;
 }
 
 export interface TableSheet {
