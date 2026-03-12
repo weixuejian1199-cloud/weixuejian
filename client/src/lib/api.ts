@@ -52,7 +52,52 @@ export interface UploadResponse {
   data_source?: string;
 }
 
-// ── Poll Upload Status ───────────────────────────────────────────────────────────────────────────────────
+// ── Upload Rows (大文件全量数据分批上传) ────────────────────────────────────────────────────────────────────────────
+// 当文件行数 > MAX_FULL_ROWS_INLINE 时，前端解析完成后调用此函数把全量数据分批上传到服务端
+const UPLOAD_ROWS_BATCH_SIZE = 2_000; // 每批 2000 行 ≈ 1MB JSON
+
+export async function uploadRows(
+  sessionId: string,
+  allRows: Record<string, unknown>[],
+  onProgress?: (percent: number) => void
+): Promise<{ totalRows: number }> {
+  const totalBatches = Math.ceil(allRows.length / UPLOAD_ROWS_BATCH_SIZE);
+
+  // 分批上传
+  for (let i = 0; i < totalBatches; i++) {
+    const batch = allRows.slice(i * UPLOAD_ROWS_BATCH_SIZE, (i + 1) * UPLOAD_ROWS_BATCH_SIZE);
+    const res = await fetch("/api/atlas/upload-rows", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ sessionId, rows: batch, batchIndex: i, totalBatches }),
+    });
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try { const err = await res.json(); msg = err.error || msg; } catch {}
+      throw new Error(`分批上传失败 (batch ${i}): ${msg}`);
+    }
+    if (onProgress) onProgress(Math.round(((i + 1) / totalBatches) * 90));
+  }
+
+  // 发送 finalize 请求，服务端合并并覆盖主数据
+  const finalRes = await fetch("/api/atlas/upload-rows", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ sessionId, batchIndex: 0, totalBatches, finalize: true }),
+  });
+  if (!finalRes.ok) {
+    let msg = `HTTP ${finalRes.status}`;
+    try { const err = await finalRes.json(); msg = err.error || msg; } catch {}
+    throw new Error(`全量数据合并失败: ${msg}`);
+  }
+  const finalData = await finalRes.json();
+  if (onProgress) onProgress(100);
+  return { totalRows: finalData.totalRows };
+}
+
+// ── Chat (streaming) ────────────────────────────────────────────────────────────────────────────────────
 // Polls /api/atlas/status/:sessionId until status=ready or error.
 // Calls onProgress(35..92) while waiting, resolves with full UploadResponse.
 export async function pollUploadStatus(

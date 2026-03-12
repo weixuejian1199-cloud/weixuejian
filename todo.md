@@ -891,3 +891,9 @@
 - [x] 根因：allRows 全量数据内联在 upload-parsed JSON body 中，大文件（46906行）序列化后约20-30MB，超出部署层反向代理限制
 - [x] 修复：将 MAX_FULL_ROWS_INLINE 从 50000 降低到 3000，超过 3000 行时不内联 allRows，请求体始终 < 3MB，彻底解决 413
 - [x] 全量统计（sum/avg/max/min/groupedTop5/categoryGroupedTop20）仍来自前端预计算，准确性不受影响，104/104 测试通过
+
+## V14.7 三个阻塞问题修复
+
+- [x] 问题1：大文件 preview 降级 - 修复：大文件（>3000行）在 uploadParsed 后自动分批上传全量数据，服务端存储全量行，标签显示正确行数
+- [x] 问题2：大文件全量数据存储 - 修复：新增 /api/atlas/upload-rows 端点，前端分批（2000行/批）POST，服务端追加写入 S3，完成后更新 storedRowCount + canExport
+- [x] 问题3：导出无响应 - 修复：AtlasTableRenderer 导出改为 Blob URL 下载，避免 XLSX.writeFile 在某些环境被拦截
