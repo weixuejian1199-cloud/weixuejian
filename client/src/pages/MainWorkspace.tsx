@@ -1788,9 +1788,10 @@ function MessageBubble({
           </div>
         )}
         {/* P0-B: Quality issues hint block */}
-        {message.qualityIssues && message.qualityIssues.length > 0 && (
+        {/* NOTE: 过滤掉旧版全表缺失值警告（Phase 1 起，缺失值提示由 detectDataQuality 专项处理） */}
+        {message.qualityIssues && message.qualityIssues.filter(i => !i.startsWith('缺失值警告')).length > 0 && (
           <div className="mb-2 flex flex-col gap-1">
-            {message.qualityIssues.map((issue, idx) => {
+            {message.qualityIssues.filter(i => !i.startsWith('缺失值警告')).map((issue, idx) => {
               const isWarning = issue.startsWith('⚠️');
               const isSuccess = issue.startsWith('✅');
               // P0-B UI: detect outlier warning and find matching detail

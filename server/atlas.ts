@@ -1100,14 +1100,8 @@ export function registerAtlasRoutes(app: Express) {
           ).join(", ");
 
           // Detect data quality issues for AI context
+          // NOTE: 全表缺失値警告已移除（Phase 1 治理提示仅针对 groupByField 列，由前端 detectDataQuality 生成）
           const qualityIssues: string[] = [];
-          const nullFields = dfInfo.fields.filter(f => f.null_count > 0);
-          if (nullFields.length > 0) {
-            const highNullFields = nullFields.filter(f => f.null_count / dfInfo.row_count > 0.05);
-            if (highNullFields.length > 0) {
-              qualityIssues.push(`缺失值警告：${highNullFields.map(f => `${f.name}(${f.null_count}个空值)`).join('、')}`);
-            }
-          }
           if (injectedFields.length > 0) {
             qualityIssues.push(`字段容错提示：${injectedFields.join('、')}字段在数据中缺失，已自动按 0 处理，计算结果不受影响`);
           }
@@ -2617,9 +2611,8 @@ ${sampleRows}
           const metricsSummary = keyMetrics.map(m => `${m.name}: ${m.value}`).join("、");
 
           // Quality checks
+          // NOTE: 全表缺失値警告已移除（Phase 1 治理提示仅针对 groupByField 列，由前端 detectDataQuality 生成）
           const qualityIssues: string[] = [];
-          const highNullFields = dfInfo.fields.filter(f => f.null_count > dfInfo.row_count * 0.3);
-          if (highNullFields.length > 0) qualityIssues.push(`缺失值警告：${highNullFields.map(f => `${f.name}(${f.null_count}个空值)`).join('、')}`);
           if (injectedFields.length > 0) qualityIssues.push(`字段容错提示：${injectedFields.join('、')}字段在数据中缺失，已自动按 0 处理`);
           const mappingEntries = Object.entries(fieldMapping);
           if (mappingEntries.length > 0) qualityIssues.push(`字段识别提示：已自动将 ${mappingEntries.map(([o, c]) => `「${o}」→「${c}」`).join('、')} 对齐为标准字段名`);
