@@ -2887,13 +2887,7 @@ ${sampleRows}
           }).join(", ");
 
           const qualityIssues: string[] = [];
-          const nullFields = dfInfo.fields.filter(f => f.null_count > 0);
-          if (nullFields.length > 0) {
-            const highNullFields = nullFields.filter(f => f.null_count / dfInfo.row_count > 0.05);
-            if (highNullFields.length > 0) {
-              qualityIssues.push(`\u7f3a\u5931\u503c\u8b66\u544a\uff1a${highNullFields.map(f => `${f.name}(${f.null_count}\u4e2a\u7a7a\u503c)`).join('\u3001')}`);
-            }
-          }
+          // NOTE: 全表缺失值警告已移除（Phase 1 起，缺失值提示由 detectDataQuality 专项处理，仅针对 groupByField 列）
           const mappingEntries = Object.entries(fieldMapping);
           if (mappingEntries.length > 0) {
             qualityIssues.push(`\u5b57\u6bb5\u8bc6\u522b\u63d0\u793a\uff1a\u5df2\u81ea\u52a8\u5c06 ${mappingEntries.map(([o, c]) => `\u300c${o}\u300d\u2192\u300c${c}\u300d`).join('\u3001')} \u5bf9\u9f50\u4e3a\u6807\u51c6\u5b57\u6bb5\u540d`);
