@@ -867,3 +867,13 @@
 
 - [ ] P0: 多文件 Top10 真正合并所有文件达人数据（修复 UNION 逻辑）
 - [ ] P1: 消除店铺名/文件名冒充达人昵称入榜（空值率极高的文件跳过达人分组）
+
+## V14.4 分类字段全量预计算（P0 修复）
+
+- [x] parseFile.ts：添加 computeCategoryStats 函数，对所有分类字段（省份/支付方式/城市/状态等）做全量预计算（count + sum + avg），结果存入 ParsedFileData.categoryGroupedTop20
+- [x] atlas.ts FieldInfo/DataFrameInfo 接口：添加 categoryGroupedTop20 字段定义
+- [x] atlas.ts upload-parsed 端点：透传前端 categoryGroupedTop20 到 dfInfo JSON 列
+- [x] atlas.ts 多文件字段列表注入修复：从 slice(0,8) 改为全量字段（修复多文件场景字段截断问题）
+- [x] atlas.ts 单文件 prompt 注入：添加 categoryStatsContext，基于全量数据注入分类字段统计
+- [x] atlas.ts 多文件 prompt 注入：每个 dataset_profile[N] 段注入 pfpCategoryStatsContext
+- [x] atlas.ts 多文件跨文件合并：添加 crossFileCategorySection，UNION 所有文件的分类字段统计

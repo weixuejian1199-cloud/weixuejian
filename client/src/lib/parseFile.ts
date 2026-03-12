@@ -27,6 +27,17 @@ export interface GroupedTop5Entry {
   source?: string; // source filename (for multi-file UNION)
 }
 
+// Category grouped entry: for categorical fields (省份/支付方式/城市/状态 etc.)
+// count = number of rows in this category
+// sum = sum of the primary numeric field for this category (if available)
+// avg = avg of the primary numeric field for this category (if available)
+export interface CategoryGroupedEntry {
+  label: string;   // category value (e.g. "山东", "抗音支付")
+  count: number;   // row count in this category
+  sum?: number;    // sum of primary numeric field (optional)
+  avg?: number;    // avg of primary numeric field (optional)
+}
+
 export interface ParsedField {
   name: string;
   type: "numeric" | "text" | "datetime";
@@ -53,6 +64,9 @@ export interface ParsedField {
   productGroupedTop5?: GroupedTop5Entry[];
   // Which product field was used for productGroupedTop5 (e.g. "选购商品")
   productGroupByField?: string;
+  // Category-dimension stats: for ALL categorical fields (省份/支付方式/城市/状态 etc.)
+  // Key = category field name, Value = top20 entries with count/sum/avg
+  categoryGroupedTop20?: Record<string, CategoryGroupedEntry[]>;
 }
 
 // ── Phase 1：数据质量元数据 ─────────────────────────────────────────────────
@@ -118,6 +132,9 @@ export interface ParsedFileData {
   allGroupByFields?: Array<{ field: string; tier: number }>;
   // Phase 1: 达人昵称字段治理元数据（仅当 groupByField 存在时生成）
   dataQuality?: DataQuality;
+  // Category stats: full-dataset GROUP BY stats for ALL categorical fields
+  // Key = field name (e.g. "省份", "支付方式"), Value = top20 entries
+  categoryGroupedTop20?: Record<string, CategoryGroupedEntry[]>;
 }
 
 const PREVIEW_ROWS = 500;
@@ -257,6 +274,121 @@ function computeGroupedTopN(
     .sort((a, b) => b[1] - a[1])
     .slice(0, topN);
   return { entries: sorted.map(([label, sum]) => ({ label, sum, source: sourceFilename })), validTotalSum };
+}
+
+// ── 分类字段全量预计算 ─────────────────────────────────────────────────────────
+
+/**
+ * 分类字段识别规则：
+ * - 包含以下关键词的字段被识别为分类字段（省/市/城市/支付/状态/渠道/门店/仓库/来源/平台/类型/等级/标签/地区/区域/国家/性别/品类/类别/行业/部门/岗位/职位）
+ * - 排除自由文本字段（备注/地址/说明/描述/内容/详情/评价/留言/原因/问题）
+ * - 排除金额/数值字段（isAmountField 判断）
+ * - 排除 unique_count 占比 > 50% 的字段（自由文本）
+ * - 排除已作为 groupByField/productGroupByField 的字段（避免重复）
+ * - 最多统计 20 个分类字段（避免 prompt 过长）
+ */
+const CATEGORY_FIELD_KEYWORDS = [
+  "省", "市", "城市", "地区", "区域", "国家", "地域",
+  "支付", "付款", "结算",
+  "状态", "类型", "类别", "品类", "分类", "等级", "级别",
+  "渠道", "来源", "平台", "门店", "仓库", "仓",
+  "性别", "标签", "行业", "部门", "岗位", "职位",
+];
+
+const FREE_TEXT_FIELD_KEYWORDS = [
+  "备注", "地址", "说明", "描述", "内容", "详情", "评价", "留言", "原因", "问题",
+  "remark", "address", "description", "comment", "note",
+];
+
+const MAX_CATEGORY_FIELDS = 20;
+
+/**
+ * 判断字段名是否为分类字段（基于关键词）
+ */
+function isCategoryField(fieldName: string): boolean {
+  const lower = fieldName.toLowerCase();
+  // 排除自由文本字段
+  if (FREE_TEXT_FIELD_KEYWORDS.some(kw => fieldName.includes(kw) || lower.includes(kw.toLowerCase()))) return false;
+  // 排除金额字段
+  if (isAmountField(fieldName)) return false;
+  // 包含分类关键词
+  return CATEGORY_FIELD_KEYWORDS.some(kw => fieldName.includes(kw) || lower.includes(kw.toLowerCase()));
+}
+
+/**
+ * 计算所有分类字段的全量 GROUP BY 统计（count/sum/avg）
+ * @param rows 全量行数据
+ * @param headers 所有字段名
+ * @param headerTypes 字段类型映射
+ * @param primaryNumericField 主要数值字段名（用于计算 sum/avg，通常是金额字段）
+ * @param excludeFields 排除的字段（已作为 groupByField/productGroupByField）
+ * @param totalRowCount 总行数（用于判断 unique_count 占比）
+ * @returns Record<fieldName, CategoryGroupedEntry[]>
+ */
+function computeCategoryStats(
+  rows: Record<string, unknown>[],
+  headers: string[],
+  headerTypes: Record<string, "numeric" | "text" | "datetime">,
+  primaryNumericField: string | null,
+  excludeFields: Set<string>,
+  totalRowCount: number
+): Record<string, CategoryGroupedEntry[]> {
+  const result: Record<string, CategoryGroupedEntry[]> = {};
+  let fieldCount = 0;
+
+  for (const h of headers) {
+    if (fieldCount >= MAX_CATEGORY_FIELDS) break;
+    // 只处理文本/日期类型字段
+    if (headerTypes[h] === "numeric") continue;
+    // 排除已处理的字段
+    if (excludeFields.has(h)) continue;
+    // 判断是否为分类字段
+    if (!isCategoryField(h)) continue;
+
+    // 全量 GROUP BY 统计
+    const countMap = new Map<string, number>();
+    const sumMap = new Map<string, number>();
+
+    for (const row of rows) {
+      const catVal = row[h];
+      if (catVal === null || catVal === undefined || catVal === "") continue;
+      const key = String(catVal).trim();
+      if (key === "" || key === "-" || key === "—" || key === "N/A" || key === "无") continue;
+
+      countMap.set(key, (countMap.get(key) ?? 0) + 1);
+
+      if (primaryNumericField) {
+        const numVal = Number(row[primaryNumericField]);
+        if (!isNaN(numVal)) {
+          sumMap.set(key, (sumMap.get(key) ?? 0) + numVal);
+        }
+      }
+    }
+
+    // 排除自由文本字段：unique_count 占比 > 50%
+    const uniqueCount = countMap.size;
+    if (uniqueCount > totalRowCount * 0.5) continue;
+    // 至少有 2 个不同值才有统计意义
+    if (uniqueCount < 2) continue;
+
+    // 按 count 降序排列，取 Top20
+    const sorted = Array.from(countMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, GROUPED_TOP_N);
+
+    result[h] = sorted.map(([label, count]) => {
+      const entry: CategoryGroupedEntry = { label, count };
+      if (primaryNumericField && sumMap.has(label)) {
+        entry.sum = sumMap.get(label)!;
+        entry.avg = entry.sum / count;
+      }
+      return entry;
+    });
+
+    fieldCount++;
+  }
+
+  return result;
 }
 
 // ── Phase 1：detectDataQuality ──────────────────────────────────────────────
@@ -553,12 +685,39 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     return field;
   });
 
-  // ── Phase 1：生成 dataQuality 元数据 ──────────────────────────────────────
+  // ── Phase 1：生成 dataQuality 元数据 ──────────────────────────────────────────────
   // 仅当 groupByField 存在时生成（无分组字段的文件不生成）
   let dataQuality: DataQuality | undefined;
   if (groupByField) {
     dataQuality = detectDataQuality(rows, groupByField, representativeGroupedTopN);
   }
+
+  // ── 分类字段全量预计算 ──────────────────────────────────────────────
+  // 找到主要数值字段（金额字段，用于计算分类字段的 sum/avg）
+  const PRIMARY_AMOUNT_KEYWORDS = ['商品金额', '订单应付金额', '订单金额', '销售额', '金额'];
+  const primaryNumericField = (() => {
+    // 先找包含金额关键词的数值字段
+    for (const kw of PRIMARY_AMOUNT_KEYWORDS) {
+      const found = fields.find(f => f.type === 'numeric' && f.name.includes(kw));
+      if (found) return found.name;
+    }
+    // 如果没有，取第一个数值字段
+    return fields.find(f => f.type === 'numeric')?.name ?? null;
+  })();
+
+  // 排除已作为 groupByField 和 productGroupByField 的字段
+  const excludeFromCategory = new Set<string>();
+  if (groupByField) excludeFromCategory.add(groupByField);
+  if (productGroupByField) excludeFromCategory.add(productGroupByField);
+
+  const categoryGroupedTop20 = computeCategoryStats(
+    rows,
+    headers,
+    headerTypes,
+    primaryNumericField,
+    excludeFromCategory,
+    totalRowCount
+  );
 
   const preview = rows.slice(0, PREVIEW_ROWS);
   const sampleRows = rows.slice(0, SAMPLE_ROWS);
@@ -573,5 +732,6 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     groupByField: groupByField ?? undefined,
     allGroupByFields: allGroupByFields.length > 0 ? allGroupByFields : undefined,
     dataQuality,
+    categoryGroupedTop20: Object.keys(categoryGroupedTop20).length > 0 ? categoryGroupedTop20 : undefined,
   };
 }
