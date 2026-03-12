@@ -48,6 +48,11 @@ export interface ParsedField {
   // T7: sum of ALL valid (non-placeholder) groups — used to compute null-nickname amount
   // null_nickname_amount = field.sum - validGroupSum
   validGroupSum?: number;
+  // Product-dimension groupedTop5: GROUP BY 选购商品, SUM numeric field, TOP20 by sum
+  // Used for "商品 Top" queries — separate from talent-dimension groupedTop5
+  productGroupedTop5?: GroupedTop5Entry[];
+  // Which product field was used for productGroupedTop5 (e.g. "选购商品")
+  productGroupByField?: string;
 }
 
 // ── Phase 1：数据质量元数据 ─────────────────────────────────────────────────
@@ -488,6 +493,12 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
   const allGroupByFields = detectAllGroupByFields(headers, headerTypes);
   // Primary groupBy field = highest priority tier (null if no qualifying text field found)
   const groupByField = allGroupByFields.length > 0 ? allGroupByFields[0].field : null;
+  // Product-dimension groupBy field: detect "选购商品" or similar product name field
+  // Used for product-level Top N queries ("商品 Top", "销售数量 Top" etc.)
+  const PRODUCT_FIELD_KEYWORDS = ["选购商品", "商品名称", "商品名", "SKU名称", "SKU", "品名"];
+  const productGroupByField = PRODUCT_FIELD_KEYWORDS
+    .map(kw => headers.find(h => h === kw || h.includes(kw)))
+    .find(h => h !== undefined && headerTypes[h] !== "numeric" && !isAmountField(h)) ?? null;
 
   // ── 计算 groupedTopN（用于 detectDataQuality 的 top1_ratio 计算）──────────
   // 取第一个数值字段的 groupedTopN 作为代表（通常是主要金额字段）
@@ -525,6 +536,17 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
         if (representativeGroupedTopN.length === 0 && field.groupedTop5.length > 0) {
           representativeGroupedTopN = field.groupedTop5;
         }
+      }
+      // Product-dimension groupedTop5: GROUP BY 选购商品, SUM numeric field, TOP20
+      // Only compute if productGroupByField is different from the primary groupByField
+      if (productGroupByField && productGroupByField !== groupByField) {
+        const productGroupedResult = computeGroupedTopN(rows, h, productGroupByField, file.name);
+        field.productGroupedTop5 = productGroupedResult.entries;
+        field.productGroupByField = productGroupByField;
+      } else if (productGroupByField && productGroupByField === groupByField) {
+        // If product field IS the primary groupBy field, reuse groupedTop5 as productGroupedTop5
+        field.productGroupedTop5 = field.groupedTop5;
+        field.productGroupByField = productGroupByField;
       }
     }
 

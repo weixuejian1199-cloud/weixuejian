@@ -175,6 +175,9 @@ interface FieldInfo {
   // T7: sum of ALL valid (non-placeholder) groups — used to compute null-nickname amount
   // null_nickname_amount = field.sum - validGroupSum
   validGroupSum?: number;
+  // Product-dimension groupedTop5 (GROUP BY 选购商品) for product Top queries
+  productGroupedTop5?: Array<{ label: string; sum: number; source?: string }>;
+  productGroupByField?: string;
 }
 
 interface DataFrameInfo {
@@ -1520,6 +1523,9 @@ export function registerAtlasRoutes(app: Express) {
         numericStats: Array<{ name: string; sum: number; avg: number; max: number; min: number; zeros: number; outliers: number; count: number }>;
         groupedTop5Map: Map<string, Array<{ label: string; sum: number }>>;
         groupByFieldMap: Map<string, string>;
+        // Product-dimension groupedTop5 (GROUP BY 选购商品) for product Top queries
+        productGroupedTop5Map: Map<string, Array<{ label: string; sum: number }>>;
+        productGroupByFieldMap: Map<string, string>;
       }
 
       const perFileProfiles: PerFileProfile[] = [];
@@ -1546,13 +1552,21 @@ export function registerAtlasRoutes(app: Express) {
           })
           .filter(Boolean) as PerFileProfile['numericStats'];
 
-        // Build groupedTop5 map
+        // Build groupedTop5 map (talent-dimension: GROUP BY 达人昵称)
         const g5Map = new Map<string, Array<{ label: string; sum: number }>>();
         const gbMap = new Map<string, string>();
+        // Build productGroupedTop5 map (product-dimension: GROUP BY 选购商品)
+        const pg5Map = new Map<string, Array<{ label: string; sum: number }>>();
+        const pgbMap = new Map<string, string>();
         for (const f of di.fields) {
           if (f.groupedTop5 && f.groupedTop5.length > 0) {
             g5Map.set(f.name, f.groupedTop5);
             if (f.groupByField) gbMap.set(f.name, f.groupByField);
+          }
+          // Extract product-dimension groupedTop5
+          if ((f as any).productGroupedTop5 && (f as any).productGroupedTop5.length > 0) {
+            pg5Map.set(f.name, (f as any).productGroupedTop5);
+            if ((f as any).productGroupByField) pgbMap.set(f.name, (f as any).productGroupByField);
           }
         }
 
@@ -1566,6 +1580,8 @@ export function registerAtlasRoutes(app: Express) {
           numericStats: ns,
           groupedTop5Map: g5Map,
           groupByFieldMap: gbMap,
+          productGroupedTop5Map: pg5Map,
+          productGroupByFieldMap: pgbMap,
         });
         // Detailed groupedTop5 debug log
         const g5Summary = Array.from(g5Map.entries()).map(([field, entries]) =>
@@ -1791,6 +1807,33 @@ export function registerAtlasRoutes(app: Express) {
         return `\n【${gbField}字段空值说明（重要）】\n- 字段「${gbField}」存在于数据中（字段存在，不是缺失）\n- 共有 ${affectedRows} 行的「${gbField}」値为空値或占位符（null/空字符串: ${nullOrEmpty}行，占位符如"-"/"—"/"N/A": ${placeholder}行）\n- 这些行在达人排名中被过滤，但其对应金额仍计入文件总金额\n${nullAmountLines.length > 0 ? nullAmountLines.join('\n') + '\n' : ''}- ⚠️ 禁止说「文件不包含${gbField}字段」——字段存在，只是部分行値为空\n`;
       })();
 
+      // Build single-file product Top context (GROUP BY 选购商品)
+      const singleFileProductTopContext = (() => {
+        const lines: string[] = [];
+        for (const f of dfInfo.fields) {
+          const pg5 = (f as any).productGroupedTop5 as Array<{ label: string; sum: number }> | undefined;
+          const pgbField = (f as any).productGroupByField as string | undefined;
+          if (!pg5 || pg5.length === 0 || !pgbField) continue;
+          if (f.type !== 'numeric' || f.sum === undefined) continue;
+          // Only include key numeric fields
+          const keyNumericFields = ['商品金额', '订单应付金额', '订单金额', '销售额', '金额', '商品数量', '数量'];
+          if (!keyNumericFields.some(kw => f.name.includes(kw))) continue;
+          const top10 = pg5.slice(0, 10);
+          const topLabels = top10.map(e => `${e.label}(${e.sum.toLocaleString()})`);
+          lines.push(`${f.name}按${pgbField}前${top10.length}名（全量数据）: ${topLabels.join(' / ')}`);
+          lines.push(`⚠️ 商品排名规则：必须将以上全部 ${top10.length} 名展示在表格中，不得因金额差异大而只展示 Top1`);
+        }
+        if (lines.length === 0) return '';
+        return `
+══ 商品排名（全量数据，禁止用样本行覆盖）══
+⚠️ 以下商品排名基于全量数据按商品名称聚合，是唯一可信的商品排名来源。
+❌ 严格禁止：对 sample_rows 做 GROUP BY / SUM / COUNT 来得出商品排名。
+✅ 当用户询问商品 Top / 商品排名 / 销售金额 Top / 销售数量 Top 时，必须且只能引用以下数据：
+${lines.join('\n')}
+══ 商品排名结束 ══
+`;
+      })();
+
       const statsContext = numericStats.length > 0 ? `
 ══ 全量统计摘要（基于 ${dfInfo.row_count.toLocaleString()} 行全量数据，非样本）══
 重要约束：当用户询问总量/合计/均値/最大/最小等聚合指标时，必须直接引用以下全量统计値，禁止对样本行重新计算。
@@ -1800,12 +1843,12 @@ ${topPerformers.map(s => [
   `${s!.name}最大: ${s!.max.toFixed(2)}`,
   `${s!.name}最小: ${s!.min.toFixed(2)}`,
   `${s!.name}零値或空白: ${s!.zeros}个`,
-  `${s!.name}异常高値(>均化3倍): ${s!.outliers}个`,
+  `${s!.name}异常高値(>均到3倍): ${s!.outliers}个`,
   s!.top5IsFullData && s!.top5!.length > 0
     ? `${s!.name}前${s!.top5!.length}名（按${(s as any).groupByField || '分组维度'}聚合，全量数据）: ${s!.top5!.join(' / ')}\n⚠️ 排名规则：必须将以上全部 ${s!.top5!.length} 名展示在表格中，不得因金额差异大而只展示 Top1`
     : null,
 ].filter(Boolean).join('\n')).join('\n')}
-${groupByFieldNullContext}══ 全量统计摘要结束 ══
+${groupByFieldNullContext}${singleFileProductTopContext}══ 全量统计摘要结束 ══
 ` : '';
 
       const categoryContext = categoricalFields.length > 0 ? `
@@ -2021,6 +2064,58 @@ ${sampleTable}`;
     }
   }
 
+  // Build cross-file product Top ranking (GROUP BY 选购商品, SUM 商品金额/商品数量)
+  const productTopLines = (() => {
+    const lines: string[] = [];
+    // Collect all numeric fields that have productGroupedTop5 data
+    const allProductFields = new Set<string>();
+    for (const pfp of perFileProfiles) {
+      for (const [fieldName] of Array.from(pfp.productGroupedTop5Map.entries())) {
+        allProductFields.add(fieldName);
+      }
+    }
+    // For each numeric field, UNION all productGroupedTop5 entries across files
+    for (const fieldName of Array.from(allProductFields)) {
+      const unionMap = new Map<string, number>();
+      let productGroupByFieldName = '';
+      for (const pfp of perFileProfiles) {
+        // Try exact match first, then semantic match
+        let entries = pfp.productGroupedTop5Map.get(fieldName);
+        if (!entries || entries.length === 0) {
+          // Semantic match: find field with same keyword
+          const AMOUNT_KEYWORDS = ['商品金额', '订单金额', '应付金额', '实付金额', '销售金额'];
+          const QTY_KEYWORDS = ['商品数量', '订单数量', '数量'];
+          const allKws = [...AMOUNT_KEYWORDS, ...QTY_KEYWORDS];
+          for (const kw of allKws) {
+            if (!fieldName.includes(kw)) continue;
+            for (const [pfpField, pfpEntries] of Array.from(pfp.productGroupedTop5Map.entries())) {
+              if (pfpField.includes(kw) && pfpEntries.length > 0) {
+                entries = pfpEntries;
+                break;
+              }
+            }
+            if (entries && entries.length > 0) break;
+          }
+        }
+        if (!entries || entries.length === 0) continue;
+        if (!productGroupByFieldName) {
+          productGroupByFieldName = pfp.productGroupByFieldMap.get(fieldName) || '选购商品';
+        }
+        for (const entry of entries) {
+          const lbl = entry.label.trim();
+          if (!lbl) continue;
+          unionMap.set(lbl, (unionMap.get(lbl) ?? 0) + entry.sum);
+        }
+      }
+      if (unionMap.size === 0) continue;
+      const sorted = Array.from(unionMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      const topLabels = sorted.map(([label, sum]) => `${label}(${sum.toLocaleString()})`);
+      lines.push(`${fieldName}跨文件商品前${topLabels.length}名（按${productGroupByFieldName}聚合，全量数据）: ${topLabels.join(' / ')}`);
+      lines.push(`⚠️ 商品排名规则：必须将以上全部 ${topLabels.length} 名展示在表格中，不得因金额差异大而只展示 Top1`);
+    }
+    return lines.join('\n');
+  })();
+
   const topPerformersSection = topPerformersLines ? `
 
 ══ 跨文件达人排名（全量合并，禁止用样本行覆盖此结果）══
@@ -2031,11 +2126,20 @@ ${sampleTable}`;
 ${topPerformersLines}
 ══ 跨文件达人排名结束 ══` : `
 
-⚠️ 当前文件中未检测到可靠的达人分组字段，无法生成跨文件达人排名。如需达人 Top10，请确认文件中包含"达人昵称"等分组字段。`;
+⚠️ 当前文件中未检测到可靠的达人分组字段，无法生成跨文件达人排名。如需达人 Top10，请确认文件中包含“达人昵称”等分组字段。`;
+
+  const productTopSection = productTopLines ? `
+
+══ 跨文件商品排名（全量合并，禁止用样本行覆盖此结果）══
+⚠️ 以下商品排名基于所有文件全量数据 UNION 后按商品名称重新聚合，是唯一可信的商品排名来源。
+❌ 严格禁止：对 sample_rows 做 GROUP BY / SUM / COUNT 来得出商品排名。
+✅ 当用户询问商品 Top / 商品排名 / 销售金额 Top / 销售数量 Top 时，必须且只能引用以下数据：
+${productTopLines}
+══ 跨文件商品排名结束 ══` : '';
 
   const nullNicknameSection = nullNicknameLines.length > 0 ? `\n\n══ 无达人昵称订单金额统计（T7）══\n说明：以下金额来自达人昵称字段为空或占位符的订单（字段存在但值为空），必须按全文件口径回答，不得只统计单个文件。\n${nullNicknameLines.join('\n')}\n══ 无达人昵称金额统计结束 ══` : '';
 
-  return sections.join('\n\n') + (totals.length > 0 ? `\n\n══ 跨文件汇总 ══\n${totals.join('\n')}` : '') + nullNicknameSection + topPerformersSection;
+  return sections.join('\n\n') + (totals.length > 0 ? `\n\n══ 跨文件汇总 ══\n${totals.join('\n')}` : '') + nullNicknameSection + topPerformersSection + productTopSection;
 })() : `══ dataset_profile ══
 文件：${filename}（全量 ${dfInfo.row_count.toLocaleString()} 行 × ${dfInfo.col_count} 列）
 字段说明：
@@ -2932,6 +3036,11 @@ ${sampleRows}
         // Grouped top5: GROUP BY dimension field, SUM numeric field, TOP5 by sum
         groupedTop5?: FrontendGroupedTop5Entry[];
         groupByField?: string;
+        // T7 fix: sum of ALL valid non-placeholder groups (for precise null-nickname amount)
+        validGroupSum?: number;
+        // Product-dimension groupedTop5 (GROUP BY 选购商品) for product Top queries
+        productGroupedTop5?: FrontendGroupedTop5Entry[];
+        productGroupByField?: string;
       }
       const parsed = req.body as {
         filename: string;
@@ -2973,6 +3082,9 @@ ${sampleRows}
           ...(f.groupByField !== undefined ? { groupByField: f.groupByField } : {}),
           // T7 fix: persist validGroupSum (sum of ALL valid non-placeholder groups) for precise null-nickname amount
           ...(f.validGroupSum !== undefined ? { validGroupSum: f.validGroupSum } : {}),
+          // Product-dimension groupedTop5 (GROUP BY 选购商品) for product Top queries
+          ...(f.productGroupedTop5 !== undefined ? { productGroupedTop5: f.productGroupedTop5 } : {}),
+          ...(f.productGroupByField !== undefined ? { productGroupByField: f.productGroupByField } : {}),
         })),
         preview: (parsed.preview || []).slice(0, 500),
         ...(parsed.groupByField !== undefined ? { groupByField: parsed.groupByField } : {}),
