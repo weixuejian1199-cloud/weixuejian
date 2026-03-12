@@ -361,15 +361,12 @@ export default function MainWorkspace() {
     const sessionIds = readyFiles.map(f => f.sessionId).filter(Boolean) as string[];
     const primarySessionId = sessionIds[0];
 
-    // Detect if user wants a report/table generated
-    // IMPORTANT: Analysis words like 「分析」「汇总」「统计」「可视化」 do NOT trigger report generation
-    // They go through chat pathway so AI can provide insights first
-    // isReport: only trigger report generation when user explicitly asks to CREATE/GENERATE
-    // Analysis/tutorial questions like 「怎么算工资条」「工资条需要什么资料」go through chat path
-    // isReport: only trigger report generation when user explicitly asks to CREATE/GENERATE
-    // Analysis/tutorial questions like 「怎么算工资条」「工资条需要什么资料」go through chat path
-    // Queries like 「报表在哪里」「历史报表」 also go through chat path
-    const isReport = /生成报表|导出表格|excel表|xlsx表|日报生成|(帮我|(帮我)?生成|(帮我)?制作|(帮我)?做一份|(帮我)?做个|(帮我)?输出|(帮我)?整理成|(帮我)?提取).{0,8}(工资条|工资单|薪资表|薪酬表|分红明细|考勤表|出勤表|财务报表|销售报表|绩效表|奖金表|扣款表|个税表|实发明细|表格)|排名表|对比表/i.test(msg);
+    // Detect if user wants a formatted report (payroll, attendance, etc.)
+    // IMPORTANT: Only trigger generate-report for structured payroll/HR/finance document generation.
+    // "生成表格", "排名表", "对比表", "统计表" etc. go through CHAT path → atlas-table → AtlasTableRenderer
+    // This ensures P0-P5 fixes (fullRows, export gate, rank sort) all apply.
+    // generate-report path is kept for legacy payroll/HR doc generation only.
+    const isReport = /日报生成|(帮我|(帮我)?生成|(帮我)?制作|(帮我)?做一份|(帮我)?做个|(帮我)?输出|(帮我)?整理成|(帮我)?提取).{0,8}(工资条|工资单|薪资表|薪酬表|分红明细|考勤表|出勤表|绩效表|奖金表|扣款表|个税表|实发明细)/i.test(msg);
 
     // Create new AbortController for this request
     const abortController = new AbortController();
@@ -2076,9 +2073,18 @@ function MessageBubble({
                         const colNames = tableData.columns as string[];
                         const categoryKey: string | undefined = tableData.category_key;
 
-                        // 判断是否为分类统计类表格：存在 category_key 或列名包含占比/排名关键词
+                        // 判断是否为分类统计类表格：
+                        // 1. 存在 category_key（AI 明确标注）
+                        // 2. 列名包含占比/排名/分布关键词
+                        // 3. 列名命中 FIELD_ALIAS_GROUPS 中任何一个分类字段（如「省份」「支付方式」「城市」等）
                         const hasCategoryHint = !!categoryKey ||
-                          colNames.some(c => c.includes('占比') || c.includes('排名') || c.includes('分布'));
+                          colNames.some(c => c.includes('占比') || c.includes('排名') || c.includes('分布')) ||
+                          colNames.some(colName => {
+                            const cl = colName.toLowerCase();
+                            return FIELD_ALIAS_GROUPS.some(group =>
+                              group.some(kw => cl.includes(kw) || kw.includes(cl))
+                            );
+                          });
                         if (hasCategoryHint) isCategoryTable = true;
 
                         for (const uf of (uploadedFiles ?? [])) {

@@ -9,6 +9,38 @@
 
 import * as XLSX from "xlsx";
 
+// ── SPU 标准化映射表 ──────────────────────────────────────────────────────────
+// 格式：{ 原始商品名: 标准 SPU 名称 }
+// 规则：
+//   - 命中映射表 → 合并到标准名称
+//   - 未命中 → 保持原名，不自动猜测合并
+//   - 后续由业务方持续补充，不在运行时做模糊推断
+export const SPU_MAPPING: Record<string, string> = {
+  // 一条根 2包 系列（去渠道前缀/仓库前缀，保留核心名称+规格）
+  "【胡说老王专属】中国台湾金门一条根-3片/包*2包-(（抖店nj）一条根2包)": "一条根2包",
+  "【胡说老王专属】中国台湾金门一条根-3片/包*2包-((抖店nj）一条根2包)": "一条根2包",
+  "（抖店nj）一条根2包": "一条根2包",
+  "【抖店】新一条根2包": "一条根2包",
+  // 一条根 8包 系列
+  "【胡说老王专属】中国台湾金门一条根-3片/包*8包-(（抖店nj）一条根8包)": "一条根8包",
+  "【胡说老王专属】中国台湾金门一条根-3片/包*8包-((抖店nj）一条根8包)": "一条根8包",
+  "（抖店nj）一条根8包": "一条根8包",
+  "【抖店】新一条根8包": "一条根8包",
+  // TODO: 后续由业务方补充更多映射
+};
+
+/**
+ * 将商品名标准化：命中 SPU_MAPPING 则返回标准名称，否则返回原名。
+ * 不做模糊匹配，不做 AI 猜测，严格精确匹配。
+ */
+export function normalizeSPU(productName: string): string {
+  return SPU_MAPPING[productName.trim()] ?? productName.trim();
+}
+
+// 组合装统计入口的稳定 key
+export const COMBO_ORDERS_KEY = "combo_orders";
+export const COMBO_ORDERS_DISPLAY = "组合装订单";
+
 export interface ColumnStat {
   sum: number;
   min: number;
@@ -139,8 +171,9 @@ export interface ParsedFileData {
 
 const PREVIEW_ROWS = 500;
 const SAMPLE_ROWS = 20;
-// Store top 20 for grouping so AI can return Top10/Top20 accurately
-const GROUPED_TOP_N = 20;
+// Store top 50 for grouping so AI can return Top10/Top20/Top50 accurately
+// Increased from 20 to fix city/product dimension truncation (e.g. 22 cities only showing 20)
+const GROUPED_TOP_N = 50;
 
 /**
  * Priority-tiered dimension field detection.
@@ -674,12 +707,39 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
           representativeGroupedTopN = field.groupedTop5;
         }
       }
-      // Product-dimension groupedTop5: GROUP BY 选购商品, SUM numeric field, TOP20
-      // Only compute if productGroupByField is different from the primary groupByField
+      // Product-dimension groupedTop5: GROUP BY 选购商品, SUM numeric field, TOP50
+      // P2: 商品口径分离：含分号的行进入组合装池，不含分号的行进入单品池
+      // 单品池经 SPU_MAPPING 标准化后再做 GROUP BY
       if (productGroupByField && productGroupByField !== groupByField) {
-        const productGroupedResult = computeGroupedTopN(rows, h, productGroupByField, file.name);
+        // 分离单品和组合装
+        const singleRows: Record<string, unknown>[] = [];
+        const comboRows: Record<string, unknown>[] = [];
+        for (const row of rows) {
+          const productVal = row[productGroupByField];
+          if (productVal === null || productVal === undefined || productVal === "") continue;
+          const productStr = String(productVal);
+          if (productStr.includes(";") || productStr.includes("；")) {
+            comboRows.push(row);
+          } else {
+            singleRows.push(row);
+          }
+        }
+        // 单品池：先用 SPU_MAPPING 标准化商品名，再做 GROUP BY
+        const normalizedSingleRows = singleRows.map(row => ({
+          ...row,
+          [productGroupByField]: normalizeSPU(String(row[productGroupByField] ?? "")),
+        }));
+        const productGroupedResult = computeGroupedTopN(normalizedSingleRows, h, productGroupByField, file.name);
         field.productGroupedTop5 = productGroupedResult.entries;
         field.productGroupByField = productGroupByField;
+        // 组合装池：单独统计订单数和金额（不拆分到任何主品）
+        // 存入 field 上的临时属性，后面在 mergedCategoryGroupedTop20 里统一写入
+        const comboSum = comboRows.reduce((s, row) => {
+          const v = Number(row[h]);
+          return isNaN(v) ? s : s + v;
+        }, 0);
+        (field as unknown as Record<string, unknown>)._comboOrderCount = comboRows.length;
+        (field as unknown as Record<string, unknown>)._comboOrderSum = comboSum;
       } else if (productGroupByField && productGroupByField === groupByField) {
         // If product field IS the primary groupBy field, reuse groupedTop5 as productGroupedTop5
         field.productGroupedTop5 = field.groupedTop5;
@@ -755,6 +815,24 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
         sum: e.sum,
         avg: undefined,
       }));
+    }
+    // P2：组合装订单单独写入，使用稳定 key COMBO_ORDERS_KEY
+    // 取主要数値字段中统计到的组合装订单数和金额
+    const primaryProductField = fields.find(f =>
+      f.productGroupByField === productGroupByField &&
+      (f as unknown as Record<string, unknown>)._comboOrderCount !== undefined
+    );
+    if (primaryProductField) {
+      const comboCount = (primaryProductField as unknown as Record<string, unknown>)._comboOrderCount as number;
+      const comboSum = (primaryProductField as unknown as Record<string, unknown>)._comboOrderSum as number;
+      if (comboCount > 0) {
+        mergedCategoryGroupedTop20[COMBO_ORDERS_KEY] = [{
+          label: COMBO_ORDERS_DISPLAY,
+          count: comboCount,
+          sum: comboSum,
+          avg: comboCount > 0 ? comboSum / comboCount : 0,
+        }];
+      }
     }
   }
 
