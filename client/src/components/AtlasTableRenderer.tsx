@@ -11,6 +11,11 @@ interface AtlasTableData {
   sortBy?: number;    // default sort column index
   sortDir?: "asc" | "desc";
   source?: string;    // data source note, e.g. "基于 46,906 行全量数据统计"
+  /**
+   * P1 Level-1 精确绑定：AI 输出分类统计表格时填入原始字段名（如 "收货省份"）。
+   * 前端用此 key 直接命中 categoryGroupedTop20，无需模糊匹配。
+   */
+  category_key?: string;
 }
 
 interface AtlasTableRendererProps {
@@ -22,12 +27,17 @@ interface AtlasTableRendererProps {
    * 格式：与 AtlasTableData.rows 相同，行数组，每行与 columns 对应。
    */
   fullRows?: (string | number)[][];
+  /**
+   * isCategoryTable: 是否为分类统计类表格（省份/支付方式/状态等分布）。
+   * 若为 true 且 fullRows 未命中，禁止导出，提示「无法保证全量准确性，本次禁止导出」。
+   */
+  isCategoryTable?: boolean;
 }
 
 // 默认展示行数：超过此数量时折叠，显示「展开全部」按钮
 const DEFAULT_DISPLAY_ROWS = 20;
 
-export function AtlasTableRenderer({ rawJson, onAdjust, fullRows }: AtlasTableRendererProps) {
+export function AtlasTableRenderer({ rawJson, onAdjust, fullRows, isCategoryTable }: AtlasTableRendererProps) {
   let data: AtlasTableData | null = null;
   try {
     data = JSON.parse(rawJson);
@@ -36,22 +46,28 @@ export function AtlasTableRenderer({ rawJson, onAdjust, fullRows }: AtlasTableRe
   }
   if (!data || !data.columns || !data.rows) return null;
 
-  return <AtlasTableView data={data} onAdjust={onAdjust} fullRows={fullRows} />;
+  return <AtlasTableView data={data} onAdjust={onAdjust} fullRows={fullRows} isCategoryTable={isCategoryTable} />;
 }
 
 function AtlasTableView({
   data,
   onAdjust,
   fullRows,
+  isCategoryTable,
 }: {
   data: AtlasTableData;
   onAdjust?: (prompt: string) => void;
   fullRows?: (string | number)[][];
+  isCategoryTable?: boolean;
 }) {
+  // P1 闸门：分类统计类表格且 fullRows 未命中时，禁止导出
+  const exportBlocked = isCategoryTable === true && !fullRows;
   const [sortCol, setSortCol] = useState<number>(data.sortBy ?? -1);
   const [sortDir, setSortDir] = useState<"asc" | "desc">(data.sortDir ?? "desc");
   // 是否展开全部行（默认折叠，只显示前20行）
   const [expanded, setExpanded] = useState(false);
+  // P5：导出结果提示（null=未导出，string=成功消息）
+  const [exportResult, setExportResult] = useState<string | null>(null);
 
   const sortedRows = useCallback(() => {
     if (sortCol < 0) return data.rows;
@@ -82,19 +98,59 @@ function AtlasTableView({
    * 导出数据源优先级：
    * 1. fullRows（系统预计算完整数据集）—— 分类统计类问题的真实数据
    * 2. sortedRows()（AI 返回的展示层数据）—— 兜底
+   *
+   * P0 修复：如果表格含「排名」列，导出前按排名列升序重排，确保第 1 名在第一行。
    */
-  const getExportRows = () => fullRows ?? sortedRows();
+  const getExportRows = () => {
+    const rows = fullRows ?? sortedRows();
+    // 检测排名列（列名包含「排名」或等于「序号」）
+    const rankColIdx = data.columns.findIndex(
+      c => c === '排名' || c.includes('排名') || c === '序号' || c === 'rank'
+    );
+    if (rankColIdx < 0) return rows;
+    // 按排名列数值升序重排（排名 1 在第一行）
+    return [...rows].sort((a, b) => {
+      const an = Number(String(a[rankColIdx]).replace(/[^\d]/g, ''));
+      const bn = Number(String(b[rankColIdx]).replace(/[^\d]/g, ''));
+      if (isNaN(an) || isNaN(bn)) return 0;
+      return an - bn;
+    });
+  };
 
   const handleExportExcel = () => {
+    if (exportBlocked) {
+      alert('无法保证全量准确性，本次禁止导出。\n原因：分类统计数据未能匹配到全量预计算结果，导出将仅包含样本数据而非全量。');
+      return;
+    }
     const exportRows = getExportRows();
+    // P5：行数断言 —— 若 fullRows 存在，实际导出行数必须等于 fullRows.length
+    if (fullRows && exportRows.length !== fullRows.length) {
+      alert(`导出中止：行数不一致。\n预期 ${fullRows.length} 行，实际 ${exportRows.length} 行。\n请刷新页面后重试。`);
+      console.error('[Atlas/export] Row count assertion failed', { expected: fullRows.length, actual: exportRows.length });
+      return;
+    }
     const ws = XLSX.utils.aoa_to_sheet([data.columns, ...exportRows]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, data.title.slice(0, 31));
     XLSX.writeFile(wb, `${data.title}.xlsx`);
+    // P5：导出成功提示
+    const label = fullRows ? `已导出 ${exportRows.length} 行（全量数据）` : `已导出 ${exportRows.length} 行`;
+    setExportResult(label);
+    setTimeout(() => setExportResult(null), 4000);
   };
 
   const handleExportCsv = () => {
+    if (exportBlocked) {
+      alert('无法保证全量准确性，本次禁止导出。\n原因：分类统计数据未能匹配到全量预计算结果，导出将仅包含样本数据而非全量。');
+      return;
+    }
     const exportRows = getExportRows();
+    // P5：行数断言
+    if (fullRows && exportRows.length !== fullRows.length) {
+      alert(`导出中止：行数不一致。\n预期 ${fullRows.length} 行，实际 ${exportRows.length} 行。\n请刷新页面后重试。`);
+      console.error('[Atlas/export] Row count assertion failed', { expected: fullRows.length, actual: exportRows.length });
+      return;
+    }
     const rows = [data.columns, ...exportRows];
     const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -104,6 +160,10 @@ function AtlasTableView({
     a.download = `${data.title}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    // P5：导出成功提示
+    const label = fullRows ? `已导出 ${exportRows.length} 行（全量数据）` : `已导出 ${exportRows.length} 行`;
+    setExportResult(label);
+    setTimeout(() => setExportResult(null), 4000);
   };
 
   const allRows = sortedRows();
@@ -249,38 +309,54 @@ function AtlasTableView({
         <button
           onClick={handleExportExcel}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-          style={{
+          style={exportBlocked ? {
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            color: "var(--atlas-text-3)",
+            cursor: "not-allowed",
+            opacity: 0.5,
+          } : {
             background: "rgba(52,211,153,0.1)",
             border: "1px solid rgba(52,211,153,0.25)",
             color: "var(--atlas-success)",
           }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(52,211,153,0.18)"}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "rgba(52,211,153,0.1)"}
-          title={fullRows ? `导出完整数据（${exportCount} 行）` : "导出 Excel"}
+          onMouseEnter={e => { if (!exportBlocked) (e.currentTarget as HTMLElement).style.background = "rgba(52,211,153,0.18)"; }}
+          onMouseLeave={e => { if (!exportBlocked) (e.currentTarget as HTMLElement).style.background = "rgba(52,211,153,0.1)"; }}
+          title={exportBlocked ? "无法保证全量准确性，本次禁止导出" : (fullRows ? `导出完整数据（${exportCount} 行）` : "导出 Excel")}
         >
           <Download size={12} />
-          导出 Excel{fullRows ? ` (${exportCount}行)` : ""}
+          {exportBlocked ? "导出 Excel（禁用）" : `导出 Excel${fullRows ? ` (${exportCount}行)` : ""}`}
         </button>
         <button
           onClick={handleExportCsv}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-          style={{
+          style={exportBlocked ? {
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            color: "var(--atlas-text-3)",
+            cursor: "not-allowed",
+            opacity: 0.5,
+          } : {
             background: "var(--atlas-elevated)",
             border: "1px solid var(--atlas-border-2)",
             color: "var(--atlas-text-2)",
           }}
           onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.4)";
-            (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
+            if (!exportBlocked) {
+              (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.4)";
+              (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
+            }
           }}
           onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border-2)";
-            (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+            if (!exportBlocked) {
+              (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border-2)";
+              (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
+            }
           }}
-          title={fullRows ? `导出完整数据（${exportCount} 行）` : "导出 CSV"}
+          title={exportBlocked ? "无法保证全量准确性，本次禁止导出" : (fullRows ? `导出完整数据（${exportCount} 行）` : "导出 CSV")}
         >
           <Download size={12} />
-          导出 CSV{fullRows ? ` (${exportCount}行)` : ""}
+          {exportBlocked ? "导出 CSV（禁用）" : `导出 CSV${fullRows ? ` (${exportCount}行)` : ""}`}
         </button>
         {onAdjust && (
           <button
@@ -304,6 +380,15 @@ function AtlasTableView({
         {onAdjust && data.source && (
           <span className="text-xs" style={{ color: "var(--atlas-text-3)", opacity: 0.7 }}>
             📊 {data.source}
+          </span>
+        )}
+        {/* P5：导出成功提示 */}
+        {exportResult && (
+          <span
+            className="ml-auto text-xs font-medium"
+            style={{ color: "var(--atlas-success)", opacity: 0.9 }}
+          >
+            ✓ {exportResult}
           </span>
         )}
       </div>

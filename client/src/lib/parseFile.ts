@@ -558,6 +558,11 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     rows = XLSX.utils.sheet_to_json(ws, { defval: null });
   }
 
+  // P3：过滤全空行（文件末尾空白行、中间分隔行），使 totalRowCount 与服务端口径对齐
+  rows = rows.filter(row =>
+    Object.values(row).some(v => v !== null && v !== undefined && v !== "")
+  );
+
   const totalRowCount = rows.length;
   if (totalRowCount === 0) {
     return {
@@ -722,6 +727,37 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
   const preview = rows.slice(0, PREVIEW_ROWS);
   const sampleRows = rows.slice(0, SAMPLE_ROWS);
 
+  // P4a：将达人/商品 Top20 合并进 categoryGroupedTop20，让三级匹配逻辑能命中这两个维度
+  // groupedTop5 实际存的是 Top20（GROUPED_TOP_N=20），字段名是历史命名残留
+  const mergedCategoryGroupedTop20: Record<string, CategoryGroupedEntry[]> = { ...categoryGroupedTop20 };
+
+  // 将达人维度 groupedTop5 合并进去（以 groupByField 为 key）
+  if (groupByField) {
+    // 取所有数値字段中最主要的那个的 groupedTop5
+    const talentField = fields.find(f => f.groupByField === groupByField && f.groupedTop5 && f.groupedTop5.length > 0);
+    if (talentField?.groupedTop5 && !mergedCategoryGroupedTop20[groupByField]) {
+      mergedCategoryGroupedTop20[groupByField] = talentField.groupedTop5.map(e => ({
+        label: e.label,
+        count: 0, // groupedTop5 没有行数统计，用 0 占位
+        sum: e.sum,
+        avg: undefined,
+      }));
+    }
+  }
+
+  // 将商品维度 productGroupedTop5 合并进去（以 productGroupByField 为 key）
+  if (productGroupByField) {
+    const productField = fields.find(f => f.productGroupByField === productGroupByField && f.productGroupedTop5 && f.productGroupedTop5.length > 0);
+    if (productField?.productGroupedTop5 && !mergedCategoryGroupedTop20[productGroupByField]) {
+      mergedCategoryGroupedTop20[productGroupByField] = productField.productGroupedTop5.map(e => ({
+        label: e.label,
+        count: 0,
+        sum: e.sum,
+        avg: undefined,
+      }));
+    }
+  }
+
   return {
     filename: file.name,
     totalRowCount,
@@ -732,6 +768,6 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     groupByField: groupByField ?? undefined,
     allGroupByFields: allGroupByFields.length > 0 ? allGroupByFields : undefined,
     dataQuality,
-    categoryGroupedTop20: Object.keys(categoryGroupedTop20).length > 0 ? categoryGroupedTop20 : undefined,
+    categoryGroupedTop20: Object.keys(mergedCategoryGroupedTop20).length > 0 ? mergedCategoryGroupedTop20 : undefined,
   };
 }

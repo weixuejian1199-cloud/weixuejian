@@ -1948,73 +1948,160 @@ function MessageBubble({
                       </div>
                     ) : null
                   ) : (() => {
-                    // D方案：尝试从系统预计算的 categoryGroupedTop20 中构建 fullRows
-                    // 匹配逻辑：解析 AI 返回的表格，找到列名匹配的分类字段，用全量统计构建 fullRows
+                    // P1 重写：三级匹配逐级降级，匹配失败时禁止静默降级
+                    // Level-1: category_key 精确绑定
+                    // Level-2: 字段名精确包含匹配
+                    // Level-3: 受控 alias 兜底（alias 命中多个候选时禁止猜测）
                     let fullRows: (string | number)[][] | undefined = undefined;
+                    let isCategoryTable = false;
+
+                    // 受控 alias 组（每组内的关键词互为别名）
+                    const FIELD_ALIAS_GROUPS: string[][] = [
+                      ['省', '省份', '收货省', '发货省', '地区', '区域', '省市'],
+                      ['支付', '付款', '结算', '支付方式', '付款方式', '买家支付'],
+                      ['城市', '收货城市', '发货城市', '市', '城市名'],
+                      ['状态', '订单状态', '支付状态', '发货状态', '物流状态'],
+                      ['渠道', '来源', '平台', '销售渠道', '来源渠道'],
+                      ['类型', '订单类型', '商品类型', '业务类型'],
+                      ['门店', '店铺', '商家', '门店名称', '店铺名称'],
+                    ];
+
+                    type CategoryEntry = { label: string; count: number; sum?: number; avg?: number };
+
+                    /**
+                     * 尝试匹配字段名到列名：三级递进
+                     * 返回：{ level: 1|2|3, fieldName, entries } 或 null
+                     */
+                    const tryMatchField = (
+                      top20: Record<string, CategoryEntry[]>,
+                      colNames: string[],
+                      categoryKey?: string
+                    ): { level: number; fieldName: string; entries: CategoryEntry[] } | null => {
+                      // Level-1: category_key 精确绑定
+                      if (categoryKey && top20[categoryKey]) {
+                        return { level: 1, fieldName: categoryKey, entries: top20[categoryKey] };
+                      }
+
+                      // Level-2: 字段名精确包含匹配
+                      const exactMatches: { fieldName: string; entries: CategoryEntry[] }[] = [];
+                      for (const [fieldName, entries] of Object.entries(top20)) {
+                        const hit = colNames.some(c =>
+                          c.includes(fieldName) || fieldName.includes(c)
+                        );
+                        if (hit) exactMatches.push({ fieldName, entries });
+                      }
+                      if (exactMatches.length === 1) {
+                        return { level: 2, ...exactMatches[0] };
+                      }
+                      if (exactMatches.length > 1) {
+                        // 多个精确匹配：选 entries 最多的（覆盖最广）
+                        const best = exactMatches.reduce((a, b) => a.entries.length >= b.entries.length ? a : b);
+                        return { level: 2, ...best };
+                      }
+
+                      // Level-3: 受控 alias 兜底
+                      const aliasMatches: { fieldName: string; entries: CategoryEntry[] }[] = [];
+                      for (const [fieldName, entries] of Object.entries(top20)) {
+                        const fieldLower = fieldName.toLowerCase();
+                        const hit = colNames.some(colName => {
+                          const colLower = colName.toLowerCase();
+                          return FIELD_ALIAS_GROUPS.some(group => {
+                            const fieldInGroup = group.some(kw => fieldLower.includes(kw) || kw.includes(fieldLower));
+                            const colInGroup = group.some(kw => colLower.includes(kw) || kw.includes(colLower));
+                            return fieldInGroup && colInGroup;
+                          });
+                        });
+                        if (hit) aliasMatches.push({ fieldName, entries });
+                      }
+                      if (aliasMatches.length === 1) {
+                        return { level: 3, ...aliasMatches[0] };
+                      }
+                      if (aliasMatches.length > 1) {
+                        // alias 命中多个候选：禁止猜测，记录日志并返回 null
+                        console.warn(
+                          '[Atlas/P1] Level-3 alias matched multiple candidates, refusing to guess.',
+                          { colNames, candidates: aliasMatches.map(m => m.fieldName) }
+                        );
+                        return null;
+                      }
+
+                      return null;
+                    };
+
+                    /**
+                     * 根据匹配结果构建 fullRows
+                     */
+                    const buildFullRows = (
+                      colNames: string[],
+                      fieldName: string,
+                      entries: CategoryEntry[]
+                    ): (string | number)[][] => {
+                      const labelColIdx = colNames.findIndex(c =>
+                        c.includes(fieldName) || fieldName.includes(c) ||
+                        FIELD_ALIAS_GROUPS.some(g => {
+                          const fl = fieldName.toLowerCase();
+                          const cl = c.toLowerCase();
+                          return g.some(kw => fl.includes(kw) || kw.includes(fl)) &&
+                                 g.some(kw => cl.includes(kw) || kw.includes(cl));
+                        })
+                      );
+                      const countColIdx = colNames.findIndex(c =>
+                        c.includes('订单数') || c.includes('数量') || c.toLowerCase().includes('count') || c.includes('笔数') || c.includes('件数')
+                      );
+                      const sumColIdx = colNames.findIndex(c =>
+                        c.includes('金额') || c.includes('销售额') || c.includes('应付') || c.includes('收入') || c.includes('GMV')
+                      );
+                      const pctColIdx = colNames.findIndex(c => c.includes('占比') || c.includes('%'));
+                      const rankColIdx = colNames.findIndex(c => c === '排名' || c.includes('排名') || c === '序号');
+                      const totalCount = entries.reduce((s, e) => s + e.count, 0);
+                      const totalSum = entries.reduce((s, e) => s + (e.sum ?? 0), 0);
+                      return entries.map((entry, rank) => {
+                        const row: (string | number)[] = new Array(colNames.length).fill("");
+                        if (rankColIdx >= 0) row[rankColIdx] = rank + 1;
+                        if (labelColIdx >= 0) row[labelColIdx] = entry.label;
+                        if (countColIdx >= 0) row[countColIdx] = entry.count;
+                        if (sumColIdx >= 0 && entry.sum !== undefined) row[sumColIdx] = entry.sum.toFixed(2);
+                        if (pctColIdx >= 0) {
+                          const base = sumColIdx >= 0 && totalSum > 0 ? totalSum : totalCount;
+                          const val = sumColIdx >= 0 && entry.sum !== undefined ? entry.sum : entry.count;
+                          row[pctColIdx] = base > 0 ? ((val / base) * 100).toFixed(2) + '%' : '0%';
+                        }
+                        return row;
+                      });
+                    };
+
                     try {
                       const tableData = JSON.parse(seg.content);
                       if (tableData?.columns && Array.isArray(tableData.columns)) {
-                        // 尝试匹配每个已上传文件的 categoryGroupedTop20
+                        const colNames = tableData.columns as string[];
+                        const categoryKey: string | undefined = tableData.category_key;
+
+                        // 判断是否为分类统计类表格：存在 category_key 或列名包含占比/排名关键词
+                        const hasCategoryHint = !!categoryKey ||
+                          colNames.some(c => c.includes('占比') || c.includes('排名') || c.includes('分布'));
+                        if (hasCategoryHint) isCategoryTable = true;
+
                         for (const uf of (uploadedFiles ?? [])) {
                           if (!uf.categoryGroupedTop20) continue;
-                          // 查找表格列名中是否有匹配的分类字段
-                          type CategoryEntry = { label: string; count: number; sum?: number; avg?: number };
-                          for (const [fieldName, rawEntries] of Object.entries(uf.categoryGroupedTop20)) {
-                            const entries = rawEntries as CategoryEntry[];
-                            // 匹配条件：表格列名中包含该字段名，且列数 <= 4（分类统计表格特征）
-                            const colNames = tableData.columns as string[];
-                            const hasFieldCol = colNames.some(c =>
-                              c.includes(fieldName) || fieldName.includes(c) ||
-                              // 常见别名匹配
-                              (fieldName.includes('省') && c.includes('省')) ||
-                              (fieldName.includes('支付') && c.includes('支付')) ||
-                              (fieldName.includes('城市') && c.includes('城市')) ||
-                              (fieldName.includes('状态') && c.includes('状态'))
+                          const result = tryMatchField(uf.categoryGroupedTop20, colNames, categoryKey);
+                          if (result) {
+                            fullRows = buildFullRows(colNames, result.fieldName, result.entries);
+                            console.info(
+                              `[Atlas/P1] fullRows matched via Level-${result.level}`,
+                              { fieldName: result.fieldName, rows: fullRows.length }
                             );
-                            if (hasFieldCol && entries.length > 0) {
-                              // 构建 fullRows：按表格列顺序映射数据
-                              // 找到分类字段列索引和数值列索引
-                              const labelColIdx = colNames.findIndex(c =>
-                                c.includes(fieldName) || fieldName.includes(c) ||
-                                (fieldName.includes('省') && c.includes('省')) ||
-                                (fieldName.includes('支付') && c.includes('支付')) ||
-                                (fieldName.includes('城市') && c.includes('城市')) ||
-                                (fieldName.includes('状态') && c.includes('状态'))
-                              );
-                              const countColIdx = colNames.findIndex(c =>
-                                c.includes('订单数') || c.includes('数量') || c.includes('count') || c.includes('笔数')
-                              );
-                              const sumColIdx = colNames.findIndex(c =>
-                                c.includes('金额') || c.includes('销售额') || c.includes('应付') || c.includes('收入')
-                              );
-                              const pctColIdx = colNames.findIndex(c =>
-                                c.includes('占比') || c.includes('%')
-                              );
-                              const totalCount = entries.reduce((s, e) => s + e.count, 0);
-                              const totalSum = entries.reduce((s, e) => s + (e.sum ?? 0), 0);
-                              fullRows = entries.map((entry, rank) => {
-                                const row: (string | number)[] = new Array(colNames.length).fill("");
-                                // 填入排名列
-                                const rankColIdx = colNames.findIndex(c => c.includes('排名') || c === '序号');
-                                if (rankColIdx >= 0) row[rankColIdx] = rank + 1;
-                                // 填入分类名称
-                                if (labelColIdx >= 0) row[labelColIdx] = entry.label;
-                                // 填入订单数
-                                if (countColIdx >= 0) row[countColIdx] = entry.count;
-                                // 填入金额
-                                if (sumColIdx >= 0 && entry.sum !== undefined) row[sumColIdx] = entry.sum.toFixed(2);
-                                // 填入占比
-                                if (pctColIdx >= 0) {
-                                  const base = sumColIdx >= 0 && totalSum > 0 ? totalSum : totalCount;
-                                  const val = sumColIdx >= 0 && entry.sum !== undefined ? entry.sum : entry.count;
-                                  row[pctColIdx] = base > 0 ? ((val / base) * 100).toFixed(2) + '%' : '0%';
-                                }
-                                return row;
-                              });
-                              break;
-                            }
+                            break;
                           }
-                          if (fullRows) break;
+                        }
+
+                        // 匹配失败时打 warning
+                        if (!fullRows && (uploadedFiles ?? []).some(uf => uf.categoryGroupedTop20)) {
+                          const availableFields = (uploadedFiles ?? [])
+                            .flatMap(uf => Object.keys(uf.categoryGroupedTop20 ?? {}));
+                          console.warn(
+                            '[Atlas/P1] All 3 levels failed to match fullRows.',
+                            { colNames, categoryKey, availableFields }
+                          );
                         }
                       }
                     } catch {
@@ -2026,6 +2113,7 @@ function MessageBubble({
                         rawJson={seg.content}
                         onAdjust={onQuickAction}
                         fullRows={fullRows}
+                        isCategoryTable={isCategoryTable}
                       />
                     );
                   })()
