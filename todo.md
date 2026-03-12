@@ -885,3 +885,9 @@
 - [x] 修复D：系统预计算 fullRows 注入前端状态，导出从真实数据源取数（不从 AI 返回结果导出）
 - [x] 修复E：单文件+多文件达人 Top 只保留一个核心金额字段，禁止双列金额
 - [x] TypeScript 编译 0 errors 验证通过
+
+## V14.6 修复大文件上传 HTTP 413 错误
+
+- [x] 根因：allRows 全量数据内联在 upload-parsed JSON body 中，大文件（46906行）序列化后约20-30MB，超出部署层反向代理限制
+- [x] 修复：将 MAX_FULL_ROWS_INLINE 从 50000 降低到 3000，超过 3000 行时不内联 allRows，请求体始终 < 3MB，彻底解决 413
+- [x] 全量统计（sum/avg/max/min/groupedTop5/categoryGroupedTop20）仍来自前端预计算，准确性不受影响，104/104 测试通过

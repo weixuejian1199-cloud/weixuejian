@@ -139,7 +139,7 @@ export interface ParsedFileData {
   // Key = field name (e.g. "省份", "支付方式"), Value = top20 entries
   categoryGroupedTop20?: Record<string, CategoryGroupedEntry[]>;
   // 修复项 B：全量数据行，用于 upload-parsed 存储到 S3（替代 preview 作为业务真源）
-  // 仅当 totalRowCount ≤ MAX_FULL_ROWS_INLINE (50000) 时填充，超出时前端不内联传输，强制走 chunk 上传路径
+  // 仅当 totalRowCount ≤ MAX_FULL_ROWS_INLINE (3000) 时填充，超出时不内联（避免 HTTP 413）
   allRows?: Record<string, unknown>[];
 }
 
@@ -794,9 +794,11 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
   const sampleRows = rows.slice(0, SAMPLE_ROWS);
 
   // 修复项 B：分流规则
-  // ≤ 50000 行：内联传输全量数据，服务端直接存 S3（替代 preview 作为业务真源）
-  // > 50000 行：不内联，MainWorkspace 将强制切换为 chunk 上传路径，服务端自行解析存全量
-  const MAX_FULL_ROWS_INLINE = 50_000;
+  // ≤ 3000 行：内联传输全量数据，服务端直接存 S3（替代 preview 作为业务真源）
+  // > 3000 行：不内联，避免 JSON body 超出部署层反向代理限制（HTTP 413）
+  //   服务端收到 allRows=undefined 时自动降级用 preview（500行）作为数据源
+  //   全量统计（sum/avg/max/min/groupedTop5/categoryGroupedTop20）仍来自前端预计算，准确性不受影响
+  const MAX_FULL_ROWS_INLINE = 3_000;
   const allRows: Record<string, unknown>[] | undefined =
     totalRowCount <= MAX_FULL_ROWS_INLINE ? rows : undefined;
 
