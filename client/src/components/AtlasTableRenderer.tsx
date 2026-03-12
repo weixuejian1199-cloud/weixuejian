@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Download, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { Download, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown, ChevronDown as ExpandIcon } from "lucide-react";
 import * as XLSX from "xlsx";
 
 interface AtlasTableData {
@@ -16,9 +16,18 @@ interface AtlasTableData {
 interface AtlasTableRendererProps {
   rawJson: string;
   onAdjust?: (prompt: string) => void;
+  /**
+   * fullRows: 系统预计算的完整数据集（来自 categoryGroupedTop20 或其他真实统计）。
+   * 当提供时，导出操作使用 fullRows 而非 AI 返回的 rows，确保导出数据完整。
+   * 格式：与 AtlasTableData.rows 相同，行数组，每行与 columns 对应。
+   */
+  fullRows?: (string | number)[][];
 }
 
-export function AtlasTableRenderer({ rawJson, onAdjust }: AtlasTableRendererProps) {
+// 默认展示行数：超过此数量时折叠，显示「展开全部」按钮
+const DEFAULT_DISPLAY_ROWS = 20;
+
+export function AtlasTableRenderer({ rawJson, onAdjust, fullRows }: AtlasTableRendererProps) {
   let data: AtlasTableData | null = null;
   try {
     data = JSON.parse(rawJson);
@@ -27,12 +36,22 @@ export function AtlasTableRenderer({ rawJson, onAdjust }: AtlasTableRendererProp
   }
   if (!data || !data.columns || !data.rows) return null;
 
-  return <AtlasTableView data={data} onAdjust={onAdjust} />;
+  return <AtlasTableView data={data} onAdjust={onAdjust} fullRows={fullRows} />;
 }
 
-function AtlasTableView({ data, onAdjust }: { data: AtlasTableData; onAdjust?: (prompt: string) => void }) {
+function AtlasTableView({
+  data,
+  onAdjust,
+  fullRows,
+}: {
+  data: AtlasTableData;
+  onAdjust?: (prompt: string) => void;
+  fullRows?: (string | number)[][];
+}) {
   const [sortCol, setSortCol] = useState<number>(data.sortBy ?? -1);
   const [sortDir, setSortDir] = useState<"asc" | "desc">(data.sortDir ?? "desc");
+  // 是否展开全部行（默认折叠，只显示前20行）
+  const [expanded, setExpanded] = useState(false);
 
   const sortedRows = useCallback(() => {
     if (sortCol < 0) return data.rows;
@@ -59,15 +78,24 @@ function AtlasTableView({ data, onAdjust }: { data: AtlasTableData; onAdjust?: (
     }
   };
 
+  /**
+   * 导出数据源优先级：
+   * 1. fullRows（系统预计算完整数据集）—— 分类统计类问题的真实数据
+   * 2. sortedRows()（AI 返回的展示层数据）—— 兜底
+   */
+  const getExportRows = () => fullRows ?? sortedRows();
+
   const handleExportExcel = () => {
-    const ws = XLSX.utils.aoa_to_sheet([data.columns, ...sortedRows()]);
+    const exportRows = getExportRows();
+    const ws = XLSX.utils.aoa_to_sheet([data.columns, ...exportRows]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, data.title.slice(0, 31));
     XLSX.writeFile(wb, `${data.title}.xlsx`);
   };
 
   const handleExportCsv = () => {
-    const rows = [data.columns, ...sortedRows()];
+    const exportRows = getExportRows();
+    const rows = [data.columns, ...exportRows];
     const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -78,7 +106,12 @@ function AtlasTableView({ data, onAdjust }: { data: AtlasTableData; onAdjust?: (
     URL.revokeObjectURL(url);
   };
 
-  const rows = sortedRows();
+  const allRows = sortedRows();
+  // 展示层：折叠时只显示前20行，展开时显示全部
+  const displayRows = expanded ? allRows : allRows.slice(0, DEFAULT_DISPLAY_ROWS);
+  const hasMore = allRows.length > DEFAULT_DISPLAY_ROWS;
+  // 导出条数：优先 fullRows，否则 AI rows 全量
+  const exportCount = fullRows ? fullRows.length : allRows.length;
   const highlightCol = data.highlight ?? -1;
 
   return (
@@ -100,7 +133,10 @@ function AtlasTableView({ data, onAdjust }: { data: AtlasTableData; onAdjust?: (
             {data.title}
           </span>
           <span className="text-xs" style={{ color: "var(--atlas-text-3)" }}>
-            {rows.length} 行 × {data.columns.length} 列
+            {/* 展示层行数 / 完整行数（如果有 fullRows 则显示完整数） */}
+            {fullRows
+              ? `展示 ${displayRows.length} / 共 ${exportCount} 行 × ${data.columns.length} 列`
+              : `${displayRows.length}${hasMore ? `/${allRows.length}` : ""} 行 × ${data.columns.length} 列`}
           </span>
         </div>
       </div>
@@ -136,7 +172,7 @@ function AtlasTableView({ data, onAdjust }: { data: AtlasTableData; onAdjust?: (
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, ri) => (
+            {displayRows.map((row, ri) => (
               <tr
                 key={ri}
                 style={{
@@ -176,6 +212,35 @@ function AtlasTableView({ data, onAdjust }: { data: AtlasTableData; onAdjust?: (
         </table>
       </div>
 
+      {/* 展开全部按钮（仅当 AI rows 超过20行时显示） */}
+      {hasMore && (
+        <div
+          className="flex items-center justify-center py-2 cursor-pointer transition-colors"
+          style={{
+            borderTop: "1px solid var(--atlas-border)",
+            background: "var(--atlas-elevated)",
+            color: "var(--atlas-accent)",
+          }}
+          onClick={() => setExpanded(e => !e)}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.06)"}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)"}
+        >
+          <ExpandIcon
+            size={12}
+            style={{
+              marginRight: 4,
+              transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 0.2s",
+            }}
+          />
+          <span className="text-xs font-medium">
+            {expanded
+              ? `收起（显示前 ${DEFAULT_DISPLAY_ROWS} 行）`
+              : `展开全部（共 ${allRows.length} 行${fullRows ? `，导出含 ${exportCount} 行完整数据` : ""}）`}
+          </span>
+        </div>
+      )}
+
       {/* Action bar */}
       <div
         className="flex items-center gap-2 px-4 py-2.5"
@@ -191,9 +256,10 @@ function AtlasTableView({ data, onAdjust }: { data: AtlasTableData; onAdjust?: (
           }}
           onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(52,211,153,0.18)"}
           onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "rgba(52,211,153,0.1)"}
+          title={fullRows ? `导出完整数据（${exportCount} 行）` : "导出 Excel"}
         >
           <Download size={12} />
-          导出 Excel
+          导出 Excel{fullRows ? ` (${exportCount}行)` : ""}
         </button>
         <button
           onClick={handleExportCsv}
@@ -211,9 +277,10 @@ function AtlasTableView({ data, onAdjust }: { data: AtlasTableData; onAdjust?: (
             (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border-2)";
             (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
           }}
+          title={fullRows ? `导出完整数据（${exportCount} 行）` : "导出 CSV"}
         >
           <Download size={12} />
-          导出 CSV
+          导出 CSV{fullRows ? ` (${exportCount}行)` : ""}
         </button>
         {onAdjust && (
           <button

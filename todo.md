@@ -877,3 +877,11 @@
 - [x] atlas.ts 单文件 prompt 注入：添加 categoryStatsContext，基于全量数据注入分类字段统计
 - [x] atlas.ts 多文件 prompt 注入：每个 dataset_profile[N] 段注入 pfpCategoryStatsContext
 - [x] atlas.ts 多文件跨文件合并：添加 crossFileCategorySection，UNION 所有文件的分类字段统计
+
+## V14.5 全链路修复（P0+P1）
+
+- [x] 修复A+B：prompt 注入从 top10 改为全量50条，增加总计校验行约束（单文件+多文件+跨文件）
+- [x] 修复C：前端展示层支持展开全部，AI 输出规则允许分类统计全量行（最多50行）
+- [x] 修复D：系统预计算 fullRows 注入前端状态，导出从真实数据源取数（不从 AI 返回结果导出）
+- [x] 修复E：单文件+多文件达人 Top 只保留一个核心金额字段，禁止双列金额
+- [x] TypeScript 编译 0 errors 验证通过

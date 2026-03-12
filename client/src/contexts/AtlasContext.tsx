@@ -46,6 +46,12 @@ export interface UploadedFile {
   status: "uploading" | "ready" | "error";
   uploadedAt: Date;
   uploadProgress?: number; // 0-100, only meaningful when status === "uploading"
+  /**
+   * 系统预计算的分类字段全量统计（来自 parseFile.computeCategoryStats）。
+   * key: 字段名（如「收货省份」「支付方式」），value: 全量统计条目数组。
+   * 用于 AtlasTableRenderer 导出时提供完整数据集，避免只导出 AI 展示层的前20行。
+   */
+  categoryGroupedTop20?: Record<string, Array<{ label: string; count: number; sum?: number; avg?: number }>>;
 }
 
 export interface TableSheet {

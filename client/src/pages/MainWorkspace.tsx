@@ -214,6 +214,9 @@ export default function MainWorkspace() {
           preview: result.df_info.preview || [],
           file_size_kb: Math.round(file.size / 1024),
         },
+        // D方案：将前端预计算的分类字段全量统计存入 UploadedFile
+        // 用于 AtlasTableRenderer 导出时提供完整数据集，避免只导出 AI 展示层的前20行
+        categoryGroupedTop20: parsed.categoryGroupedTop20 || undefined,
       });
 
       // Update current task title with filename (use first file's name)
@@ -911,12 +914,13 @@ export default function MainWorkspace() {
                     idx === messages.length - 1;
                   return (
                     <MessageBubble
-                      key={msg.id}
-                      message={msg}
-                      onDownload={handleDownload}
-                      onQuickAction={isLastAssistant && !msg.isStreaming ? handleQuickAction : undefined}
-                      isLastAssistant={isLastAssistant}
-                    />
+                       key={msg.id}
+                       message={msg}
+                       onDownload={handleDownload}
+                       onQuickAction={isLastAssistant && !msg.isStreaming ? handleQuickAction : undefined}
+                       isLastAssistant={isLastAssistant}
+                       uploadedFiles={uploadedFiles}
+                     />
                   );
                 })}
               </>
@@ -1551,11 +1555,13 @@ function MessageBubble({
   onDownload,
   onQuickAction,
   isLastAssistant,
+  uploadedFiles,
 }: {
   message: Message & { suggestedActions?: SuggestedAction[] };
   onDownload: (id: string, filename: string) => void;
   onQuickAction?: (prompt: string) => void;
   isLastAssistant?: boolean;
+  uploadedFiles?: import("@/contexts/AtlasContext").UploadedFile[];
 }) {
   const [copied, setCopied] = useState(false);
   const [showTable, setShowTable] = useState(true);
@@ -1941,13 +1947,88 @@ function MessageBubble({
                         <Streamdown>{seg.content}</Streamdown>
                       </div>
                     ) : null
-                  ) : (
-                    <AtlasTableRenderer
-                      key={idx}
-                      rawJson={seg.content}
-                      onAdjust={onQuickAction}
-                    />
-                  )
+                  ) : (() => {
+                    // D方案：尝试从系统预计算的 categoryGroupedTop20 中构建 fullRows
+                    // 匹配逻辑：解析 AI 返回的表格，找到列名匹配的分类字段，用全量统计构建 fullRows
+                    let fullRows: (string | number)[][] | undefined = undefined;
+                    try {
+                      const tableData = JSON.parse(seg.content);
+                      if (tableData?.columns && Array.isArray(tableData.columns)) {
+                        // 尝试匹配每个已上传文件的 categoryGroupedTop20
+                        for (const uf of (uploadedFiles ?? [])) {
+                          if (!uf.categoryGroupedTop20) continue;
+                          // 查找表格列名中是否有匹配的分类字段
+                          type CategoryEntry = { label: string; count: number; sum?: number; avg?: number };
+                          for (const [fieldName, rawEntries] of Object.entries(uf.categoryGroupedTop20)) {
+                            const entries = rawEntries as CategoryEntry[];
+                            // 匹配条件：表格列名中包含该字段名，且列数 <= 4（分类统计表格特征）
+                            const colNames = tableData.columns as string[];
+                            const hasFieldCol = colNames.some(c =>
+                              c.includes(fieldName) || fieldName.includes(c) ||
+                              // 常见别名匹配
+                              (fieldName.includes('省') && c.includes('省')) ||
+                              (fieldName.includes('支付') && c.includes('支付')) ||
+                              (fieldName.includes('城市') && c.includes('城市')) ||
+                              (fieldName.includes('状态') && c.includes('状态'))
+                            );
+                            if (hasFieldCol && entries.length > 0) {
+                              // 构建 fullRows：按表格列顺序映射数据
+                              // 找到分类字段列索引和数值列索引
+                              const labelColIdx = colNames.findIndex(c =>
+                                c.includes(fieldName) || fieldName.includes(c) ||
+                                (fieldName.includes('省') && c.includes('省')) ||
+                                (fieldName.includes('支付') && c.includes('支付')) ||
+                                (fieldName.includes('城市') && c.includes('城市')) ||
+                                (fieldName.includes('状态') && c.includes('状态'))
+                              );
+                              const countColIdx = colNames.findIndex(c =>
+                                c.includes('订单数') || c.includes('数量') || c.includes('count') || c.includes('笔数')
+                              );
+                              const sumColIdx = colNames.findIndex(c =>
+                                c.includes('金额') || c.includes('销售额') || c.includes('应付') || c.includes('收入')
+                              );
+                              const pctColIdx = colNames.findIndex(c =>
+                                c.includes('占比') || c.includes('%')
+                              );
+                              const totalCount = entries.reduce((s, e) => s + e.count, 0);
+                              const totalSum = entries.reduce((s, e) => s + (e.sum ?? 0), 0);
+                              fullRows = entries.map((entry, rank) => {
+                                const row: (string | number)[] = new Array(colNames.length).fill("");
+                                // 填入排名列
+                                const rankColIdx = colNames.findIndex(c => c.includes('排名') || c === '序号');
+                                if (rankColIdx >= 0) row[rankColIdx] = rank + 1;
+                                // 填入分类名称
+                                if (labelColIdx >= 0) row[labelColIdx] = entry.label;
+                                // 填入订单数
+                                if (countColIdx >= 0) row[countColIdx] = entry.count;
+                                // 填入金额
+                                if (sumColIdx >= 0 && entry.sum !== undefined) row[sumColIdx] = entry.sum.toFixed(2);
+                                // 填入占比
+                                if (pctColIdx >= 0) {
+                                  const base = sumColIdx >= 0 && totalSum > 0 ? totalSum : totalCount;
+                                  const val = sumColIdx >= 0 && entry.sum !== undefined ? entry.sum : entry.count;
+                                  row[pctColIdx] = base > 0 ? ((val / base) * 100).toFixed(2) + '%' : '0%';
+                                }
+                                return row;
+                              });
+                              break;
+                            }
+                          }
+                          if (fullRows) break;
+                        }
+                      }
+                    } catch {
+                      // 解析失败时不传 fullRows
+                    }
+                    return (
+                      <AtlasTableRenderer
+                        key={idx}
+                        rawJson={seg.content}
+                        onAdjust={onQuickAction}
+                        fullRows={fullRows}
+                      />
+                    );
+                  })()
                 )}
               </div>
             );
