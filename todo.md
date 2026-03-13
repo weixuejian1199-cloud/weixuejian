@@ -938,10 +938,10 @@
 ## D 阶段：核心功能修复 + UI 规格对齐（2026-03-13 紧急）
 
 ### D-FUNC: 功能修复（最高优先级）
-- [ ] D-FUNC-1: 诊断上传→计算→导出完整链路，定位所有断点
-- [ ] D-FUNC-2: 修复数据计算管道（AI分析结果准确可用）
-- [ ] D-FUNC-3: 修复Excel导出端到端可用
-- [ ] D-FUNC-4: 端到端验证并编写测试
+- [x] D-FUNC-1: 诊断上传→计算→导出完整链路，定位所有断点
+- [x] D-FUNC-2: 修复数据计算管道（AI分析结果准确可用）
+- [x] D-FUNC-3: 修复Excel导出端到端可用
+- [x] D-FUNC-4: 端到端验证并编写测试
 
 ### D-UI: UI 按规格文档逐条修正
 - [ ] D-UI-1: Sidebar 重写（200px、☰🔍图标、层次感颜色）
@@ -966,8 +966,29 @@
 
 ## F 阶段：导出全量数据修复（2026-03-13 用户截图反馈）
 
-- [ ] F-1: 导出 Excel 必须包含全量数据（不是 AI 预览的 50 行）
+- [x] F-1: 导出 Excel 必须包含全量数据（不是 AI 预览的 50 行）—— 通过 ResultSet 路径实现
 - [ ] F-2: 导出按钮显示正确的全量行数（如"导出 Excel (1383行)"）
 - [ ] F-3: 修复子订单编号列多值拼接错误
-- [ ] F-4: 后端 generate-report 使用 fullRows 生成 Excel
+- [x] F-4: 后端 generate-report 使用 fullRows 生成 Excel —— 通过 exportFromResultSet 实现
 - [ ] F-5: 内联 AtlasTableRenderer 导出使用 fullRows 而非 AI rows
+
+## V3.0 管道真正接入（2026-03-13 诊断+修复）
+
+### 诊断结果
+- [x] 诊断发现：A/B 阶段管道"空转"——代码写了但没接入实际链路
+- [x] 诊断发现：chat 端点仍用旧 prompt，不读 ResultSet
+- [x] 诊断发现：generate-report 让 AI 生成 JSON（最多 100 行），不用 Delivery 层
+- [x] 诊断发现：前端只发 500 行 preview，后端存储也只有 500 行
+- [x] 诊断发现：upload-parsed 端点没有调用 Pipeline
+
+### 修复项
+- [x] D-FUNC-1: generate-report 端点改造——优先从 ResultSet 导出全量数据，fallback 到旧逻辑
+- [x] D-FUNC-2: chat 端点注入 ResultSet 精确指标——在 systemPrompt 后追加 ResultSet 数据摘要
+- [x] D-FUNC-3: 前端 parseFile.ts 发送全量数据（不再截断为 500 行，上限 50000 行）
+- [x] D-FUNC-4: 后端 upload-parsed 端点不再截断 preview 数据
+- [x] D-FUNC-5: 创建 runPipelineFromParsedData 函数——从前端已解析的 JSON 数据生成 ResultSet
+- [x] D-FUNC-6: 创建 runParsedPipelineInBackground 函数——upload-parsed 端点后台运行 Pipeline
+- [x] D-FUNC-7: upload-parsed 端点接入 Pipeline（调用 runParsedPipelineInBackground）
+- [x] D-FUNC-8: 更新 b7-bridge.test.ts 适配新的 import 语句
+- [x] D-FUNC-9: 编写 8 个 Pipeline 集成测试（全部通过）
+- [x] D-FUNC-10: 全部 15 个测试文件、204 个测试用例通过
