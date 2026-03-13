@@ -220,10 +220,10 @@ export default function MainWorkspace() {
       });
 
       // Update current task title with filename (use first file's name)
-      if (activeTaskId) {
-        const currentTask = tasks.find(t => t.id === activeTaskId);
+      if (taskId) {
+        const currentTask = tasks.find(t => t.id === taskId);
         if (currentTask && currentTask.title === "新建任务") {
-          updateTask(activeTaskId, { title: result.filename });
+          updateTask(taskId, { title: result.filename });
         }
       }
 
@@ -327,33 +327,29 @@ export default function MainWorkspace() {
     if (!msg || isGenerating) return;
 
     // If no active task exists, create one first so messages have a task to attach to.
-    // createNewTask() sets activeTaskId in React state, but the current closure still
-    // sees the stale null value. We defer the actual send by 50ms to let the state flush.
-    if (!activeTaskId) {
-      createNewTask();
-      setTimeout(() => handleSend(text, isQuickAction), 50);
-      return;
-    }
+    // createNewTask() returns the new task ID synchronously, so we use it directly
+    // to avoid stale closure issues with activeTaskId.
+    const taskId = activeTaskId || createNewTask();
 
     setInput("");
     setIsGenerating(true);
     setPendingActions([]); // Clear pending actions when user sends
 
-    addMessage({ role: "user", content: msg });
+    addMessage({ role: "user", content: msg }, taskId);
     // Determine thinking steps based on context
     const steps = hasFiles
       ? ["解析文件数据", "理解你的需求", "生成回复"]
       : ["理解你的需求", "生成回复"];
-    addMessage({ role: "assistant", content: "", isStreaming: true, thinkingSteps: steps });
+    addMessage({ role: "assistant", content: "", isStreaming: true, thinkingSteps: steps }, taskId);
 
     // Auto-generate task title from first user message
-    if (activeTaskId) {
-      const currentTask = tasks.find(t => t.id === activeTaskId);
-      const isFirstMessage = currentTask?.messages.filter(m => m.role === "user").length === 0;
-      if (isFirstMessage && (currentTask?.title === "新建任务" || !currentTask?.title)) {
+    {
+      const currentTask = tasks.find(t => t.id === taskId);
+      const isFirstMessage = !currentTask || currentTask.messages.filter(m => m.role === "user").length === 0;
+      if (isFirstMessage && (!currentTask?.title || currentTask?.title === "新建任务")) {
         // Generate a concise title: take first 20 chars of message, strip punctuation at end
         const autoTitle = msg.replace(/[，。！？,.!?]+$/, "").slice(0, 20) + (msg.length > 20 ? "..." : "");
-        updateTask(activeTaskId, { title: autoTitle });
+        updateTask(taskId, { title: autoTitle });
       }
     }
 
@@ -886,95 +882,6 @@ export default function MainWorkspace() {
           {messages.length === 0 ? (
             <>
               <EmptyState onUpload={() => fileInputRef.current?.click()} onQuickAsk={(q) => handleSend(q)} />
-
-              {/* Gemini-style: input box below greeting, centered */}
-              <div className="w-full max-w-[680px] mx-auto mt-6">
-                <div
-                  className="rounded-3xl overflow-hidden"
-                  style={{
-                    background: "#ffffff",
-                    border: "1px solid #e5e7eb",
-                    transition: "border-color 0.15s ease, box-shadow 0.15s ease",
-                  }}
-                  onFocusCapture={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = "#4f6ef7";
-                    (e.currentTarget as HTMLElement).style.boxShadow = "0 0 0 3px rgba(79,110,247,0.1)";
-                  }}
-                  onBlurCapture={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = "#e5e7eb";
-                    (e.currentTarget as HTMLElement).style.boxShadow = "none";
-                  }}
-                >
-                  <textarea
-                    ref={textareaRef}
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="直接提问，或拖入 Excel/CSV 文件开始分析..."
-                    disabled={isGenerating}
-                    rows={1}
-                    className="w-full bg-transparent outline-none resize-none px-4 pt-3 pb-1"
-                    style={{
-                      color: "#1f2937",
-                      fontSize: "14px",
-                      lineHeight: "1.6",
-                      minHeight: 42,
-                      maxHeight: 160,
-                      fontFamily: "inherit",
-                    }}
-                  />
-                  <div className="flex items-center justify-between px-3 pb-2.5 pt-1">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
-                        style={{ background: "#f9fafb", border: "1px solid #e5e7eb", color: "#6b7280" }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(79,110,247,0.4)"; (e.currentTarget as HTMLElement).style.color = "#4f6ef7"; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#e5e7eb"; (e.currentTarget as HTMLElement).style.color = "#6b7280"; }}
-                        title="上传文件（支持多选）"
-                      >
-                        <Paperclip size={12} />
-                        上传文件
-                      </button>
-                      <span className="text-xs" style={{ color: "#9ca3af" }}>Enter 发送</span>
-                    </div>
-                    <button
-                      onClick={() => handleSend()}
-                      disabled={!input.trim()}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
-                      style={{
-                        background: input.trim() ? "#4f6ef7" : "#e5e7eb",
-                        color: input.trim() ? "#fff" : "#9ca3af",
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      <Send size={13} />
-                      发送
-                    </button>
-                  </div>
-                </div>
-
-                {/* Quick tags below input box */}
-                <div className="flex items-center gap-2 flex-wrap justify-center mt-3">
-                  {[
-                    { label: "出纳模版", q: "帮我把上传的数据汇总生成报表" },
-                    { label: "会计模版", q: "帮我生成利润表" },
-                    { label: "HR 中心", q: "帮我生成工资条" },
-                    { label: "数据分析", q: "帮我分析销售数据，找出趋势和排名" },
-                  ].map((tag, i) => (
-                    <button
-                      key={i}
-                      onClick={() => { setInput(tag.q); setTimeout(() => textareaRef.current?.focus(), 50); }}
-                      className="px-3.5 py-2 rounded-full text-sm whitespace-nowrap transition-all"
-                      style={{ background: "#ffffff", border: "1px solid #e5e7eb", color: "#1f2937" }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#4f6ef7"; (e.currentTarget as HTMLElement).style.color = "#4f6ef7"; (e.currentTarget as HTMLElement).style.background = "#eff2fe"; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#e5e7eb"; (e.currentTarget as HTMLElement).style.color = "#1f2937"; (e.currentTarget as HTMLElement).style.background = "#ffffff"; }}
-                    >
-                      {tag.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </>
           ) : (() => {
             const startIdx = Math.max(0, messages.length - visibleCount);
@@ -1133,52 +1040,7 @@ export default function MainWorkspace() {
         </div>
       </div>
 
-      {/* Quick action pills — visible when no messages OR when files are ready */}
-      {!isGenerating && (messages.length === 0 || hasFiles) && (
-        <div className="flex-shrink-0 pb-3">
-          <div className="w-full max-w-4xl mx-auto px-6">
-            <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-              {[
-                { label: "出纳模版", q: "帮我把上传的数据汇总生成报表" },
-                { label: "会计模版", q: "帮我生成利润表" },
-                { label: "HR 中心", q: "帮我生成工资条" },
-                { label: "数据分析", q: "帮我分析销售数据，找出趋势和排名" },
-              ].map((pill, i) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    if (pill.q === "__MERGE_INLINE__") {
-                      handleQuickAction("__MERGE_INLINE__");
-                    } else {
-                      setInput(pill.q);
-                      setTimeout(() => textareaRef.current?.focus(), 50);
-                    }
-                  }}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm whitespace-nowrap flex-shrink-0 transition-all"
-                  style={{
-                    background: "#ffffff",
-                    border: "1px solid #e5e7eb",
-                    color: "#1f2937",
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = "#4f6ef7";
-                    (e.currentTarget as HTMLElement).style.color = "#4f6ef7";
-                    (e.currentTarget as HTMLElement).style.background = "#eff2fe";
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = "#e5e7eb";
-                    (e.currentTarget as HTMLElement).style.color = "#1f2937";
-                    (e.currentTarget as HTMLElement).style.background = "#ffffff";
-                  }}
-                >
-                  <span>{pill.label}</span>
-                </button>
-              ))}
-
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Quick action pills removed per UI spec */}
 
       {/* P1-C: Merge Confirmation Dialog */}
       <AnimatePresence>
@@ -2307,7 +2169,118 @@ function MessageBubble({
 
 // -- EmptyState ------------------------------------------------------------------
 
+const FEATURE_CARDS = [
+  {
+    icon: "📊",
+    title: "数据分析",
+    desc: "智能分析数据规律和趋势",
+    q: "帮我分析这份数据，找出关键规律和异常值",
+    color: "#4f6ef7",
+    bg: "rgba(79,110,247,0.08)",
+  },
+  {
+    icon: "📄",
+    title: "生成报表",
+    desc: "自动生成专业汇总报表",
+    q: "帮我把上传的数据汇总生成报表，包含关键指标和统计",
+    color: "#10b981",
+    bg: "rgba(16,185,129,0.08)",
+  },
+  {
+    icon: "👥",
+    title: "HR 中心",
+    desc: "工资条、考勤、绩效表",
+    q: "帮我生成工资条",
+    color: "#f59e0b",
+    bg: "rgba(245,158,11,0.08)",
+  },
+  {
+    icon: "🏆",
+    title: "排名分析",
+    desc: "快速找出 Top/Bottom 数据",
+    q: "帮我找出数据中排名前10和后10的记录",
+    color: "#8b5cf6",
+    bg: "rgba(139,92,246,0.08)",
+  },
+];
+
 function EmptyState({ onUpload, onQuickAsk }: { onUpload: () => void; onQuickAsk: (q: string) => void }) {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 600);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 600);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+
+  if (isMobile) {
+    // Mobile: greeting + 4 feature cards
+    return (
+      <div className="flex flex-col w-full px-2" style={{ gap: 20 }}>
+        {/* Greeting */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+          className="text-center pt-2"
+        >
+          <h1 style={{ fontSize: "22px", fontWeight: 700, color: "#1f2937", lineHeight: 1.3 }}>
+            <span style={{ color: "#4f6ef7" }}>✶</span> Hi，我是 ATLAS
+          </h1>
+          <p style={{ fontSize: "14px", color: "#6b7280", marginTop: 6, lineHeight: 1.5 }}>
+            上传文件或直接提问，开始智能分析
+          </p>
+        </motion.div>
+
+        {/* Upload button */}
+        <motion.button
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.3 }}
+          onClick={onUpload}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-medium transition-all"
+          style={{
+            background: "#4f6ef7",
+            color: "#ffffff",
+            fontSize: "15px",
+            border: "none",
+          }}
+          onMouseEnter={e => (e.currentTarget.style.opacity = "0.9")}
+          onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
+        >
+          <Upload size={16} />
+          上传 Excel / CSV 文件
+        </motion.button>
+
+        {/* 4 feature cards */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18, duration: 0.3 }}
+          className="grid grid-cols-2 gap-3"
+        >
+          {FEATURE_CARDS.map((card, i) => (
+            <button
+              key={i}
+              onClick={() => onQuickAsk(card.q)}
+              className="flex flex-col items-start p-4 rounded-2xl text-left transition-all"
+              style={{
+                background: card.bg,
+                border: `1px solid ${card.color}22`,
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "0.85"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+            >
+              <span style={{ fontSize: "22px", lineHeight: 1 }}>{card.icon}</span>
+              <span style={{ fontSize: "13px", fontWeight: 600, color: "#1f2937", marginTop: 8 }}>{card.title}</span>
+              <span style={{ fontSize: "11px", color: "#6b7280", marginTop: 3, lineHeight: 1.4 }}>{card.desc}</span>
+            </button>
+          ))}
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Desktop: Gemini-style greeting + quick tags
   return (
     <div className="flex flex-col items-center gap-6 w-full max-w-[680px] mx-auto text-center">
       {/* Gemini-style greeting */}
@@ -2326,7 +2299,7 @@ function EmptyState({ onUpload, onQuickAsk }: { onUpload: () => void; onQuickAsk
             lineHeight: 1.3,
           }}
         >
-          <span style={{ color: "#4f6ef7" }}>✦</span> Hi，需要我帮你处理什么数据？
+          <span style={{ color: "#4f6ef7" }}>✶</span> Hi，需要我帮你处理什么数据？
         </h1>
         <p
           style={{

@@ -17,12 +17,11 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Settings, X, LogIn,
+  Settings, X,
   PanelLeftClose, PanelLeftOpen,
   Gift, MoreHorizontal, Search,
   Share2, Trash2, Pencil, Copy, Check,
   FileText, BarChart3, Users, FolderOpen,
-  Sparkles, Zap, BookOpen,
 } from "lucide-react";
 import { useAtlas } from "@/contexts/AtlasContext";
 import { trpc } from "@/lib/trpc";
@@ -39,9 +38,6 @@ const FUNCTION_MODULES = [
   { id: "hr", icon: Users, label: "HR 中心", available: true, action: "hr" },
   { id: "datahub", icon: BarChart3, label: "数据中枢", available: false },
   { id: "files", icon: FolderOpen, label: "文件", available: false },
-  { id: "aitools", icon: Sparkles, label: "AI 工具", available: false },
-  { id: "automation", icon: Zap, label: "自动化", available: false },
-  { id: "knowledge", icon: BookOpen, label: "知识库", available: false },
 ] as const;
 
 export default function Sidebar() {
@@ -257,7 +253,7 @@ export default function Sidebar() {
           ...(isMobile && sidebarOpen ? { height: "100vh" } : {}),
         }}
       >
-        {/* ═══ Top: ☰ Toggle + 🔍 Search ═══ */}
+        {/* ═══ Top: ☰ Toggle (left) + 🔍 Search (right) ═══ */}
         <div className="flex items-center flex-shrink-0 px-1.5 pt-2.5 pb-1" style={{ gap: 2 }}>
           <IconBtn
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -266,7 +262,10 @@ export default function Sidebar() {
             {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </IconBtn>
 
-          {/* 🔍 Search icon — expanded only */}
+          {/* Spacer to push search to right */}
+          {!collapsed && <div className="flex-1" />}
+
+          {/* 🔍 Search icon — expanded only, right side */}
           {!collapsed && (
             <IconBtn
               onClick={() => { setSearchOpen(!searchOpen); if (searchOpen) setSearchQuery(""); }}
@@ -613,42 +612,7 @@ export default function Sidebar() {
             </div>
           )}
 
-          {/* User avatar / Login */}
-          <div className="flex items-center" style={{ justifyContent: collapsed ? "center" : "flex-start", paddingLeft: collapsed ? 0 : 2 }}>
-            {user ? (
-              <button
-                title={user.name}
-                className="flex items-center gap-2.5 rounded-lg transition-all py-1.5 px-1"
-                style={{ color: "#3c4043" }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.06)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-              >
-                <div
-                  className="w-7 h-7 rounded-full flex items-center justify-center font-medium flex-shrink-0"
-                  style={{ background: "linear-gradient(135deg, #4f6ef7 0%, #7c5bf7 100%)", color: "#fff", fontSize: "12px" }}
-                >
-                  {user.name[0].toUpperCase()}
-                </div>
-                {!collapsed && (
-                  <span className="truncate" style={{ color: "#3c4043", fontSize: "13px", maxWidth: 110 }}>
-                    {user.name}
-                  </span>
-                )}
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowLoginModal(true)}
-                title="登录"
-                className="flex items-center gap-2.5 rounded-lg transition-all py-1.5 px-1"
-                style={{ color: "#5f6368" }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.06)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-              >
-                <LogIn size={16} />
-                {!collapsed && <span style={{ fontSize: "13px" }}>登录</span>}
-              </button>
-            )}
-          </div>
+          {/* User info removed — shown in TopBar only */}
         </div>
       </motion.aside>
 
