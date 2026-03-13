@@ -885,3 +885,14 @@
 - [x] 修复D：系统预计算 fullRows 注入前端状态，导出从真实数据源取数（不从 AI 返回结果导出）
 - [x] 修复E：单文件+多文件达人 Top 只保留一个核心金额字段，禁止双列金额
 - [x] TypeScript 编译 0 errors 验证通过
+
+## V3.0 方案落地 — A 阶段（定规矩）
+
+- [x] A1：字段映射表（shared/fieldAliases.ts）— 30 标准字段 × 4 平台
+- [x] A2：统计口径定义（shared/metrics.ts）— 10 个核心口径精确计算规则
+- [x] A3：ResultSet 类型定义（shared/resultSet.ts）— 含 8 个可审计字段
+- [x] A4：处理管道数据结构定义（shared/pipeline.ts）— 9 步输入输出接口 + 错误分级
+- [x] A5：AI 表达边界规则（shared/aiConstraints.ts）— 结构化规则 + prompt 硬约束
+- [x] A6：L1 模板计算公式定义（shared/templates.ts）— 多店合并/工资条/考勤/利润
+- [x] A7：数据库 schema 更新 — ResultSet 存储表 + pnpm db:push
+- [x] A8：单元测试 — 字段映射/口径计算/ResultSet 验证

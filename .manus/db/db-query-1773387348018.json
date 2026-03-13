@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `result_sets` (\n\t`id` varchar(64) NOT NULL,\n\t`userId` int NOT NULL,\n\t`sessionId` varchar(64),\n\t`templateId` varchar(64),\n\t`computationVersion` varchar(32) NOT NULL,\n\t`sourceFiles` json NOT NULL,\n\t`filtersApplied` json,\n\t`skippedRowsCount` int NOT NULL DEFAULT 0,\n\t`skippedRowsSample` json,\n\t`metrics` json NOT NULL,\n\t`rowCount` int NOT NULL DEFAULT 0,\n\t`fields` json,\n\t`dataS3Key` varchar(512),\n\t`sourcePlatform` varchar(64),\n\t`isMultiFile` int NOT NULL DEFAULT 0,\n\t`cleaningLog` json,\n\t`generatedAt` bigint NOT NULL,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `result_sets_id` PRIMARY KEY(`id`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute CREATE TABLE `result_sets` (\n\t`id` varchar(64) NOT NULL,\n\t`userId` int NOT NULL,\n\t`sessionId` varchar(64),\n\t`templateId` varchar(64),\n\t`computationVersion` varchar(32) NOT NULL,\n\t`sourceFiles` json NOT NULL,\n\t`filtersApplied` json,\n\t`skippedRowsCount` int NOT NULL DEFAULT 0,\n\t`skippedRowsSample` json,\n\t`metrics` json NOT NULL,\n\t`rowCount` int NOT NULL DEFAULT 0,\n\t`fields` json,\n\t`dataS3Key` varchar(512),\n\t`sourcePlatform` varchar(64),\n\t`isMultiFile` int NOT NULL DEFAULT 0,\n\t`cleaningLog` json,\n\t`generatedAt` bigint NOT NULL,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `result_sets_id` PRIMARY KEY(`id`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 160
+}

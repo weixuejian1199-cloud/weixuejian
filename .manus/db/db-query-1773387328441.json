@@ -1,0 +1,85 @@
+{
+  "query": "SELECT * FROM `__drizzle_migrations` ORDER BY created_at;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute SELECT * FROM `__drizzle_migrations` ORDER BY created_at;",
+  "rows": [
+    {
+      "id": "1",
+      "hash": "e9e25a8cd7b11d1a67734b5a9a94c6ab9fbecf00cd0c29fe20c7f824ef837b7e",
+      "created_at": "1772898712237"
+    },
+    {
+      "id": "2",
+      "hash": "448997e7f0f0eea443996d21e04a3b168bc157198c14130b941e84316042b8af",
+      "created_at": "1772898811649"
+    },
+    {
+      "id": "3",
+      "hash": "295dd8ec9e37fdc2d8010cbf660e8dc37ab010e6fb78c8cde86bfddafdcc0ba0",
+      "created_at": "1772899540719"
+    },
+    {
+      "id": "490219",
+      "hash": "f69e3ff80d780dc42b0db6e80749c3a7ad1ce62a865a10b35399a82ecd0a82cd",
+      "created_at": "1772904538220"
+    },
+    {
+      "id": "490220",
+      "hash": "eed15233d7d7da2f6ae3f499fb51f606e03fabaf7fdf61b9c4f364143e746ba7",
+      "created_at": "1772907554293"
+    },
+    {
+      "id": "490221",
+      "hash": "f1cb946dac7fb8d2bb8225a0b6b0d2b6c643786de893812c639f7f10f92848a0",
+      "created_at": "1772924703249"
+    },
+    {
+      "id": "490222",
+      "hash": "ad8e9ffc3aba4e34856b7f4e83c374f0419605221241f92f2e1f4e8d46f04cfd",
+      "created_at": "1772924738297"
+    },
+    {
+      "id": "490223",
+      "hash": "14311eb6bc4a00989368d853cb44719206b8f2db3797b66682809a2fe8d6d005",
+      "created_at": "1772931874875"
+    },
+    {
+      "id": "490224",
+      "hash": "6e6eb8c93fa7f236ffb432c586b97c5aff6550336e8d5778ee8efe9637e0a1cb",
+      "created_at": "1772947722106"
+    },
+    {
+      "id": "490225",
+      "hash": "bd67f441441ce505588509f1cb28a2c76853a8adeeefa62ae06f0dd6d7e7f132",
+      "created_at": "1772948927122"
+    },
+    {
+      "id": "490226",
+      "hash": "c152b22bc3d098ecc9e0b199cb7965c44b5f58cce0ccd6700d2276ff90b988d7",
+      "created_at": "1772954284983"
+    },
+    {
+      "id": "490227",
+      "hash": "92422ae3b8535f2101d79e1068e59ecf1bb117bde1ab924a747a237d2fb7088e",
+      "created_at": "1772954443528"
+    },
+    {
+      "id": "490228",
+      "hash": "68be3b406e59d10f295a44e3ebf79927ff68339bce35ef08449d10f11ff6ea67",
+      "created_at": "1772977055026"
+    },
+    {
+      "id": "520219",
+      "hash": "a0ca7ac44d9e2fa3bc5c3cd70a5a1b5c852965576ec70a8b4eabd897222b41f8",
+      "created_at": "1773031865236"
+    },
+    {
+      "id": "520220",
+      "hash": "5e46c7a68762dac5e84b991f61f7bc233793a2bfd1269658ebdf4a89924539f1",
+      "created_at": "1773033617080"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\thash\tcreated_at\n1\te9e25a8cd7b11d1a67734b5a9a94c6ab9fbecf00cd0c29fe20c7f824ef837b7e\t1772898712237\n2\t448997e7f0f0eea443996d21e04a3b168bc157198c14130b941e84316042b8af\t1772898811649\n3\t295dd8ec9e37fdc2d8010cbf660e8dc37ab010e6fb78c8cde86bfddafdcc0ba0\t1772899540719\n490219\tf69e3ff80d780dc42b0db6e80749c3a7ad1ce62a865a10b35399a82ecd0a82cd\t1772904538220\n490220\teed15233d7d7da2f6ae3f499fb51f606e03fabaf7fdf61b9c4f364143e746ba7\t1772907554293\n490221\tf1cb946dac7fb8d2bb8225a0b6b0d2b6c643786de893812c639f7f10f92848a0\t1772924703249\n490222\tad8e9ffc3aba4e34856b7f4e83c374f0419605221241f92f2e1f4e8d46f04cfd\t1772924738297\n490223\t14311eb6bc4a00989368d853cb44719206b8f2db3797b66682809a2fe8d6d005\t1772931874875\n490224\t6e6eb8c93fa7f236ffb432c586b97c5aff6550336e8d5778ee8efe9637e0a1cb\t1772947722106\n490225\tbd67f441441ce505588509f1cb28a2c76853a8adeeefa62ae06f0dd6d7e7f132\t1772948927122\n490226\tc152b22bc3d098ecc9e0b199cb7965c44b5f58cce0ccd6700d2276ff90b988d7\t1772954284983\n490227\t92422ae3b8535f2101d79e1068e59ecf1bb117bde1ab924a747a237d2fb7088e\t1772954443528\n490228\t68be3b406e59d10f295a44e3ebf79927ff68339bce35ef08449d10f11ff6ea67\t1772977055026\n520219\ta0ca7ac44d9e2fa3bc5c3cd70a5a1b5c852965576ec70a8b4eabd897222b41f8\t1773031865236\n520220\t5e46c7a68762dac5e84b991f61f7bc233793a2bfd1269658ebdf4a89924539f1\t1773033617080\n",
+  "stderr": "",
+  "execution_time_ms": 56
+}

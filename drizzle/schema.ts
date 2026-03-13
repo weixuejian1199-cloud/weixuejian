@@ -1,6 +1,6 @@
 import {
   int, mysqlEnum, mysqlTable, text,
-  timestamp, varchar, json,
+  timestamp, varchar, json, bigint,
 } from "drizzle-orm/mysql-core";
 
 /**
@@ -77,6 +77,8 @@ export const reports = mysqlTable("reports", {
   fileUrl:    text("fileUrl"),
   fileSizeKb: int("fileSizeKb"),
   prompt:     text("prompt"),
+  /** Link to the ResultSet that produced this report */
+  resultSetId: varchar("resultSetId", { length: 64 }),
   status:     mysqlEnum("status", ["generating", "completed", "failed"])
                 .default("generating").notNull(),
   // Auto-expire after 7 days
@@ -87,6 +89,50 @@ export const reports = mysqlTable("reports", {
 
 export type Report = typeof reports.$inferSelect;
 export type InsertReport = typeof reports.$inferInsert;
+
+// ── ResultSets (V3.0 唯一真值源) ─────────────────────────────────────────────
+// 每次计算任务产出一个 ResultSet，包含 8 个可审计字段。
+// 页面显示、Excel 导出、IM 回复、AI 表达全部从 ResultSet 读取数字。
+
+export const resultSets = mysqlTable("result_sets", {
+  /** 计算任务唯一标识 */
+  id:                varchar("id", { length: 64 }).primaryKey(),
+  userId:            int("userId").notNull(),
+  /** 关联的 session ID（单文件）或 null（多文件合并） */
+  sessionId:         varchar("sessionId", { length: 64 }),
+  /** 使用的模板 ID（自由对话则为 null） */
+  templateId:        varchar("templateId", { length: 64 }),
+  /** 计算引擎版本号 */
+  computationVersion: varchar("computationVersion", { length: 32 }).notNull(),
+  /** 参与计算的源文件列表 JSON */
+  sourceFiles:       json("sourceFiles").notNull(),
+  /** 应用的筛选条件 JSON */
+  filtersApplied:    json("filtersApplied"),
+  /** 被跳过的脏数据行数 */
+  skippedRowsCount:  int("skippedRowsCount").default(0).notNull(),
+  /** 被跳过行的前 5 条示例 JSON */
+  skippedRowsSample: json("skippedRowsSample"),
+  /** 核心口径计算结果 JSON */
+  metrics:           json("metrics").notNull(),
+  /** 标准化后的数据行数 */
+  rowCount:          int("rowCount").default(0).notNull(),
+  /** 标准化后的字段列表 JSON */
+  fields:            json("fields"),
+  /** 标准化数据行的 S3 存储路径（大数据量不存 DB） */
+  dataS3Key:         varchar("dataS3Key", { length: 512 }),
+  /** 数据来源平台 */
+  sourcePlatform:    varchar("sourcePlatform", { length: 64 }),
+  /** 是否为多文件合并结果 */
+  isMultiFile:       int("isMultiFile").default(0).notNull(),
+  /** 清洗日志 JSON */
+  cleaningLog:       json("cleaningLog"),
+  /** ResultSet 生成时间（UTC 毫秒时间戳） */
+  generatedAt:       bigint("generatedAt", { mode: "number" }).notNull(),
+  createdAt:         timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ResultSetRecord = typeof resultSets.$inferSelect;
+export type InsertResultSetRecord = typeof resultSets.$inferInsert;
 
 // ── Scheduled Tasks ───────────────────────────────────────────────────────────
 
@@ -227,7 +273,6 @@ export const openclawTasks = mysqlTable("openclaw_tasks", {
   outputFiles: json("outputFiles").$type<Array<{ name: string; fileKey: string; fileUrl: string; mimeType: string }>>(),
   status:      mysqlEnum("status", ["pending", "processing", "completed", "failed"])
                  .default("pending").notNull(),
-  errorMsg:    text("errorMsg"),
   /** Milliseconds since epoch when task was picked up by OpenClaw */
   pickedUpAt:  timestamp("pickedUpAt"),
   /** Milliseconds since epoch when task was completed */
