@@ -60,7 +60,7 @@ function AppContent() {
   return (
     <div
       className={`flex flex-col h-screen overflow-hidden ${theme}`}
-      style={{ background: "var(--atlas-bg)" }}
+      style={{ background: "#f0f4f9" }}
     >
       <TopBar />
       <div className="flex flex-1 overflow-hidden">
@@ -94,9 +94,9 @@ export default function App() {
             position="bottom-right"
             toastOptions={{
               style: {
-                background: "var(--atlas-elevated)",
-                border: "1px solid var(--atlas-border)",
-                color: "var(--atlas-text)",
+                background: "#ffffff",
+                border: "1px solid #e5e7eb",
+                color: "#1f2937",
                 fontSize: "13px",
               },
             }}

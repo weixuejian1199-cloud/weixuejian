@@ -766,7 +766,7 @@ export default function MainWorkspace() {
       {/* Header */}
       <div
         className="px-5 py-2.5 flex items-center gap-2.5 flex-shrink-0"
-        style={{ borderBottom: "1px solid var(--atlas-border)" }}
+        style={{ borderBottom: "none" }}
       >
         <div
           className="w-6 h-6 rounded-md flex items-center justify-center"
@@ -928,20 +928,27 @@ export default function MainWorkspace() {
       </div>
 
       {/* Bottom input area */}
-      <div className="flex-shrink-0" style={{ borderTop: "1px solid var(--atlas-border)" }}>
+      <div className="flex-shrink-0" style={{ borderTop: "none" }}>
         <div className="w-full max-w-4xl mx-auto px-6 pt-3 pb-4">
 
           {/* Input box */}
           <div
-            className="rounded-xl overflow-hidden"
+            className="rounded-3xl overflow-hidden"
             style={{
-              background: "var(--atlas-elevated)",
-              border: "1px solid var(--atlas-border-2)",
-              transition: "border-color 0.15s ease",
+              background: "#ffffff",
+              border: "1px solid #e5e7eb",
+              transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+              maxWidth: "680px",
+              margin: "0 auto",
             }}
-            onFocusCapture={e => (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.4)"}
-            onBlurCapture={e => (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border-2)"}
-          >
+            onFocusCapture={e => {
+              (e.currentTarget as HTMLElement).style.borderColor = "#4f6ef7";
+              (e.currentTarget as HTMLElement).style.boxShadow = "0 0 0 3px rgba(79,110,247,0.1)";
+            }}
+            onBlurCapture={e => {
+              (e.currentTarget as HTMLElement).style.borderColor = "#e5e7eb";
+              (e.currentTarget as HTMLElement).style.boxShadow = "none";
+            }}          >
             <textarea
               ref={textareaRef}
               value={input}
@@ -956,7 +963,7 @@ export default function MainWorkspace() {
               rows={1}
               className="w-full bg-transparent outline-none resize-none px-4 pt-3 pb-1"
               style={{
-                color: "var(--atlas-text)",
+                color: "#1f2937",
                 fontSize: "14px",
                 lineHeight: "1.6",
                 minHeight: 42,
@@ -1019,8 +1026,8 @@ export default function MainWorkspace() {
                   disabled={!input.trim()}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
                   style={{
-                    background: input.trim() ? "var(--atlas-accent)" : "var(--atlas-border)",
-                    color: input.trim() ? "#fff" : "var(--atlas-text-3)",
+                    background: input.trim() ? "#4f6ef7" : "#e5e7eb",
+                    color: input.trim() ? "#fff" : "#9ca3af",
                     transition: "all 0.15s ease",
                   }}
                 >
@@ -1039,12 +1046,10 @@ export default function MainWorkspace() {
           <div className="w-full max-w-4xl mx-auto px-6">
             <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
               {[
-                { icon: "📊", label: "生成汇总报表", q: "帮我把上传的数据汇总生成报表" },
-                { icon: "🏪", label: "多门店数据合并", q: "__MERGE_INLINE__" },
-                { icon: "💰", label: "生成工资条", q: "帮我生成工资条" },
-                { icon: "📈", label: "销售数据分析", q: "帮我分析销售数据，找出趋势和排名" },
-                { icon: "💸", label: "计算分红", q: "帮我计算分红明细" },
-                { icon: "📅", label: "考勤汇总", q: "帮我汇总考勤数据" },
+                { label: "出纳模版", q: "帮我把上传的数据汇总生成报表" },
+                { label: "会计模版", q: "帮我生成利润表" },
+                { label: "HR 中心", q: "帮我生成工资条" },
+                { label: "数据分析", q: "帮我分析销售数据，找出趋势和排名" },
               ].map((pill, i) => (
                 <button
                   key={i}
@@ -1056,145 +1061,28 @@ export default function MainWorkspace() {
                       setTimeout(() => textareaRef.current?.focus(), 50);
                     }
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs whitespace-nowrap flex-shrink-0 transition-all"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm whitespace-nowrap flex-shrink-0 transition-all"
                   style={{
-                    background: "var(--atlas-elevated)",
-                    border: "1px solid var(--atlas-border)",
-                    color: "var(--atlas-text-2)",
+                    background: "#ffffff",
+                    border: "1px solid #e5e7eb",
+                    color: "#1f2937",
                   }}
                   onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.4)";
-                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
-                    (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.06)";
+                    (e.currentTarget as HTMLElement).style.borderColor = "#4f6ef7";
+                    (e.currentTarget as HTMLElement).style.color = "#4f6ef7";
+                    (e.currentTarget as HTMLElement).style.background = "#eff2fe";
                   }}
                   onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border)";
-                    (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
-                    (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
+                    (e.currentTarget as HTMLElement).style.borderColor = "#e5e7eb";
+                    (e.currentTarget as HTMLElement).style.color = "#1f2937";
+                    (e.currentTarget as HTMLElement).style.background = "#ffffff";
                   }}
                 >
-                  <span style={{ fontSize: "12px" }}>{pill.icon}</span>
                   <span>{pill.label}</span>
                 </button>
               ))}
 
-              {/* 更多 button */}
-              <button
-                onClick={() => setShowMorePanel(v => !v)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs whitespace-nowrap flex-shrink-0 transition-all"
-                style={{
-                  background: showMorePanel ? "rgba(91,140,255,0.1)" : "var(--atlas-elevated)",
-                  border: `1px solid ${showMorePanel ? "rgba(91,140,255,0.4)" : "var(--atlas-border)"}`,
-                  color: showMorePanel ? "var(--atlas-accent)" : "var(--atlas-text-2)",
-                }}
-              >
-                <span>更多</span>
-                <span style={{ fontSize: "10px", opacity: 0.7 }}>{showMorePanel ? "▲" : "▼"}</span>
-              </button>
             </div>
-
-            {/* More panel */}
-            <AnimatePresence>
-              {showMorePanel && (
-                <motion.div
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.18 }}
-                  className="mt-3"
-                >
-                  <div
-                    className="rounded-2xl p-4"
-                    style={{ background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)" }}
-                  >
-                    {[
-                      {
-                        category: "📊 报表生成",
-                        items: [
-                          { label: "生成销售汇总报表", q: "帮我生成销售汇总报表，包含各维度统计" },
-                          { label: "多门店对比表", q: "帮我生成多门店数据对比表" },
-                          { label: "月度/季度趋势报表", q: "帮我生成月度趋势报表，展示数据变化" },
-                          { label: "自定义格式报表", q: "帮我按自定义格式生成报表" },
-                        ],
-                      },
-                      {
-                        category: "💰 HR 薪资",
-                        items: [
-                          { label: "生成工资条", q: "帮我生成工资条，每人一张" },
-                          { label: "计算绩效奖金", q: "帮我根据数据计算绩效奖金" },
-                          { label: "计算分红明细", q: "帮我计算分红明细" },
-                          { label: "统计出勤与工资", q: "帮我统计出勤天数并计算对应工资" },
-                        ],
-                      },
-                      {
-                        category: "📅 考勤管理",
-                        items: [
-                          { label: "汇总考勤数据", q: "帮我汇总考勤数据" },
-                          { label: "统计迟到/早退/缺勤", q: "帮我统计迟到、早退、缺勤情况" },
-                          { label: "生成月度考勤报告", q: "帮我生成月度考勤报告" },
-                        ],
-                      },
-                      {
-                        category: "🔍 数据分析",
-                        items: [
-                          { label: "找出排名前10", q: "帮我找出数据中排名前10的记录" },
-                          { label: "分析数据异常", q: "帮我找出数据中的异常值、负值或重复记录" },
-                          { label: "按时间段对比", q: "帮我对比不同时间段的数据变化" },
-                          { label: "计算同比/环比", q: "帮我计算数据的同比和环比增长率" },
-                        ],
-                      },
-                      {
-                        category: "📁 文件处理",
-                        items: [
-                          { label: "合并多个 Excel", q: "帮我把多个 Excel 文件合并成一张表" },
-                          { label: "按条件拆分表格", q: "帮我按某个字段把表格拆分成多个分组" },
-                          { label: "清洗数据", q: "帮我清洗数据，去除重复行和空值" },
-                        ],
-                      },
-                    ].map((group, gi) => (
-                      <div key={gi} className={gi > 0 ? "mt-4" : ""}>
-                        <div
-                          className="text-xs font-medium mb-2"
-                          style={{ color: "var(--atlas-text-2)" }}
-                        >
-                          {group.category}
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {group.items.map((item, ii) => (
-                            <button
-                              key={ii}
-                              onClick={() => {
-                                setInput(item.q);
-                                setShowMorePanel(false);
-                                setTimeout(() => textareaRef.current?.focus(), 50);
-                              }}
-                              className="px-3 py-1.5 rounded-lg text-xs transition-all"
-                              style={{
-                                background: "var(--atlas-elevated)",
-                                border: "1px solid var(--atlas-border)",
-                                color: "var(--atlas-text-2)",
-                              }}
-                              onMouseEnter={e => {
-                                (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.4)";
-                                (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
-                                (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.06)";
-                              }}
-                              onMouseLeave={e => {
-                                (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border)";
-                                (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
-                                (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
-                              }}
-                            >
-                              {item.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
         </div>
       )}
@@ -2318,120 +2206,76 @@ function MessageBubble({
 
 function EmptyState({ onUpload, onQuickAsk }: { onUpload: () => void; onQuickAsk: (q: string) => void }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-8 w-full max-w-2xl mx-auto text-center">
-      {/* Brand — primary visual focus */}
+    <div className="flex flex-col items-center justify-center gap-6 w-full max-w-[680px] mx-auto text-center">
+      {/* Gemini-style greeting */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.92 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.35, ease: "easeOut" }}
-        className="flex flex-col items-center gap-4"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="flex flex-col items-center gap-3"
       >
-        {/* Logo mark */}
-        <div
-          className="w-20 h-20 rounded-3xl flex items-center justify-center"
+        <h1
           style={{
-            background: "linear-gradient(135deg, rgba(91,140,255,0.15) 0%, rgba(91,140,255,0.06) 100%)",
-            border: "1px solid rgba(91,140,255,0.22)",
-            boxShadow: "0 8px 32px rgba(91,140,255,0.12)",
+            fontSize: "28px",
+            fontWeight: 700,
+            color: "#1f2937",
+            letterSpacing: "-0.5px",
+            lineHeight: 1.3,
           }}
         >
-          <BarChart2 size={36} style={{ color: "var(--atlas-accent)" }} />
-        </div>
-        {/* Brand name + tagline */}
-        <div className="flex flex-col items-center gap-1.5">
-          <h2
-            className="font-bold tracking-tight"
-            style={{ color: "var(--atlas-text)", fontSize: "26px", letterSpacing: "-0.5px" }}
-          >
-            ATLAS
-          </h2>
-          <p
-            style={{
-              color: "var(--atlas-accent)",
-              fontSize: "13px",
-              letterSpacing: "0.06em",
-              fontWeight: 500,
-              opacity: 0.85,
-            }}
-          >
-            行政 · 财务 · 数据分析 三合一智能助手
-          </p>
-        </div>
-
+          <span style={{ color: "#4f6ef7" }}>✦</span> Hi，需要我帮你处理什么数据？
+        </h1>
+        <p
+          style={{
+            fontSize: "15px",
+            color: "#6b7280",
+            lineHeight: 1.6,
+            maxWidth: "480px",
+          }}
+        >
+          上传 Excel 或 CSV 文件，用一句话告诉我需求
+        </p>
       </motion.div>
 
-      {/* AI Welcome Bubble */}
+      {/* 4 quick tags per UI spec */}
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.18, duration: 0.35 }}
-        className="w-full flex gap-2.5"
+        transition={{ delay: 0.15, duration: 0.35 }}
+        className="flex items-center gap-2 flex-wrap justify-center"
       >
-        {/* Avatar */}
-        <div
-          className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
-          style={{
-            background: "rgba(91,140,255,0.12)",
-            border: "1px solid rgba(91,140,255,0.2)",
-          }}
-        >
-          <Sparkles size={12} style={{ color: "var(--atlas-accent)" }} />
-        </div>
-
-        <div
-          className="flex-1 px-4 py-3.5 rounded-2xl text-left"
-          style={{
-            background: "var(--atlas-surface)",
-            border: "1px solid var(--atlas-border)",
-          }}
-        >
-          <p style={{ color: "var(--atlas-text)", fontSize: "14px", lineHeight: "1.75" }}>
-            我是 ATLAS，专注行政、财务与数据分析的智能助手。
-          </p>
-          <p style={{ color: "var(--atlas-text-2)", fontSize: "14px", lineHeight: "1.75", marginTop: "6px" }}>
-            上传你的 Excel 或 CSV 文件，用一句话告诉我需求——比如「生成工资条」「汇总各店销售」「做考勤统计」。
-          </p>
-          <p style={{ color: "var(--atlas-text-2)", fontSize: "14px", lineHeight: "1.75", marginTop: "6px" }}>
-            我来处理数据、生成报表，你直接下载。
-          </p>
-
-          {/* 三步引导 */}
-          <div className="flex items-center gap-0 mt-4">
-            {[
-              { icon: "📁", label: "上传文件" },
-              { icon: "💬", label: "说需求" },
-              { icon: "📊", label: "下载报表" },
-            ].map((step, i) => (
-              <div key={i} className="flex items-center">
-                <div
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-                  style={{
-                    background: i === 0 ? "rgba(91,140,255,0.12)" : i === 1 ? "rgba(91,140,255,0.08)" : "rgba(91,140,255,0.06)",
-                    border: `1px solid rgba(91,140,255,${i === 0 ? "0.28" : i === 1 ? "0.20" : "0.14"})`,
-                  }}
-                >
-                  <span style={{ fontSize: "13px" }}>{step.icon}</span>
-                  <span
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: 500,
-                      color: i === 0 ? "var(--atlas-accent)" : i === 1 ? "rgba(91,140,255,0.85)" : "rgba(91,140,255,0.65)",
-                      letterSpacing: "0.02em",
-                    }}
-                  >
-                    {step.label}
-                  </span>
-                </div>
-                {i < 2 && (
-                  <ChevronRight
-                    size={13}
-                    style={{ color: "rgba(91,140,255,0.35)", margin: "0 2px", flexShrink: 0 }}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+        {[
+          { label: "出纳模版", q: "帮我把上传的数据汇总生成报表" },
+          { label: "会计模版", q: "帮我生成利润表" },
+          { label: "HR 中心", q: "帮我生成工资条" },
+          { label: "数据分析", q: "帮我分析销售数据，找出趋势和排名" },
+        ].map((tag, i) => (
+          <button
+            key={i}
+            onClick={() => {
+              onQuickAsk(tag.q);
+            }}
+            className="px-4 py-2 rounded-full text-sm transition-all"
+            style={{
+              background: "#ffffff",
+              border: "1px solid #e5e7eb",
+              color: "#1f2937",
+              fontWeight: 400,
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.borderColor = "#4f6ef7";
+              (e.currentTarget as HTMLElement).style.color = "#4f6ef7";
+              (e.currentTarget as HTMLElement).style.background = "#eff2fe";
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.borderColor = "#e5e7eb";
+              (e.currentTarget as HTMLElement).style.color = "#1f2937";
+              (e.currentTarget as HTMLElement).style.background = "#ffffff";
+            }}
+          >
+            {tag.label}
+          </button>
+        ))}
       </motion.div>
     </div>
   );

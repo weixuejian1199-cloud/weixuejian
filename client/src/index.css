@@ -4,9 +4,12 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ═══════════════════════════════════════════════════════════════
-   ATLAS V4.0 — Design System
-   Dark: #0F1115 cold black / Light: Manus-inspired warm white
-   Accent: #5B8CFF electric blue
+   ATLAS V1.0 GA — Gemini-Inspired Design System
+   Theme: Light only (no dark mode)
+   Background: #f0f4f9 (Gemini page bg)
+   Brand: #4f6ef7 (blue)
+   Font: -apple-system → Noto Sans SC
+   Radius: 24px (chat), 12px (cards), 8px (buttons)
 ═══════════════════════════════════════════════════════════════ */
 
 @theme inline {
@@ -37,97 +40,99 @@
   --color-sidebar-border: var(--sidebar-border);
 }
 
-/* ── Light Theme (default) ────────────────────────────────────── */
+/* ── Light Theme (default & only) — Gemini-inspired ──────────── */
 :root,
 .light {
-  --radius: 0.5rem;
+  --radius: 0.75rem;
 
-  /* Shadcn compat */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.15 0.01 260);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.15 0.01 260);
+  /* Shadcn compat — mapped from UI spec hex colors */
+  --background: oklch(0.965 0.01 250);   /* #f0f4f9 */
+  --foreground: oklch(0.18 0.02 260);    /* #1f2937 */
+  --card: oklch(1 0 0);                  /* #ffffff */
+  --card-foreground: oklch(0.18 0.02 260);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.15 0.01 260);
-  --primary: oklch(0.55 0.18 255);
+  --popover-foreground: oklch(0.18 0.02 260);
+  --primary: oklch(0.52 0.17 265);       /* #4f6ef7 */
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.96 0.003 260);
-  --secondary-foreground: oklch(0.35 0.01 260);
-  --muted: oklch(0.96 0.003 260);
-  --muted-foreground: oklch(0.55 0.01 260);
-  --accent: oklch(0.96 0.003 260);
-  --accent-foreground: oklch(0.15 0.01 260);
-  --destructive: oklch(0.58 0.22 25);
-  --border: oklch(0.9 0.005 260);
-  --input: oklch(0.9 0.005 260);
-  --ring: oklch(0.55 0.18 255);
-  --sidebar: oklch(0.97 0.003 260);
-  --sidebar-foreground: oklch(0.15 0.01 260);
-  --sidebar-border: oklch(0.9 0.005 260);
+  --secondary: oklch(0.965 0.01 250);    /* #f0f4f9 */
+  --secondary-foreground: oklch(0.35 0.02 260);
+  --muted: oklch(0.965 0.01 250);
+  --muted-foreground: oklch(0.48 0.02 250); /* #6b7280 */
+  --accent: oklch(0.965 0.01 250);
+  --accent-foreground: oklch(0.18 0.02 260);
+  --destructive: oklch(0.58 0.22 25);    /* #ef4444 */
+  --border: oklch(0.92 0.005 250);       /* #e5e7eb */
+  --input: oklch(0.92 0.005 250);
+  --ring: oklch(0.52 0.17 265);          /* #4f6ef7 */
+  --sidebar: oklch(0.965 0.01 250);      /* same as page bg */
+  --sidebar-foreground: oklch(0.18 0.02 260);
+  --sidebar-border: oklch(0.92 0.005 250);
 
-  /* ATLAS custom tokens — light */
-  --atlas-bg:          #FFFFFF;
-  --atlas-surface:     #F7F8FA;
-  --atlas-elevated:    #FFFFFF;
-  --atlas-card:        #FFFFFF;
-  --atlas-border:      rgba(0,0,0,0.07);
-  --atlas-border-2:    rgba(0,0,0,0.12);
-  --atlas-text:        #111318;
-  --atlas-text-2:      #4B5568;
-  --atlas-text-3:      #9CA3AF;
-  --atlas-accent:      #4F7FFF;
-  --atlas-accent-2:    #6B4FFF;
-  --atlas-success:     #10B981;
-  --atlas-warning:     #F59E0B;
-  --atlas-danger:      #EF4444;
-  --atlas-sidebar-w:   360px;
-  --atlas-topbar-h:    48px;
-  --atlas-radius:      8px;
+  /* ── ATLAS Design Tokens (from UI spec) ──────────────────── */
+  --atlas-bg:          #f0f4f9;
+  --atlas-surface:     #ffffff;
+  --atlas-card:        #ffffff;
+  --atlas-text:        #1f2937;
+  --atlas-text-2:      #6b7280;
+  --atlas-text-3:      #9ca3af;
+  --atlas-brand:       #4f6ef7;
+  --atlas-brand-light: #eff2fe;
+  --atlas-user-bubble: #e8eaed;
+  --atlas-success:     #10b981;
+  --atlas-error:       #ef4444;
+  --atlas-warning:     #f59e0b;
+  --atlas-border:      #e5e7eb;
+
+  /* Missing aliases (referenced in existing components) */
+  --atlas-elevated:      #ffffff;
+  --atlas-border-2:      #d1d5db;
+  --atlas-accent:        #4f6ef7;
+  --atlas-danger:        #ef4444;
+  --atlas-text-muted:    #9ca3af;
+  --atlas-nav-active-bg: rgba(79,110,247,0.08);
+  --atlas-nav-hover-bg:  rgba(0,0,0,0.04);
+
+  /* Layout dimensions */
+  --atlas-sidebar-w:     200px;
+  --atlas-sidebar-w-min: 48px;
+  --atlas-topbar-h:      56px;
+  --atlas-topbar-h-mobile: 48px;
+  --atlas-chat-max-w:    680px;
+  --atlas-msg-max-w:     720px;
+
+  /* Shadows — subtle, Gemini-style */
+  --atlas-shadow-sm:   0 1px 3px rgba(0,0,0,0.04);
+  --atlas-shadow-md:   0 4px 12px rgba(0,0,0,0.06);
+  --atlas-shadow-lg:   0 8px 24px rgba(0,0,0,0.08);
+
+  /* Nav states */
+  --atlas-nav-hover:   rgba(0,0,0,0.04);
+  --atlas-nav-active:  rgba(79,110,247,0.08);
 }
 
-/* ── Dark Theme ────────────────────────────────────────────────── */
+/* ── Dark Theme (disabled per spec, kept for shadcn compat) ──── */
 .dark {
-  /* Shadcn compat */
-  --background: oklch(0.12 0.008 260);
-  --foreground: oklch(0.92 0.005 260);
-  --card: oklch(0.16 0.008 260);
-  --card-foreground: oklch(0.92 0.005 260);
-  --popover: oklch(0.16 0.008 260);
-  --popover-foreground: oklch(0.92 0.005 260);
-  --primary: oklch(0.62 0.18 255);
+  --background: oklch(0.965 0.01 250);
+  --foreground: oklch(0.18 0.02 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.02 260);
+  --primary: oklch(0.52 0.17 265);
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.20 0.008 260);
-  --secondary-foreground: oklch(0.75 0.01 260);
-  --muted: oklch(0.20 0.008 260);
-  --muted-foreground: oklch(0.55 0.01 260);
-  --accent: oklch(0.20 0.008 260);
-  --accent-foreground: oklch(0.92 0.005 260);
-  --destructive: oklch(0.65 0.22 25);
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 10%);
-  --ring: oklch(0.62 0.18 255);
-  --sidebar: oklch(0.155 0.008 260);
-  --sidebar-foreground: oklch(0.92 0.005 260);
-  --sidebar-border: oklch(1 0 0 / 8%);
-
-  /* ATLAS custom tokens — dark */
-  --atlas-bg:          #0F1115;
-  --atlas-surface:     #181B21;
-  --atlas-elevated:    #1E2128;
-  --atlas-card:        #22262F;
-  --atlas-border:      rgba(255,255,255,0.07);
-  --atlas-border-2:    rgba(255,255,255,0.12);
-  --atlas-text:        #E8EAF0;
-  --atlas-text-2:      #9BA3B4;
-  --atlas-text-3:      #5C6478;
-  --atlas-accent:      #5B8CFF;
-  --atlas-accent-2:    #7B5FFF;
-  --atlas-success:     #34D399;
-  --atlas-warning:     #FBBF24;
-  --atlas-danger:      #F87171;
-  --atlas-sidebar-w:   360px;
-  --atlas-topbar-h:    48px;
-  --atlas-radius:      8px;
+  --secondary: oklch(0.965 0.01 250);
+  --secondary-foreground: oklch(0.35 0.02 260);
+  --muted: oklch(0.965 0.01 250);
+  --muted-foreground: oklch(0.48 0.02 250);
+  --accent: oklch(0.965 0.01 250);
+  --accent-foreground: oklch(0.18 0.02 260);
+  --destructive: oklch(0.58 0.22 25);
+  --border: oklch(0.92 0.005 250);
+  --input: oklch(0.92 0.005 250);
+  --ring: oklch(0.52 0.17 265);
+  --sidebar: oklch(0.965 0.01 250);
+  --sidebar-foreground: oklch(0.18 0.02 260);
+  --sidebar-border: oklch(0.92 0.005 250);
 }
 
 /* ── Base ─────────────────────────────────────────────────────── */
@@ -135,9 +140,10 @@
   * { @apply border-border outline-ring/50; }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
     -webkit-font-smoothing: antialiased;
-    transition: background-color 0.25s ease, color 0.25s ease;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
   button:not(:disabled), [role="button"]:not([aria-disabled="true"]),
   [type="button"]:not(:disabled), [type="submit"]:not(:disabled),
@@ -154,52 +160,142 @@
   @media (min-width: 1024px) { .container { padding-left: 2rem; padding-right: 2rem; max-width: 1280px; } }
   .flex { min-height: 0; min-width: 0; }
 
-  /* Atlas chip */
-  .atlas-chip {
-    display: inline-flex; align-items: center;
-    padding: 4px 10px; border-radius: 20px;
-    font-size: 11px; font-weight: 500;
-    background: var(--atlas-elevated);
-    border: 1px solid var(--atlas-border-2);
-    color: var(--atlas-text-2);
-    transition: all 0.15s ease;
-    cursor: pointer;
-  }
-  .atlas-chip:hover {
-    background: rgba(91,140,255,0.1);
-    border-color: rgba(91,140,255,0.3);
-    color: var(--atlas-accent);
-  }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 4px; height: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--atlas-border-2); border-radius: 2px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--atlas-text-3); }
-
-  /* Sidebar transition */
+  /* ── Sidebar ──────────────────────────────────────────────── */
   .atlas-sidebar {
-    transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.22s ease,
-                transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: width 200ms ease, opacity 200ms ease;
   }
 
-  /* Theme transition */
-  *, *::before, *::after {
-    transition-property: background-color, border-color, color;
-    transition-duration: 0.2s;
-    transition-timing-function: ease;
+  /* ── Quick Tags (capsule buttons) ─────────────────────────── */
+  .atlas-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 400;
+    background: var(--atlas-surface);
+    border: 1px solid var(--atlas-border);
+    color: var(--atlas-text);
+    cursor: pointer;
+    transition: all 150ms ease;
+    user-select: none;
+  }
+  .atlas-tag:hover {
+    background: var(--atlas-brand-light);
+    border-color: var(--atlas-brand);
+    color: var(--atlas-brand);
+  }
+  .atlas-tag:active {
+    transform: scale(0.95);
   }
 
-  /* Pulse dot animation */
-  @keyframes pulse-dot {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(0.85); }
+  /* ── Chat Input Box ───────────────────────────────────────── */
+  .atlas-chat-input {
+    background: var(--atlas-surface);
+    border: 1px solid var(--atlas-border);
+    border-radius: 24px;
+    max-width: var(--atlas-chat-max-w);
+    box-shadow: var(--atlas-shadow-sm);
+    transition: border-color 200ms ease, box-shadow 200ms ease;
   }
-  .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+  .atlas-chat-input:focus-within {
+    border-color: var(--atlas-brand);
+    box-shadow: 0 0 0 3px rgba(79,110,247,0.12);
+  }
 
-  /* Thinking dots bounce animation */
-  @keyframes thinking-bounce {
+  /* ── User Message Bubble ──────────────────────────────────── */
+  .atlas-user-bubble {
+    background: var(--atlas-user-bubble);
+    border-radius: 20px 20px 4px 20px;
+    padding: 10px 16px;
+    color: var(--atlas-text);
+    font-size: 15px;
+    line-height: 1.7;
+    max-width: var(--atlas-msg-max-w);
+  }
+
+  /* ── AI Reply (no background, Gemini-style) ───────────────── */
+  .atlas-ai-reply {
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--atlas-text);
+    max-width: var(--atlas-msg-max-w);
+  }
+
+  /* ── File Card ────────────────────────────────────────────── */
+  .atlas-file-card {
+    background: var(--atlas-surface);
+    border: 1px solid var(--atlas-border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    box-shadow: var(--atlas-shadow-sm);
+    transition: box-shadow 200ms ease;
+  }
+  .atlas-file-card:hover {
+    box-shadow: var(--atlas-shadow-md);
+  }
+
+  /* ── Table Summary Card ───────────────────────────────────── */
+  .atlas-table-card {
+    background: var(--atlas-surface);
+    border: 1px solid var(--atlas-border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--atlas-shadow-sm);
+  }
+
+  /* ── Error Card ───────────────────────────────────────────── */
+  .atlas-error-card {
+    background: var(--atlas-surface);
+    border: 1px solid var(--atlas-border);
+    border-left: 4px solid var(--atlas-error);
+    border-radius: 12px;
+    padding: 16px;
+  }
+
+  /* ── Overlay / Modal ──────────────────────────────────────── */
+  .atlas-overlay-backdrop {
+    background: rgba(0,0,0,0.4);
+    animation: atlas-fade-in 250ms ease-out;
+  }
+  .atlas-overlay-panel {
+    animation: atlas-slide-up 250ms ease-out;
+  }
+
+  /* ── Number Highlight ─────────────────────────────────────── */
+  .atlas-num-amount {
+    color: var(--atlas-brand);
+    font-weight: 700;
+  }
+  .atlas-num-positive {
+    color: var(--atlas-success);
+    font-weight: 700;
+  }
+  .atlas-num-negative {
+    color: var(--atlas-error);
+    font-weight: 700;
+  }
+
+  /* ── Scrollbar — thin, minimal ────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.1);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+
+  /* ── Processing Status Spinner ────────────────────────────── */
+  @keyframes atlas-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  .atlas-spinner {
+    animation: atlas-spin 1s linear infinite;
+  }
+
+  /* ── Thinking Dots ────────────────────────────────────────── */
+  @keyframes atlas-thinking {
     0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
     40% { transform: translateY(-4px); opacity: 1; }
   }
@@ -208,30 +304,39 @@
     height: 5px;
     border-radius: 50%;
     background: var(--atlas-text-3);
-    animation: thinking-bounce 1.2s ease-in-out infinite;
+    animation: atlas-thinking 1.2s ease-in-out infinite;
   }
 
-  /* Number counter */
-  @keyframes count-up {
-    from { opacity: 0; transform: translateY(4px); }
+  /* ── Animations ───────────────────────────────────────────── */
+  @keyframes atlas-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes atlas-slide-up {
+    from { opacity: 0; transform: translateY(16px); }
     to { opacity: 1; transform: translateY(0); }
   }
-  .count-up { animation: count-up 0.4s ease forwards; }
+  @keyframes atlas-slide-right {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+  }
+  @keyframes atlas-msg-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 
-  /* Dashboard card shimmer */
-  @keyframes shimmer {
+  .atlas-animate-in {
+    animation: atlas-msg-in 200ms ease-out;
+  }
+
+  /* ── Shimmer (loading skeleton) ───────────────────────────── */
+  @keyframes atlas-shimmer {
     0% { background-position: -200% 0; }
     100% { background-position: 200% 0; }
   }
-  .shimmer {
-    background: linear-gradient(90deg, var(--atlas-elevated) 25%, var(--atlas-card) 50%, var(--atlas-elevated) 75%);
+  .atlas-shimmer {
+    background: linear-gradient(90deg, #f0f4f9 25%, #ffffff 50%, #f0f4f9 75%);
     background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-  }
-
-  /* Progress bar shimmer sweep */
-  @keyframes shimmer-sweep {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(350%); }
+    animation: atlas-shimmer 1.5s infinite;
   }
 }
