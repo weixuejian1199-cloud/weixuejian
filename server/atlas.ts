@@ -31,9 +31,7 @@ import { storagePut, storageGet } from "./storage";
 import { getSession, createSession, updateSession, createReport, updateReport, getReport, getSimilarExamples, getUserReports, getDb } from "./db";
 import { authenticateRequest } from "./_core/auth";
 import { isOpenClawEnabled, callOpenClaw, callOpenClawStream, getPresignedUrlsForSessions } from "./openclaw";
-import { runPipelineInBackground, runParsedPipelineInBackground, getResultSetForSession } from "./pipeline/bridge";
-import { exportFromResultSet } from "./pipeline/delivery";
-import { buildExpressionPrompt, buildDataSummary } from "./pipeline/expression";
+import { runPipelineInBackground } from "./pipeline/bridge";
 import { pushAtlasMsgToOpenClaw, pushQwenReplyToOpenClaw } from "./im/wsServer";
 import { openclawTasks, chatConversations, chatMessages, personalTemplates } from "../drizzle/schema";
 
@@ -1936,7 +1934,7 @@ ${lines.join('\n')}
 - 如果找不到精确匹配，选最相近的字段并告知用户
 `;
 
-      let systemPrompt = `你是 ATLAS，一个具备行政管理、财务分析、数据分析三大专业能力的智能业务助手。你是 ATLAS 智能报表平台的一部分。
+      const systemPrompt = `你是 ATLAS，一个具备行政管理、财务分析、数据分析三大专业能力的智能业务助手。你是 ATLAS 智能报表平台的一部分。
 
 ══ ATLAS 系统能力（你必须知道）══
 你所在的 ATLAS 系统具备以下功能：
@@ -2398,30 +2396,6 @@ ${dataTable}`}
 - 这个块不会显示给用户，前端会自动解析成按钮
 -- **正文质量优先，不要为了生成追问而拖长正文**`;
       const totalRows = data.length;
-
-      // ═══ V3.0: 尝试注入 ResultSet 精确指标到 systemPrompt ═══
-      try {
-        // 对于单文件场景，尝试从 Pipeline ResultSet 获取精确计算结果
-        if (!isMultiFile && allSessionIds.length === 1) {
-          const resultSet = await getResultSetForSession(allSessionIds[0]);
-          if (resultSet && resultSet.metrics.length > 0) {
-            const expressionOutput = buildExpressionPrompt(resultSet);
-            // 将 ResultSet 精确指标追加到 systemPrompt 中
-            const resultSetSection = `\n\n══ V3.0 Pipeline 精确计算结果（最高优先级数字来源）══\n` +
-              `⚠️ 以下指标由 Pipeline 确定性计算引擎 v${resultSet.computationVersion} 产出，使用 Decimal.js 精确计算。\n` +
-              `⚠️ 当以下指标与旧版统计摘要冲突时，必须以此处的数字为准。\n\n` +
-              expressionOutput.resultSetSummary +
-              (expressionOutput.cleaningLogSummary ? `\n\n数据清洗说明：\n${expressionOutput.cleaningLogSummary}` : '') +
-              `\n══ V3.0 精确计算结果结束 ══`;
-            // 注入到 systemPrompt 末尾
-            systemPrompt += resultSetSection;
-            console.log(`[Atlas] V3.0 ResultSet injected into chat prompt, ${resultSet.metrics.length} metrics`);
-          }
-        }
-      } catch (rsErr: any) {
-        console.warn(`[Atlas] V3.0 ResultSet injection failed (non-fatal): ${rsErr?.message}`);
-      }
-
           // ── OpenClaw SSE streaming (if configured) ──────────────────────
       if (isOpenClawEnabled()) {
         console.log("[Atlas] Routing to OpenClaw SSE channel");
@@ -2517,7 +2491,6 @@ ${dataTable}`}
 
   // ── POST /api/atlas/generate-report ──────────────────────────────────────
   // Generate Excel report based on user requirement
-  // V3.0: 优先从 Pipeline ResultSet 导出全量数据，fallback 到旧 AI 生成逻辑
 
   app.post("/api/atlas/generate-report", optionalAuth, async (req: Request, res: Response) => {
     try {
@@ -2547,83 +2520,6 @@ ${dataTable}`}
         return;
       }
 
-      const userId = (req as any).userId || 0;
-
-      // ═══ V3.0 新路径：优先从 ResultSet 导出全量数据 ═══
-      try {
-        const resultSet = await getResultSetForSession(session_id);
-        if (resultSet && resultSet.standardizedRows.length > 0) {
-          console.log(`[Atlas] V3.0 ResultSet found for session ${session_id}, rows: ${resultSet.rowCount}, exporting full data`);
-
-          // 使用 Delivery 层导出全量数据
-          const exportResult = await exportFromResultSet(resultSet, {
-            format: "xlsx",
-            fileName: report_title || requirement.slice(0, 30).replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g, "_"),
-            includeSummary: true,
-            includeCleaningLog: true,
-          });
-
-          // 构建摘要信息
-          const dataSummary = buildDataSummary(resultSet);
-          const metricsInfo = resultSet.metrics
-            .filter((m: any) => "value" in m && m.value !== undefined)
-            .map((m: any) => `${m.displayName}: ${m.value} ${m.unit}`)
-            .join("\n");
-
-          // Persist report to DB
-          const reportId = nanoid();
-          const safeTitle = (report_title || requirement.slice(0, 30) || "report").replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g, "_").slice(0, 40);
-          await createReport({
-            id: reportId,
-            sessionId: session_id,
-            userId,
-            title: safeTitle,
-            filename: exportResult.fileName,
-            fileKey: exportResult.s3Key,
-            fileUrl: exportResult.url,
-            fileSizeKb: Math.ceil(exportResult.fileSize / 1024),
-            prompt: requirement,
-            status: "completed",
-            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-          });
-
-          const aiMessage = `✅ **${safeTitle}** 已生成完毕！（V3.0 全量导出）\n\n` +
-            `📊 数据概况：\n${dataSummary}\n\n` +
-            (metricsInfo ? `📈 核心指标：\n${metricsInfo}\n\n` : "") +
-            `报表包含 ${resultSet.rowCount} 行全量数据（含数据明细、汇总统计、清洗日志 3 个工作表）。\n` +
-            `⚠️ 数据来源：Pipeline 确定性计算引擎 v${resultSet.computationVersion}，非 AI 生成。`;
-
-          // 构建预览 sheets（前50行）供前端展示
-          const previewHeaders = resultSet.fields.slice(0, 15); // 最多15列预览
-          const previewRows = resultSet.standardizedRows.slice(0, 50).map(row =>
-            previewHeaders.map(h => row[h] ?? "")
-          );
-
-          res.json({
-            report_id: reportId,
-            filename: exportResult.fileName,
-            download_url: exportResult.url,
-            ai_message: aiMessage,
-            plan: {
-              title: safeTitle,
-              sheets: [{
-                name: "数据明细",
-                headers: previewHeaders,
-                rows: previewRows as (string | number)[][],
-                summary: `全量 ${resultSet.rowCount} 行数据（预览前 50 行）`,
-              }],
-              insights: metricsInfo || "全量数据已导出",
-            },
-          });
-          return;
-        }
-      } catch (rsErr: any) {
-        console.warn(`[Atlas] V3.0 ResultSet export failed, falling back to legacy: ${rsErr?.message}`);
-      }
-
-      // ═══ 旧路径 Fallback：AI 生成 JSON → Excel ═══
-      console.log(`[Atlas] No ResultSet for session ${session_id}, using legacy AI generation`);
-
       // Load parsed data from S3
       const data = await loadSessionData(session_id);
       if (!data) {
@@ -2634,6 +2530,7 @@ ${dataTable}`}
       const openai = createLLM();
       const fieldNames = dfInfo.fields.map((f: FieldInfo) => f.name).join(", ");
       // Build full-dataset statistics summary to inject into AI prompt
+      // This ensures AI uses accurate stats even when only 500 sample rows are provided
       const numericFields = dfInfo.fields.filter((f: FieldInfo) => f.type === 'numeric');
       const fullStatsLines: string[] = [];
       for (const f of numericFields) {
@@ -2709,11 +2606,13 @@ ${sampleRows}
           messages: [{ role: "user", content: aiPrompt }],
         });
         const rawText = await aiResult.text;
+        // Extract JSON from response
         const jsonMatch = rawText.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new Error("AI did not return valid JSON");
         reportData = JSON.parse(jsonMatch[0]);
       } catch (e) {
         console.warn("[Atlas] AI report generation failed, using fallback:", e);
+        // Fallback: create a simple summary sheet
         const headers = dfInfo.fields.map((f: FieldInfo) => f.name);
         const rows = data.slice(0, 30).map(row => headers.map((h: string) => row[h] ?? ""));
         reportData = {
@@ -2733,6 +2632,8 @@ ${sampleRows}
       for (const sheet of reportData.sheets) {
         const wsData = [sheet.headers, ...sheet.rows];
         const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+        // Style header row (bold)
         const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
         for (let c = range.s.c; c <= range.e.c; c++) {
           const cellAddr = XLSX.utils.encode_cell({ r: 0, c });
@@ -2740,6 +2641,8 @@ ${sampleRows}
             ws[cellAddr].s = { font: { bold: true }, fill: { fgColor: { rgb: "1E3A5F" } } };
           }
         }
+
+        // Auto column widths
         ws["!cols"] = sheet.headers.map(h => ({ wch: Math.max(h.length * 2, 12) }));
         XLSX.utils.book_append_sheet(workbook, ws, sheet.name.slice(0, 31));
       }
@@ -2752,7 +2655,8 @@ ${sampleRows}
       const reportKey = `atlas-reports/${reportId}-${safeTitle}.xlsx`;
       const { url: reportUrl } = await storagePut(reportKey, excelBuffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
-      // 4. Persist report to DB
+      // 4. Persist report to DB (replaces in-memory reportStore)
+      const userId = (req as any).userId || 0;
       await createReport({
         id: reportId,
         sessionId: session_id,
@@ -2764,10 +2668,10 @@ ${sampleRows}
         fileSizeKb: Math.ceil(excelBuffer.length / 1024),
         prompt: requirement,
         status: "completed",
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       });
 
-      const aiMessage = `✅ **${reportData.title}** 已生成完毕！（旧版导出，数据量受限）\n\n${reportData.insights}\n\n报表包含 ${reportData.sheets.length} 个工作表：${reportData.sheets.map(s => s.name).join("、")}。\n⚠️ 提示：重新上传文件可启用 V3.0 全量导出。`;
+      const aiMessage = `✅ **${reportData.title}** 已生成完毕！\n\n${reportData.insights}\n\n报表包含 ${reportData.sheets.length} 个工作表：${reportData.sheets.map(s => s.name).join("、")}。`;
 
       res.json({
         report_id: reportId,
@@ -3360,8 +3264,7 @@ ${sampleRows}
           ...(f.productGroupedTop5 !== undefined ? { productGroupedTop5: f.productGroupedTop5 } : {}),
           ...(f.productGroupByField !== undefined ? { productGroupByField: f.productGroupByField } : {}),
         })),
-        // V3.0: Store full data rows for full-quantity export (no longer truncated to 500)
-        preview: parsed.preview || [],
+        preview: (parsed.preview || []).slice(0, 500),
         ...(parsed.groupByField !== undefined ? { groupByField: parsed.groupByField } : {}),
         ...(parsed.allGroupByFields !== undefined ? { allGroupByFields: parsed.allGroupByFields } : {}),
         // Phase 1: 透传前端生成的 dataQuality 元数据，存入 dfInfo JSON 列
@@ -3595,14 +3498,6 @@ ${sampleRows}
           await storeUploadResult(sessionId, finalResult);
           await updateSession(sessionId, { status: "ready" });
           console.log(`[Atlas] upload-parsed complete: ${sessionId}, rows=${dfInfo.row_count}`);
-
-          // V3.0: 在后台运行 Pipeline，从前端已解析的全量数据生成 ResultSet
-          // 不阻塞旧流程，失败也不影响现有功能
-          const fullRows = parsed.preview || [];
-          if (fullRows.length > 0) {
-            runParsedPipelineInBackground(sessionId, userId, fullRows, originalname)
-              .catch(err => console.warn(`[Pipeline] Parsed pipeline failed (non-blocking):`, err?.message));
-          }
         } catch (bgErr: any) {
           console.error(`[Atlas] upload-parsed background failed:`, bgErr);
           await updateSession(sessionId, { status: "error" }).catch(() => {});

@@ -17,7 +17,7 @@
 
 import { nanoid } from "nanoid";
 import { eq } from "drizzle-orm";
-import { runPipeline, runPipelineFromParsedData, type PipelineInput, type ParsedDataPipelineInput, type PipelineOutput } from "./index";
+import { runPipeline, type PipelineInput, type PipelineOutput } from "./index";
 import { storagePut, storageGet } from "../storage";
 import { getDb } from "../db";
 import { resultSets, sessions } from "../../drizzle/schema";
@@ -67,44 +67,6 @@ export async function runPipelineInBackground(
   } catch (err: any) {
     // Pipeline 失败不影响旧流程
     console.error(`[Pipeline] Background pipeline error for session ${sessionId}:`, err?.message);
-  }
-}
-
-/**
- * V3.0: 从前端已解析的 JSON 数据在后台运行 Pipeline。
- * 用于 upload-parsed 端点（前端用 SheetJS 解析后发送 JSON）。
- */
-export async function runParsedPipelineInBackground(
-  sessionId: string,
-  userId: number,
-  rows: Record<string, unknown>[],
-  fileName: string,
-  templateId?: string
-): Promise<void> {
-  try {
-    console.log(`[Pipeline] Starting parsed-data pipeline for session ${sessionId}, rows=${rows.length}`);
-
-    const input: ParsedDataPipelineInput = {
-      rows,
-      fileName,
-      userId: String(userId),
-      templateId,
-    };
-
-    const output = await runPipelineFromParsedData(input);
-
-    if (output.success && output.resultSet) {
-      await saveResultSet(output.resultSet, sessionId, userId);
-      console.log(`[Pipeline] ResultSet saved for parsed session ${sessionId}, jobId: ${output.resultSet.jobId}, rows: ${output.resultSet.rowCount}`);
-    } else {
-      console.warn(`[Pipeline] Parsed pipeline failed for session ${sessionId}: ${output.errorSummary}`);
-      const errorCount = output.context.errors.filter(
-        e => e.level === "fatal" || e.level === "critical"
-      ).length;
-      console.warn(`[Pipeline] ${errorCount} critical errors in parsed pipeline`);
-    }
-  } catch (err: any) {
-    console.error(`[Pipeline] Parsed pipeline error for session ${sessionId}:`, err?.message);
   }
 }
 

@@ -156,7 +156,7 @@ export interface ParsedFileData {
   totalRowCount: number;
   colCount: number;
   fields: ParsedField[];
-  preview: Record<string, unknown>[]; // full data rows (V3.0: send all rows for full-quantity export)
+  preview: Record<string, unknown>[]; // first 500 rows
   sampleRows: Record<string, unknown>[]; // first 20 rows for AI prompt
   // The dimension field used for groupedTop5 (e.g. "达人昵称")
   groupByField?: string;
@@ -169,8 +169,6 @@ export interface ParsedFileData {
   categoryGroupedTop20?: Record<string, CategoryGroupedEntry[]>;
 }
 
-// Send first 500 rows as preview to backend (avoids HTTP 413 on large files)
-// Full-quantity export is handled by Pipeline which reads from original file buffer
 const PREVIEW_ROWS = 500;
 const SAMPLE_ROWS = 20;
 // Store top 50 for grouping so AI can return Top10/Top20/Top50 accurately
@@ -786,10 +784,7 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     totalRowCount
   );
 
-  // V3.0: Send all rows for full-quantity export
-  // For very large files (>50k rows), truncate to prevent JSON serialization timeout
-  const MAX_FULL_ROWS = 50000;
-  const preview = rows.length <= MAX_FULL_ROWS ? rows : rows.slice(0, MAX_FULL_ROWS);
+  const preview = rows.slice(0, PREVIEW_ROWS);
   const sampleRows = rows.slice(0, SAMPLE_ROWS);
 
   // P4a：将达人/商品 Top20 合并进 categoryGroupedTop20，让三级匹配逻辑能命中这两个维度
