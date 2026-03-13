@@ -238,6 +238,10 @@ interface AtlasContextType {
   updateScheduledTask: (id: string, updates: Partial<ScheduledTask>) => void;
   removeScheduledTask: (id: string) => void;
 
+  // File Panel
+  filePanelOpen: boolean;
+  setFilePanelOpen: (open: boolean) => void;
+
   // Settings
   backendUrl: string;
   setBackendUrl: (url: string) => void;
@@ -289,6 +293,7 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
   });
   const [user, setUser] = useState<User | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [filePanelOpen, setFilePanelOpen] = useState(false);
   const [tasks, setTasks] = useState<Task[]>(() => {
     try {
       const saved = localStorage.getItem("atlas_tasks");
@@ -607,6 +612,7 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
       platforms, addPlatform, updatePlatform, removePlatform,
       apiKeys, addApiKey, updateApiKey, removeApiKey,
       scheduledTasks, addScheduledTask, updateScheduledTask, removeScheduledTask,
+      filePanelOpen, setFilePanelOpen,
       backendUrl, setBackendUrl,
       apiKey, setApiKey,
       history: tasks, setHistory: setTasks as any, addHistory,

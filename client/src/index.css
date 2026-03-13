@@ -64,12 +64,13 @@
   --border: oklch(0.92 0.005 250);       /* #e5e7eb */
   --input: oklch(0.92 0.005 250);
   --ring: oklch(0.52 0.17 265);          /* #4f6ef7 */
-  --sidebar: oklch(0.965 0.01 250);      /* same as page bg */
+  --sidebar: oklch(0.94 0.012 250);     /* slightly darker than page bg for depth */
   --sidebar-foreground: oklch(0.18 0.02 260);
   --sidebar-border: oklch(0.92 0.005 250);
 
   /* ── ATLAS Design Tokens (from UI spec) ──────────────────── */
   --atlas-bg:          #f0f4f9;
+  --atlas-sidebar-bg:  #e8ecf4;  /* sidebar bg — darker than #f0f4f9 for depth */
   --atlas-surface:     #ffffff;
   --atlas-card:        #ffffff;
   --atlas-text:        #1f2937;

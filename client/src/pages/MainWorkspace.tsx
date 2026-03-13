@@ -878,11 +878,104 @@ export default function MainWorkspace() {
       <div className="flex-1 overflow-y-auto">
         <div className={
           messages.length === 0
-            ? "h-full flex items-center justify-center px-6"
+            ? "h-full flex flex-col px-6"
             : "w-full max-w-4xl mx-auto px-6 py-5 space-y-4"
         }>
+          {/* Gemini-style: push content to ~40% from top */}
+          {messages.length === 0 && <div style={{ flex: '0 0 35%' }} />}
           {messages.length === 0 ? (
-            <EmptyState onUpload={() => fileInputRef.current?.click()} onQuickAsk={(q) => handleSend(q)} />
+            <>
+              <EmptyState onUpload={() => fileInputRef.current?.click()} onQuickAsk={(q) => handleSend(q)} />
+
+              {/* Gemini-style: input box below greeting, centered */}
+              <div className="w-full max-w-[680px] mx-auto mt-6">
+                <div
+                  className="rounded-3xl overflow-hidden"
+                  style={{
+                    background: "#ffffff",
+                    border: "1px solid #e5e7eb",
+                    transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+                  }}
+                  onFocusCapture={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = "#4f6ef7";
+                    (e.currentTarget as HTMLElement).style.boxShadow = "0 0 0 3px rgba(79,110,247,0.1)";
+                  }}
+                  onBlurCapture={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = "#e5e7eb";
+                    (e.currentTarget as HTMLElement).style.boxShadow = "none";
+                  }}
+                >
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="直接提问，或拖入 Excel/CSV 文件开始分析..."
+                    disabled={isGenerating}
+                    rows={1}
+                    className="w-full bg-transparent outline-none resize-none px-4 pt-3 pb-1"
+                    style={{
+                      color: "#1f2937",
+                      fontSize: "14px",
+                      lineHeight: "1.6",
+                      minHeight: 42,
+                      maxHeight: 160,
+                      fontFamily: "inherit",
+                    }}
+                  />
+                  <div className="flex items-center justify-between px-3 pb-2.5 pt-1">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+                        style={{ background: "#f9fafb", border: "1px solid #e5e7eb", color: "#6b7280" }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(79,110,247,0.4)"; (e.currentTarget as HTMLElement).style.color = "#4f6ef7"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#e5e7eb"; (e.currentTarget as HTMLElement).style.color = "#6b7280"; }}
+                        title="上传文件（支持多选）"
+                      >
+                        <Paperclip size={12} />
+                        上传文件
+                      </button>
+                      <span className="text-xs" style={{ color: "#9ca3af" }}>Enter 发送</span>
+                    </div>
+                    <button
+                      onClick={() => handleSend()}
+                      disabled={!input.trim()}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                      style={{
+                        background: input.trim() ? "#4f6ef7" : "#e5e7eb",
+                        color: input.trim() ? "#fff" : "#9ca3af",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      <Send size={13} />
+                      发送
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quick tags below input box */}
+                <div className="flex items-center gap-2 flex-wrap justify-center mt-3">
+                  {[
+                    { label: "出纳模版", q: "帮我把上传的数据汇总生成报表" },
+                    { label: "会计模版", q: "帮我生成利润表" },
+                    { label: "HR 中心", q: "帮我生成工资条" },
+                    { label: "数据分析", q: "帮我分析销售数据，找出趋势和排名" },
+                  ].map((tag, i) => (
+                    <button
+                      key={i}
+                      onClick={() => { setInput(tag.q); setTimeout(() => textareaRef.current?.focus(), 50); }}
+                      className="px-3.5 py-2 rounded-full text-sm whitespace-nowrap transition-all"
+                      style={{ background: "#ffffff", border: "1px solid #e5e7eb", color: "#1f2937" }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#4f6ef7"; (e.currentTarget as HTMLElement).style.color = "#4f6ef7"; (e.currentTarget as HTMLElement).style.background = "#eff2fe"; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "#e5e7eb"; (e.currentTarget as HTMLElement).style.color = "#1f2937"; (e.currentTarget as HTMLElement).style.background = "#ffffff"; }}
+                    >
+                      {tag.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
           ) : (() => {
             const startIdx = Math.max(0, messages.length - visibleCount);
             const visibleMessages = messages.slice(startIdx).filter(m => !m.isHidden);
@@ -2110,21 +2203,37 @@ function MessageBubble({
         )}
 
         {/* Download button + Task Complete Rating */}
-        {message.report_id && message.report_filename && (
+        {/* Case 1: report_id exists → use proxy download via /api/atlas/download/:reportId */}
+        {/* Case 2: download_url exists (merge/payslip/attendance) → direct S3 URL download */}
+        {((message.report_id && message.report_filename) || (message.download_url && message.report_filename)) && (
           <motion.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
             className="mt-2 space-y-2"
           >
-            {/* Task complete bar */}
-            <TaskCompleteBar
-              reportId={message.report_id}
-              messagePreview={message.content.slice(0, 500)}
-            />
+            {/* Task complete bar (only for report_id based reports) */}
+            {message.report_id && (
+              <TaskCompleteBar
+                reportId={message.report_id}
+                messagePreview={message.content.slice(0, 500)}
+              />
+            )}
             {/* Download button */}
             <button
-              onClick={() => onDownload(message.report_id!, message.report_filename!)}
+              onClick={() => {
+                if (message.download_url) {
+                  // Direct S3 URL download (merge/payslip/attendance)
+                  const a = document.createElement("a");
+                  a.href = message.download_url;
+                  a.download = message.report_filename || "download.xlsx";
+                  a.click();
+                  toast.success("开始下载");
+                } else if (message.report_id) {
+                  // Proxy download via /api/atlas/download/:reportId
+                  onDownload(message.report_id, message.report_filename!);
+                }
+              }}
               className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all text-sm"
               style={{
                 background: "rgba(52,211,153,0.1)",
@@ -2200,7 +2309,7 @@ function MessageBubble({
 
 function EmptyState({ onUpload, onQuickAsk }: { onUpload: () => void; onQuickAsk: (q: string) => void }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-6 w-full max-w-[680px] mx-auto text-center">
+    <div className="flex flex-col items-center gap-6 w-full max-w-[680px] mx-auto text-center">
       {/* Gemini-style greeting */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}

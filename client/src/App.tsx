@@ -22,6 +22,7 @@ import SearchPage from "./pages/SearchPage";
 import LibraryPage from "./pages/LibraryPage";
 import InvitePage from "./pages/InvitePage";
 import HRCenterPage from "./pages/HRCenterPage";
+import FilePanel from "./components/FilePanel";
 
 function AppContent() {
   const { activeNav, theme, showLoginModal, setUser } = useAtlas();
@@ -81,6 +82,7 @@ function AppContent() {
         </main>
       </div>
       {showLoginModal && <LoginModal />}
+      <FilePanel />
     </div>
   );
 }

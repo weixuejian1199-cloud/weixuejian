@@ -60,8 +60,10 @@ function AtlasTableView({
   fullRows?: (string | number)[][];
   isCategoryTable?: boolean;
 }) {
-  // P1 闸门：分类统计类表格且 fullRows 未命中时，禁止导出
-  const exportBlocked = isCategoryTable === true && !fullRows;
+  // P1 闸门：分类统计类表格且 fullRows 未命中时，显示警告但允许导出 AI rows
+  // 之前是禁止导出，现在改为允许导出但提示数据可能不完整
+  const exportWarning = isCategoryTable === true && !fullRows;
+  const exportBlocked = false; // 不再禁止导出
   const [sortCol, setSortCol] = useState<number>(data.sortBy ?? -1);
   const [sortDir, setSortDir] = useState<"asc" | "desc">(data.sortDir ?? "desc");
   // 是否展开全部行（默认折叠，只显示前20行）
@@ -118,9 +120,9 @@ function AtlasTableView({
   };
 
   const handleExportExcel = () => {
-    if (exportBlocked) {
-      alert('无法保证全量准确性，本次禁止导出。\n原因：分类统计数据未能匹配到全量预计算结果，导出将仅包含样本数据而非全量。');
-      return;
+    if (exportWarning) {
+      const proceed = confirm('提示：当前导出为 AI 分析数据（非全量预计算数据），数据量可能不完整。\n\n是否继续导出？');
+      if (!proceed) return;
     }
     const exportRows = getExportRows();
     // P5：行数断言 —— 若 fullRows 存在，实际导出行数必须等于 fullRows.length
@@ -140,9 +142,9 @@ function AtlasTableView({
   };
 
   const handleExportCsv = () => {
-    if (exportBlocked) {
-      alert('无法保证全量准确性，本次禁止导出。\n原因：分类统计数据未能匹配到全量预计算结果，导出将仅包含样本数据而非全量。');
-      return;
+    if (exportWarning) {
+      const proceed = confirm('提示：当前导出为 AI 分析数据（非全量预计算数据），数据量可能不完整。\n\n是否继续导出？');
+      if (!proceed) return;
     }
     const exportRows = getExportRows();
     // P5：行数断言
@@ -309,54 +311,46 @@ function AtlasTableView({
         <button
           onClick={handleExportExcel}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-          style={exportBlocked ? {
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            color: "var(--atlas-text-3)",
-            cursor: "not-allowed",
-            opacity: 0.5,
+          style={exportWarning ? {
+            background: "rgba(234,179,8,0.1)",
+            border: "1px solid rgba(234,179,8,0.25)",
+            color: "#eab308",
           } : {
             background: "rgba(52,211,153,0.1)",
             border: "1px solid rgba(52,211,153,0.25)",
             color: "var(--atlas-success)",
           }}
-          onMouseEnter={e => { if (!exportBlocked) (e.currentTarget as HTMLElement).style.background = "rgba(52,211,153,0.18)"; }}
-          onMouseLeave={e => { if (!exportBlocked) (e.currentTarget as HTMLElement).style.background = "rgba(52,211,153,0.1)"; }}
-          title={exportBlocked ? "无法保证全量准确性，本次禁止导出" : (fullRows ? `导出完整数据（${exportCount} 行）` : "导出 Excel")}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = exportWarning ? "rgba(234,179,8,0.18)" : "rgba(52,211,153,0.18)"}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = exportWarning ? "rgba(234,179,8,0.1)" : "rgba(52,211,153,0.1)"}
+          title={exportWarning ? "当前为 AI 分析数据，可能不完整" : (fullRows ? `导出完整数据（${exportCount} 行）` : "导出 Excel")}
         >
           <Download size={12} />
-          {exportBlocked ? "导出 Excel（禁用）" : `导出 Excel${fullRows ? ` (${exportCount}行)` : ""}`}
+          {exportWarning ? `导出 Excel（AI数据）` : `导出 Excel${fullRows ? ` (${exportCount}行)` : ""}`}
         </button>
         <button
           onClick={handleExportCsv}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-          style={exportBlocked ? {
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            color: "var(--atlas-text-3)",
-            cursor: "not-allowed",
-            opacity: 0.5,
+          style={exportWarning ? {
+            background: "rgba(234,179,8,0.06)",
+            border: "1px solid rgba(234,179,8,0.2)",
+            color: "#ca8a04",
           } : {
             background: "var(--atlas-elevated)",
             border: "1px solid var(--atlas-border-2)",
             color: "var(--atlas-text-2)",
           }}
           onMouseEnter={e => {
-            if (!exportBlocked) {
-              (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.4)";
-              (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
-            }
+            (e.currentTarget as HTMLElement).style.borderColor = exportWarning ? "rgba(234,179,8,0.4)" : "rgba(91,140,255,0.4)";
+            (e.currentTarget as HTMLElement).style.color = exportWarning ? "#eab308" : "var(--atlas-accent)";
           }}
           onMouseLeave={e => {
-            if (!exportBlocked) {
-              (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border-2)";
-              (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
-            }
+            (e.currentTarget as HTMLElement).style.borderColor = exportWarning ? "rgba(234,179,8,0.2)" : "var(--atlas-border-2)";
+            (e.currentTarget as HTMLElement).style.color = exportWarning ? "#ca8a04" : "var(--atlas-text-2)";
           }}
-          title={exportBlocked ? "无法保证全量准确性，本次禁止导出" : (fullRows ? `导出完整数据（${exportCount} 行）` : "导出 CSV")}
+          title={exportWarning ? "当前为 AI 分析数据，可能不完整" : (fullRows ? `导出完整数据（${exportCount} 行）` : "导出 CSV")}
         >
           <Download size={12} />
-          {exportBlocked ? "导出 CSV（禁用）" : `导出 CSV${fullRows ? ` (${exportCount}行)` : ""}`}
+          {exportWarning ? `导出 CSV（AI数据）` : `导出 CSV${fullRows ? ` (${exportCount}行)` : ""}`}
         </button>
         {onAdjust && (
           <button

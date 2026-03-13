@@ -2529,7 +2529,22 @@ ${dataTable}`}
       // 1. Ask AI to generate the report data as JSON
       const openai = createLLM();
       const fieldNames = dfInfo.fields.map((f: FieldInfo) => f.name).join(", ");
-      // Pass ALL data (up to 500 rows) so AI can generate accurate reports based on real data
+      // Build full-dataset statistics summary to inject into AI prompt
+      // This ensures AI uses accurate stats even when only 500 sample rows are provided
+      const numericFields = dfInfo.fields.filter((f: FieldInfo) => f.type === 'numeric');
+      const fullStatsLines: string[] = [];
+      for (const f of numericFields) {
+        if (f.sum !== undefined && f.avg !== undefined) {
+          fullStatsLines.push(
+            `${f.name}: 总计=${f.sum.toFixed(2)}, 均值=${f.avg.toFixed(2)}, 最大=${(f.max ?? 0).toFixed(2)}, 最小=${(f.min ?? 0).toFixed(2)}`
+          );
+        }
+      }
+      const fullStatsSection = fullStatsLines.length > 0
+        ? `\n══ 全量统计摘要（基于 ${dfInfo.row_count.toLocaleString()} 行全量数据，非样本）══\n重要约束：当需要汇总/合计/均值等指标时，必须直接引用以下全量统计值，禁止对样本行重新计算。\n${fullStatsLines.join('\n')}\n══ 全量统计摘要结束 ══\n`
+        : '';
+
+      // Pass sample data (up to 500 rows) for field understanding
       const maxReportRows = Math.min(data.length, 500);
       const allReportData = data.slice(0, maxReportRows);
       const sampleRows = JSON.stringify(allReportData, null, 2);
@@ -2541,12 +2556,12 @@ ${dataTable}`}
         ? `\n\n参考示例（这是用户评分较高的历史报表，请学习其分析风格和结构）：\n${ragExamples.map((ex, i) => `示例${i + 1}：需求「${ex.prompt}」，用户评分：${ex.rating}星`).join("\n")}`
         : "";
 
-      const aiPrompt = `你是数据分析专家。根据以下完整数据和需求，生成一份准确的报表。${ragSection}
+      const aiPrompt = `你是数据分析专家。根据以下数据和需求，生成一份准确的报表。${ragSection}
 
-数据文件：${filename}（${dfInfo.row_count}行 x ${dfInfo.col_count}列）
+数据文件：${filename}（全量 ${dfInfo.row_count}行 x ${dfInfo.col_count}列）
 字段：${fieldNames}
-
-完整数据（共${maxReportRows}行，这是所有数据）：
+${fullStatsSection}
+样本数据（共${maxReportRows}行，仅用于理解字段含义，不代表全量数据）：
 ${sampleRows}
 
 用户需求：${requirement}
@@ -2559,7 +2574,7 @@ ${sampleRows}
       "name": "Sheet名称",
       "headers": ["入1", "入2", "入3"],
       "rows": [
-        ["倃1", "倃2", "倃3"]
+        ["值1", "值2", "值3"]
       ],
       "summary": "本sheet的说明"
     }
@@ -2569,9 +2584,9 @@ ${sampleRows}
 
 要求：
 - 最多3个Sheet
-- 每个Sheet最多50行数据
-- 数据要准确，基于实际数据计算
-- 如果需要汇总，请按需求进行分组汇总
+- 每个Sheet最多100行数据
+- 数据要准确，汇总统计必须使用上方全量统计摘要中的数据
+- 如果需要分组汇总，请基于样本数据中的分组字段进行 GROUP BY
 - 只返回JSON，不要其他文字`;
 
       let reportData: {
