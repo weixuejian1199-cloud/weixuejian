@@ -169,9 +169,9 @@ export interface ParsedFileData {
   categoryGroupedTop20?: Record<string, CategoryGroupedEntry[]>;
 }
 
-// V3.0: Send ALL rows to backend for full-quantity export via Pipeline
-// Previously was 500, which caused exports to be truncated
-const PREVIEW_ROWS = Infinity;
+// Send first 500 rows as preview to backend (avoids HTTP 413 on large files)
+// Full-quantity export is handled by Pipeline which reads from original file buffer
+const PREVIEW_ROWS = 500;
 const SAMPLE_ROWS = 20;
 // Store top 50 for grouping so AI can return Top10/Top20/Top50 accurately
 // Increased from 20 to fix city/product dimension truncation (e.g. 22 cities only showing 20)
