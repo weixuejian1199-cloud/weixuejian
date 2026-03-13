@@ -4,7 +4,7 @@
  * No nav items (HR/模板/数据中枢 removed — accessed via quick tags)
  * Width: 200px expanded / 48px collapsed
  */
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Settings, X, LogIn, Loader2,
@@ -28,6 +28,13 @@ export default function Sidebar() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [taskMenuOpen, setTaskMenuOpen] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 600);
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 600);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
 
   // ── Double-click rename state ─────────────────────────────────────────────
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -37,8 +44,8 @@ export default function Sidebar() {
   // Responsive: auto-collapse on mobile (<600px per spec)
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 600) setSidebarOpen(false);
-      else setSidebarOpen(true);
+      if (window.innerWidth < 600) { setSidebarOpen(false); setIsMobile(true); }
+      else { setSidebarOpen(true); setIsMobile(false); }
     };
     handleResize();
     window.addEventListener("resize", handleResize);
@@ -68,7 +75,7 @@ export default function Sidebar() {
   const handleNewTask = () => {
     createNewTask();
     setActiveNav("home");
-    if (window.innerWidth < 600) setSidebarOpen(false);
+    if (isMobile) setSidebarOpen(false);
   };
 
   const deleteSessionMut = trpc.session.delete.useMutation();
@@ -143,7 +150,7 @@ export default function Sidebar() {
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-30"
-            style={{ background: "rgba(0,0,0,0.4)", display: window.innerWidth < 600 ? "block" : "none" }}
+            style={{ background: "rgba(0,0,0,0.4)", display: isMobile ? "block" : "none" }}
             onClick={() => setSidebarOpen(false)}
           />
         )}
@@ -317,7 +324,7 @@ export default function Sidebar() {
                             </div>
                           ) : (
                             <button
-                              onClick={() => { setActiveTaskId(task.id); setActiveNav("home"); if (window.innerWidth < 600) setSidebarOpen(false); }}
+                              onClick={() => { setActiveTaskId(task.id); setActiveNav("home"); if (isMobile) setSidebarOpen(false); }}
                               onDoubleClick={e => { e.preventDefault(); startRename(task.id, task.title); }}
                               className="w-full text-left px-2 py-1.5"
                             >

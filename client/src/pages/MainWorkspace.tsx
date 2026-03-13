@@ -1472,11 +1472,10 @@ function MessageBubble({
         <div
           className="max-w-[72%] px-4 py-2.5 rounded-2xl"
           style={{
-            background: "rgba(91,140,255,0.12)",
-            border: "1px solid rgba(91,140,255,0.2)",
+            background: "#e8eaed",
           }}
         >
-          <p style={{ color: "var(--atlas-text)", fontSize: "14px", lineHeight: "1.6" }}>
+          <p style={{ color: "#1f1f1f", fontSize: "14px", lineHeight: "1.6" }}>
             {message.content}
           </p>
         </div>
@@ -1492,13 +1491,12 @@ function MessageBubble({
     >
       {/* Avatar */}
       <div
-        className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+        className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
         style={{
-          background: "rgba(91,140,255,0.12)",
-          border: "1px solid rgba(91,140,255,0.2)",
+          background: "linear-gradient(135deg, #4f6ef7, #7b93fa)",
         }}
       >
-        <Sparkles size={12} style={{ color: "var(--atlas-accent)" }} />
+        <Sparkles size={13} style={{ color: "#ffffff" }} />
       </div>
 
       <div className="flex-1 min-w-0">
@@ -1789,11 +1787,7 @@ function MessageBubble({
         )}
         {/* Message bubble */}
         <div
-          className="px-4 py-3 rounded-2xl"
-          style={{
-            background: "var(--atlas-surface)",
-            border: "1px solid var(--atlas-border)",
-          }}
+          className="py-1"
         >
           {/* @ts-ignore */}
           {message.isAnalyzing ? (
@@ -2175,19 +2169,19 @@ function MessageBubble({
                 onClick={() => onQuickAction(action.prompt)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                 style={{
-                  background: "var(--atlas-elevated)",
-                  border: "1px solid var(--atlas-border-2)",
-                  color: "var(--atlas-text-2)",
+                  background: "#f0f4f9",
+                  border: "1px solid #d3dbe5",
+                  color: "#444746",
                 }}
                 onMouseEnter={e => {
-                  (e.currentTarget as HTMLElement).style.borderColor = "rgba(91,140,255,0.5)";
-                  (e.currentTarget as HTMLElement).style.color = "var(--atlas-accent)";
-                  (e.currentTarget as HTMLElement).style.background = "rgba(91,140,255,0.06)";
+                  (e.currentTarget as HTMLElement).style.borderColor = "#4f6ef7";
+                  (e.currentTarget as HTMLElement).style.color = "#4f6ef7";
+                  (e.currentTarget as HTMLElement).style.background = "rgba(79,110,247,0.06)";
                 }}
                 onMouseLeave={e => {
-                  (e.currentTarget as HTMLElement).style.borderColor = "var(--atlas-border-2)";
-                  (e.currentTarget as HTMLElement).style.color = "var(--atlas-text-2)";
-                  (e.currentTarget as HTMLElement).style.background = "var(--atlas-elevated)";
+                  (e.currentTarget as HTMLElement).style.borderColor = "#d3dbe5";
+                  (e.currentTarget as HTMLElement).style.color = "#444746";
+                  (e.currentTarget as HTMLElement).style.background = "#f0f4f9";
                 }}
               >
                 <span>{action.icon}</span>

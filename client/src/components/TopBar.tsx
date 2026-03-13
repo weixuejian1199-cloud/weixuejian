@@ -5,7 +5,7 @@
  * Center: conversation title (or ATLAS on home)
  * Right: 📎 file clip + ⋮ more + user avatar
  */
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Menu, Paperclip, MoreVertical, LogOut, Settings, Loader2 } from "lucide-react";
 import { useAtlas, type NavItem } from "@/contexts/AtlasContext";
 import { trpc } from "@/lib/trpc";
@@ -146,6 +146,14 @@ export default function TopBar() {
     user, setShowLoginModal,
   } = useAtlas();
 
+  // Responsive mobile detection
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 600);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 600);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+
   // Get current conversation title
   const activeTask = tasks.find(t => t.id === activeTaskId);
   const title = activeTask?.title || "";
@@ -175,7 +183,7 @@ export default function TopBar() {
         className="w-9 h-9 rounded-full flex items-center justify-center transition-all flex-shrink-0"
         style={{
           color: "#6b7280",
-          display: window.innerWidth < 600 ? "flex" : "none",
+          display: isMobile ? "flex" : "none",
         }}
         onClick={() => setSidebarOpen(!sidebarOpen)}
         onMouseEnter={e => {
