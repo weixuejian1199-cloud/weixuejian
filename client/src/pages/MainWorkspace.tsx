@@ -18,6 +18,7 @@ import {
 import { Streamdown } from "streamdown";
 import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTableRenderer";
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, uploadParsed, type SuggestedAction } from "@/lib/api";
 import { parseFile, type DataQuality } from "@/lib/parseFile"; // v14.2-groupby-fix
 import { trpc } from "@/lib/trpc";
@@ -835,9 +836,11 @@ export default function MainWorkspace() {
                       e.preventDefault();
                       removeUploadedFile(f.id);
                     }}
-                    className="ml-0.5 rounded-full flex items-center justify-center opacity-0 group-hover/chip:opacity-100 transition-opacity hover:bg-black/20"
-                    style={{ width: 14, height: 14, flexShrink: 0, fontSize: "11px", lineHeight: 1, color: "currentColor" }}
+                    className="ml-0.5 rounded-full flex items-center justify-center transition-all hover:bg-black/20"
+                    style={{ width: 16, height: 16, flexShrink: 0, fontSize: "11px", lineHeight: 1, color: "currentColor", opacity: 0.65 }}
                     title="删除文件"
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "0.65"; }}
                   >
                     <X size={9} />
                   </button>
@@ -874,14 +877,20 @@ export default function MainWorkspace() {
       <div className="flex-1 overflow-y-auto">
         <div className={
           messages.length === 0
-            ? "h-full flex flex-col px-6"
+            ? "h-full flex flex-col items-center justify-center px-6"
             : "w-full max-w-4xl mx-auto px-6 py-5 space-y-4"
         }>
-          {/* Gemini-style: push content to ~40% from top */}
-          {messages.length === 0 && <div style={{ flex: '0 0 35%' }} />}
           {messages.length === 0 ? (
             <>
-              <EmptyState onUpload={() => fileInputRef.current?.click()} onQuickAsk={(q) => handleSend(q)} />
+              <EmptyState
+                onUpload={() => fileInputRef.current?.click()}
+                onQuickAsk={(q) => handleSend(q)}
+                input={input}
+                setInput={setInput}
+                onSend={() => handleSend()}
+                onKeyDown={handleKeyDown}
+                isGenerating={isGenerating}
+              />
             </>
           ) : (() => {
             const startIdx = Math.max(0, messages.length - visibleCount);
@@ -927,8 +936,8 @@ export default function MainWorkspace() {
         </div>
       </div>
 
-      {/* Bottom input area */}
-      <div className="flex-shrink-0" style={{ borderTop: "none" }}>
+      {/* Bottom input area - only shown when there are messages */}
+      {messages.length > 0 && <div className="flex-shrink-0" style={{ borderTop: "none" }}>
         <div className="w-full max-w-4xl mx-auto px-6 pt-3 pb-4">
 
           {/* Input box */}
@@ -1038,7 +1047,7 @@ export default function MainWorkspace() {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Quick action pills removed per UI spec */}
 
@@ -2169,187 +2178,235 @@ function MessageBubble({
 
 // -- EmptyState ------------------------------------------------------------------
 
-const FEATURE_CARDS = [
+const FEATURE_CARDS_V2 = [
   {
-    icon: "📊",
-    title: "数据分析",
-    desc: "智能分析数据规律和趋势",
-    q: "帮我分析这份数据，找出关键规律和异常值",
-    color: "#4f6ef7",
-    bg: "rgba(79,110,247,0.08)",
+    emoji: "🏪",
+    title: "出纳报表",
+    desc: "收支汇总、现金流水",
+    q: "帮我把上传的数据汇总生成出纳报表",
+    color: "#ef4444",
+    bg: "rgba(239,68,68,0.07)",
+    border: "rgba(239,68,68,0.15)",
   },
   {
-    icon: "📄",
-    title: "生成报表",
-    desc: "自动生成专业汇总报表",
-    q: "帮我把上传的数据汇总生成报表，包含关键指标和统计",
-    color: "#10b981",
-    bg: "rgba(16,185,129,0.08)",
+    emoji: "🧮",
+    title: "会计报表",
+    desc: "利润表、资产负债表",
+    q: "帮我生成利润表和资产负债表",
+    color: "#3b82f6",
+    bg: "rgba(59,130,246,0.07)",
+    border: "rgba(59,130,246,0.15)",
   },
   {
-    icon: "👥",
+    emoji: "👤",
     title: "HR 中心",
-    desc: "工资条、考勤、绩效表",
+    desc: "工资条、考勤、绩效",
     q: "帮我生成工资条",
     color: "#f59e0b",
-    bg: "rgba(245,158,11,0.08)",
+    bg: "rgba(245,158,11,0.07)",
+    border: "rgba(245,158,11,0.15)",
   },
   {
-    icon: "🏆",
-    title: "排名分析",
-    desc: "快速找出 Top/Bottom 数据",
-    q: "帮我找出数据中排名前10和后10的记录",
-    color: "#8b5cf6",
-    bg: "rgba(139,92,246,0.08)",
+    emoji: "📊",
+    title: "数据分析",
+    desc: "趋势分析、排名统计",
+    q: "帮我分析这份数据，找出关键规律和趋势",
+    color: "#3b82f6",
+    bg: "rgba(59,130,246,0.07)",
+    border: "rgba(59,130,246,0.15)",
   },
 ];
 
-function EmptyState({ onUpload, onQuickAsk }: { onUpload: () => void; onQuickAsk: (q: string) => void }) {
-  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 600);
+type EmptyStateProps = {
+  onUpload: () => void;
+  onQuickAsk: (q: string) => void;
+  input: string;
+  setInput: (v: string) => void;
+  onSend: () => void;
+  onKeyDown: (e: React.KeyboardEvent) => void;
+  isGenerating: boolean;
+};
+
+function EmptyState({ onUpload, onQuickAsk, input, setInput, onSend, onKeyDown, isGenerating }: EmptyStateProps) {
+  const { user } = useAuth();
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize textarea
   useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 600);
-    window.addEventListener("resize", handler);
-    return () => window.removeEventListener("resize", handler);
-  }, []);
+    if (inputRef.current) {
+      inputRef.current.style.height = "auto";
+      inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 120) + "px";
+    }
+  }, [input]);
 
-  if (isMobile) {
-    // Mobile: greeting + 4 feature cards
-    return (
-      <div className="flex flex-col w-full px-2" style={{ gap: 20 }}>
-        {/* Greeting */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: "easeOut" }}
-          className="text-center pt-2"
-        >
-          <h1 style={{ fontSize: "22px", fontWeight: 700, color: "#1f2937", lineHeight: 1.3 }}>
-            <span style={{ color: "#4f6ef7" }}>✶</span> Hi，我是 ATLAS
-          </h1>
-          <p style={{ fontSize: "14px", color: "#6b7280", marginTop: 6, lineHeight: 1.5 }}>
-            上传文件或直接提问，开始智能分析
-          </p>
-        </motion.div>
+  const displayName = user?.name ? user.name.split(" ")[0] : "";
 
-        {/* Upload button */}
-        <motion.button
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.3 }}
-          onClick={onUpload}
-          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-medium transition-all"
-          style={{
-            background: "#4f6ef7",
-            color: "#ffffff",
-            fontSize: "15px",
-            border: "none",
-          }}
-          onMouseEnter={e => (e.currentTarget.style.opacity = "0.9")}
-          onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
-        >
-          <Upload size={16} />
-          上传 Excel / CSV 文件
-        </motion.button>
-
-        {/* 4 feature cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.18, duration: 0.3 }}
-          className="grid grid-cols-2 gap-3"
-        >
-          {FEATURE_CARDS.map((card, i) => (
-            <button
-              key={i}
-              onClick={() => onQuickAsk(card.q)}
-              className="flex flex-col items-start p-4 rounded-2xl text-left transition-all"
-              style={{
-                background: card.bg,
-                border: `1px solid ${card.color}22`,
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "0.85"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
-            >
-              <span style={{ fontSize: "22px", lineHeight: 1 }}>{card.icon}</span>
-              <span style={{ fontSize: "13px", fontWeight: 600, color: "#1f2937", marginTop: 8 }}>{card.title}</span>
-              <span style={{ fontSize: "11px", color: "#6b7280", marginTop: 3, lineHeight: 1.4 }}>{card.desc}</span>
-            </button>
-          ))}
-        </motion.div>
-      </div>
-    );
-  }
-
-  // Desktop: Gemini-style greeting + quick tags
   return (
-    <div className="flex flex-col items-center gap-6 w-full max-w-[680px] mx-auto text-center">
-      {/* Gemini-style greeting */}
+    <div className="flex flex-col items-center w-full max-w-[720px] mx-auto" style={{ gap: 28 }}>
+      {/* Greeting */}
       <motion.div
-        initial={{ opacity: 0, y: 12 }}
+        initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
-        className="flex flex-col items-center gap-3"
+        className="text-left w-full"
+        style={{ paddingLeft: 4 }}
       >
+        {/* ATLAS diamond icon + Hi line */}
+        <div className="flex items-center gap-2 mb-2">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L15.5 8.5L22 12L15.5 15.5L12 22L8.5 15.5L2 12L8.5 8.5L12 2Z" fill="#4f6ef7" />
+            <path d="M12 2L15.5 8.5L22 12L15.5 15.5L12 22L8.5 15.5L2 12L8.5 8.5L12 2Z" fill="url(#atlasGrad)" />
+            <defs>
+              <linearGradient id="atlasGrad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="#4f6ef7" />
+                <stop offset="50%" stopColor="#10b981" />
+                <stop offset="100%" stopColor="#f59e0b" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <span style={{ fontSize: "15px", color: "#6b7280", fontWeight: 500 }}>
+            Hi{displayName ? ` ${displayName}` : ""}
+          </span>
+        </div>
         <h1
           style={{
-            fontSize: "28px",
+            fontSize: "clamp(22px, 3.5vw, 30px)",
             fontWeight: 700,
             color: "#1f2937",
             letterSpacing: "-0.5px",
-            lineHeight: 1.3,
+            lineHeight: 1.25,
           }}
         >
-          <span style={{ color: "#4f6ef7" }}>✶</span> Hi，需要我帮你处理什么数据？
+          需要我帮你处理什么数据？
         </h1>
-        <p
-          style={{
-            fontSize: "15px",
-            color: "#6b7280",
-            lineHeight: 1.6,
-            maxWidth: "480px",
-          }}
-        >
-          上传 Excel 或 CSV 文件，用一句话告诉我需求
-        </p>
       </motion.div>
 
-      {/* 4 quick tags per UI spec */}
+      {/* Centered input box */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1, duration: 0.35 }}
+        className="w-full"
+      >
+        <div
+          className="rounded-3xl overflow-hidden w-full"
+          style={{
+            background: "#ffffff",
+            border: "1px solid #e2e5ea",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+            transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+          }}
+          onFocusCapture={e => {
+            (e.currentTarget as HTMLElement).style.borderColor = "#4f6ef7";
+            (e.currentTarget as HTMLElement).style.boxShadow = "0 0 0 3px rgba(79,110,247,0.1)";
+          }}
+          onBlurCapture={e => {
+            (e.currentTarget as HTMLElement).style.borderColor = "#e2e5ea";
+            (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 12px rgba(0,0,0,0.06)";
+          }}
+        >
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="上传文件或直接提问，开始分析..."
+            disabled={isGenerating}
+            rows={1}
+            className="w-full bg-transparent outline-none resize-none px-5 pt-4 pb-2"
+            style={{
+              color: "#1f2937",
+              fontSize: "15px",
+              lineHeight: "1.6",
+              minHeight: 48,
+              maxHeight: 120,
+              fontFamily: "inherit",
+            }}
+          />
+          <div className="flex items-center justify-between px-4 pb-3 pt-1">
+            {/* Left: + icon + upload */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onUpload}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all"
+                style={{
+                  background: "#f1f3f9",
+                  color: "#5f6368",
+                  border: "none",
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.background = "#e8eaf6";
+                  (e.currentTarget as HTMLElement).style.color = "#4f6ef7";
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.background = "#f1f3f9";
+                  (e.currentTarget as HTMLElement).style.color = "#5f6368";
+                }}
+                title="上传文件"
+              >
+                <Paperclip size={13} />
+                上传文件
+              </button>
+              <span className="text-xs" style={{ color: "#9ca3af" }}>Enter 发送</span>
+            </div>
+            {/* Right: Generate button */}
+            <button
+              onClick={onSend}
+              disabled={!input.trim() || isGenerating}
+              className="flex items-center gap-2 px-5 py-2 rounded-2xl text-sm font-semibold transition-all"
+              style={{
+                background: input.trim() && !isGenerating ? "#4f6ef7" : "#e5e7eb",
+                color: input.trim() && !isGenerating ? "#ffffff" : "#9ca3af",
+                transition: "all 0.15s ease",
+              }}
+            >
+              Generate
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* 4 feature cards */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15, duration: 0.35 }}
-        className="flex items-center gap-2 flex-wrap justify-center"
+        transition={{ delay: 0.2, duration: 0.35 }}
+        className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full"
       >
-        {[
-          { label: "出纳模版", q: "帮我把上传的数据汇总生成报表" },
-          { label: "会计模版", q: "帮我生成利润表" },
-          { label: "HR 中心", q: "帮我生成工资条" },
-          { label: "数据分析", q: "帮我分析销售数据，找出趋势和排名" },
-        ].map((tag, i) => (
+        {FEATURE_CARDS_V2.map((card, i) => (
           <button
             key={i}
-            onClick={() => {
-              onQuickAsk(tag.q);
-            }}
-            className="px-4 py-2 rounded-full text-sm transition-all"
+            onClick={() => onQuickAsk(card.q)}
+            className="flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all"
             style={{
-              background: "#ffffff",
-              border: "1px solid #e5e7eb",
-              color: "#1f2937",
-              fontWeight: 400,
+              background: card.bg,
+              border: `1px solid ${card.border}`,
             }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.borderColor = "#4f6ef7";
-              (e.currentTarget as HTMLElement).style.color = "#4f6ef7";
-              (e.currentTarget as HTMLElement).style.background = "#eff2fe";
+              (e.currentTarget as HTMLElement).style.opacity = "0.82";
+              (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)";
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.borderColor = "#e5e7eb";
-              (e.currentTarget as HTMLElement).style.color = "#1f2937";
-              (e.currentTarget as HTMLElement).style.background = "#ffffff";
+              (e.currentTarget as HTMLElement).style.opacity = "1";
+              (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
             }}
           >
-            {tag.label}
+            <span
+              className="flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{
+                width: 36,
+                height: 36,
+                background: `${card.color}18`,
+                fontSize: "18px",
+              }}
+            >
+              {card.emoji}
+            </span>
+            <div className="flex flex-col min-w-0">
+              <span style={{ fontSize: "13px", fontWeight: 600, color: "#1f2937", lineHeight: 1.3 }}>{card.title}</span>
+              <span style={{ fontSize: "11px", color: "#6b7280", marginTop: 2, lineHeight: 1.4 }}>{card.desc}</span>
+            </div>
           </button>
         ))}
       </motion.div>

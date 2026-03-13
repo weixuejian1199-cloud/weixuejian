@@ -971,3 +971,12 @@
 - [ ] F-3: 修复子订单编号列多值拼接错误
 - [ ] F-4: 后端 generate-report 使用 fullRows 生成 Excel
 - [ ] F-5: 内联 AtlasTableRenderer 导出使用 fullRows 而非 AI rows
+
+
+## G 阶段：欢迎页重设计 + Bug 修复（2026-03-14）
+
+- [x] G-1: 修复文件 chip X 删除按钮（始终可见，增大点击区域，移除 opacity-0）
+- [x] G-2: 新建任务无操作不留记录（Sidebar 过滤空任务，仅当前活跃任务除外）
+- [x] G-3: 欢迎页重设计（按图二：ATLAS 菱形图标 + Hi 用户名 + 大标题 + 居中输入框 + 4 个功能卡片）
+- [x] G-4: 对话框移至欢迎语正下方（非底部固定），有消息时底部输入框才出现
+- [x] G-5: V3.0 Pipeline 修复（补回 3 个 import，generate-report V3.0 路径，chat ResultSet 注入）

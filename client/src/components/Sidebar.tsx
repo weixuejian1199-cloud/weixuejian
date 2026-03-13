@@ -109,9 +109,14 @@ export default function Sidebar() {
     }
   }, [searchOpen]);
 
-  const filteredTasks = tasks.filter(t =>
-    !searchQuery || t.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredTasks = tasks.filter(t => {
+    // 过滤掉无操作的空任务（非当前活跃任务、标题为默认、无消息、无文件）
+    const isEmpty = t.title === "新建任务" &&
+      (!t.messages || t.messages.length === 0) &&
+      (!t.uploadedFiles || t.uploadedFiles.length === 0);
+    if (isEmpty && t.id !== activeTaskId) return false;
+    return !searchQuery || t.title.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   const handleNewTask = () => {
     createNewTask();
