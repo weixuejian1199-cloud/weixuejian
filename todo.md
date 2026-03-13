@@ -896,3 +896,17 @@
 - [x] A6：L1 模板计算公式定义（shared/templates.ts）— 多店合并/工资条/考勤/利润
 - [x] A7：数据库 schema 更新 — ResultSet 存储表 + pnpm db:push
 - [x] A8：单元测试 — 字段映射/口径计算/ResultSet 验证
+
+## V3.0 方案落地 — B 阶段（打底座）
+
+- [x] B1: Ingestion 层 — server/pipeline/ingestion.ts（文件解析、平台识别、字段标准化）
+- [x] B2: Governance 层 — server/pipeline/governance.ts（脏数据清洗、缺失值处理、异常值标记）
+- [x] B3: Computation 层 — server/pipeline/computation.ts（后端计算引擎，Decimal.js 精度，口径计算）
+- [x] B4: Expression 层 — server/pipeline/expression.ts（AI prompt 构建，边界约束注入）
+- [x] B5: Delivery 层 — server/pipeline/delivery.ts（ResultSet 生成、导出同源、Excel 输出）
+- [x] B6: Pipeline 编排器 — server/pipeline/index.ts（9 步管道串联，错误收集，审计日志）
+- [ ] B7: atlas.ts 重构 — 上传端点接入 Pipeline，替代现有散落逻辑
+- [ ] B8: 多文件对齐 — Pipeline 支持多文件合并、字段对齐、跨文件计算
+- [ ] B9: 大文件处理 — 流式解析、Worker 线程、内存控制
+- [ ] B10: 双轨验证 — 新旧管道并行运行，结果对比
+- [x] B11: 单元测试 — Pipeline 各层独立测试 + 集成测试（22 用例全部通过）
