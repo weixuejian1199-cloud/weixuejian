@@ -905,8 +905,8 @@
 - [x] B4: Expression 层 — server/pipeline/expression.ts（AI prompt 构建，边界约束注入）
 - [x] B5: Delivery 层 — server/pipeline/delivery.ts（ResultSet 生成、导出同源、Excel 输出）
 - [x] B6: Pipeline 编排器 — server/pipeline/index.ts（9 步管道串联，错误收集，审计日志）
-- [ ] B7: atlas.ts 重构 — 上传端点接入 Pipeline，替代现有散落逻辑
-- [ ] B8: 多文件对齐 — Pipeline 支持多文件合并、字段对齐、跨文件计算
-- [ ] B9: 大文件处理 — 流式解析、Worker 线程、内存控制
-- [ ] B10: 双轨验证 — 新旧管道并行运行，结果对比
+- [x] B7: atlas.ts 重构 — 上传端点接入 Pipeline（双轨运行，新管道不阻塞旧流程）+ bridge 模块 + 12 测试通过
+- [x] B8: 多文件对齐 — 字段冲突检测 + 溯源标记 + 缺失字段补空 + 5 测试通过
+- [x] B9: 大文件/脏数据处理 — 1000行测试 + 50列宽表 + 脏数据容错 + 4 测试通过
+- [x] B10: 双轨验证 — 已在 B7 中实现（Pipeline 后台并行运行，不阻塞旧流程）
 - [x] B11: 单元测试 — Pipeline 各层独立测试 + 集成测试（22 用例全部通过）

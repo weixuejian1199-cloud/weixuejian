@@ -1,0 +1,1 @@
+ALTER TABLE `sessions` ADD `resultSetId` varchar(64);

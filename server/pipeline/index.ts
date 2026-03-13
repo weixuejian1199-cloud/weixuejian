@@ -15,7 +15,7 @@
  */
 
 import { nanoid } from "nanoid";
-import { type PipelineContext, createPipelineContext } from "@shared/pipeline";
+import { type PipelineContext, createPipelineContext, ErrorLevel } from "@shared/pipeline";
 import type { ResultSet, SourceFileInfo } from "@shared/resultSet";
 import { runIngestion, type IngestionResult } from "./ingestion";
 import { runGovernance, type GovernanceResult } from "./governance";
@@ -86,7 +86,27 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
     // 合并多文件的行数据和字段映射
     const mergedData = mergeIngestionResults(ingestionResults);
 
-    // ── Layer 2: Governance ──────────────────────────────────────
+    // B8: 记录多文件字段冲突
+    if (mergedData.fieldConflicts.length > 0) {
+      for (const conflict of mergedData.fieldConflicts) {
+        ctx.errors.push({
+          level: ErrorLevel.WARNING,
+          step: 5,
+          code: "W3005",
+          message: `字段冲突：「${conflict.rawField}」在「${conflict.file1}」映射为「${conflict.std1}」，在「${conflict.file2}」映射为「${conflict.std2}」，已以第一个文件为准`,
+        });
+      }
+    }
+    if (mergedData.fileCount > 1) {
+      ctx.errors.push({
+        level: ErrorLevel.INFO,
+        step: 5,
+        code: "I4008",
+        message: `多文件合并完成：${mergedData.fileCount} 个文件，共 ${mergedData.rawRows.length} 行数据`,
+      });
+    }
+
+    // ── Layer 2: Governance ──────────────────────────────────────────
     const governance = runGovernance(
       ctx,
       mergedData.rawRows,
@@ -152,24 +172,73 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
 interface MergedIngestionData {
   rawRows: Record<string, string>[];
   fieldMapping: Record<string, string>;
+  fieldConflicts: Array<{ rawField: string; file1: string; std1: string; file2: string; std2: string }>;
+  fileCount: number;
 }
 
 /**
- * 合并多个文件的 Ingestion 结果。
- * 行数据直接拼接，字段映射取并集。
+ * B8: 增强版多文件合并 — 字段对齐 + 冲突检测 + 跨文件标准化
+ *
+ * 处理策略：
+ *   1. 字段映射取并集，冲突时以第一个文件为准
+ *   2. 每行注入 __sourceFile 和 __sourceIndex 便于溯源
+ *   3. 不同文件的同名原始字段映射到不同标准字段时记录冲突
+ *   4. 缺失字段自动补 null，保证所有行结构一致
  */
 function mergeIngestionResults(results: IngestionResult[]): MergedIngestionData {
   const allRows: Record<string, string>[] = [];
   const mergedMapping: Record<string, string> = {};
+  const fieldConflicts: Array<{ rawField: string; file1: string; std1: string; file2: string; std2: string }> = [];
+  // 记录每个原始字段名 → 标准名 + 来源文件
+  const fieldOrigin = new Map<string, { stdName: string; fileName: string }>();
 
-  for (const result of results) {
-    // 合并行数据
-    allRows.push(...result.rawRows);
+  for (let fileIdx = 0; fileIdx < results.length; fileIdx++) {
+    const result = results[fileIdx];
 
-    // 合并字段映射（后面的不覆盖前面的）
+    // 合并行数据，注入溯源标记
+    for (const row of result.rawRows) {
+      allRows.push({
+        ...row,
+        __sourceFile: result.originalFileName,
+        __sourceIndex: String(fileIdx),
+      });
+    }
+
+    // 合并字段映射，检测冲突
     for (const [rawName, stdName] of Object.entries(result.fieldMapping)) {
-      if (!(rawName in mergedMapping)) {
+      const existing = fieldOrigin.get(rawName);
+      if (existing) {
+        if (existing.stdName !== stdName) {
+          // 同名原始字段映射到不同标准字段 → 冲突
+          fieldConflicts.push({
+            rawField: rawName,
+            file1: existing.fileName,
+            std1: existing.stdName,
+            file2: result.originalFileName,
+            std2: stdName,
+          });
+          // 以第一个文件的映射为准，不覆盖
+        }
+      } else {
+        fieldOrigin.set(rawName, { stdName, fileName: result.originalFileName });
         mergedMapping[rawName] = stdName;
+      }
+    }
+  }
+
+  // 保证所有行具有相同的字段结构（缺失字段补空字符串）
+  if (results.length > 1) {
+    const allFieldNames = new Set<string>();
+    for (const row of allRows) {
+      for (const key of Object.keys(row)) {
+        allFieldNames.add(key);
+      }
+    }
+    for (const row of allRows) {
+      for (const field of Array.from(allFieldNames)) {
+        if (!(field in row)) {
+          row[field] = "";
+        }
       }
     }
   }
@@ -177,6 +246,8 @@ function mergeIngestionResults(results: IngestionResult[]): MergedIngestionData 
   return {
     rawRows: allRows,
     fieldMapping: mergedMapping,
+    fieldConflicts,
+    fileCount: results.length,
   };
 }
 

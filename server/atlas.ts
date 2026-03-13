@@ -31,6 +31,7 @@ import { storagePut, storageGet } from "./storage";
 import { getSession, createSession, updateSession, createReport, updateReport, getReport, getSimilarExamples, getUserReports, getDb } from "./db";
 import { authenticateRequest } from "./_core/auth";
 import { isOpenClawEnabled, callOpenClaw, callOpenClawStream, getPresignedUrlsForSessions } from "./openclaw";
+import { runPipelineInBackground } from "./pipeline/bridge";
 import { pushAtlasMsgToOpenClaw, pushQwenReplyToOpenClaw } from "./im/wsServer";
 import { openclawTasks, chatConversations, chatMessages, personalTemplates } from "../drizzle/schema";
 
@@ -1325,6 +1326,11 @@ export function registerAtlasRoutes(app: Express) {
           // 5d. Update session status to ready
           await updateSession(sessionId, { status: "ready" });
           console.log(`[Atlas] Background processing complete for session ${sessionId}`);
+
+          // V3.0 双轨：在后台并行运行新 Pipeline，生成 ResultSet
+          // 不阻塞旧流程，失败也不影响现有功能
+          runPipelineInBackground(sessionId, userId, buffer, originalname, mimetype)
+            .catch(err => console.warn(`[Pipeline] Background pipeline failed (non-blocking):`, err?.message));
         } catch (bgErr: any) {
           console.error(`[Atlas] Background processing failed for session ${sessionId}:`, bgErr);
           await updateSession(sessionId, { status: "error" }).catch(() => {});
