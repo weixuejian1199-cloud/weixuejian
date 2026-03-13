@@ -33,7 +33,9 @@ describe("B7 Atlas Integration", () => {
     // Verify the import exists in atlas.ts by reading the file
     const fs = await import("fs");
     const atlasContent = fs.readFileSync("server/atlas.ts", "utf-8");
-    expect(atlasContent).toContain('import { runPipelineInBackground } from "./pipeline/bridge"');
+    // V3.0: import now includes getResultSetForSession as well
+    expect(atlasContent).toContain('runPipelineInBackground');
+    expect(atlasContent).toContain('from "./pipeline/bridge"');
   });
 
   it("should call runPipelineInBackground in upload endpoint", async () => {

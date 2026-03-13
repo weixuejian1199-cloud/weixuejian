@@ -31,7 +31,9 @@ import { storagePut, storageGet } from "./storage";
 import { getSession, createSession, updateSession, createReport, updateReport, getReport, getSimilarExamples, getUserReports, getDb } from "./db";
 import { authenticateRequest } from "./_core/auth";
 import { isOpenClawEnabled, callOpenClaw, callOpenClawStream, getPresignedUrlsForSessions } from "./openclaw";
-import { runPipelineInBackground } from "./pipeline/bridge";
+import { runPipelineInBackground, getResultSetForSession } from "./pipeline/bridge";
+import { exportFromResultSet } from "./pipeline/delivery";
+import { buildExpressionPrompt, buildDataSummary } from "./pipeline/expression";
 import { pushAtlasMsgToOpenClaw, pushQwenReplyToOpenClaw } from "./im/wsServer";
 import { openclawTasks, chatConversations, chatMessages, personalTemplates } from "../drizzle/schema";
 
@@ -2437,6 +2439,30 @@ ${dataTable}`}
       // ── Qwen3-Max / Kimi-K2.5 streaming (default / fallback channel) ────
       const openai = createLLM(totalRows);
 
+      // ═══ V3.0: 尝试注入 ResultSet 精确指标到 systemPrompt ═══
+      let finalSystemPrompt = systemPrompt;
+      try {
+        // 对于单文件场景，尝试从 Pipeline ResultSet 获取精确计算结果
+        if (!isMultiFile && allSessionIds.length === 1) {
+          const resultSet = await getResultSetForSession(allSessionIds[0]);
+          if (resultSet && resultSet.metrics.length > 0) {
+            const expressionOutput = buildExpressionPrompt(resultSet);
+            // 将 ResultSet 精确指标追加到 systemPrompt 中
+            const resultSetSection = `\n\n══ V3.0 Pipeline 精确计算结果（最高优先级数字来源）══\n` +
+              `⚠️ 以下指标由 Pipeline 确定性计算引擎 v${resultSet.computationVersion} 产出，使用 Decimal.js 精确计算。\n` +
+              `⚠️ 当以下指标与旧版统计摘要冲突时，必须以此处的数字为准。\n\n` +
+              expressionOutput.resultSetSummary +
+              (expressionOutput.cleaningLogSummary ? `\n\n数据清洗说明：\n${expressionOutput.cleaningLogSummary}` : '') +
+              `\n══ V3.0 精确计算结果结束 ══`;
+            // 注入到 finalSystemPrompt 末尾
+            finalSystemPrompt += resultSetSection;
+            console.log(`[Atlas] V3.0 ResultSet injected into chat prompt, ${resultSet.metrics.length} metrics`);
+          }
+        }
+      } catch (rsErr: any) {
+        console.warn(`[Atlas] V3.0 ResultSet injection failed (non-fatal): ${rsErr?.message}`);
+      }
+
       // Build message history
       const messages: Array<{ role: "user" | "assistant"; content: string }> = [
         ...(history || []).slice(-4), // Keep last 4 messages for context (speed)
@@ -2445,7 +2471,7 @@ ${dataTable}`}
 
       const result = streamText({
         model: openai.chat(selectModel(totalRows)),
-        system: systemPrompt,
+        system: finalSystemPrompt,
         messages,
       });
 
@@ -2519,6 +2545,82 @@ ${dataTable}`}
         res.status(404).json({ error: "Session data not found. Please re-upload the file." });
         return;
       }
+
+      // ═══ V3.0 新路径：优先从 ResultSet 导出全量数据 ═══
+      try {
+        const resultSet = await getResultSetForSession(session_id);
+        if (resultSet && resultSet.standardizedRows.length > 0) {
+          console.log(`[Atlas] V3.0 ResultSet found for session ${session_id}, rows: ${resultSet.rowCount}, exporting full data`);
+
+          // 使用 Delivery 层导出全量数据
+          const safeTitle = (report_title || requirement.slice(0, 30)).replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g, "_").slice(0, 40);
+          const exportResult = await exportFromResultSet(resultSet, {
+            format: "xlsx",
+            fileName: safeTitle,
+            includeSummary: true,
+            includeCleaningLog: true,
+          });
+
+          // 构建摘要信息
+          const dataSummary = buildDataSummary(resultSet);
+          const metricsInfo = resultSet.metrics
+            .filter((m: any) => "value" in m && m.value !== undefined)
+            .map((m: any) => `${m.displayName}: ${m.value} ${m.unit}`)
+            .join("\n");
+
+          // Persist report to DB
+          const reportId = nanoid();
+          const userId = (req as any).userId || 0;
+          await createReport({
+            id: reportId,
+            sessionId: session_id,
+            userId,
+            title: safeTitle,
+            filename: exportResult.fileName,
+            fileKey: exportResult.s3Key,
+            fileUrl: exportResult.url,
+            fileSizeKb: Math.ceil(exportResult.fileSize / 1024),
+            prompt: requirement,
+            status: "completed",
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          });
+
+          const aiMessage = `\u2705 **${safeTitle}** \u5df2\u751f\u6210\u5b8c\u6bd5\uff01\uff08V3.0 \u5168\u91cf\u5bfc\u51fa\uff09\n\n` +
+            `\ud83d\udcca \u6570\u636e\u6982\u51b5\uff1a\n${dataSummary}\n\n` +
+            (metricsInfo ? `\ud83d\udcc8 \u6838\u5fc3\u6307\u6807\uff1a\n${metricsInfo}\n\n` : "") +
+            `\u62a5\u8868\u5305\u542b ${resultSet.rowCount} \u884c\u5168\u91cf\u6570\u636e\uff08\u542b\u6570\u636e\u660e\u7ec6\u3001\u6c47\u603b\u7edf\u8ba1\u3001\u6e05\u6d17\u65e5\u5fd7 3 \u4e2a\u5de5\u4f5c\u8868\uff09\u3002\n` +
+            `\u26a0\ufe0f \u6570\u636e\u6765\u6e90\uff1aPipeline \u786e\u5b9a\u6027\u8ba1\u7b97\u5f15\u64ce v${resultSet.computationVersion}\uff0c\u975e AI \u751f\u6210\u3002`;
+
+          // 构建预览 sheets（前50行）供前端展示
+          const previewHeaders = resultSet.fields.slice(0, 15);
+          const previewRows = resultSet.standardizedRows.slice(0, 50).map((row: Record<string, unknown>) =>
+            previewHeaders.map(h => row[h] ?? "")
+          );
+
+          res.json({
+            report_id: reportId,
+            filename: exportResult.fileName,
+            download_url: exportResult.url,
+            ai_message: aiMessage,
+            plan: {
+              title: safeTitle,
+              sheets: [{
+                name: "\u6570\u636e\u660e\u7ec6",
+                headers: previewHeaders,
+                rows: previewRows as (string | number)[][],
+                summary: `\u5168\u91cf ${resultSet.rowCount} \u884c\u6570\u636e\uff08\u9884\u89c8\u524d 50 \u884c\uff09`,
+              }],
+              insights: metricsInfo || "\u5168\u91cf\u6570\u636e\u5df2\u5bfc\u51fa",
+            },
+          });
+          return;
+        }
+      } catch (rsErr: any) {
+        console.warn(`[Atlas] V3.0 ResultSet export failed, falling back to legacy: ${rsErr?.message}`);
+      }
+
+      // ═══ 旧路径 Fallback：AI 生成 JSON → Excel ═══
+      console.log(`[Atlas] No ResultSet for session ${session_id}, using legacy AI generation`);
 
       // Load parsed data from S3
       const data = await loadSessionData(session_id);
