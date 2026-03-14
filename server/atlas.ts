@@ -279,6 +279,10 @@ function parseExcelBufferAsync(
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const workerScript = path.resolve(__dirname, "xlsxWorker.mjs");
 
+    // 超时时间：10 分钟（60000 ms），用于处理大文件
+    const TIMEOUT_MS = 10 * 60 * 1000;
+    let timeoutId: NodeJS.Timeout | null = null;
+
     const worker = new Worker(workerScript, {
       workerData: {
         buffer: buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
@@ -286,7 +290,19 @@ function parseExcelBufferAsync(
       },
     });
 
+    // 设置超时
+    timeoutId = setTimeout(() => {
+      worker.terminate();
+      reject(new Error(`XLSX 解析超时（超过 ${TIMEOUT_MS / 1000 / 60} 分钟），文件可能过大或格式复杂。请尝试 CSV 格式或联系技术支持。`));
+    }, TIMEOUT_MS);
+
     worker.on("message", (result: XlsxWorkerResult & { error?: string }) => {
+      // 清除超时定时器
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
       if (result.error) {
         reject(new Error(result.error));
       } else {
@@ -294,8 +310,19 @@ function parseExcelBufferAsync(
       }
     });
 
-    worker.on("error", (err) => reject(err));
+    worker.on("error", (err) => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      reject(err);
+    });
+
     worker.on("exit", (code) => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
       if (code !== 0) reject(new Error(`XLSX worker exited with code ${code}`));
     });
   });
