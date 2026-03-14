@@ -37,7 +37,7 @@ import { buildExpressionPrompt, buildDataSummary } from "./pipeline/expression";
 import { pushAtlasMsgToOpenClaw, pushQwenReplyToOpenClaw } from "./im/wsServer";
 import { openclawTasks, chatConversations, chatMessages, personalTemplates, sessions, resultSets } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
-import type { FieldMetadata, GroupedMetric, ExportPayload } from "../shared/types";
+import type { FieldMetadata, GroupedMetric, ExportPayload, FieldAggType, MetricAggType } from "../shared/types";
 
 // ── Phase 4：辅助函数（V4.0）────────────────────────────────────────────────────
 
@@ -1885,9 +1885,10 @@ export function registerAtlasRoutes(app: Express) {
         for (const s of validSessions) {
           const di = s!.dfInfo as DataFrameInfo | null;
           if (!di) continue;
-          const field = di.fields.find((f: FieldInfo) => f.name === s.name);
-          if (field && (field as any).metadata) {
-            return (field as any).metadata as FieldMetadata;
+          // 获取第一个数值字段的元信息（如果存在）
+          const firstNumericField = di.fields.find((f: FieldInfo) => f.type === 'numeric' && (f as any).metadata);
+          if (firstNumericField && (firstNumericField as any).metadata) {
+            return (firstNumericField as any).metadata as FieldMetadata;
           }
         }
         return undefined;
@@ -1913,6 +1914,13 @@ export function registerAtlasRoutes(app: Express) {
           return { entries: [], matchedField: fieldName, valid: false, reason: `字段身份未确认: ${targetMetadata.canonicalName}` };
         }
 
+        // ── Phase 4：aggType 分层拦截（V4.0）────────────────────────────────────────────
+        // 字段身份层允许 "none"，但聚合层不允许，必须在进入聚合链路前拦截
+        if (targetMetadata?.aggType === "none") {
+          console.warn(`[Atlas/chat] 字段不可聚合（aggType=none），跳过汇总: ${targetMetadata.canonicalName} (fieldRole=${targetMetadata.fieldRole})`);
+          return { entries: [], matchedField: fieldName, valid: false, reason: `字段不可聚合: ${targetMetadata.canonicalName}` };
+        }
+
         if (!targetMetadata || !targetMetadata.metricKey || !targetMetadata.aggType || !targetGroupByKey) {
           return { entries: [], matchedField: fieldName, valid: false, reason: `字段身份元信息不完整` };
         }
@@ -1927,6 +1935,12 @@ export function registerAtlasRoutes(app: Express) {
           const groupByKey = groupByField ? inferGroupByKey(groupByField) : undefined;
 
           if (!metadata || !groupByKey) continue;
+
+          // ── Phase 4：aggType 分层拦截（V4.0）────────────────────────────────────────────
+          if (metadata.aggType === "none") {
+            console.warn(`[Atlas/chat] 字段不可聚合（aggType=none），跳过: ${metadata.canonicalName}`);
+            continue;
+          }
 
           // ── Phase 4：精确校验（metricKey + aggType + groupByKey + sourceDomain）────────────
           const validation = validateMetricMatch(
@@ -1949,13 +1963,13 @@ export function registerAtlasRoutes(app: Express) {
             continue;
           }
 
-          // 转换为 GroupedMetric 格式
+          // 转换为 GroupedMetric 格式（聚合层，aggType 不会是 "none"）
           const groupedMetrics: GroupedMetric[] = f.groupedTop5.map((entry: any) => ({
             label: entry.label,
             sum: entry.sum,
             source: pfp.fileName,
             metricKey: metadata.metricKey,
-            aggType: metadata.aggType,
+            aggType: metadata.aggType as MetricAggType,  // 已过滤 "none"
             groupByField: groupByField,
             groupByKey: groupByKey,
             groupByRole: metadata.fieldRole,
