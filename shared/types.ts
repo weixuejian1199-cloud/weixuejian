@@ -76,7 +76,7 @@ export interface GroupedMetric {
   /** 分组字段结构化标识（关键：汇总匹配必须用这个），例如："talent_nickname" */
   groupByKey: string;
   
-  /** 分组字段角色 */
+  /** 分组字段角色（不允许 unknown，因为已进入聚合链路） */
   groupByRole: "dimension" | "metric" | "identifier" | "datetime";
   
   /** 来源 Session ID */

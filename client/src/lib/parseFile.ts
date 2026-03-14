@@ -254,25 +254,8 @@ export interface ColumnStat {
 }
 
 // Grouped topN entry: group label + aggregated sum from full dataset
-// ── Phase 4：增加结构化标识（V4.0）──────────────────────────────────────────
-export interface GroupedTop5Entry {
-  label: string;   // e.g. "达人昵称" value
-  sum: number;     // aggregated sum of the numeric field for this group
-  source?: string; // source filename (for multi-file UNION)
-  // ── Phase 4：结构化标识 ──────────────────────────────────────────────────────
-  /** 度量标识 */
-  metricKey?: string;
-  /** 聚合类型 */
-  aggType?: "sum" | "count" | "avg";
-  /** 分组字段结构化标识（关键：汇总匹配必须用这个） */
-  groupByKey?: string;
-  /** 分组字段角色 */
-  groupByRole?: "dimension" | "metric" | "identifier" | "datetime";
-  /** 来源 Session ID（暂不生成，后端合并时填充） */
-  sourceSessionId?: string;
-  /** 来源文件名（由 source 字段提供） */
-  sourceFileName?: string;
-}
+// ── Phase 4：使用共享类型定义（V4.0）────────────────────────────────────────────
+import type { GroupedTop5Entry } from "../../../shared/types";
 
 // Category grouped entry: for categorical fields (省份/支付方式/城市/状态 etc.)
 // count = number of rows in this category
@@ -530,8 +513,12 @@ function computeGroupedTopN(
   // ── Phase 4：生成结构化标识（V4.0）────────────────────────────────────────────
   const groupByKey = inferGroupByKey(groupField);
   const metricKey = numericFieldMetadata?.metricKey ?? `unknown_${numericField}`;
-  const aggType = numericFieldMetadata?.aggType ?? "sum";
-  const groupByRole = groupField === groupByField ? "dimension" : "dimension";
+  // ── Phase 4：过滤 "none"，只允许 MetricAggType（V4.0）──────────────────────────
+  // GroupedTop5Entry.aggType 不允许 "none"
+  const aggType = numericFieldMetadata?.aggType && numericFieldMetadata.aggType !== "none" 
+    ? numericFieldMetadata.aggType 
+    : "sum";  // 如果是 "none"，默认使用 "sum"
+  const groupByRole = "dimension";  // groupField 总是维度字段
   
   return {
     entries: sorted.map(([label, sum]) => ({
