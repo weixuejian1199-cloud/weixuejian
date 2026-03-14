@@ -197,26 +197,28 @@ export async function runPipelineFromParsedData(
     console.log(`[Pipeline] ✅ Governance done: ${governance.rows.length} rows after cleaning`);
 
     // ── Layer 3: Computation ──────────────────────────────────────────────────────────────
-    // 收集所有标准字段名（来自 fieldMapping 的 values + rawRows 的原始字段名）
+    // 问题1修复：先收集所有已映射的标准名
     const allFields = new Set<string>();
     for (const stdName of Object.values(fieldMapping)) {
       allFields.add(stdName);
     }
-    // 也保留未映射的原始字段
-    if (rawRows.length > 0) {
-      for (const key of Object.keys(rawRows[0])) {
+    // 问题1修复：遍历所有行（而非只看 rawRows[0]），确保后续行新增字段不漏收
+    for (const row of rawRows) {
+      for (const key of Object.keys(row)) {
         if (!fieldMapping[key]) {
           allFields.add(key);
         }
       }
     }
+    // 问题2修复：日志下移到 allFields 构建完成后，输出 union field count
+    console.log(`[Pipeline]   Fields (union): ${allFields.size}`);
 
     const sourceFiles: SourceFileInfo[] = [{
       fileName: originalFileName,
       s3Key: "",
       totalRows: rawRows.length + 1,
       dataRows: rawRows.length,
-      fieldCount: rawRows.length > 0 ? Object.keys(rawRows[0]).length : 0,
+      fieldCount: allFields.size,  // 问题2修复：改用 allFields.size（union field count）
       platform: "parsed",
     }];
 
@@ -231,10 +233,17 @@ export async function runPipelineFromParsedData(
       templateId,
     };
 
-     const resultSet = step8Compute(ctx, computationInput);
+    const resultSet = step8Compute(ctx, computationInput);
     console.log(`[Pipeline] ✅ Computation done: ${resultSet.metrics.length} metrics, ${resultSet.rowCount} rows`);
-    // ── Layer 4: Expression（构建 AI prompt，不阻塞持久化）────────────────────────────────
-    buildExpressionPrompt(resultSet);
+
+    // ── Layer 4: Expression（构建 AI prompt，同步执行 + try/catch 隔离）────────────────────
+    // 问题4修复：加 try/catch 隔离，失败记录日志但不中断主链路
+    try {
+      buildExpressionPrompt(resultSet);
+    } catch (exprErr: any) {
+      console.error(`[Pipeline] ❌ buildExpressionPrompt failed (non-blocking): ${exprErr?.message}`);
+    }
+
     return { success: true, resultSet };
   } catch (err: any) {
     const errorSummary = err?.message || "Pipeline execution error";
