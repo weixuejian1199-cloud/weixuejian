@@ -394,7 +394,7 @@ describe("B4: Expression 层", () => {
     const output = buildExpressionPrompt(rs);
 
     // 验证硬约束存在
-    expect(output.systemPrompt).toContain("所有数字必须来自 ResultSet");
+    expect(output.systemPrompt).toContain("所有数字必须来自 V3.0 Pipeline 的 ResultSet");
     expect(output.systemPrompt).toContain("不能自行计算");
     // 验证数据注入
     expect(output.systemPrompt).toContain("总销售额");
