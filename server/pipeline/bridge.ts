@@ -15,7 +15,13 @@
  */
 
 import { eq } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import { runPipeline, type PipelineInput } from "./index";
+import { runGovernance } from "./governance";
+import { step8Compute, type ComputationInput } from "./computation";
+import { buildExpressionPrompt } from "./expression";
+import { createPipelineContext } from "@shared/pipeline";
+import type { SourceFileInfo } from "@shared/resultSet";
 import { storagePut, storageGet } from "../storage";
 import { getDb } from "../db";
 import { resultSets, sessions } from "../../drizzle/schema";
@@ -145,6 +151,180 @@ export async function runPipelineInBackground(
       // 忽略状态写入失败
     }
     // Pipeline 失败不影响旧流程，不抛出错误
+  }
+}
+
+// ── 从已解析 JSON 数据运行 Pipeline ──────────────────────────────────────────────
+
+/**
+ * Solution B 核心函数：从前端已解析的 JSON 数据直接运行 Pipeline。
+ * 跳过 Ingestion 层（不需要原始文件 buffer），从 Governance 层开始。
+ *
+ * 数据流：
+ *   前端 parsed.preview（JSON rows）
+ *   → fieldMapping（由 atlas.ts normalizeFieldNames 生成）
+ *   → runGovernance（清洗 + 去重）
+ *   → step8Compute（计算 ResultSet）
+ *   → buildExpressionPrompt（构建 AI prompt）
+ *   → saveResultSet（持久化到 S3 + DB）
+ *
+ * 硬约束：
+ * - 调用方负责在调用前写入 pipelineStatus=running
+ * - 本函数负责写入终态 success 或 failed
+ */
+export async function runPipelineFromParsedData(
+  sessionId: string,
+  userId: number,
+  rawRows: Record<string, string>[],
+  fieldMapping: Record<string, string>,
+  originalFileName: string,
+  templateId?: string
+): Promise<{ success: boolean; resultSet?: ResultSet; errorSummary?: string }> {
+  const jobId = nanoid(12);
+  const ctx = createPipelineContext(jobId, String(userId));
+
+  console.log(`[Pipeline] 🚀 Starting parsed-data pipeline for session ${sessionId}`);
+  console.log(`[Pipeline]   File: ${originalFileName}, Rows: ${rawRows.length}`);
+
+  try {
+    // ── Layer 2: Governance（跳过 Ingestion，直接从清洗开始）──────────────────────────────
+    const governance = runGovernance(ctx, rawRows, fieldMapping);
+    if (ctx.aborted || governance.rows.length === 0) {
+      const errorSummary = ctx.abortReason || "清洗后无有效数据";
+      console.error(`[Pipeline] ❌ Governance failed for session ${sessionId}: ${errorSummary}`);
+      return { success: false, errorSummary };
+    }
+    console.log(`[Pipeline] ✅ Governance done: ${governance.rows.length} rows after cleaning`);
+
+    // ── Layer 3: Computation ──────────────────────────────────────────────────────────────
+    // 收集所有标准字段名（来自 fieldMapping 的 values + rawRows 的原始字段名）
+    const allFields = new Set<string>();
+    for (const stdName of Object.values(fieldMapping)) {
+      allFields.add(stdName);
+    }
+    // 也保留未映射的原始字段
+    if (rawRows.length > 0) {
+      for (const key of Object.keys(rawRows[0])) {
+        if (!fieldMapping[key]) {
+          allFields.add(key);
+        }
+      }
+    }
+
+    const sourceFiles: SourceFileInfo[] = [{
+      fileName: originalFileName,
+      s3Key: "",
+      totalRows: rawRows.length + 1,
+      dataRows: rawRows.length,
+      fieldCount: rawRows.length > 0 ? Object.keys(rawRows[0]).length : 0,
+      platform: "parsed",
+    }];
+
+    const computationInput: ComputationInput = {
+      rows: governance.rows,
+      sourceFiles,
+      skippedRows: governance.skippedRows,
+      skippedCount: governance.skippedCount,
+      fields: Array.from(allFields),
+      platform: "parsed",
+      isMultiFile: false,
+      templateId,
+    };
+
+     const resultSet = step8Compute(ctx, computationInput);
+    console.log(`[Pipeline] ✅ Computation done: ${resultSet.metrics.length} metrics, ${resultSet.rowCount} rows`);
+    // ── Layer 4: Expression（构建 AI prompt，不阻塞持久化）────────────────────────────────
+    buildExpressionPrompt(resultSet);
+    return { success: true, resultSet };
+  } catch (err: any) {
+    const errorSummary = err?.message || "Pipeline execution error";
+    console.error(`[Pipeline] ❌ runPipelineFromParsedData error for session ${sessionId}: ${errorSummary}`);
+     return { success: false, errorSummary };
+  }
+}
+
+/**
+ * 在 upload-parsed 流程的后台运行 Pipeline（Solution B）。
+ * 调用方负责在调用前写入 pipelineStatus=running。
+ * 本函数负责写入终态 success 或 failed。
+ *
+ * 硬约束：
+ * - 在写终态前必须重新获取 DB（不复用函数启动时的连接）
+ */
+export async function runParsedPipelineInBackground(
+  sessionId: string,
+  userId: number,
+  rawRows: Record<string, string>[],
+  fieldMapping: Record<string, string>,
+  originalFileName: string,
+  templateId?: string
+): Promise<void> {
+  console.log(`[Pipeline] 🚀 Starting background parsed pipeline for session ${sessionId}`);
+  try {
+    const result = await runPipelineFromParsedData(
+      sessionId,
+      userId,
+      rawRows,
+      fieldMapping,
+      originalFileName,
+      templateId
+    );
+
+    if (result.success && result.resultSet) {
+      console.log(`[Pipeline] 💾 Saving ResultSet for session ${sessionId}`);
+      console.log(`[Pipeline]   RowCount: ${result.resultSet.rowCount}`);
+      console.log(`[Pipeline]   Metrics: ${result.resultSet.metrics.length}`);
+
+      // 持久化 ResultSet（saveResultSet 内部会更新 session.resultSetId）
+      const jobId = await saveResultSet(result.resultSet, sessionId, userId);
+
+      // ⭐ 硬约束：写终态前重新获取 DB（不复用函数启动时的连接）
+      const dbForStatus = await getDb();
+      if (dbForStatus) {
+        await dbForStatus.update(sessions)
+          .set({
+            pipelineStatus: "success",
+            pipelineError: null,
+            pipelineFinishedAt: new Date(),
+          })
+          .where(eq(sessions.id, sessionId));
+        console.log(`[Pipeline] ✅ Updated pipelineStatus to 'success' for session ${sessionId}`);
+      } else {
+        console.error(`[Pipeline] ❌ Cannot write success status for ${sessionId}: DB unavailable`);
+      }
+      console.log(`[Pipeline] ✅ ResultSet saved successfully, jobId: ${jobId}`);
+    } else {
+      const errorSummary = result.errorSummary || "Parsed pipeline failed";
+      // ⭐ 硬约束：写终态前重新获取 DB（不复用函数启动时的连接）
+      const dbForStatus = await getDb();
+      if (dbForStatus) {
+        await dbForStatus.update(sessions)
+          .set({
+            pipelineStatus: "failed",
+            pipelineError: errorSummary,
+            pipelineFinishedAt: new Date(),
+          })
+          .where(eq(sessions.id, sessionId));
+        console.log(`[Pipeline] ❌ Updated pipelineStatus to 'failed' for session ${sessionId}`);
+      }
+    }
+  } catch (err: any) {
+    const errMsg = err?.message || "Unknown exception in parsed pipeline";
+    console.error(`[Pipeline] ❌ Background parsed pipeline error for session ${sessionId}: ${errMsg}`);
+    try {
+      const dbForStatus = await getDb();
+      if (dbForStatus) {
+        await dbForStatus.update(sessions)
+          .set({
+            pipelineStatus: "failed",
+            pipelineError: errMsg,
+            pipelineFinishedAt: new Date(),
+          })
+          .where(eq(sessions.id, sessionId));
+      }
+    } catch {
+      // 忽略状态写入失败
+    }
   }
 }
 

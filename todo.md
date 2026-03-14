@@ -991,3 +991,9 @@
 - [x] I-1: 恢复侧边栏“模板库”和“HR 中心”导航项（点击直接跳转对应页面）
 - [x] I-2: 首页四个功能卡片原本就存在，无需修复
 - [x] I-3: 底部提示条原本就是 toast，无需修复
+
+## J 阶段：前端切换 upload 端点，打通 V3 Pipeline 主链（2026-03-14）
+- [ ] J-1: MainWorkspace.tsx 替换 uploadParsed 为 smartUpload（直接发原始文件）
+- [ ] J-2: 适配 upload 端点返回字段（session_id、status 等）
+- [ ] J-3: 优化上传进度 UI（进度条、加载动画）
+- [ ] J-4: TypeScript 编译通过，测试通过

@@ -31,7 +31,7 @@ import { storagePut, storageGet } from "./storage";
 import { getSession, createSession, updateSession, createReport, updateReport, getReport, getSimilarExamples, getUserReports, getDb } from "./db";
 import { authenticateRequest } from "./_core/auth";
 import { isOpenClawEnabled, callOpenClaw, callOpenClawStream, getPresignedUrlsForSessions } from "./openclaw";
-import { runPipelineInBackground, getResultSetForSession } from "./pipeline/bridge";
+import { runPipelineInBackground, getResultSetForSession, runParsedPipelineInBackground } from "./pipeline/bridge";
 import { exportFromResultSet } from "./pipeline/delivery";
 import { buildExpressionPrompt, buildDataSummary } from "./pipeline/expression";
 import { pushAtlasMsgToOpenClaw, pushQwenReplyToOpenClaw } from "./im/wsServer";
@@ -3564,9 +3564,15 @@ ${sampleRows}
          isMerged: 0,
         status: "uploading",
       });
-      // V3.0: upload-parsed 没有原始文件 buffer，无法启动 Pipeline，不写 pipelineStatus=running（否则会永久卡住）
-      // pipelineStatus 保持 null（not_started），表示 Pipeline 未启动
-      console.log(`[Pipeline] upload-parsed: no buffer available, skipping Pipeline for session ${sessionId}`);
+      // Solution B: upload-parsed 使用前端已解析的 JSON 数据触发 Pipeline
+      // 写入 pipelineStatus=running，由 runParsedPipelineInBackground 负责写终态 success/failed
+      await updateSession(sessionId, {
+        pipelineStatus: "running",
+        pipelineError: null,
+        pipelineStartedAt: new Date(),
+        pipelineFinishedAt: null,
+      }).catch(err => console.warn(`[Pipeline] Failed to write running status for ${sessionId}:`, err?.message));
+      console.log(`[Pipeline] upload-parsed: pipelineStatus=running for session ${sessionId}`);
       res.json({
         session_id: sessionId,
         filename: originalname,
@@ -3585,9 +3591,25 @@ ${sampleRows}
             dividend:   ["\u5458\u5de5\u59d3\u540d"],
           };
           const requiredFields = requiredByScenario[scenarioHint.type] || [];
-          const { normalizedData, fieldMapping } = normalizeFieldNames(workingData, requiredFields);
-
+           const { normalizedData, fieldMapping } = normalizeFieldNames(workingData, requiredFields);
           await storeSessionData(sessionId, normalizedData);
+          // Solution B: 从前端已解析的 JSON 数据运行 Pipeline
+          // rawRows 使用原始 workingData（字段名未标准化）， fieldMapping 由 normalizeFieldNames 生成
+          const rawRowsForPipeline = workingData.map(row => {
+            const r: Record<string, string> = {};
+            for (const [k, v] of Object.entries(row)) {
+              r[k] = v === null || v === undefined ? "" : String(v);
+            }
+            return r;
+          });
+          // 异步运行 Pipeline，不阻塞当前 setImmediate 的其他工作
+          runParsedPipelineInBackground(
+            sessionId,
+            userId,
+            rawRowsForPipeline,
+            fieldMapping,
+            originalname
+          ).catch(err => console.error(`[Pipeline] runParsedPipelineInBackground failed for ${sessionId}:`, err?.message));
           await updateSession(sessionId, {
             rowCount: dfInfo.row_count,
             colCount: dfInfo.col_count,

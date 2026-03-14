@@ -25,6 +25,60 @@ describe("B7 Pipeline Bridge", () => {
     const bridge = await import("./pipeline/bridge");
     expect(typeof bridge.getResultSetById).toBe("function");
   });
+
+  // Solution B: 新增函数导出测试
+  it("should export runPipelineFromParsedData function (Solution B)", async () => {
+    const bridge = await import("./pipeline/bridge");
+    expect(typeof bridge.runPipelineFromParsedData).toBe("function");
+  });
+
+  it("should export runParsedPipelineInBackground function (Solution B)", async () => {
+    const bridge = await import("./pipeline/bridge");
+    expect(typeof bridge.runParsedPipelineInBackground).toBe("function");
+  });
+
+  it("should run runPipelineFromParsedData with valid data and return ResultSet", async () => {
+    const bridge = await import("./pipeline/bridge");
+    // 使用电商订单数据，并提供正确的 fieldMapping（原始名 → 标准名）
+    // fieldMapping 由 fieldAliases.normalizeFieldNames 生成，格式为 { "原始字段名": "standard_field_name" }
+    const rawRows = [
+      { "订单号": "DY001", "实付金额": "500", "订单应付金额": "550" },
+      { "订单号": "DY002", "实付金额": "600", "订单应付金额": "650" },
+      { "订单号": "DY003", "实付金额": "700", "订单应付金额": "750" },
+    ];
+    // fieldMapping: 原始字段名 → STANDARD_FIELDS 中的标准名
+    // "订单号" → "order_id"，"实付金额" → "pay_amount"
+    const fieldMapping: Record<string, string> = {
+      "订单号": "order_id",
+      "实付金额": "pay_amount",
+      "订单应付金额": "pay_amount",
+    };
+    const result = await bridge.runPipelineFromParsedData(
+      "test-session-001",
+      0,
+      rawRows,
+      fieldMapping,
+      "test.xlsx"
+    );
+    expect(result.success).toBe(true);
+    expect(result.resultSet).toBeDefined();
+    expect(result.resultSet?.rowCount).toBe(3);
+    expect(result.resultSet?.metrics.length).toBeGreaterThan(0);
+  });
+
+  it("should handle empty rawRows gracefully in runPipelineFromParsedData", async () => {
+    const bridge = await import("./pipeline/bridge");
+    const result = await bridge.runPipelineFromParsedData(
+      "test-session-empty",
+      0,
+      [],
+      {},
+      "empty.xlsx"
+    );
+    // 空数据应返回失败（清洗后无有效数据）
+    expect(result.success).toBe(false);
+    expect(result.errorSummary).toBeDefined();
+  });
 });
 
 // Test pipeline integration with atlas.ts import
