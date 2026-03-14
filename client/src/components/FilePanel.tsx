@@ -197,6 +197,17 @@ function FileItem({ file, onRemove }: { file: UploadedFile; onRemove: () => void
             />
           </div>
         )}
+        {/* File status hint */}
+        {file.status === "ready" && rowCount != null && rowCount > 500 && (
+          <div className="mt-1 text-xs" style={{ color: "#22c55e", fontSize: "10px" }}>
+            ✅ 全量数据已就绪（{rowCount.toLocaleString()} 行）
+          </div>
+        )}
+        {file.status === "ready" && rowCount != null && rowCount <= 500 && (
+          <div className="mt-1 text-xs" style={{ color: "#eab308", fontSize: "10px" }}>
+            ⚠️ 预览数据（前 {rowCount} 行）
+          </div>
+        )}
       </div>
 
       {/* Remove button (visible on hover) */}
