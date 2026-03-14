@@ -2948,6 +2948,7 @@ ${dataTable}`}
           );
           res.json({
             report_id: reportId,
+            resultSetId,  // ── Phase 4：返回 resultSetId（V4.0）
             filename: exportResult.fileName,
             download_url: exportResult.url,
             export_path: "v3_resultset",
@@ -3024,6 +3025,7 @@ ${dataTable}`}
           );
           res.json({
             report_id: reportId,
+            resultSetId,  // ── Phase 4：返回 resultSetId（V4.0）
             filename: exportResult.fileName,
             download_url: exportResult.url,
             export_path: "v3_resultset",
