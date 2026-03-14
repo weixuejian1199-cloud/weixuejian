@@ -322,10 +322,11 @@ function AtlasTableView({
           }}
           onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = exportWarning ? "rgba(234,179,8,0.18)" : "rgba(52,211,153,0.18)"}
           onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = exportWarning ? "rgba(234,179,8,0.1)" : "rgba(52,211,153,0.1)"}
-          title={exportWarning ? "当前为 AI 分析数据，可能不完整" : (fullRows ? `导出完整数据（${exportCount} 行）` : "导出 Excel")}
+          title={exportWarning ? "⚠️ 当前为预览数据或 AI 分析数据，可能不完整" : (fullRows ? `✅ 导出完整数据（${exportCount.toLocaleString()} 行）` : "⚠️ 导出预览数据（前50行）")}
         >
           <Download size={12} />
-          {exportWarning ? `导出 Excel（AI数据）` : `导出 Excel${fullRows ? ` (${exportCount}行)` : ""}`}
+          {exportWarning ? `导出（预览）` : (fullRows ? `导出（${exportCount.toLocaleString()}行）` : `导出（50行）`)}
+          {!exportWarning && fullRows && exportCount > 500 && <span style={{ marginLeft: "4px", opacity: 0.8 }}>✅</span>}
         </button>
         <button
           onClick={handleExportCsv}
