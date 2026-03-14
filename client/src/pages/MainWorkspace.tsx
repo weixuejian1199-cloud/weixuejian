@@ -19,7 +19,7 @@ import { Streamdown } from "streamdown";
 import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTableRenderer";
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, uploadParsed, type SuggestedAction } from "@/lib/api";
+import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, uploadFile, type SuggestedAction } from "@/lib/api";
 import { parseFile, type DataQuality } from "@/lib/parseFile"; // v14.2-groupby-fix
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -155,7 +155,7 @@ export default function MainWorkspace() {
     let currentProgress = 5;
 
     try {
-      // Phase 1: 前端本地解析 Excel/CSV（0% → 30%，利用用户本地 CPU）
+      // Phase 1: 前端本地解析 Excel/CSV（仅用于预览展示，不传给后端）
       updateMyMsg("", { isAnalyzing: true, analyzeProgress: 8 });
       updateUploadedFile(tempId, { uploadProgress: 5 });
 
@@ -165,8 +165,8 @@ export default function MainWorkspace() {
       updateMyMsg("", { isAnalyzing: true, analyzeProgress: 20 });
       updateUploadedFile(tempId, { uploadProgress: 20 });
 
-      // Phase 1b: 将解析结果发给服务器（只传 JSON，不传原始文件）
-      const uploadResult = await uploadParsed(parsed, (percent) => {
+      // Phase 1b: 直接上传原始文件 buffer（让后端解析全量数据）
+      const uploadResult = await uploadFile(file, (percent) => {
         const mappedProgress = Math.round(20 + (percent / 100) * 10);
         if (mappedProgress > currentProgress) {
           currentProgress = mappedProgress;

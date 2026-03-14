@@ -89,6 +89,11 @@ export function step8Compute(
     return cleanRow;
   });
 
+  // 判断 ResultSet 类型
+  // 如果是模板生成的汇总表，则为 aggregate
+  // 否则默认为 full_detail（完整明细）
+  rs.resultType = input.templateId ? "aggregate" : "full_detail";
+
   // 执行核心口径计算
   try {
     rs.metrics = computeAllMetrics(input.rows);
