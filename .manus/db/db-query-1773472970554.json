@@ -1,0 +1,90 @@
+{
+  "query": "\nSELECT s.id, s.originalName, s.status, s.pipelineStatus, s.rowCount, s.createdAt\nFROM sessions s\nJOIN users u ON s.userId = u.id\nWHERE u.username = 'weixuejian'\nORDER BY s.createdAt DESC\nLIMIT 10;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute \nSELECT s.id, s.originalName, s.status, s.pipelineStatus, s.rowCount, s.createdAt\nFROM sessions s\nJOIN users u ON s.userId = u.id\nWHERE u.username = 'weixuejian'\nORDER BY s.createdAt DESC\nLIMIT 10;\n",
+  "rows": [
+    {
+      "id": "cYxsSRiIiGdv5oQeNATnd",
+      "originalName": "BBB.xlsx",
+      "status": "ready",
+      "pipelineStatus": "failed",
+      "rowCount": "27727",
+      "createdAt": "2026-03-14 07:16:32"
+    },
+    {
+      "id": "9OdT0ghsExCfcj1QcUH-S",
+      "originalName": "AAA.xlsx",
+      "status": "ready",
+      "pipelineStatus": "failed",
+      "rowCount": "44923",
+      "createdAt": "2026-03-14 07:16:27"
+    },
+    {
+      "id": "XPvF3lC13NvHpxdbafLL4",
+      "originalName": "BBB.xlsx",
+      "status": "ready",
+      "pipelineStatus": "failed",
+      "rowCount": "27727",
+      "createdAt": "2026-03-14 06:32:21"
+    },
+    {
+      "id": "9FG2lJiUx7TTdoGlBbQYA",
+      "originalName": "AAA.xlsx",
+      "status": "ready",
+      "pipelineStatus": "failed",
+      "rowCount": "44923",
+      "createdAt": "2026-03-14 06:32:15"
+    },
+    {
+      "id": "ODlos26vTxj-DH6rBwKm4",
+      "originalName": "BBB.xlsx",
+      "status": "ready",
+      "pipelineStatus": "failed",
+      "rowCount": "27727",
+      "createdAt": "2026-03-14 06:17:52"
+    },
+    {
+      "id": "hWu-LAO6An6si10xb_gFD",
+      "originalName": "AAA.xlsx",
+      "status": "ready",
+      "pipelineStatus": "failed",
+      "rowCount": "44923",
+      "createdAt": "2026-03-14 06:17:39"
+    },
+    {
+      "id": "dmQzj9bPxSr2_bfiG7-pb",
+      "originalName": "抖音订单_3.csv",
+      "status": "ready",
+      "pipelineStatus": "success",
+      "rowCount": "5500",
+      "createdAt": "2026-03-14 05:45:11"
+    },
+    {
+      "id": "-efGsD5V8sl0xAyAARipH",
+      "originalName": "抖音订单_2.csv",
+      "status": "ready",
+      "pipelineStatus": "success",
+      "rowCount": "5500",
+      "createdAt": "2026-03-14 05:45:07"
+    },
+    {
+      "id": "JTaSna3bKbOpfPJvhAwLy",
+      "originalName": "抖音订单_1.csv",
+      "status": "ready",
+      "pipelineStatus": "success",
+      "rowCount": "5500",
+      "createdAt": "2026-03-14 05:45:03"
+    },
+    {
+      "id": "gY8LLGC92qSQVbmxw7eIQ",
+      "originalName": "小文件.xlsx",
+      "status": "ready",
+      "pipelineStatus": "NULL",
+      "rowCount": "8",
+      "createdAt": "2026-03-14 04:47:47"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\toriginalName\tstatus\tpipelineStatus\trowCount\tcreatedAt\ncYxsSRiIiGdv5oQeNATnd\tBBB.xlsx\tready\tfailed\t27727\t2026-03-14 07:16:32\n9OdT0ghsExCfcj1QcUH-S\tAAA.xlsx\tready\tfailed\t44923\t2026-03-14 07:16:27\nXPvF3lC13NvHpxdbafLL4\tBBB.xlsx\tready\tfailed\t27727\t2026-03-14 06:32:21\n9FG2lJiUx7TTdoGlBbQYA\tAAA.xlsx\tready\tfailed\t44923\t2026-03-14 06:32:15\nODlos26vTxj-DH6rBwKm4\tBBB.xlsx\tready\tfailed\t27727\t2026-03-14 06:17:52\nhWu-LAO6An6si10xb_gFD\tAAA.xlsx\tready\tfailed\t44923\t2026-03-14 06:17:39\ndmQzj9bPxSr2_bfiG7-pb\t抖音订单_3.csv\tready\tsuccess\t5500\t2026-03-14 05:45:11\n-efGsD5V8sl0xAyAARipH\t抖音订单_2.csv\tready\tsuccess\t5500\t2026-03-14 05:45:07\nJTaSna3bKbOpfPJvhAwLy\t抖音订单_1.csv\tready\tsuccess\t5500\t2026-03-14 05:45:03\ngY8LLGC92qSQVbmxw7eIQ\t小文件.xlsx\tready\tNULL\t8\t2026-03-14 04:47:47\n",
+  "stderr": "",
+  "execution_time_ms": 134
+}
