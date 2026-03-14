@@ -135,6 +135,13 @@ export const resultSets = mysqlTable("result_sets", {
   cleaningLog:       json("cleaningLog"),
   /** ResultSet 生成时间（UTC 毫秒时间戳） */
   generatedAt:       bigint("generatedAt", { mode: "number" }).notNull(),
+  // ── Phase 4：导出标识（V4.0）────────────────────────────────────────────
+  /** 导出记录关联的 ResultSet ID（唯一标识） */
+  resultSetId:       varchar("resultSetId", { length: 64 }),
+  /** 导出行数（用于验证 standardizedRows 是否完整） */
+  exportRowCount:    int("exportRowCount").default(0).notNull(),
+  /** 是否具备全量导出能力（true = 有完整数据，false = 只有预览/摘要） */
+  exportableFullData: int("exportableFullData").default(0).notNull(),
   createdAt:         timestamp("createdAt").defaultNow().notNull(),
 });
 
