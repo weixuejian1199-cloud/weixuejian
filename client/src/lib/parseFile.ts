@@ -937,9 +937,10 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
       field.avg = stat.sum / stat.count;
       // top5 sorted descending by value (full dataset, row-level)
       field.top5 = [...stat.top5Heap].sort((a, b) => b.value - a.value);
-      // groupedTopN: GROUP BY primary dimension field, SUM this numeric field, TOP20 by sum
-      if (groupByField) {
-        // ── Phase 4：传入字段身份元信息（V4.0）────────────────────────────────────
+      
+      // ── Phase 4：只有 metric 类型字段才生成 groupedTop5（V4.0）────────────────
+      // 标识符字段（identifier）不适合分组聚合，跳过
+      if (groupByField && field.metadata?.fieldRole === "metric") {
         const groupedResult = computeGroupedTopN(rows, h, groupByField, file.name, GROUPED_TOP_N, field.metadata);
         field.groupedTop5 = groupedResult.entries;
         field.validGroupSum = groupedResult.validTotalSum; // T7: total sum of ALL valid groups
@@ -949,10 +950,12 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
           representativeGroupedTopN = field.groupedTop5;
         }
       }
+      
       // Product-dimension groupedTop5: GROUP BY 选购商品, SUM numeric field, TOP50
       // P2: 商品口径分离：含分号的行进入组合装池，不含分号的行进入单品池
       // 单品池经 SPU_MAPPING 标准化后再做 GROUP BY
-      if (productGroupByField && productGroupByField !== groupByField) {
+      // ── Phase 4：只有 metric 类型字段才生成 productGroupedTop5（V4.0）────────────
+      if (productGroupByField && productGroupByField !== groupByField && field.metadata?.fieldRole === "metric") {
         // 分离单品和组合装
         const singleRows: Record<string, unknown>[] = [];
         const comboRows: Record<string, unknown>[] = [];

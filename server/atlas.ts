@@ -1885,9 +1885,10 @@ export function registerAtlasRoutes(app: Express) {
         for (const s of validSessions) {
           const di = s!.dfInfo as DataFrameInfo | null;
           if (!di) continue;
-          const field = di.fields.find((f: FieldInfo) => f.name === s.name);
-          if (field && (field as any).metadata) {
-            return (field as any).metadata as FieldMetadata;
+          // 获取第一个数值字段的元信息（如果存在）
+          const firstNumericField = di.fields.find((f: FieldInfo) => f.type === 'numeric' && (f as any).metadata);
+          if (firstNumericField && (firstNumericField as any).metadata) {
+            return (firstNumericField as any).metadata as FieldMetadata;
           }
         }
         return undefined;
