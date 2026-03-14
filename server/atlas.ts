@@ -2453,9 +2453,10 @@ ${dataTable}`}
           if (resultSet && resultSet.metrics.length > 0) {
             const expressionOutput = buildExpressionPrompt(resultSet);
             // 将 ResultSet 精确指标追加到 systemPrompt 中
-            const resultSetSection = `\n\n══ V3.0 Pipeline 精确计算结果（最高优先级数字来源）══\n` +
+            const resultSetSection = `\n\n══ V3.0 Pipeline 精确计算结果（唯一数字来源）══\n` +
               `⚠️ 以下指标由 Pipeline 确定性计算引擎 v${resultSet.computationVersion} 产出，使用 Decimal.js 精确计算。\n` +
-              `⚠️ 当以下指标与旧版统计摘要冲突时，必须以此处的数字为准。\n\n` +
+              `⚠️ 你的回答中的所有数字必须来自以下数据，禁止自行计算或推断。\n` +
+              `⚠️ 如果用户问的数据不在以下列表中，你必须明确回答"当前数据中没有这个信息"，而不是猜测。\n\n` +
               expressionOutput.resultSetSummary +
               (expressionOutput.cleaningLogSummary ? `\n\n数据清洗说明：\n${expressionOutput.cleaningLogSummary}` : '') +
               `\n══ V3.0 精确计算结果结束 ══`;
