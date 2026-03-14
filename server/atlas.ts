@@ -2754,251 +2754,89 @@ ${dataTable}`}
         }
       }
 
-      // 非 success 状态：尝试 V3 路径（如果有 ResultSet 就用 V3，否则 fallback）
+      // 非 success 状态：如果 ResultSet 不存在，直接返回 500 错误（不再 fallback）
       try {
         const resultSet = await getResultSetForSession(session_id);
-        if (resultSet && resultSet.standardizedRows.length > 0) {
-          console.log(`[Atlas] ✅ V3.0 ResultSet found for session ${session_id}, rows: ${resultSet.rowCount}, exporting full data`);
-          const safeTitle = (report_title || requirement.slice(0, 30)).replace(/[^a-zA-Z0-9一-龥_-]/g, "_").slice(0, 40);
-          const exportResult = await exportFromResultSet(resultSet, {
-            format: "xlsx",
-            fileName: safeTitle,
-            includeSummary: true,
-            includeCleaningLog: true,
-          });
-          const dataSummary = buildDataSummary(resultSet);
-          const metricsInfo = resultSet.metrics
-            .filter((m: any) => "value" in m && m.value !== undefined)
-            .map((m: any) => `${m.displayName}: ${m.value} ${m.unit}`)
-            .join("\n");
-          const reportId = nanoid();
-          const userId = (req as any).userId || 0;
-          await createReport({
-            id: reportId,
-            sessionId: session_id,
-            userId,
-            title: safeTitle,
-            filename: exportResult.fileName,
-            fileKey: exportResult.s3Key,
-            fileUrl: exportResult.url,
-            fileSizeKb: Math.ceil(exportResult.fileSize / 1024),
-            prompt: requirement,
-            status: "completed",
-            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-          });
-          const aiMessage = `✅ **${safeTitle}** 已生成完成！（V3.0 全量导出）\n\n` +
-            `📊 数据概况：\n${dataSummary}\n\n` +
-            (metricsInfo ? `📈 核心指标：\n${metricsInfo}\n\n` : "") +
-            `报表包含 ${resultSet.rowCount} 行全量数据（含数据明细、汇总统计、清洗日志 3 个工作表）。\n` +
-            `⚠️ 数据来源：Pipeline 确定性计算引擎 v${resultSet.computationVersion}，非 AI 生成。`;
-          const previewHeaders = resultSet.fields.slice(0, 15);
-          const previewRows = resultSet.standardizedRows.slice(0, 50).map((row: Record<string, unknown>) =>
-            previewHeaders.map((h: string) => row[h] ?? "")
-          );
-          res.json({
-            report_id: reportId,
-            filename: exportResult.fileName,
-            download_url: exportResult.url,
-            export_path: "v3_resultset",
-            export_reason: "resultset_found",
-            ai_message: aiMessage,
-            plan: {
-              title: safeTitle,
-              sheets: [{
-                name: "数据明细",
-                headers: previewHeaders,
-                rows: previewRows as (string | number)[][],
-                summary: `全量 ${resultSet.rowCount} 行数据（预览前 50 行）`,
-              }],
-              insights: metricsInfo || "全量数据已导出",
-            },
+        if (!resultSet || resultSet.standardizedRows.length === 0) {
+          console.error(`[Atlas] ❌ No ResultSet available for session ${session_id}, pipelineStatus=${currentPipelineStatus}`);
+          res.status(500).json({
+            error: `数据未就绪：全量数据尚未完成处理，请稍后重试或重新上传文件`,
+            session_id,
+            pipelineStatus: currentPipelineStatus,
+            export_path: "error",
+            export_reason: "resultset_missing",
           });
           return;
         }
+
+        console.log(`[Atlas] ✅ V3.0 ResultSet found for session ${session_id}, rows: ${resultSet.rowCount}, exporting full data`);
+        const safeTitle = (report_title || requirement.slice(0, 30)).replace(/[^a-zA-Z0-9一-龥_-]/g, "_").slice(0, 40);
+        const exportResult = await exportFromResultSet(resultSet, {
+          format: "xlsx",
+          fileName: safeTitle,
+          includeSummary: true,
+          includeCleaningLog: true,
+        });
+        const dataSummary = buildDataSummary(resultSet);
+        const metricsInfo = resultSet.metrics
+          .filter((m: any) => "value" in m && m.value !== undefined)
+          .map((m: any) => `${m.displayName}: ${m.value} ${m.unit}`)
+          .join("\n");
+        const reportId = nanoid();
+        const userId = (req as any).userId || 0;
+        await createReport({
+          id: reportId,
+          sessionId: session_id,
+          userId,
+          title: safeTitle,
+          filename: exportResult.fileName,
+          fileKey: exportResult.s3Key,
+          fileUrl: exportResult.url,
+          fileSizeKb: Math.ceil(exportResult.fileSize / 1024),
+          prompt: requirement,
+          status: "completed",
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+        const aiMessage = `✅ **${safeTitle}** 已生成完成！（V3.0 全量导出）\n\n` +
+          `📊 数据概况：\n${dataSummary}\n\n` +
+          (metricsInfo ? `📈 核心指标：\n${metricsInfo}\n\n` : "") +
+          `报表包含 ${resultSet.rowCount} 行全量数据（含数据明细、汇总统计、清洗日志 3 个工作表）。\n` +
+          `⚠️ 数据来源：Pipeline 确定性计算引擎 v${resultSet.computationVersion}，非 AI 生成。`;
+        const previewHeaders = resultSet.fields.slice(0, 15);
+        const previewRows = resultSet.standardizedRows.slice(0, 50).map((row: Record<string, unknown>) =>
+          previewHeaders.map((h: string) => row[h] ?? "")
+        );
+        res.json({
+          report_id: reportId,
+          filename: exportResult.fileName,
+          download_url: exportResult.url,
+          export_path: "v3_resultset",
+          export_reason: "resultset_found",
+          ai_message: aiMessage,
+          plan: {
+            title: safeTitle,
+            sheets: [{
+              name: "数据明细",
+              headers: previewHeaders,
+              rows: previewRows as (string | number)[][],
+              summary: `全量 ${resultSet.rowCount} 行数据（预览前 50 行）`,
+            }],
+            insights: metricsInfo || "全量数据已导出",
+          },
+        });
+        return;
       } catch (rsErr: any) {
-        console.warn(`[Atlas] V3.0 ResultSet export failed, falling back to legacy: ${rsErr?.message}`);
-      }
-
-      // ═══ 旧路径 Fallback：AI 生成 JSON → Excel ═══
-      console.log(`[Atlas] ⚠️ No ResultSet for session ${session_id}, using legacy AI generation`);
-      // ═══ 旧路径 Fallback：AI 生成 JSON → Excel ═══
-      console.log(`[Atlas] No ResultSet for session ${session_id}, using legacy AI generation`);
-
-      // Load parsed data from S3
-      const data = await loadSessionData(session_id);
-      if (!data) {
-        res.status(404).json({ error: "Session data expired. Please re-upload the file." });
+        console.error(`[Atlas] ❌ ResultSet export failed for session ${session_id}: ${rsErr?.message}`);
+        res.status(500).json({
+          error: `导出失败：${rsErr?.message || "未知错误"}`,
+          session_id,
+          pipelineStatus: currentPipelineStatus,
+          export_path: "error",
+          export_reason: "resultset_export_failed",
+        });
         return;
       }
-      // 1. Ask AI to generate the report data as JSON
-      const openai = createLLM();
-      const fieldNames = dfInfo.fields.map((f: FieldInfo) => f.name).join(", ");
-      // Build full-dataset statistics summary to inject into AI prompt
-      // This ensures AI uses accurate stats even when only 500 sample rows are provided
-      const numericFields = dfInfo.fields.filter((f: FieldInfo) => f.type === 'numeric');
-      const fullStatsLines: string[] = [];
-      for (const f of numericFields) {
-        if (f.sum !== undefined && f.avg !== undefined) {
-          fullStatsLines.push(
-            `${f.name}: 总计=${f.sum.toFixed(2)}, 均值=${f.avg.toFixed(2)}, 最大=${(f.max ?? 0).toFixed(2)}, 最小=${(f.min ?? 0).toFixed(2)}`
-          );
-        }
-      }
-      const fullStatsSection = fullStatsLines.length > 0
-        ? `\n══ 全量统计摘要（基于 ${dfInfo.row_count.toLocaleString()} 行全量数据，非样本）══\n重要约束：当需要汇总/合计/均值等指标时，必须直接引用以下全量统计值，禁止对样本行重新计算。\n${fullStatsLines.join('\n')}\n══ 全量统计摘要结束 ══\n`
-        : '';
-
-      // Pass sample data (up to 500 rows) for field understanding
-      const maxReportRows = Math.min(data.length, 500);
-      const allReportData = data.slice(0, maxReportRows);
-      const sampleRows = JSON.stringify(allReportData, null, 2);
-
-      // RAG: retrieve similar high-rated examples for self-learning
-      const columnSignature = dfInfo.fields.map((f: FieldInfo) => f.name).join(",");
-      const ragExamples = await getSimilarExamples(columnSignature, 2);
-      const ragSection = ragExamples.length > 0
-        ? `\n\n参考示例（这是用户评分较高的历史报表，请学习其分析风格和结构）：\n${ragExamples.map((ex, i) => `示例${i + 1}：需求「${ex.prompt}」，用户评分：${ex.rating}星`).join("\n")}`
-        : "";
-
-      const aiPrompt = `你是数据分析专家。根据以下数据和需求，生成一份准确的报表。${ragSection}
-
-数据文件：${filename}（全量 ${dfInfo.row_count}行 x ${dfInfo.col_count}列）
-字段：${fieldNames}
-${fullStatsSection}
-样本数据（共${maxReportRows}行，仅用于理解字段含义，不代表全量数据）：
-${sampleRows}
-
-用户需求：${requirement}
-
-请返回一个 JSON 对象，格式如下：
-{
-  "title": "报表标题",
-  "sheets": [
-    {
-      "name": "Sheet名称",
-      "headers": ["入1", "入2", "入3"],
-      "rows": [
-        ["值1", "值2", "值3"]
-      ],
-      "summary": "本sheet的说明"
-    }
-  ],
-  "insights": "关键发现和建议（2-3条）"
-}
-
-要求：
-- 最多3个Sheet
-- 每个Sheet最多100行数据
-- 数据要准确，汇总统计必须使用上方全量统计摘要中的数据
-- 如果需要分组汇总，请基于样本数据中的分组字段进行 GROUP BY
-- 只返回JSON，不要其他文字`;
-
-      let reportData: {
-        title: string;
-        sheets: Array<{
-          name: string;
-          headers: string[];
-          rows: (string | number)[][];
-          summary?: string;
-        }>;
-        insights: string;
-      };
-
-      try {
-        const aiResult = await streamText({
-          model: openai.chat(selectModel(data?.length)),
-          messages: [{ role: "user", content: aiPrompt }],
-        });
-        const rawText = await aiResult.text;
-        // Extract JSON from response
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("AI did not return valid JSON");
-        reportData = JSON.parse(jsonMatch[0]);
-      } catch (e) {
-        console.warn("[Atlas] AI report generation failed, using fallback:", e);
-        // Fallback: create a simple summary sheet
-        const headers = dfInfo.fields.map((f: FieldInfo) => f.name);
-        const rows = data.slice(0, 30).map(row => headers.map((h: string) => row[h] ?? ""));
-        reportData = {
-          title: report_title || requirement.slice(0, 30),
-          sheets: [{
-            name: "数据汇总",
-            headers,
-            rows: rows as (string | number)[][],
-            summary: "原始数据（前30行）",
-          }],
-          insights: `已导出 ${Math.min(data.length, 30)} 行数据。`,
-        };
-      }
-
-      // 2. Generate Excel file
-      const workbook = XLSX.utils.book_new();
-      for (const sheet of reportData.sheets) {
-        const wsData = [sheet.headers, ...sheet.rows];
-        const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-        // Style header row (bold)
-        const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
-        for (let c = range.s.c; c <= range.e.c; c++) {
-          const cellAddr = XLSX.utils.encode_cell({ r: 0, c });
-          if (ws[cellAddr]) {
-            ws[cellAddr].s = { font: { bold: true }, fill: { fgColor: { rgb: "1E3A5F" } } };
-          }
-        }
-
-        // Auto column widths
-        ws["!cols"] = sheet.headers.map(h => ({ wch: Math.max(h.length * 2, 12) }));
-        XLSX.utils.book_append_sheet(workbook, ws, sheet.name.slice(0, 31));
-      }
-
-      const excelBuffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
-
-      // 3. Upload to S3
-      const reportId = nanoid();
-      const safeTitle = (reportData.title || "report").replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g, "_").slice(0, 40);
-      const reportKey = `atlas-reports/${reportId}-${safeTitle}.xlsx`;
-      const { url: reportUrl } = await storagePut(reportKey, excelBuffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-
-      // 4. Persist report to DB (replaces in-memory reportStore)
-      const userId = (req as any).userId || 0;
-      await createReport({
-        id: reportId,
-        sessionId: session_id,
-        userId,
-        title: reportData.title || safeTitle,
-        filename: `${safeTitle}.xlsx`,
-        fileKey: reportKey,
-        fileUrl: reportUrl,
-        fileSizeKb: Math.ceil(excelBuffer.length / 1024),
-        prompt: requirement,
-        status: "completed",
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-      });
-
-      const aiMessage = `✅ **${reportData.title}** 已生成完毕！\n\n${reportData.insights}\n\n报表包含 ${reportData.sheets.length} 个工作表：${reportData.sheets.map(s => s.name).join("、")}。`;
-      res.json({
-        report_id: reportId,
-        filename: `${safeTitle}.xlsx`,
-        download_url: reportUrl,
-        export_path: "legacy_ai",
-        export_reason: fallbackReason,
-        ai_message: aiMessage,
-        plan: {
-          title: reportData.title,
-          sheets: reportData.sheets.map(s => ({
-            name: s.name,
-            headers: s.headers,
-            rows: s.rows.slice(0, 50),
-            summary: s.summary || "",
-          })),
-          insights: reportData.insights,
-        },
-      });;
-    } catch (err: any) {
-      console.error("[Atlas] Generate report error:", err);
-      res.status(500).json({ error: err.message || "Report generation failed" });
-    }
-  });
+      // ═══ V3.0 导出逻辑结束 ═══
 
   // ── Personal Templates API (V13.7) ─────────────────────────────────────────
   // GET /api/atlas/templates — list user's personal templates
