@@ -94,7 +94,6 @@ export async function pollUploadStatus(
 
 export interface GenerateReportResponse {
   report_id: string;
-  resultSetId?: string;
   filename: string;
   download_url: string;
   ai_message: string;

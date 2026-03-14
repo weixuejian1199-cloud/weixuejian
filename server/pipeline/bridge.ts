@@ -365,16 +365,6 @@ export async function saveResultSet(
   console.log(`[Pipeline]   Metrics: ${rs.metrics.length}`);
   console.log(`[Pipeline]   Fields: ${rs.fields.length}`);
 
-  // ── Phase 4：设置导出标识（V4.0）────────────────────────────────────────────
-  // 确保 resultSetId 有值
-  if (!rs.resultSetId) {
-    rs.resultSetId = rs.jobId;
-  }
-  
-  // 设置导出行数和是否具备全量导出能力
-  rs.exportRowCount = rs.standardizedRows.length;
-  rs.exportableFullData = rs.standardizedRows.length > 0;
-
   // 1. 将标准化数据行存到 S3（⭐ V3.0 导出的必要条件，S3 写入失败按 Pipeline failed 处理）
   let dataS3Key: string | null = null;
   if (rs.standardizedRows.length > 0) {
@@ -413,19 +403,15 @@ export async function saveResultSet(
       isMultiFile: rs.isMultiFile ? 1 : 0,
       cleaningLog: rs.cleaningLog as any,
       generatedAt: rs.createdAt,
-      // ── Phase 4：保存导出标识（V4.0）────────────────────────────────────────────
-      resultSetId: rs.resultSetId,
-      exportRowCount: rs.exportRowCount,
-      exportableFullData: rs.exportableFullData ? 1 : 0,
     });
     console.log(`[Pipeline] ✅ ResultSet inserted into DB`);
 
     // 3. 更新 session 关联 resultSetId（⭐ 统一字段命名：使用 resultSetId）
     console.log(`[Pipeline] 💾 Updating session with resultSetId...`);
     await db.update(sessions)
-      .set({ resultSetId: rs.resultSetId })
+      .set({ resultSetId: rs.jobId })
       .where(eq(sessions.id, sessionId));
-    console.log(`[Pipeline] ✅ Session updated with resultSetId: ${rs.resultSetId}`);
+    console.log(`[Pipeline] ✅ Session updated with resultSetId: ${rs.jobId}`);
   } catch (err: any) {
     console.error(`[Pipeline] ❌ Failed to save ResultSet to DB: ${err?.message}`);
     throw err; // 抛出错误，让上层知道失败
@@ -451,9 +437,18 @@ export async function getResultSetForSession(
       .where(eq(resultSets.sessionId, sessionId))
       .limit(1);
 
-    if (rows.length === 0) return null;
+    if (rows.length === 0) {
+      console.log(`[Pipeline] 🔍 [DEBUG] getResultSetForSession: no ResultSet found for session ${sessionId}`);
+      return null;
+    }
 
     const record = rows[0];
+    console.log(`[Pipeline] 🔍 [DEBUG] getResultSetForSession for session ${sessionId}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] Found ResultSet record.id: ${record.id}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] record.rowCount: ${record.rowCount}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] record.dataS3Key: ${record.dataS3Key}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] record.computationVersion: ${record.computationVersion}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] record.isMultiFile: ${record.isMultiFile}`);
 
     // 从 S3 加载标准化数据行
     let standardizedRows: Record<string, string | number | null>[] = [];
@@ -486,11 +481,14 @@ export async function getResultSetForSession(
       sourcePlatform: record.sourcePlatform || "unknown",
       isMultiFile: record.isMultiFile === 1,
       cleaningLog: record.cleaningLog as any || [],
-      // ── Phase 4：读取导出标识（V4.0）────────────────────────────────────────────
-      resultSetId: record.resultSetId || record.id,
-      exportRowCount: record.exportRowCount,
-      exportableFullData: record.exportableFullData === 1,
     };
+
+    console.log(`[Pipeline] 🔍 [DEBUG] Rebuilt ResultSet for session ${sessionId}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] rs.jobId (resultSetId): ${rs.jobId}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] rs.rowCount: ${rs.rowCount}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] rs.standardizedRows.length: ${rs.standardizedRows.length}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] rs.fields count: ${rs.fields.length}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] First 3 standardizedRows sample:`, JSON.stringify(rs.standardizedRows.slice(0, 3), null, 2));
 
     return rs;
   } catch (err: any) {
@@ -547,10 +545,6 @@ export async function getResultSetById(
       sourcePlatform: record.sourcePlatform || "unknown",
       isMultiFile: record.isMultiFile === 1,
       cleaningLog: record.cleaningLog as any || [],
-      // ── Phase 4：读取导出标识（V4.0）────────────────────────────────────────────
-      resultSetId: record.resultSetId || record.id,
-      exportRowCount: record.exportRowCount,
-      exportableFullData: record.exportableFullData === 1,
     };
 
     return rs;

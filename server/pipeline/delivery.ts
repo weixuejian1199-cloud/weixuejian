@@ -18,13 +18,14 @@ import * as XLSX from "xlsx";
 import Decimal from "decimal.js";
 import { nanoid } from "nanoid";
 import type { ResultSet } from "@shared/resultSet";
-import type { ExportPayload } from "@shared/types";
 import { getDisplayName } from "@shared/fieldAliases";
 import { getTemplateById, type TemplateDefinition } from "@shared/templates";
 import { storagePut } from "../storage";
 
 // ── 导出格式 ──────────────────────────────────────────────────────
+
 export type ExportFormat = "xlsx" | "csv";
+
 export interface ExportOptions {
   /** 导出格式 */
   format: ExportFormat;
@@ -35,6 +36,7 @@ export interface ExportOptions {
   /** 是否包含清洗日志 Sheet */
   includeCleaningLog?: boolean;
 }
+
 export interface ExportResult {
   /** 导出文件的 S3 URL */
   url: string;
@@ -46,66 +48,11 @@ export interface ExportResult {
   fileSize: number;
 }
 
-// ── Phase 4：止血 + 约束（V4.0）────────────────────────────────────────────
+// ── 导出引擎 ──────────────────────────────────────────────────────
 
 /**
- * 过滤 unknown_ 字段（允许导出，但增加告警）
- */
-function filterUnknownFields(
-  fields: string[],
-  resultSet: ResultSet
-): { filteredFields: string[]; warnings: string[] } {
-  const warnings: string[] = [];
-  const filteredFields: string[] = [];
-
-  for (const field of fields) {
-    // 检查字段是否以 unknown_ 开头
-    if (field.startsWith("unknown_")) {
-      warnings.push(`字段 "${field}" 未完成映射，已从导出中过滤`);
-    } else {
-      filteredFields.push(field);
-    }
-  }
-
-  return { filteredFields, warnings };
-}
-
-/**
- * 验证 ResultSet 是否具备全量导出能力
- */
-function validateExportCapability(
-  resultSet: ResultSet
-): { valid: boolean; error?: string; warnings?: string[] } {
-  // ── Phase 4：验证导出能力（V4.0）────────────────────────────────────────────
-  // 硬规则：如果 exportableFullData = false，直接报错
-  if (!resultSet.exportableFullData) {
-    return {
-      valid: false,
-      error: `导出失败：当前结果不具备全量导出能力（exportableFullData=false），请联系管理员确认数据完整性后再导出`
-    };
-  }
-
-  // 硬规则：验证 exportRowCount 和 standardizedRows.length 一致
-  if (resultSet.exportRowCount !== resultSet.standardizedRows.length) {
-    return {
-      valid: false,
-      error: `导出失败：数据完整性验证失败（exportRowCount=${resultSet.exportRowCount}，standardizedRows.length=${resultSet.standardizedRows.length}），请联系管理员确认数据一致性后再导出`
-    };
-  }
-
-  // 如果 standardizedRows 为空，报错
-  if (resultSet.standardizedRows.length === 0) {
-    return {
-      valid: false,
-      error: `导出失败：没有可导出的数据（standardizedRows.length=0），请联系管理员确认数据来源后再导出`
-    };
-  }
-
-  return { valid: true };
-}
-
-/**
- * 导出引擎
+ * 从 ResultSet 导出 Excel/CSV 文件。
+ * 确保导出的数字与页面显示完全一致（导出同源）。
  */
 export async function exportFromResultSet(
   resultSet: ResultSet,
@@ -113,20 +60,13 @@ export async function exportFromResultSet(
 ): Promise<ExportResult> {
   const { format, includeSummary = true, includeCleaningLog = false } = options;
 
-  // ── Phase 4：验证导出能力（V4.0）────────────────────────────────────────────
-  const validation = validateExportCapability(resultSet);
-  if (!validation.valid) {
-    throw new Error(validation.error);
-  }
-
-  // ── Phase 4：过滤 unknown_ 字段（V4.0）────────────────────────────────────────────
-  // 确定导出字段（过滤 unknown_）
-  const { filteredFields, warnings } = filterUnknownFields(resultSet.fields, resultSet);
-
-  // 如果有告警，记录日志
-  if (warnings.length > 0) {
-    console.warn(`[Delivery] 导出告警：${warnings.join('; ')}`);
-  }
+  console.log(`[Delivery] 🔍 [DEBUG] exportFromResultSet called`);
+  console.log(`[Delivery] 🔍 [DEBUG] resultSet.jobId: ${resultSet.jobId}`);
+  console.log(`[Delivery] 🔍 [DEBUG] resultSet.rowCount: ${resultSet.rowCount}`);
+  console.log(`[Delivery] 🔍 [DEBUG] resultSet.standardizedRows.length: ${resultSet.standardizedRows.length}`);
+  console.log(`[Delivery] 🔍 [DEBUG] export format: ${format}`);
+  console.log(`[Delivery] 🔍 [DEBUG] includeSummary: ${includeSummary}`);
+  console.log(`[Delivery] 🔍 [DEBUG] includeCleaningLog: ${includeCleaningLog}`);
 
   // 确定文件名
   const baseName = options.fileName || generateFileName(resultSet);
@@ -148,7 +88,7 @@ export async function exportFromResultSet(
   }
 
   // Sheet 2: 数据明细（全量）
-  const dataSheet = buildDataSheet(resultSet, template, filteredFields);
+  const dataSheet = buildDataSheet(resultSet, template);
   XLSX.utils.book_append_sheet(workbook, dataSheet, "数据明细（全量）");
 
   // Sheet 3: 清洗日志（如果启用）
@@ -238,12 +178,17 @@ function formatDateTime(value: unknown): string | null {
  */
 function buildDataSheet(
   resultSet: ResultSet,
-  template: TemplateDefinition | null | undefined,
-  filteredFields?: string[]
+  template: TemplateDefinition | null | undefined
 ): XLSX.WorkSheet {
-  // ── Phase 4：使用过滤后的字段列表（V4.0）────────────────────────────────────────────
-  // 如果提供了 filteredFields，使用它；否则使用原始 fields
-  const columns = filteredFields || resultSet.fields;
+  // 确定列顺序
+  let columns: string[];
+  if (template) {
+    // 模板模式：使用模板定义的列顺序
+    columns = template.exportColumns;
+  } else {
+    // 自由模式：使用 ResultSet 中的字段顺序
+    columns = resultSet.fields;
+  }
 
   // 构建表头（使用中文显示名）
   const headerRow = columns.map(col => {

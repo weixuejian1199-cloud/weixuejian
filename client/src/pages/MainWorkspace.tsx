@@ -388,7 +388,6 @@ export default function MainWorkspace() {
         // Show result with table data and download button
         updateLastMessage(result.ai_message, {
           report_id: result.report_id,
-          resultSetId: result.resultSetId,  // ── Phase 4：传递 resultSetId（V4.0）
           report_filename: result.filename,
           tableData: result.plan?.sheets || [],
           // @ts-ignore
