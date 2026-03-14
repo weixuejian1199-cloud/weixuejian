@@ -2675,6 +2675,15 @@ ${dataTable}`}
         }
         // 有 ResultSet，导出（如果导出失败也必须返回 500，不能 fallback）
         try {
+          console.log(`[Atlas] 🔍 [DEBUG] generate-report for session ${session_id}`);
+          console.log(`[Atlas] 🔍 [DEBUG] resultSet.jobId: ${resultSet.jobId}`);
+          console.log(`[Atlas] 🔍 [DEBUG] resultSet.rowCount: ${resultSet.rowCount}`);
+          console.log(`[Atlas] 🔍 [DEBUG] resultSet.standardizedRows.length: ${resultSet.standardizedRows.length}`);
+          console.log(`[Atlas] 🔍 [DEBUG] resultSet.computationVersion: ${resultSet.computationVersion}`);
+          console.log(`[Atlas] 🔍 [DEBUG] resultSet.isMultiFile: ${resultSet.isMultiFile}`);
+          console.log(`[Atlas] 🔍 [DEBUG] resultSet.sourcePlatform: ${resultSet.sourcePlatform}`);
+          console.log(`[Atlas] 🔍 [DEBUG] resultSet.fields count: ${resultSet.fields.length}`);
+          console.log(`[Atlas] 🔍 [DEBUG] First 3 standardizedRows sample:`, JSON.stringify(resultSet.standardizedRows.slice(0, 3), null, 2));
           console.log(`[Atlas] ✅ V3.0 ResultSet found for session ${session_id}, rows: ${resultSet.rowCount}, exporting full data`);
           const safeTitle = (report_title || requirement.slice(0, 30)).replace(/[^a-zA-Z0-9一-龥_-]/g, "_").slice(0, 40);
           const exportResult = await exportFromResultSet(resultSet, {

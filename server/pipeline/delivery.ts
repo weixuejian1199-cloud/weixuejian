@@ -60,6 +60,14 @@ export async function exportFromResultSet(
 ): Promise<ExportResult> {
   const { format, includeSummary = true, includeCleaningLog = false } = options;
 
+  console.log(`[Delivery] 🔍 [DEBUG] exportFromResultSet called`);
+  console.log(`[Delivery] 🔍 [DEBUG] resultSet.jobId: ${resultSet.jobId}`);
+  console.log(`[Delivery] 🔍 [DEBUG] resultSet.rowCount: ${resultSet.rowCount}`);
+  console.log(`[Delivery] 🔍 [DEBUG] resultSet.standardizedRows.length: ${resultSet.standardizedRows.length}`);
+  console.log(`[Delivery] 🔍 [DEBUG] export format: ${format}`);
+  console.log(`[Delivery] 🔍 [DEBUG] includeSummary: ${includeSummary}`);
+  console.log(`[Delivery] 🔍 [DEBUG] includeCleaningLog: ${includeCleaningLog}`);
+
   // 确定文件名
   const baseName = options.fileName || generateFileName(resultSet);
   const ext = format === "xlsx" ? ".xlsx" : ".csv";

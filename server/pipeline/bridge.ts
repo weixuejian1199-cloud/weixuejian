@@ -437,9 +437,18 @@ export async function getResultSetForSession(
       .where(eq(resultSets.sessionId, sessionId))
       .limit(1);
 
-    if (rows.length === 0) return null;
+    if (rows.length === 0) {
+      console.log(`[Pipeline] 🔍 [DEBUG] getResultSetForSession: no ResultSet found for session ${sessionId}`);
+      return null;
+    }
 
     const record = rows[0];
+    console.log(`[Pipeline] 🔍 [DEBUG] getResultSetForSession for session ${sessionId}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] Found ResultSet record.id: ${record.id}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] record.rowCount: ${record.rowCount}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] record.dataS3Key: ${record.dataS3Key}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] record.computationVersion: ${record.computationVersion}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] record.isMultiFile: ${record.isMultiFile}`);
 
     // 从 S3 加载标准化数据行
     let standardizedRows: Record<string, string | number | null>[] = [];
@@ -473,6 +482,13 @@ export async function getResultSetForSession(
       isMultiFile: record.isMultiFile === 1,
       cleaningLog: record.cleaningLog as any || [],
     };
+
+    console.log(`[Pipeline] 🔍 [DEBUG] Rebuilt ResultSet for session ${sessionId}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] rs.jobId (resultSetId): ${rs.jobId}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] rs.rowCount: ${rs.rowCount}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] rs.standardizedRows.length: ${rs.standardizedRows.length}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] rs.fields count: ${rs.fields.length}`);
+    console.log(`[Pipeline] 🔍 [DEBUG] First 3 standardizedRows sample:`, JSON.stringify(rs.standardizedRows.slice(0, 3), null, 2));
 
     return rs;
   } catch (err: any) {

@@ -188,10 +188,24 @@ export async function updateReport(id: string, data: Partial<InsertReport>) {
 export async function getReport(id: string) {
   const db = await getDb();
   if (!db) return undefined;
+
   const result = await db.select().from(reports)
     .where(eq(reports.id, id))
     .limit(1);
-  return result[0];
+
+  const report = result[0];
+
+  if (report) {
+    console.log(`[DB] 🔍 [DEBUG] getReport for reportId: ${report.id}`);
+    console.log(`[DB] 🔍 [DEBUG] report.sessionId: ${report.sessionId}`);
+    console.log(`[DB] 🔍 [DEBUG] report.filename: ${report.filename}`);
+    console.log(`[DB] 🔍 [DEBUG] report.fileKey: ${report.fileKey}`);
+    console.log(`[DB] 🔍 [DEBUG] report.title: ${report.title}`);
+  } else {
+    console.log(`[DB] 🔍 [DEBUG] getReport: no report found for id ${id}`);
+  }
+
+  return report;
 }
 
 export async function getUserReports(userId: number) {
