@@ -44,11 +44,16 @@ describe("B7 Atlas Integration", () => {
     expect(atlasContent).toContain("runPipelineInBackground(sessionId, userId, buffer, originalname, mimetype)");
   });
 
-  it("should have non-blocking pipeline call (catch clause)", async () => {
+  it("should have non-blocking pipeline call (V2.4: bridge handles all errors internally)", async () => {
     const fs = await import("fs");
     const atlasContent = fs.readFileSync("server/atlas.ts", "utf-8");
-    // The pipeline call should be wrapped in .catch() to not block the old flow
-    expect(atlasContent).toContain('.catch(err => console.warn(`[Pipeline] Background pipeline failed (non-blocking):`');
+    // V2.4: runPipelineInBackground is called directly (no .catch wrapper needed)
+    // because bridge.ts handles all exceptions internally and writes success/failed status
+    expect(atlasContent).toContain('runPipelineInBackground(sessionId, userId, buffer, originalname, mimetype)');
+    // Verify bridge.ts handles errors internally (writes failed status on exception)
+    const bridgeContent = fs.readFileSync("server/pipeline/bridge.ts", "utf-8");
+    expect(bridgeContent).toContain('pipelineStatus: "failed"');
+    expect(bridgeContent).toContain('pipelineStatus: "success"');
   });
 });
 

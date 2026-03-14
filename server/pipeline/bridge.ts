@@ -6,18 +6,16 @@
  * 策略：双轨运行
  *   - 旧逻辑继续工作，保证现有功能不受影响
  *   - 新 Pipeline 在后台并行运行，生成 ResultSet 并持久化
- *   - ResultSet 存储到数据库 + S3（标准化数据行）
- *   - 后续逐步切换前端读取 ResultSet 替代旧数据
+ *   - Pipeline 状态追踪：null → running → success / failed
  *
- * 本文件提供：
- *   1. runPipelineInBackground() — 在 upload 端点中调用
- *   2. saveResultSet() — 将 ResultSet 持久化到 DB + S3
- *   3. getResultSetForSession() — 根据 sessionId 获取 ResultSet
+ * 硬约束（V2.4）：
+ *   1. upload 只写 running，bridge 负责全部终态 success/failed
+ *   2. 不允许函数开头因 getDb() 失败就直接 return，让 Pipeline 先执行
+ *   3. 在写 success/failed 终态前，必须重新获取 DB（不复用函数启动时的连接）
  */
 
-import { nanoid } from "nanoid";
 import { eq } from "drizzle-orm";
-import { runPipeline, type PipelineInput, type PipelineOutput } from "./index";
+import { runPipeline, type PipelineInput } from "./index";
 import { storagePut, storageGet } from "../storage";
 import { getDb } from "../db";
 import { resultSets, sessions } from "../../drizzle/schema";
@@ -28,6 +26,13 @@ import type { ResultSet } from "@shared/resultSet";
 /**
  * 在上传流程的后台运行新 Pipeline。
  * 不阻塞现有上传逻辑，失败也不影响旧流程。
+ *
+ * 调用方（atlas.ts upload 端点）负责在调用本函数前写入 pipelineStatus=running。
+ * 本函数负责在完成后写入终态 success 或 failed。
+ *
+ * 硬约束：
+ * - 不允许函数开头因 getDb() 失败就直接 return
+ * - 在写终态前必须重新获取 DB（不复用函数启动时的连接）
  */
 export async function runPipelineInBackground(
   sessionId: string,
@@ -37,36 +42,109 @@ export async function runPipelineInBackground(
   mimeType: string,
   templateId?: string
 ): Promise<void> {
+  // ⭐ 不要在函数开头因 getDb() 为空就 return，让 Pipeline 先执行
+  // ⭐ pipelineStatus 状态写入职责单一：upload 只写 running，bridge 负责全部终态 success/failed
+  console.log(`[Pipeline] 🚀 Starting background pipeline for session ${sessionId}`);
+  console.log(`[Pipeline]   File: ${originalName}, Size: ${fileBuffer.length} bytes`);
+
+  const input: PipelineInput = {
+    files: [{
+      buffer: fileBuffer,
+      originalName,
+      mimeType,
+    }],
+    templateId,
+    userId: String(userId),
+  };
+
+  // 先尝试获取 DB（不可用时先让 Pipeline 执行，后面再处理）
+  let db: Awaited<ReturnType<typeof getDb>> = null;
   try {
-    console.log(`[Pipeline] Starting background pipeline for session ${sessionId}`);
+    db = await getDb();
+  } catch {
+    // DB 不可用，先让 Pipeline 执行，到持久化阶段再处理
+  }
 
-    const input: PipelineInput = {
-      files: [{
-        buffer: fileBuffer,
-        originalName,
-        mimeType,
-      }],
-      templateId,
-      userId: String(userId),
-    };
-
+  try {
+    const startTime = Date.now();
     const output = await runPipeline(input);
+    const duration = Date.now() - startTime;
+    console.log(`[Pipeline] ✅ Pipeline completed for session ${sessionId}`);
+    console.log(`[Pipeline]   Duration: ${duration}ms`);
+    console.log(`[Pipeline]   Success: ${output.success}`);
 
     if (output.success && output.resultSet) {
-      // 持久化 ResultSet
-      await saveResultSet(output.resultSet, sessionId, userId);
-      console.log(`[Pipeline] ResultSet saved for session ${sessionId}, jobId: ${output.resultSet.jobId}`);
+      console.log(`[Pipeline] 💾 Saving ResultSet for session ${sessionId}`);
+      console.log(`[Pipeline]   RowCount: ${output.resultSet.rowCount}`);
+      console.log(`[Pipeline]   Metrics: ${output.resultSet.metrics.length}`);
+
+      // 持久化 ResultSet（saveResultSet 内部会更新 session.resultSetId）
+      const jobId = await saveResultSet(output.resultSet, sessionId, userId);
+
+      // ⭐ 硬约束：写终态前重新获取 DB（不复用函数启动时的连接）
+      const dbForStatus = await getDb();
+      if (dbForStatus) {
+        await dbForStatus.update(sessions)
+          .set({
+            pipelineStatus: "success",
+            pipelineError: null,
+            pipelineFinishedAt: new Date(),
+          })
+          .where(eq(sessions.id, sessionId));
+        console.log(`[Pipeline] ✅ Updated pipelineStatus to 'success' for session ${sessionId}`);
+      } else {
+        console.error(`[Pipeline] ❌ Cannot write success status for ${sessionId}: DB unavailable`);
+      }
+      console.log(`[Pipeline] ✅ ResultSet saved successfully, jobId: ${jobId}`);
     } else {
-      console.warn(`[Pipeline] Pipeline failed for session ${sessionId}: ${output.errorSummary}`);
-      // 记录错误但不中断旧流程
-      const errorCount = output.context.errors.filter(
-        e => e.level === "fatal" || e.level === "critical"
-      ).length;
-      console.warn(`[Pipeline] ${errorCount} critical errors in pipeline`);
+      const errorSummary = output.errorSummary || "Unknown error";
+      console.error(`[Pipeline] ❌ Pipeline failed for session ${sessionId}: ${errorSummary}`);
+      const errorCount = output.context?.errors?.filter(
+        (e: any) => e.level === "fatal" || e.level === "critical"
+      ).length ?? 0;
+      console.error(`[Pipeline] ${errorCount} critical errors in pipeline`);
+      for (const err of (output.context?.errors || [])) {
+        console.error(`[Pipeline]   [${(err as any).level?.toUpperCase()}] ${(err as any).message} (step ${(err as any).step})`);
+      }
+
+      // ⭐ 硬约束：写终态前重新获取 DB（不复用函数启动时的连接）
+      const dbForStatus = await getDb();
+      if (dbForStatus) {
+        await dbForStatus.update(sessions)
+          .set({
+            pipelineStatus: "failed",
+            pipelineError: errorSummary,
+            pipelineFinishedAt: new Date(),
+          })
+          .where(eq(sessions.id, sessionId));
+        console.log(`[Pipeline] ❌ Updated pipelineStatus to 'failed' for session ${sessionId}`);
+      } else {
+        console.error(`[Pipeline] ❌ Cannot write failed status for ${sessionId}: DB unavailable`);
+      }
     }
   } catch (err: any) {
-    // Pipeline 失败不影响旧流程
-    console.error(`[Pipeline] Background pipeline error for session ${sessionId}:`, err?.message);
+    const errMsg = err?.message || "Unknown exception in pipeline";
+    console.error(`[Pipeline] ❌ Background pipeline error for session ${sessionId}: ${errMsg}`);
+    console.error(`[Pipeline] Stack: ${err?.stack}`);
+
+    // ⭐ 硬约束：写终态前重新获取 DB（不复用函数启动时的连接）
+    try {
+      const dbForStatus = await getDb();
+      if (dbForStatus) {
+        await dbForStatus.update(sessions)
+          .set({
+            pipelineStatus: "failed",
+            pipelineError: errMsg,
+            pipelineFinishedAt: new Date(),
+          })
+          .where(eq(sessions.id, sessionId))
+          .catch(() => {}); // 非致命
+        console.log(`[Pipeline] ❌ Updated pipelineStatus to 'failed' for session ${sessionId}`);
+      }
+    } catch {
+      // 忽略状态写入失败
+    }
+    // Pipeline 失败不影响旧流程，不抛出错误
   }
 }
 
@@ -76,6 +154,11 @@ export async function runPipelineInBackground(
  * 将 ResultSet 持久化到数据库和 S3。
  * - 核心元数据存 DB（result_sets 表）
  * - 标准化数据行存 S3（避免 DB 存大量行数据）
+ *
+ * 硬约束（V2.4）：
+ * - S3 写入失败必须抛错（是 V3.0 导出的必要条件）
+ * - ResultSet 写 DB 失败必须抛错
+ * - 成功后必须更新 sessions.resultSetId
  */
 export async function saveResultSet(
   rs: ResultSet,
@@ -84,25 +167,35 @@ export async function saveResultSet(
 ): Promise<string> {
   const db = await getDb();
   if (!db) {
-    console.warn("[Pipeline] Cannot save ResultSet: database not available");
-    return rs.jobId;
+    throw new Error("Database not available");
   }
 
-  // 1. 将标准化数据行存到 S3
+  console.log(`[Pipeline] 💾 Saving ResultSet for session ${sessionId}`);
+  console.log(`[Pipeline]   JobId: ${rs.jobId}`);
+  console.log(`[Pipeline]   RowCount: ${rs.rowCount}`);
+  console.log(`[Pipeline]   Metrics: ${rs.metrics.length}`);
+  console.log(`[Pipeline]   Fields: ${rs.fields.length}`);
+
+  // 1. 将标准化数据行存到 S3（⭐ V3.0 导出的必要条件，S3 写入失败按 Pipeline failed 处理）
   let dataS3Key: string | null = null;
   if (rs.standardizedRows.length > 0) {
     const s3Key = `atlas-resultsets/${rs.jobId}/data.json`;
     try {
       const dataJson = JSON.stringify(rs.standardizedRows);
+      console.log(`[Pipeline] 💾 Uploading data rows to S3, size: ${dataJson.length} bytes`);
       await storagePut(s3Key, Buffer.from(dataJson), "application/json");
       dataS3Key = s3Key;
+      console.log(`[Pipeline] ✅ Data rows uploaded to S3: ${s3Key}`);
     } catch (err: any) {
-      console.warn(`[Pipeline] Failed to save data rows to S3: ${err?.message}`);
+      console.error(`[Pipeline] ❌ Failed to save data rows to S3: ${err?.message}`);
+      // ⭐ S3 落盘失败是 V3.0 导出的必要条件，必须抛出错误
+      throw new Error(`Failed to upload standardizedRows to S3: ${err?.message}`);
     }
   }
 
   // 2. 将元数据存到 DB
   try {
+    console.log(`[Pipeline] 💾 Inserting ResultSet into DB...`);
     await db.insert(resultSets).values({
       id: rs.jobId,
       userId,
@@ -122,15 +215,17 @@ export async function saveResultSet(
       cleaningLog: rs.cleaningLog as any,
       generatedAt: rs.createdAt,
     });
+    console.log(`[Pipeline] ✅ ResultSet inserted into DB`);
 
-    // 3. 更新 session 关联 resultSetId
+    // 3. 更新 session 关联 resultSetId（⭐ 统一字段命名：使用 resultSetId）
+    console.log(`[Pipeline] 💾 Updating session with resultSetId...`);
     await db.update(sessions)
       .set({ resultSetId: rs.jobId })
-      .where(eq(sessions.id, sessionId))
-      .catch(() => {}); // 非致命
-
+      .where(eq(sessions.id, sessionId));
+    console.log(`[Pipeline] ✅ Session updated with resultSetId: ${rs.jobId}`);
   } catch (err: any) {
-    console.error(`[Pipeline] Failed to save ResultSet to DB: ${err?.message}`);
+    console.error(`[Pipeline] ❌ Failed to save ResultSet to DB: ${err?.message}`);
+    throw err; // 抛出错误，让上层知道失败
   }
 
   return rs.jobId;
