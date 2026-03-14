@@ -2921,6 +2921,7 @@ ${dataTable}`}
             .map((m: any) => `${m.displayName}: ${m.value} ${m.unit}`)
             .join("\n");
           const reportId = nanoid();
+          const resultSetId = (resultSet as any).resultSetId || resultSet.jobId;  // ── Phase 4：绑定 resultSetId（V4.0）
           const userId = (req as any).userId || 0;
           await createReport({
             id: reportId,
@@ -2932,6 +2933,7 @@ ${dataTable}`}
             fileUrl: exportResult.url,
             fileSizeKb: Math.ceil(exportResult.fileSize / 1024),
             prompt: requirement,
+            resultSetId,  // ── Phase 4：绑定 resultSetId（V4.0）
             status: "completed",
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
           });
@@ -2995,6 +2997,7 @@ ${dataTable}`}
             .map((m: any) => `${m.displayName}: ${m.value} ${m.unit}`)
             .join("\n");
           const reportId = nanoid();
+          const resultSetId = (resultSet as any).resultSetId || resultSet.jobId;  // ── Phase 4：绑定 resultSetId（V4.0）
           const userId = (req as any).userId || 0;
           await createReport({
             id: reportId,
@@ -3006,6 +3009,7 @@ ${dataTable}`}
             fileUrl: exportResult.url,
             fileSizeKb: Math.ceil(exportResult.fileSize / 1024),
             prompt: requirement,
+            resultSetId,  // ── Phase 4：绑定 resultSetId（V4.0）
             status: "completed",
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
           });

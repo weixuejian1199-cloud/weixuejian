@@ -70,6 +70,7 @@ export interface Message {
   report_id?: string;
   report_filename?: string;
   download_url?: string;
+  resultSetId?: string;  // ── Phase 4：导出记录关联的 ResultSet ID（V4.0）
   tableData?: TableSheet[];
   thinkingSteps?: string[];  // Steps shown in "思考过程" panel
   suggestedActions?: Array<{ icon: string; label: string; prompt: string }>;  // Quick action buttons
