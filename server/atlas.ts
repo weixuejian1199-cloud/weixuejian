@@ -2837,6 +2837,11 @@ ${dataTable}`}
         return;
       }
       // ═══ V3.0 导出逻辑结束 ═══
+    } catch (err: any) {
+      console.error("[Atlas] Generate report error:", err);
+      res.status(500).json({ error: err.message || "Report generation failed" });
+    }
+  });
 
   // ── Personal Templates API (V13.7) ─────────────────────────────────────────
   // GET /api/atlas/templates — list user's personal templates

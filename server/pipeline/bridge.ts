@@ -481,6 +481,7 @@ export async function getResultSetForSession(
       sourcePlatform: record.sourcePlatform || "unknown",
       isMultiFile: record.isMultiFile === 1,
       cleaningLog: record.cleaningLog as any || [],
+      resultType: (record as any).resultType || "full_detail",
     };
 
     console.log(`[Pipeline] 🔍 [DEBUG] Rebuilt ResultSet for session ${sessionId}`);
@@ -545,6 +546,7 @@ export async function getResultSetById(
       sourcePlatform: record.sourcePlatform || "unknown",
       isMultiFile: record.isMultiFile === 1,
       cleaningLog: record.cleaningLog as any || [],
+      resultType: (record as any).resultType || "full_detail",
     };
 
     return rs;

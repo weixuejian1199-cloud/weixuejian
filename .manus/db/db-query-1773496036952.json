@@ -1,0 +1,19 @@
+{
+  "query": "SELECT id, originalName, status, pipelineStatus, pipelineError, resultSetId, rowCount FROM sessions WHERE id = 'a0X5LRwWI69MWMhUV2QAg' LIMIT 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute SELECT id, originalName, status, pipelineStatus, pipelineError, resultSetId, rowCount FROM sessions WHERE id = 'a0X5LRwWI69MWMhUV2QAg' LIMIT 1;",
+  "rows": [
+    {
+      "id": "a0X5LRwWI69MWMhUV2QAg",
+      "originalName": "cc3.xlsx",
+      "status": "ready",
+      "pipelineStatus": "failed",
+      "pipelineError": "清洗后无有效数据",
+      "resultSetId": "NULL",
+      "rowCount": "33309"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\toriginalName\tstatus\tpipelineStatus\tpipelineError\tresultSetId\trowCount\na0X5LRwWI69MWMhUV2QAg\tcc3.xlsx\tready\tfailed\t清洗后无有效数据\tNULL\t33309\n",
+  "stderr": "",
+  "execution_time_ms": 126
+}
