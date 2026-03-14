@@ -100,7 +100,16 @@ export interface ResultSet {
   /** 字段列表（标准化后的字段名） */
   fields: string[];
 
-  // ── Phase 4：导出载荷（V4.0）────────────────────────────────────────────
+  // ── Phase 4：导出标识（V4.0）────────────────────────────────────────────
+  
+  /** 导出记录关联的 ResultSet ID（唯一标识） */
+  resultSetId: string;
+  
+  /** 导出行数（用于验证 standardizedRows 是否完整） */
+  exportRowCount: number;
+  
+  /** 是否具备全量导出能力（true = 有完整数据，false = 只有预览/摘要） */
+  exportableFullData: boolean;
   
   /** 统一导出载荷（问答、汇总、导出共用同一份结果） */
   exportPayload?: ExportPayload;
@@ -158,6 +167,11 @@ export function createEmptyResultSet(jobId: string): ResultSet {
     standardizedRows: [],
     rowCount: 0,
     fields: [],
+
+    // ── Phase 4：导出标识（V4.0）────────────────────────────────────────────
+    resultSetId: "",  // 生成时填充
+    exportRowCount: 0,
+    exportableFullData: false,
 
     // 元数据
     sourcePlatform: "unknown",

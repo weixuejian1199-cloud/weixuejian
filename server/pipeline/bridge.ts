@@ -365,6 +365,16 @@ export async function saveResultSet(
   console.log(`[Pipeline]   Metrics: ${rs.metrics.length}`);
   console.log(`[Pipeline]   Fields: ${rs.fields.length}`);
 
+  // ── Phase 4：设置导出标识（V4.0）────────────────────────────────────────────
+  // 确保 resultSetId 有值
+  if (!rs.resultSetId) {
+    rs.resultSetId = rs.jobId;
+  }
+  
+  // 设置导出行数和是否具备全量导出能力
+  rs.exportRowCount = rs.standardizedRows.length;
+  rs.exportableFullData = rs.standardizedRows.length > 0;
+
   // 1. 将标准化数据行存到 S3（⭐ V3.0 导出的必要条件，S3 写入失败按 Pipeline failed 处理）
   let dataS3Key: string | null = null;
   if (rs.standardizedRows.length > 0) {
@@ -403,15 +413,19 @@ export async function saveResultSet(
       isMultiFile: rs.isMultiFile ? 1 : 0,
       cleaningLog: rs.cleaningLog as any,
       generatedAt: rs.createdAt,
+      // ── Phase 4：保存导出标识（V4.0）────────────────────────────────────────────
+      resultSetId: rs.resultSetId,
+      exportRowCount: rs.exportRowCount,
+      exportableFullData: rs.exportableFullData ? 1 : 0,
     });
     console.log(`[Pipeline] ✅ ResultSet inserted into DB`);
 
     // 3. 更新 session 关联 resultSetId（⭐ 统一字段命名：使用 resultSetId）
     console.log(`[Pipeline] 💾 Updating session with resultSetId...`);
     await db.update(sessions)
-      .set({ resultSetId: rs.jobId })
+      .set({ resultSetId: rs.resultSetId })
       .where(eq(sessions.id, sessionId));
-    console.log(`[Pipeline] ✅ Session updated with resultSetId: ${rs.jobId}`);
+    console.log(`[Pipeline] ✅ Session updated with resultSetId: ${rs.resultSetId}`);
   } catch (err: any) {
     console.error(`[Pipeline] ❌ Failed to save ResultSet to DB: ${err?.message}`);
     throw err; // 抛出错误，让上层知道失败
@@ -472,6 +486,10 @@ export async function getResultSetForSession(
       sourcePlatform: record.sourcePlatform || "unknown",
       isMultiFile: record.isMultiFile === 1,
       cleaningLog: record.cleaningLog as any || [],
+      // ── Phase 4：读取导出标识（V4.0）────────────────────────────────────────────
+      resultSetId: record.resultSetId || record.id,
+      exportRowCount: record.exportRowCount,
+      exportableFullData: record.exportableFullData === 1,
     };
 
     return rs;
@@ -529,6 +547,10 @@ export async function getResultSetById(
       sourcePlatform: record.sourcePlatform || "unknown",
       isMultiFile: record.isMultiFile === 1,
       cleaningLog: record.cleaningLog as any || [],
+      // ── Phase 4：读取导出标识（V4.0）────────────────────────────────────────────
+      resultSetId: record.resultSetId || record.id,
+      exportRowCount: record.exportRowCount,
+      exportableFullData: record.exportableFullData === 1,
     };
 
     return rs;
