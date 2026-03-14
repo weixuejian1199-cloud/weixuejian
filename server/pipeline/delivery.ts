@@ -23,6 +23,29 @@ import { getDisplayName } from "@shared/fieldAliases";
 import { getTemplateById, type TemplateDefinition } from "@shared/templates";
 import { storagePut } from "../storage";
 
+// ── 导出格式 ──────────────────────────────────────────────────────
+export type ExportFormat = "xlsx" | "csv";
+export interface ExportOptions {
+  /** 导出格式 */
+  format: ExportFormat;
+  /** 自定义文件名（不含扩展名） */
+  fileName?: string;
+  /** 是否包含汇总行 */
+  includeSummary?: boolean;
+  /** 是否包含清洗日志 Sheet */
+  includeCleaningLog?: boolean;
+}
+export interface ExportResult {
+  /** 导出文件的 S3 URL */
+  url: string;
+  /** 导出文件的 S3 Key */
+  s3Key: string;
+  /** 文件名 */
+  fileName: string;
+  /** 文件大小（字节） */
+  fileSize: number;
+}
+
 // ── Phase 4：止血 + 约束（V4.0）────────────────────────────────────────────
 
 /**

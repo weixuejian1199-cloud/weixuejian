@@ -127,6 +127,13 @@
       "when": 1773456643719,
       "tag": "0017_premium_leper_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1773492865261,
+      "tag": "0018_closed_aqueduct",
+      "breakpoints": true
     }
   ]
 }
