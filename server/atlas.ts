@@ -35,7 +35,7 @@ import { runPipelineInBackground, getResultSetForSession } from "./pipeline/brid
 import { exportFromResultSet } from "./pipeline/delivery";
 import { buildExpressionPrompt, buildDataSummary } from "./pipeline/expression";
 import { pushAtlasMsgToOpenClaw, pushQwenReplyToOpenClaw } from "./im/wsServer";
-import { openclawTasks, chatConversations, chatMessages, personalTemplates, sessions } from "../drizzle/schema";
+import { openclawTasks, chatConversations, chatMessages, personalTemplates, sessions, resultSets } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 
 // ── In-memory Rate Limiter ───────────────────────────────────────────────────
@@ -3804,10 +3804,181 @@ ${sampleRows}
         return;
       }
       // Still processing (uploading)
-      res.json({ status: "processing", session_id: sessionId });
+      res.json({
+        status: "processing",
+        session_id: sessionId,
+        pipelineStatus: session.pipelineStatus || null,
+        pipelineError: session.pipelineError || null,
+        resultSetId: session.resultSetId || null,
+      });
     } catch (err: any) {
       console.error("[Atlas] Status error:", err);
       res.status(500).json({ error: err.message || "Status check failed" });
+    }
+  });
+
+  // ── Debug API (H 阶段：Pipeline 测试支持) ─────────────────────────────────────
+
+  // H-1: GET /api/atlas/debug/session/:sessionId
+  app.get("/api/atlas/debug/session/:sessionId", optionalAuth, async (req: Request, res: Response) => {
+    try {
+      const { sessionId } = req.params;
+      const session = await getSession(sessionId);
+      if (!session) {
+        res.status(404).json({ error: "Session not found", sessionId });
+        return;
+      }
+      let resultSetSummary: any = null;
+      const db = await getDb();
+      if (db) {
+        const rsWhere = session.resultSetId
+          ? eq(resultSets.id, session.resultSetId)
+          : eq(resultSets.sessionId, sessionId);
+        const rsRows = await db.select().from(resultSets).where(rsWhere).limit(1);
+        if (rsRows.length > 0) {
+          const rs = rsRows[0];
+          resultSetSummary = {
+            id: rs.id,
+            rowCount: rs.rowCount,
+            computationVersion: rs.computationVersion,
+            dataS3Key: rs.dataS3Key,
+            metricsCount: Array.isArray(rs.metrics) ? (rs.metrics as any[]).length : 0,
+            generatedAt: rs.generatedAt,
+            skippedRowsCount: rs.skippedRowsCount,
+            sourcePlatform: rs.sourcePlatform,
+          };
+        }
+      }
+      const ps = session.pipelineStatus;
+      const diagnosis = !ps
+        ? "Pipeline 未启动（upload-parsed 路径或旧数据）"
+        : ps === "running" ? "Pipeline 正在执行，请等待或检查是否超时"
+        : ps === "failed" ? `Pipeline 失败：${session.pipelineError || "无错误信息"}`
+        : ps === "success" && !resultSetSummary ? "⚠️ 严重：pipelineStatus=success 但 ResultSet 为空，数据一致性异常"
+        : ps === "success" && resultSetSummary ? `✅ Pipeline 成功，ResultSet 已保存（${resultSetSummary.rowCount} 行）`
+        : "未知状态";
+      res.json({
+        sessionId,
+        status: session.status,
+        filename: session.originalName || session.filename,
+        rowCount: session.rowCount,
+        colCount: session.colCount,
+        createdAt: session.createdAt,
+        pipelineStatus: ps || null,
+        pipelineError: session.pipelineError || null,
+        pipelineStartedAt: session.pipelineStartedAt || null,
+        pipelineFinishedAt: session.pipelineFinishedAt || null,
+        resultSetId: session.resultSetId || null,
+        resultSet: resultSetSummary,
+        diagnosis,
+      });
+    } catch (err: any) {
+      console.error("[Atlas] Debug session error:", err);
+      res.status(500).json({ error: err.message || "Debug session failed" });
+    }
+  });
+
+  // H-2: GET /api/atlas/debug/logs?filter=xxx&n=100
+  app.get("/api/atlas/debug/logs", optionalAuth, async (req: Request, res: Response) => {
+    try {
+      const { filter = "", n = "100" } = req.query as { filter?: string; n?: string };
+      const { execSync } = await import("child_process");
+      const logFile = "/home/ubuntu/atlas-report/.manus-logs/devserver.log";
+      const limit = Math.min(Math.max(parseInt(n, 10) || 100, 1), 500);
+      let raw = "";
+      try {
+        if (filter) {
+          raw = execSync(`grep -i ${JSON.stringify(filter)} ${logFile} | tail -${limit}`, { encoding: "utf8", timeout: 5000 });
+        } else {
+          raw = execSync(`tail -${limit} ${logFile}`, { encoding: "utf8", timeout: 5000 });
+        }
+      } catch { raw = ""; }
+      const lines = raw.split("\n").filter(Boolean).map(line => {
+        const m = line.match(/^\[(\d{4}-\d{2}-\d{2}T[^\]]+)\]\s*(.*)$/);
+        return m ? { ts: m[1], msg: m[2] } : { ts: null, msg: line };
+      });
+      res.json({ total: lines.length, filter: filter || null, lines });
+    } catch (err: any) {
+      console.error("[Atlas] Debug logs error:", err);
+      res.status(500).json({ error: err.message || "Debug logs failed" });
+    }
+  });
+
+  // H-3: POST /api/atlas/debug/test-pipeline  body: { sessionId, pollSeconds? }
+  app.post("/api/atlas/debug/test-pipeline", optionalAuth, async (req: Request, res: Response) => {
+    try {
+      const { sessionId, pollSeconds = 30 } = req.body as { sessionId: string; pollSeconds?: number };
+      if (!sessionId) { res.status(400).json({ error: "sessionId is required" }); return; }
+      const session = await getSession(sessionId);
+      if (!session) { res.status(404).json({ error: "Session not found", sessionId }); return; }
+      if (!session.fileKey) { res.status(400).json({ error: "Session has no fileKey", sessionId }); return; }
+      // 重置 pipelineStatus 为 running
+      await updateSession(sessionId, {
+        pipelineStatus: "running",
+        pipelineError: null,
+        pipelineStartedAt: new Date(),
+        pipelineFinishedAt: null,
+      } as any);
+      // 从 S3 下载文件 buffer
+      const { url: s3Url } = await storageGet(session.fileKey);
+      const fileResp = await fetch(s3Url);
+      if (!fileResp.ok) { res.status(500).json({ error: `S3 download failed: ${fileResp.status}`, sessionId }); return; }
+      const fileBuffer = Buffer.from(await fileResp.arrayBuffer());
+      const userId = (req as any).userId || session.userId || 0;
+      // 异步触发 pipeline（不等待完成）
+      runPipelineInBackground(
+        sessionId, userId, fileBuffer,
+        session.originalName || session.filename || "file.xlsx",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      // 轮询等待结果
+      const maxWait = Math.min(Math.max(Number(pollSeconds) || 30, 5), 120) * 1000;
+      let waited = 0;
+      let finalStatus = "running";
+      let finalError: string | null = null;
+      let finalResultSetId: string | null = null;
+      const db = await getDb();
+      while (waited < maxWait) {
+        await new Promise(r => setTimeout(r, 2000));
+        waited += 2000;
+        if (db) {
+          const rows = await db.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+          const s = rows[0];
+          if (s) {
+            finalStatus = s.pipelineStatus || "running";
+            finalError = s.pipelineError || null;
+            finalResultSetId = s.resultSetId || null;
+            if (finalStatus === "success" || finalStatus === "failed") break;
+          }
+        }
+      }
+      let resultSetSummary: any = null;
+      if (db && finalResultSetId) {
+        const rsRows = await db.select().from(resultSets).where(eq(resultSets.id, finalResultSetId)).limit(1);
+        if (rsRows.length > 0) {
+          const rs = rsRows[0];
+          resultSetSummary = { id: rs.id, rowCount: rs.rowCount, computationVersion: rs.computationVersion, dataS3Key: rs.dataS3Key, metricsCount: Array.isArray(rs.metrics) ? (rs.metrics as any[]).length : 0, generatedAt: rs.generatedAt };
+        }
+      }
+      res.json({
+        sessionId,
+        triggered: true,
+        waitedMs: waited,
+        pipelineStatus: finalStatus,
+        pipelineError: finalError,
+        resultSetId: finalResultSetId,
+        resultSet: resultSetSummary,
+        verdict: finalStatus === "success" && resultSetSummary
+          ? `✅ Pipeline 成功，ResultSet 已保存（${resultSetSummary.rowCount} 行）`
+          : finalStatus === "success" && !resultSetSummary
+          ? "⚠️ Pipeline 成功但 ResultSet 为空（数据一致性异常）"
+          : finalStatus === "failed"
+          ? `❌ Pipeline 失败：${finalError || "无错误信息"}`
+          : `⏳ Pipeline 超时（${waited}ms），仍在 running`,
+      });
+    } catch (err: any) {
+      console.error("[Atlas] Debug test-pipeline error:", err);
+      res.status(500).json({ error: err.message || "Debug test-pipeline failed" });
     }
   });
 }

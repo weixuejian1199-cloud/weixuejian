@@ -980,3 +980,9 @@
 - [x] G-3: 欢迎页重设计（按图二：ATLAS 菱形图标 + Hi 用户名 + 大标题 + 居中输入框 + 4 个功能卡片）
 - [x] G-4: 对话框移至欢迎语正下方（非底部固定），有消息时底部输入框才出现
 - [x] G-5: V3.0 Pipeline 修复（补回 3 个 import，generate-report V3.0 路径，chat ResultSet 注入）
+
+## H 阶段：Debug 日志体系（2026-03-14 openclaw 测试支持）
+- [x] H-1: 新增 GET /api/atlas/debug/session/:sessionId（返回完整 pipeline 状态 + ResultSet 摘要）
+- [x] H-2: 新增 GET /api/atlas/debug/logs（返回最近 N 条 server 日志，支持 ?filter= 过滤）
+- [x] H-3: 新增 POST /api/atlas/debug/test-pipeline（用已有 sessionId 触发 pipeline 并轮询状态）
+- [x] H-4: /api/atlas/status/:sessionId 返回中增加 pipelineStatus/pipelineError/resultSetId 字段
