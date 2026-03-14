@@ -274,7 +274,7 @@ type XlsxWorkerResult = {
 function parseExcelBufferAsync(
   buffer: Buffer,
   filename: string,
-  timeoutMs = 60_000
+  timeoutMs = 10 * 60_000 // 10 minutes for large files (e.g. 27000+ row XLSX)
 ): Promise<XlsxWorkerResult> {
   return new Promise((resolve, reject) => {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -293,9 +293,9 @@ function parseExcelBufferAsync(
       worker.terminate().catch(() => {});
       fn();
     };
-    // Hard timeout: if worker doesn't respond within timeoutMs, reject
+    // Hard timeout: 10 分钟，处理大文件（如 27000+ 行 XLSX）
     const timer = setTimeout(() => {
-      settle(() => reject(new Error(`XLSX worker timed out after ${timeoutMs}ms for file: ${filename}`)));
+      settle(() => reject(new Error(`XLSX 解析超时（超过 ${timeoutMs / 1000 / 60} 分钟），文件可能过大或格式复杂。请尝试 CSV 格式或联系技术支持。`)));
     }, timeoutMs);
     worker.on("message", (result: XlsxWorkerResult & { error?: string }) => {
       if (result.error) {
