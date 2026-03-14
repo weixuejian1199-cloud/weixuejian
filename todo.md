@@ -986,3 +986,8 @@
 - [x] H-2: 新增 GET /api/atlas/debug/logs（返回最近 N 条 server 日志，支持 ?filter= 过滤）
 - [x] H-3: 新增 POST /api/atlas/debug/test-pipeline（用已有 sessionId 触发 pipeline 并轮询状态）
 - [x] H-4: /api/atlas/status/:sessionId 返回中增加 pipelineStatus/pipelineError/resultSetId 字段
+
+## I 阶段：恢复模板库/HR中心导航 + 首页功能卡片（2026-03-14）
+- [x] I-1: 恢复侧边栏“模板库”和“HR 中心”导航项（点击直接跳转对应页面）
+- [x] I-2: 首页四个功能卡片原本就存在，无需修复
+- [x] I-3: 底部提示条原本就是 toast，无需修复
