@@ -18,9 +18,48 @@ import * as XLSX from "xlsx";
 import Decimal from "decimal.js";
 import { nanoid } from "nanoid";
 import type { ResultSet } from "@shared/resultSet";
+import type { ExportPayload } from "@shared/types";
 import { getDisplayName } from "@shared/fieldAliases";
 import { getTemplateById, type TemplateDefinition } from "@shared/templates";
 import { storagePut } from "../storage";
+
+// ── Phase 4：三阶段拦截（V4.0）────────────────────────────────────────────
+
+/**
+ * 校验 ExportPayload 的完整性和合法性
+ * 拒绝没有完整 metricKey / groupByKey / aggType 的导出请求
+ */
+function validateExportPayload(payload: ExportPayload | undefined): { valid: boolean; error?: string } {
+  if (!payload) {
+    return { valid: false, error: "未找到导出载荷" };
+  }
+
+  // 校验 metricKey
+  if (!payload.metricKey || payload.metricKey.startsWith("unknown_")) {
+    return {
+      valid: false,
+      error: `导出失败：字段身份未确认 (metricKey=${payload.metricKey})，请联系管理员确认字段身份后再导出`
+    };
+  }
+
+  // 校验 groupByKey
+  if (!payload.groupByKey) {
+    return {
+      valid: false,
+      error: `导出失败：分组字段身份未确认 (groupByField=${payload.groupByField})`
+    };
+  }
+
+  // 校验 aggType
+  if (!payload.aggType) {
+    return {
+      valid: false,
+      error: `导出失败：聚合类型未确认`
+    };
+  }
+
+  return { valid: true };
+}
 
 // ── 导出格式 ──────────────────────────────────────────────────────
 
@@ -59,6 +98,12 @@ export async function exportFromResultSet(
   options: ExportOptions
 ): Promise<ExportResult> {
   const { format, includeSummary = true, includeCleaningLog = false } = options;
+
+  // ── Phase 4：三阶段拦截 - unknown 字段拦截（V4.0）────────────────────────
+  const validation = validateExportPayload(resultSet.exportPayload);
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
 
   // 确定文件名
   const baseName = options.fileName || generateFileName(resultSet);

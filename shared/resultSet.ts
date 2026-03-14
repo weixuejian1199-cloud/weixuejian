@@ -12,6 +12,7 @@
  */
 
 import type { MetricResult } from "./metrics";
+import type { ExportPayload } from "./types";
 
 // ── 可审计字段类型 ──────────────────────────────────────────────────
 
@@ -98,6 +99,11 @@ export interface ResultSet {
 
   /** 字段列表（标准化后的字段名） */
   fields: string[];
+
+  // ── Phase 4：导出载荷（V4.0）────────────────────────────────────────────
+  
+  /** 统一导出载荷（问答、汇总、导出共用同一份结果） */
+  exportPayload?: ExportPayload;
 
   // ── 元数据 ──────────────────────────────────────────────────
 
