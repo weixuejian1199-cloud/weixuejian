@@ -273,30 +273,41 @@ type XlsxWorkerResult = {
 
 function parseExcelBufferAsync(
   buffer: Buffer,
-  filename: string
+  filename: string,
+  timeoutMs = 60_000
 ): Promise<XlsxWorkerResult> {
   return new Promise((resolve, reject) => {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const workerScript = path.resolve(__dirname, "xlsxWorker.mjs");
-
     const worker = new Worker(workerScript, {
       workerData: {
         buffer: buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
         filename,
       },
     });
-
+    let settled = false;
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      worker.terminate().catch(() => {});
+      fn();
+    };
+    // Hard timeout: if worker doesn't respond within timeoutMs, reject
+    const timer = setTimeout(() => {
+      settle(() => reject(new Error(`XLSX worker timed out after ${timeoutMs}ms for file: ${filename}`)));
+    }, timeoutMs);
     worker.on("message", (result: XlsxWorkerResult & { error?: string }) => {
       if (result.error) {
-        reject(new Error(result.error));
+        settle(() => reject(new Error(result.error)));
       } else {
-        resolve(result);
+        settle(() => resolve(result));
       }
     });
-
-    worker.on("error", (err) => reject(err));
+    worker.on("error", (err) => settle(() => reject(err)));
     worker.on("exit", (code) => {
-      if (code !== 0) reject(new Error(`XLSX worker exited with code ${code}`));
+      // If worker exits without sending a message (any exit code), reject
+      settle(() => reject(new Error(`XLSX worker exited unexpectedly with code ${code}`)));
     });
   });
 }
@@ -1108,8 +1119,14 @@ export function registerAtlasRoutes(app: Express) {
       // 3. All heavy work (S3 upload + parse + AI) runs in background (non-blocking)
       setImmediate(async () => {
         try {
-          // 3a. Upload original file to S33
-          const { url: fileUrl } = await storagePut(fileKey, buffer, mimetype);
+          // 3a. Upload original file to S3 (with 90s timeout to prevent hang on large files)
+          const s3UploadTimeout = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`S3 upload timed out after 90s for file: ${originalname}`)), 90_000)
+          );
+          const { url: fileUrl } = await Promise.race([
+            storagePut(fileKey, buffer, mimetype),
+            s3UploadTimeout,
+          ]);
           await updateSession(sessionId, { fileUrl }).catch(() => {});
 
           // 3b. Parse data
