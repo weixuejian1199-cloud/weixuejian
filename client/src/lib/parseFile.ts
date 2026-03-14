@@ -8,6 +8,7 @@
  */
 
 import * as XLSX from "xlsx";
+import type { FieldMetadata, GroupedMetric } from "../../../shared/types";
 
 // ── SPU 标准化映射表 ──────────────────────────────────────────────────────────
 // 格式：{ 原始商品名: 标准 SPU 名称 }
@@ -41,6 +42,206 @@ export function normalizeSPU(productName: string): string {
 export const COMBO_ORDERS_KEY = "combo_orders";
 export const COMBO_ORDERS_DISPLAY = "组合装订单";
 
+// ── Phase 4：字段身份结构化（V4.0）────────────────────────────────────────────────────────────
+// 字段身份识别逻辑
+
+/**
+ * 推断字段身份元信息（FieldMetadata）
+ * 保守策略：优先匹配明确的字段名模式，未能明确识别返回 unknown
+ */
+function inferFieldMetadata(
+  fieldName: string,
+  fieldType: "numeric" | "text" | "datetime",
+  fileName: string
+): FieldMetadata {
+  const lowerName = fieldName.toLowerCase();
+  const lowerFileName = fileName.toLowerCase();
+  
+  // ── 明确模式匹配（金额类字段）─────────────────────────────────────────────
+  if (fieldName.includes("应付金额")) {
+    return {
+      metricKey: "order_payable_amount",
+      fieldRole: "metric",
+      valueType: "number",
+      aggType: "sum",
+      canonicalName: "订单应付金额",
+      sourceSheet: "订单",
+      sourceDomain: "order",
+      confidence: "high",
+      originalFieldName: fieldName,
+    };
+  }
+  
+  if (fieldName.includes("商品金额")) {
+    return {
+      metricKey: "product_amount",
+      fieldRole: "metric",
+      valueType: "number",
+      aggType: "sum",
+      canonicalName: "商品金额",
+      sourceSheet: "订单",
+      sourceDomain: "order",
+      confidence: "high",
+      originalFieldName: fieldName,
+    };
+  }
+  
+  if (fieldName.includes("订单金额") || fieldName.includes("销售额")) {
+    return {
+      metricKey: "order_amount",
+      fieldRole: "metric",
+      valueType: "number",
+      aggType: "sum",
+      canonicalName: fieldName,
+      sourceSheet: "订单",
+      sourceDomain: "order",
+      confidence: "high",
+      originalFieldName: fieldName,
+    };
+  }
+  
+  // ── 明确模式匹配（标识符类字段）─────────────────────────────────────────────
+  if (fieldName.includes("订单编号") || fieldName.includes("主订单编号")) {
+    return {
+      metricKey: "order_id",
+      fieldRole: "identifier",
+      valueType: "string",
+      aggType: "none",
+      canonicalName: "订单编号",
+      sourceSheet: "订单",
+      sourceDomain: "order",
+      confidence: "high",
+      originalFieldName: fieldName,
+    };
+  }
+  
+  if (fieldName.includes("订单号")) {
+    return {
+      metricKey: "order_no",
+      fieldRole: "identifier",
+      valueType: "string",
+      aggType: "none",
+      canonicalName: "订单号",
+      sourceSheet: "订单",
+      sourceDomain: "order",
+      confidence: "medium",
+      originalFieldName: fieldName,
+    };
+  }
+  
+  // ── 明确模式匹配（维度类字段）───────────────────────────────────────────────
+  if (fieldName.includes("达人昵称") || fieldName.includes("主播昵称")) {
+    return {
+      metricKey: "talent_nickname",
+      fieldRole: "dimension",
+      valueType: "string",
+      aggType: "none",
+      canonicalName: "达人昵称",
+      sourceSheet: "订单",
+      sourceDomain: "order",
+      confidence: "high",
+      originalFieldName: fieldName,
+    };
+  }
+  
+  if (fieldName.includes("达人") && !fieldName.includes("金额")) {
+    return {
+      metricKey: "talent",
+      fieldRole: "dimension",
+      valueType: "string",
+      aggType: "none",
+      canonicalName: "达人",
+      sourceSheet: "订单",
+      sourceDomain: "order",
+      confidence: "medium",
+      originalFieldName: fieldName,
+    };
+  }
+  
+  if (fieldName.includes("选购商品") || fieldName.includes("商品名称") || fieldName.includes("商品名")) {
+    return {
+      metricKey: "product_name",
+      fieldRole: "dimension",
+      valueType: "string",
+      aggType: "none",
+      canonicalName: "商品名称",
+      sourceSheet: "订单",
+      sourceDomain: "product",
+      confidence: "high",
+      originalFieldName: fieldName,
+    };
+  }
+  
+  if (fieldName.includes("省份") || fieldName.includes("收货省份")) {
+    return {
+      metricKey: "province",
+      fieldRole: "dimension",
+      valueType: "string",
+      aggType: "none",
+      canonicalName: "省份",
+      sourceSheet: "订单",
+      sourceDomain: "order",
+      confidence: "medium",
+      originalFieldName: fieldName,
+    };
+  }
+  
+  // ── 明确模式匹配（支付相关字段）─────────────────────────────────────────────
+  if (lowerFileName.includes("支付") || lowerFileName.includes("资金")) {
+    if (fieldName.includes("支付金额") || fieldName.includes("结算金额")) {
+      return {
+        metricKey: "payment_amount",
+        fieldRole: "metric",
+        valueType: "number",
+        aggType: "sum",
+        canonicalName: fieldName,
+        sourceSheet: "资金",
+        sourceDomain: "payment",
+        confidence: "high",
+        originalFieldName: fieldName,
+      };
+    }
+  }
+  
+  // ── 未能明确识别 → unknown（宁可 unknown，不能硬猜）────────────────────────
+  return {
+    metricKey: `unknown_${fieldName}`,
+    fieldRole: fieldType === "numeric" ? "metric" : "dimension",
+    valueType: fieldType === "numeric" ? "number" : fieldType === "datetime" ? "datetime" : "string",
+    aggType: fieldType === "numeric" ? "sum" : "none",
+    canonicalName: fieldName,
+    sourceSheet: "未知",
+    sourceDomain: "unknown",
+    confidence: "low",
+    originalFieldName: fieldName,
+  };
+}
+
+/**
+ * 推断分组字段的结构化标识（groupByKey）
+ */
+function inferGroupByKey(fieldName: string): string {
+  if (fieldName.includes("达人昵称") || fieldName.includes("主播昵称")) {
+    return "talent_nickname";
+  }
+  if (fieldName.includes("达人") && !fieldName.includes("金额")) {
+    return "talent";
+  }
+  if (fieldName.includes("选购商品") || fieldName.includes("商品名称") || fieldName.includes("商品名")) {
+    return "product_name";
+  }
+  if (fieldName.includes("省份") || fieldName.includes("收货省份")) {
+    return "province";
+  }
+  if (fieldName.includes("城市") || fieldName.includes("收货城市")) {
+    return "city";
+  }
+  // 未能识别 → 使用字段名作为 key（但会警告）
+  return `dim_${fieldName}`;
+}
+
+// ── 原有逻辑 ─────────────────────────────────────────────────────────────────
+
 export interface ColumnStat {
   sum: number;
   min: number;
@@ -53,10 +254,24 @@ export interface ColumnStat {
 }
 
 // Grouped topN entry: group label + aggregated sum from full dataset
+// ── Phase 4：增加结构化标识（V4.0）──────────────────────────────────────────
 export interface GroupedTop5Entry {
   label: string;   // e.g. "达人昵称" value
   sum: number;     // aggregated sum of the numeric field for this group
   source?: string; // source filename (for multi-file UNION)
+  // ── Phase 4：结构化标识 ──────────────────────────────────────────────────────
+  /** 度量标识 */
+  metricKey?: string;
+  /** 聚合类型 */
+  aggType?: "sum" | "count" | "avg";
+  /** 分组字段结构化标识（关键：汇总匹配必须用这个） */
+  groupByKey?: string;
+  /** 分组字段角色 */
+  groupByRole?: "dimension" | "metric" | "identifier" | "datetime";
+  /** 来源 Session ID（暂不生成，后端合并时填充） */
+  sourceSessionId?: string;
+  /** 来源文件名（由 source 字段提供） */
+  sourceFileName?: string;
 }
 
 // Category grouped entry: for categorical fields (省份/支付方式/城市/状态 etc.)
@@ -99,6 +314,9 @@ export interface ParsedField {
   // Category-dimension stats: for ALL categorical fields (省份/支付方式/城市/状态 etc.)
   // Key = category field name, Value = top20 entries with count/sum/avg
   categoryGroupedTop20?: Record<string, CategoryGroupedEntry[]>;
+  // ── Phase 4：字段身份结构化（V4.0）────────────────────────────────────────────
+  /** 字段身份元信息 */
+  metadata?: FieldMetadata;
 }
 
 // ── Phase 1：数据质量元数据 ─────────────────────────────────────────────────
@@ -285,7 +503,9 @@ function computeGroupedTopN(
   numericField: string,
   groupField: string,
   sourceFilename: string,
-  topN = GROUPED_TOP_N
+  topN = GROUPED_TOP_N,
+  // ── Phase 4：传入字段身份元信息（V4.0）──────────────────────────────────────
+  numericFieldMetadata?: FieldMetadata
 ): { entries: GroupedTop5Entry[]; validTotalSum: number } {
   const groupSums: Map<string, number> = new Map();
   for (const row of rows) {
@@ -306,7 +526,25 @@ function computeGroupedTopN(
   const sorted = Array.from(groupSums.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, topN);
-  return { entries: sorted.map(([label, sum]) => ({ label, sum, source: sourceFilename })), validTotalSum };
+  
+  // ── Phase 4：生成结构化标识（V4.0）────────────────────────────────────────────
+  const groupByKey = inferGroupByKey(groupField);
+  const metricKey = numericFieldMetadata?.metricKey ?? `unknown_${numericField}`;
+  const aggType = numericFieldMetadata?.aggType ?? "sum";
+  const groupByRole = groupField === groupByField ? "dimension" : "dimension";
+  
+  return {
+    entries: sorted.map(([label, sum]) => ({
+      label,
+      sum,
+      source: sourceFilename,
+      metricKey,
+      aggType,
+      groupByKey,
+      groupByRole,
+    })),
+    validTotalSum
+  };
 }
 
 // ── 分类字段全量预计算 ─────────────────────────────────────────────────────────
@@ -689,6 +927,9 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
       sample: sampleVals.filter((v) => v !== null && v !== undefined && v !== "").slice(0, 5) as (string | number)[],
     };
 
+    // ── Phase 4：生成字段身份元信息 ─────────────────────────────────────────────
+    field.metadata = inferFieldMetadata(h, type, file.name);
+
     if (isNumeric && stat.count > 0) {
       field.sum = stat.sum;
       field.min = stat.min;
@@ -698,7 +939,8 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
       field.top5 = [...stat.top5Heap].sort((a, b) => b.value - a.value);
       // groupedTopN: GROUP BY primary dimension field, SUM this numeric field, TOP20 by sum
       if (groupByField) {
-        const groupedResult = computeGroupedTopN(rows, h, groupByField, file.name);
+        // ── Phase 4：传入字段身份元信息（V4.0）────────────────────────────────────
+        const groupedResult = computeGroupedTopN(rows, h, groupByField, file.name, GROUPED_TOP_N, field.metadata);
         field.groupedTop5 = groupedResult.entries;
         field.validGroupSum = groupedResult.validTotalSum; // T7: total sum of ALL valid groups
         field.groupByField = groupByField;
@@ -729,7 +971,8 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
           ...row,
           [productGroupByField]: normalizeSPU(String(row[productGroupByField] ?? "")),
         }));
-        const productGroupedResult = computeGroupedTopN(normalizedSingleRows, h, productGroupByField, file.name);
+        // ── Phase 4：传入字段身份元信息（V4.0）────────────────────────────────────
+        const productGroupedResult = computeGroupedTopN(normalizedSingleRows, h, productGroupByField, file.name, GROUPED_TOP_N, field.metadata);
         field.productGroupedTop5 = productGroupedResult.entries;
         field.productGroupByField = productGroupByField;
         // 组合装池：单独统计订单数和金额（不拆分到任何主品）

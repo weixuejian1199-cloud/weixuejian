@@ -37,6 +37,130 @@ import { buildExpressionPrompt, buildDataSummary } from "./pipeline/expression";
 import { pushAtlasMsgToOpenClaw, pushQwenReplyToOpenClaw } from "./im/wsServer";
 import { openclawTasks, chatConversations, chatMessages, personalTemplates, sessions, resultSets } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
+import type { FieldMetadata, GroupedMetric, ExportPayload } from "../shared/types";
+
+// ── Phase 4：辅助函数（V4.0）────────────────────────────────────────────────────
+
+/**
+ * 推断分组字段的结构化标识（groupByKey）
+ * 注意：这里是后端版本，应该和前端的 inferGroupByKey 保持一致
+ */
+function inferGroupByKey(fieldName: string): string {
+  if (fieldName.includes("达人昵称") || fieldName.includes("主播昵称")) {
+    return "talent_nickname";
+  }
+  if (fieldName.includes("达人") && !fieldName.includes("金额")) {
+    return "talent";
+  }
+  if (fieldName.includes("选购商品") || fieldName.includes("商品名称") || fieldName.includes("商品名")) {
+    return "product_name";
+  }
+  if (fieldName.includes("省份") || fieldName.includes("收货省份")) {
+    return "province";
+  }
+  if (fieldName.includes("城市") || fieldName.includes("收货城市")) {
+    return "city";
+  }
+  // 未能识别 → 使用字段名作为 key（但会警告）
+  return `dim_${fieldName}`;
+}
+
+// ── Phase 4：多文件汇总精确校验（V4.0）────────────────────────────────────────────────────
+
+/**
+ * 检查 sourceDomain 兼容性
+ * 规则：
+ * - unknown 参与 → 不允许合并
+ * - 相同 sourceDomain → 允许
+ * - order + payment → 允许
+ * - order + product、payment + product → 不允许
+ */
+function checkSourceDomainCompatibility(
+  domain1: string,
+  domain2: string
+): boolean {
+  // unknown 参与 → 不允许合并
+  if (domain1 === "unknown" || domain2 === "unknown") {
+    return false;
+  }
+  
+  // 相同 sourceDomain → 允许
+  if (domain1 === domain2) {
+    return true;
+  }
+  
+  // order + payment → 允许
+  if (
+    (domain1 === "order" && domain2 === "payment") ||
+    (domain1 === "payment" && domain2 === "order")
+  ) {
+    return true;
+  }
+  
+  // 其他组合 → 不允许
+  return false;
+}
+
+/**
+ * 校验多文件汇总匹配（真正的三元组 + sourceDomain）
+ * 必须同时满足以下条件才允许合并：
+ * - metricKey 一致
+ * - aggType 一致
+ * - groupByKey 一致
+ * - sourceDomain 兼容
+ */
+function validateMetricMatch(
+  target: {
+    metricKey: string;
+    aggType: string;
+    groupByKey: string;
+    sourceDomain: string;
+  },
+  candidate: {
+    metricKey: string;
+    aggType: string;
+    groupByKey: string;
+    sourceDomain: string;
+  }
+): { valid: boolean; reason?: string } {
+  // 校验 metricKey
+  if (target.metricKey !== candidate.metricKey) {
+    return {
+      valid: false,
+      reason: `metricKey 不一致: ${target.metricKey} vs ${candidate.metricKey}`
+    };
+  }
+  
+  // 校验 aggType
+  if (target.aggType !== candidate.aggType) {
+    return {
+      valid: false,
+      reason: `aggType 不一致: ${target.aggType} vs ${candidate.aggType}`
+    };
+  }
+  
+  // 校验 groupByKey（关键：不能用中文字段名）
+  if (target.groupByKey !== candidate.groupByKey) {
+    return {
+      valid: false,
+      reason: `groupByKey 不一致: ${target.groupByKey} vs ${candidate.groupByKey}`
+    };
+  }
+  
+  // 校验 sourceDomain 兼容性
+  const compatible = checkSourceDomainCompatibility(
+    target.sourceDomain,
+    candidate.sourceDomain
+  );
+  if (!compatible) {
+    return {
+      valid: false,
+      reason: `sourceDomain 不兼容: ${target.sourceDomain} vs ${candidate.sourceDomain}`
+    };
+  }
+  
+  return { valid: true };
+}
 
 // ── In-memory Rate Limiter ───────────────────────────────────────────────────
 // Limits /api/atlas/chat to 20 requests per user per minute
@@ -173,18 +297,36 @@ interface FieldInfo {
   // Full-dataset top5 (value-descending), each entry: { value, rowIndex }
   top5?: Array<{ value: number; rowIndex: number }>;
   // Grouped top5: GROUP BY dimension field, SUM numeric field, TOP5 by sum — from full dataset
-  groupedTop5?: Array<{ label: string; sum: number; source?: string }>;
+  // ── Phase 4：增加结构化标识（V4.0）────────────────────────────────────────────
+  groupedTop5?: Array<{ 
+    label: string; 
+    sum: number; 
+    source?: string;
+    metricKey?: string;
+    aggType?: "sum" | "count" | "avg";
+    groupByKey?: string;
+    groupByRole?: "dimension" | "metric" | "identifier" | "datetime";
+  }>;
   // Which dimension field was used for groupedTop5
   groupByField?: string;
   // T7: sum of ALL valid (non-placeholder) groups — used to compute null-nickname amount
   // null_nickname_amount = field.sum - validGroupSum
   validGroupSum?: number;
   // Product-dimension groupedTop5 (GROUP BY 选购商品) for product Top queries
-  productGroupedTop5?: Array<{ label: string; sum: number; source?: string }>;
+  productGroupedTop5?: Array<{ 
+    label: string; 
+    sum: number; 
+    source?: string;
+    metricKey?: string;
+    aggType?: "sum" | "count" | "avg";
+    groupByKey?: string;
+  }>;
   productGroupByField?: string;
   // Category-dimension stats: for ALL categorical fields (省份/支付方式/城市/状态 etc.)
   // Key = field name, Value = top20 entries with count/sum/avg
   categoryGroupedTop20?: Record<string, Array<{ label: string; count: number; sum?: number; avg?: number }>>;
+  // ── Phase 4：字段身份元信息（V4.0）────────────────────────────────────────────
+  metadata?: FieldMetadata;
 }
 
 interface DataFrameInfo {
@@ -1735,104 +1877,180 @@ export function registerAtlasRoutes(app: Express) {
         .filter((f: FieldInfo) => f.type === 'text' && f.unique_count > 1 && f.unique_count <= 20)
         .map((f: FieldInfo) => ({ name: f.name, uniqueCount: f.unique_count, samples: f.sample.slice(0, 5) }));
 
-      // Find top performers per numeric field
-      // Rule: MUST use groupedTop5 (aggregated by dimension field) from dfInfo; NEVER rank from 500-row preview
-      // Multi-file: UNION all groupedTop5 entries, re-aggregate by label, take TOP5
+      // ── Phase 4：多文件汇总精确校验（V4.0）────────────────────────────────────────────
+      // 使用结构化字段身份进行精确匹配，而不是关键词模糊匹配
+      
+      // 获取主文件的字段身份元信息（用于作为目标匹配）
+      const primaryFieldMetadata = (() => {
+        for (const s of validSessions) {
+          const di = s!.dfInfo as DataFrameInfo | null;
+          if (!di) continue;
+          const field = di.fields.find((f: FieldInfo) => f.name === s.name);
+          if (field && (field as any).metadata) {
+            return (field as any).metadata as FieldMetadata;
+          }
+        }
+        return undefined;
+      })();
 
-      // Helper: find the best matching numeric field in a profile for a given field name
-      // Tries exact match first, then semantic match (same keyword pattern)
+      // Helper: 使用结构化字段身份匹配 groupedTop5（Phase 4 改进）
       const findMatchingGroupedTop5 = (
-        pfp: { groupedTop5Map: Map<string, Array<{ label: string; sum: number }>>; groupByFieldMap: Map<string, string>; fileName: string },
+        pfp: PerFileProfile,
         fieldName: string
-      ): { entries: Array<{ label: string; sum: number }>; matchedField: string } | null => {
-        // 1. Exact match
-        const exact = pfp.groupedTop5Map.get(fieldName);
-        if (exact && exact.length > 0) return { entries: exact, matchedField: fieldName };
-        // 2. Semantic match: find a field in this profile whose name contains the same key amount keyword
-        const AMOUNT_KEYWORDS = ["商品金额", "订单金额", "应付金额", "实付金额", "成交金额", "销售金额", "GMV", "收入"];
-        for (const kw of AMOUNT_KEYWORDS) {
-          if (!fieldName.includes(kw)) continue;
-          // Find a field in this profile that also contains the same keyword
-          for (const [pfpField, pfpEntries] of Array.from(pfp.groupedTop5Map.entries())) {
-            if (pfpField.includes(kw) && pfpEntries.length > 0) {
-              return { entries: pfpEntries, matchedField: pfpField };
+      ): { entries: Array<GroupedMetric>; matchedField: string; valid: boolean; reason?: string } | null => {
+        const targetField = pfp.dfInfo.fields.find((f: FieldInfo) => f.name === fieldName);
+        if (!targetField) {
+          return { entries: [], matchedField: fieldName, valid: false, reason: `字段 ${fieldName} 不存在` };
+        }
+
+        const targetMetadata = (targetField as any).metadata as FieldMetadata;
+        const targetGroupedBy = (targetField as any).groupByField;
+        const targetGroupByKey = targetGroupedBy ? inferGroupByKey(targetGroupedBy) : undefined;
+
+        // ── Phase 4：unknown 字段拦截（三阶段）────────────────────────────────────────
+        if (targetMetadata?.metricKey?.startsWith("unknown_")) {
+          console.warn(`[Atlas/chat] 字段身份未确认，跳过汇总: ${targetMetadata.canonicalName} (metricKey=${targetMetadata.metricKey})`);
+          return { entries: [], matchedField: fieldName, valid: false, reason: `字段身份未确认: ${targetMetadata.canonicalName}` };
+        }
+
+        if (!targetMetadata || !targetMetadata.metricKey || !targetMetadata.aggType || !targetGroupByKey) {
+          return { entries: [], matchedField: fieldName, valid: false, reason: `字段身份元信息不完整` };
+        }
+
+        // 遍历 pfp 中所有字段，寻找匹配的 groupedTop5
+        const matchedEntries: GroupedMetric[] = [];
+        for (const f of pfp.dfInfo.fields) {
+          if (!f.groupedTop5 || f.groupedTop5.length === 0) continue;
+
+          const metadata = (f as any).metadata as FieldMetadata;
+          const groupByField = (f as any).groupByField;
+          const groupByKey = groupByField ? inferGroupByKey(groupByField) : undefined;
+
+          if (!metadata || !groupByKey) continue;
+
+          // ── Phase 4：精确校验（metricKey + aggType + groupByKey + sourceDomain）────────────
+          const validation = validateMetricMatch(
+            {
+              metricKey: targetMetadata.metricKey,
+              aggType: targetMetadata.aggType,
+              groupByKey: targetGroupByKey,
+              sourceDomain: targetMetadata.sourceDomain,
+            },
+            {
+              metricKey: metadata.metricKey,
+              aggType: metadata.aggType,
+              groupByKey: groupByKey,
+              sourceDomain: metadata.sourceDomain,
             }
+          );
+
+          if (!validation.valid) {
+            console.warn(`[Atlas/chat] 字段匹配失败: ${validation.reason}`);
+            continue;
           }
+
+          // 转换为 GroupedMetric 格式
+          const groupedMetrics: GroupedMetric[] = f.groupedTop5.map((entry: any) => ({
+            label: entry.label,
+            sum: entry.sum,
+            source: pfp.fileName,
+            metricKey: metadata.metricKey,
+            aggType: metadata.aggType,
+            groupByField: groupByField,
+            groupByKey: groupByKey,
+            groupByRole: metadata.fieldRole,
+            sourceSessionId: pfp.fileId,
+            sourceFileName: pfp.fileName,
+          }));
+
+          matchedEntries.push(...groupedMetrics);
         }
-        // 3. Fallback: if this profile has any groupedTop5 data at all, use the first available
-        // (only when the primary file has no exact/semantic match — prevents missing files from being skipped)
-        if (pfp.groupedTop5Map.size > 0) {
-          for (const [pfpField, pfpEntries] of Array.from(pfp.groupedTop5Map.entries())) {
-            if (pfpEntries.length > 0) return { entries: pfpEntries, matchedField: pfpField };
-          }
+
+        if (matchedEntries.length === 0) {
+          return { entries: [], matchedField: fieldName, valid: false, reason: `未找到匹配的字段` };
         }
-        return null;
+
+        return { entries: matchedEntries, matchedField: fieldName, valid: true };
       };
 
       const topPerformers = numericStats.map(s => {
         if (!s) return null;
 
-        // Collect groupedTop5 from ALL sessions for this field (multi-file UNION)
-        // Use semantic matching to handle different field names across files
-        const allGroupedEntries: Array<{ label: string; sum: number; source?: string }> = [];
+        // ── Phase 4：使用结构化字段身份收集 groupedTop5（V4.0）────────────────────
+        const allGroupedMetrics: GroupedMetric[] = [];
+        const sourceSessionIds: string[] = [];
+        const sourceFileNames: string[] = [];
+
         for (const pfp of perFileProfiles) {
           const match = findMatchingGroupedTop5(pfp, s.name);
-          if (match && match.entries.length > 0) {
-            // P1: Skip files where the groupBy field has extremely high null rate
-            // (these files have no reliable talent data and their file name should not enter the ranking)
-            // Check: if the file's groupedTop5 contains only 1 entry and that entry's label
-            // matches the file name pattern (store name), skip it
-            const fileNameBase = pfp.fileName.replace(/[-_].*$/, '').replace(/\.(xlsx|csv|xls)$/i, '').trim();
-            const entries = match.entries;
-            // Filter out entries where the label looks like a file/store name rather than a talent nickname
-            // Heuristic: if an entry label exactly matches the file's base name, it's a store-level aggregation, not a talent
-            const validEntries = entries.filter(e => {
-              const lbl = e.label.trim();
-              // Skip if label matches the file base name (store name masquerading as talent)
-              if (lbl === fileNameBase || lbl === pfp.fileName.replace(/\.(xlsx|csv|xls)$/i, '').trim()) return false;
-              return true;
-            });
-            if (validEntries.length > 0) {
-              allGroupedEntries.push(...validEntries);
-            }
+          
+          if (!match) continue;
+          
+          // 如果字段匹配失败，跳过该文件
+          if (!match.valid) {
+            console.warn(`[Atlas/chat] 跳过文件 ${pfp.fileName}: ${match.reason}`);
+            continue;
+          }
+
+          // P1: Skip files where the groupBy field has extremely high null rate
+          // (these files have no reliable talent data and their file name should not enter the ranking)
+          const fileNameBase = pfp.fileName.replace(/[-_].*$/, '').replace(/\.(xlsx|csv|xls)$/i, '').trim();
+          const validEntries = match.entries.filter(e => {
+            const lbl = e.label.trim();
+            // Skip if label matches the file base name (store name masquerading as talent)
+            if (lbl === fileNameBase || lbl === pfp.fileName.replace(/\.(xlsx|csv|xls)$/i, '').trim()) return false;
+            return true;
+          });
+
+          if (validEntries.length > 0) {
+            allGroupedMetrics.push(...validEntries);
+            sourceSessionIds.push(pfp.fileId);
+            sourceFileNames.push(pfp.fileName);
           }
         }
 
-        let top5Labels: string[];
-        let top5IsFullData = false;
-        let groupByFieldName: string | undefined;
-
-        if (allGroupedEntries.length > 0) {
-          // Detect groupByField name from first available profile
-          for (const pfp of perFileProfiles) {
-            const gb = pfp.groupByFieldMap.get(s.name);
-            if (gb) { groupByFieldName = gb; break; }
-          }
-          // Re-aggregate: sum by label across files
-          // Also filter out placeholder labels that may have been stored in old sessions
-          const PLACEHOLDER_LABELS = new Set(["-", "—", "--", "——", "N/A", "n/a", "NA", "na", "无", "null", "NULL", "None", "none"]);
-          const unionMap = new Map<string, number>();
-          for (const entry of allGroupedEntries) {
-            const lbl = entry.label.trim();
-            if (!lbl || PLACEHOLDER_LABELS.has(lbl)) continue;
-            unionMap.set(lbl, (unionMap.get(lbl) ?? 0) + entry.sum);
-          }
-          const sorted = Array.from(unionMap.entries())
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5);
-          top5Labels = sorted.map(([label, sum]) => `${label}(${sum.toLocaleString()})`);
-          top5IsFullData = true;
-        } else {
-          // No groupedTop5 available — omit rather than show inaccurate sample ranking
-          top5Labels = [];
-          top5IsFullData = false;
+        // 如果没有匹配的字段，跳过
+        if (allGroupedMetrics.length === 0) {
+          console.warn(`[Atlas/chat] 字段 ${s.name} 未找到匹配的 groupedTop5，跳过`);
+          return null;
         }
+
+        // Re-aggregate: sum by label across files
+        const PLACEHOLDER_LABELS = new Set(["-", "—", "--", "——", "N/A", "n/a", "NA", "na", "无", "null", "NULL", "None", "none"]);
+        const unionMap = new Map<string, number>();
+        for (const entry of allGroupedMetrics) {
+          const lbl = entry.label.trim();
+          if (!lbl || PLACEHOLDER_LABELS.has(lbl)) continue;
+          unionMap.set(lbl, (unionMap.get(lbl) ?? 0) + entry.sum);
+        }
+
+        const sorted = Array.from(unionMap.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5);
+
+        const top5Labels = sorted.map(([label, sum]) => `${label}(${sum.toLocaleString()})`);
+        
+        // 获取 groupByField 和 groupByKey
+        const firstEntry = allGroupedMetrics[0];
+        const groupByFieldName = firstEntry.groupByField;
+        const groupByKey = firstEntry.groupByKey;
+        const metricKey = firstEntry.metricKey;
+        const aggType = firstEntry.aggType;
 
         return {
           ...s,
           top5: top5Labels,
-          top5IsFullData,
+          top5IsFullData: true,
           groupByField: groupByFieldName,
+          // ── Phase 4：记录结构化信息用于后续生成 ExportPayload（V4.0）────────────
+          _phase4: {
+            metricKey,
+            aggType,
+            groupByKey,
+            sourceSessionIds,
+            sourceFileNames,
+            groupedMetrics: allGroupedMetrics,
+          },
         };
       }).filter(Boolean);
 
