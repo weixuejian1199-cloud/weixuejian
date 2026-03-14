@@ -73,15 +73,15 @@ export async function exportFromResultSet(
     ? getTemplateById(resultSet.templateId)
     : null;
 
-  // Sheet 1: 数据明细
-  const dataSheet = buildDataSheet(resultSet, template);
-  XLSX.utils.book_append_sheet(workbook, dataSheet, "数据明细");
-
-  // Sheet 2: 汇总统计（如果启用）
+  // Sheet 1: 汇总统计（如果启用）
   if (includeSummary && format === "xlsx") {
     const summarySheet = buildSummarySheet(resultSet);
     XLSX.utils.book_append_sheet(workbook, summarySheet, "汇总统计");
   }
+
+  // Sheet 2: 数据明细（全量）
+  const dataSheet = buildDataSheet(resultSet, template);
+  XLSX.utils.book_append_sheet(workbook, dataSheet, "数据明细（全量）");
 
   // Sheet 3: 清洗日志（如果启用）
   if (includeCleaningLog && format === "xlsx") {
@@ -113,6 +113,56 @@ export async function exportFromResultSet(
 }
 
 // ── Sheet 构建 ──────────────────────────────────────────────────
+
+/**
+ * 判断字段是否是日期/时间字段
+ */
+function isDateTimeField(fieldName: string): boolean {
+  const dateTimeKeywords = [
+    "时间", "日期", "timestamp", "created_at", "updated_at", "completed_at",
+    "submitted_at", "paid_at", "cancelled_at", "shipped_at", "delivered_at",
+    "order_time", "pay_time", "finish_time", "submit_time", "create_time",
+    "update_time", "start_time", "end_time", "expire_time", "deadline",
+    "time", "date", "datetime",
+  ];
+  const lowerFieldName = fieldName.toLowerCase();
+  return dateTimeKeywords.some(keyword => lowerFieldName.includes(keyword));
+}
+
+/**
+ * 格式化日期/时间为可读字符串
+ */
+function formatDateTime(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+
+  // 如果是 Date 对象
+  if (value instanceof Date) {
+    return value.toISOString().replace('T', ' ').substring(0, 19); // "YYYY-MM-DD HH:mm:ss"
+  }
+
+  // 如果是字符串
+  if (typeof value === "string") {
+    // 检查是否是 ISO 8601 格式
+    if (value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+      return value.replace('T', ' ').substring(0, 19);
+    }
+    // 检查是否已经是格式化的日期/时间
+    if (value.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)) {
+      return value;
+    }
+    // 尝试解析为日期
+    try {
+      const parsed = new Date(value);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString().replace('T', ' ').substring(0, 19);
+      }
+    } catch {
+      // 忽略解析错误
+    }
+  }
+
+  return null;
+}
 
 /**
  * 构建数据明细 Sheet。
@@ -148,6 +198,16 @@ function buildDataSheet(
     return columns.map(col => {
       const value = row[col];
       if (value === null || value === undefined) return "";
+
+      // 检查是否是日期/时间字段，如果是则格式化
+      if (isDateTimeField(col)) {
+        const formatted = formatDateTime(value);
+        if (formatted !== null) {
+          return formatted;
+        }
+      }
+
+      // 普通数值字段，直接返回
       return value;
     });
   });
