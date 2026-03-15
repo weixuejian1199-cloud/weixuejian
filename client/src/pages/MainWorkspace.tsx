@@ -19,7 +19,7 @@ import { Streamdown } from "streamdown";
 import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTableRenderer";
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, uploadFile, type SuggestedAction } from "@/lib/api";
+import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, smartUpload, type SuggestedAction } from "@/lib/api";
 import { parseFile, type DataQuality } from "@/lib/parseFile"; // v14.2-groupby-fix
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -166,7 +166,7 @@ export default function MainWorkspace() {
       updateUploadedFile(tempId, { uploadProgress: 20 });
 
       // Phase 1b: 直接上传原始文件 buffer（让后端解析全量数据）
-      const uploadResult = await uploadFile(file, (percent) => {
+      const uploadResult = await smartUpload(file, (percent) => {
         const mappedProgress = Math.round(20 + (percent / 100) * 10);
         if (mappedProgress > currentProgress) {
           currentProgress = mappedProgress;
