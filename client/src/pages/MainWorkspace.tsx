@@ -19,7 +19,7 @@ import { Streamdown } from "streamdown";
 import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTableRenderer";
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, uploadParsed, type SuggestedAction } from "@/lib/api";
+import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, uploadParsed, smartUpload, exportFromSession, type SuggestedAction } from "@/lib/api";
 import { parseFile, mergeParsedFiles, type DataQuality } from "@/lib/parseFile"; // v14.2-groupby-fix
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -166,8 +166,8 @@ export default function MainWorkspace() {
       updateMyMsg("", { isAnalyzing: true, analyzeProgress: 20 });
       updateUploadedFile(tempId, { uploadProgress: 20 });
 
-      // Phase 1b: 只上传前端统计结果，不传原始行数据
-      const uploadResult = await uploadParsed(parsed, (percent) => {
+      // Phase 1b: 上传原始文件到后端（触发 Pipeline 生成完整 ResultSet）
+      const uploadResult = await smartUpload(file, (percent) => {
         const mappedProgress = Math.round(20 + (percent / 100) * 10);
         if (mappedProgress > currentProgress) {
           currentProgress = mappedProgress;
@@ -339,24 +339,53 @@ export default function MainWorkspace() {
         isStreaming: false,
       } as any, taskId);
 
-      // 上传合并后的统计数据（不创建合并文件，直接上传 ParsedFileData）
+      // 每个文件分别 smartUpload，然后调 /api/atlas/merge 合并 session
       let currentProgress = 10;
       const updateMyMsg = (content: string, extra?: Partial<Message>) =>
         updateMessageById(assistantMsgId, content, extra, taskId);
 
       try {
-        // 直接上传合并后的统计数据（使用 uploadParsed）
-        const uploadResult = await uploadParsed(merged, (percent) => {
-          currentProgress = Math.round(10 + (percent / 100) * 30);
-          updateMyMsg("", { isAnalyzing: true, analyzeProgress: currentProgress });
-        });
+        // 分别上传每个原始文件
+        const sessionIds: string[] = [];
+        const platform_names: Record<string, string> = {};
+        for (let i = 0; i < fileArray.length; i++) {
+          const file = fileArray[i];
+          updateMyMsg("", { isAnalyzing: true, analyzeProgress: Math.round(10 + (i / fileArray.length) * 30) });
+          
+          const result = await smartUpload(file);
+          sessionIds.push(result.session_id);
+          
+          // 添加到上传文件列表
+          addUploadedFile({
+            id: nanoid(),
+            name: file.name,
+            size: file.size,
+            status: "ready",
+            sessionId: result.session_id,
+            uploadedAt: new Date(),
+            uploadProgress: 100,
+          }, taskId);
+        }
 
-        // 轮询处理结果
-        currentProgress = 40;
+        // 合并 session
+        updateMyMsg("", { isAnalyzing: true, analyzeProgress: 40 });
+        const mergeRes = await fetch("/api/atlas/merge", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ session_ids: sessionIds, platform_names }),
+        });
+        const mergeData = await mergeRes.json();
+        if (!mergeRes.ok) throw new Error(mergeData.error || "合并失败");
+
+        const mergedSessionId = mergeData.session_id;
+
+        // 轮询合并后的处理结果
+        currentProgress = 50;
         const result = await pollUploadStatus(
-          uploadResult.session_id,
+          mergedSessionId,
           (pct) => {
-            currentProgress = Math.round(40 + (pct / 100) * 60);
+            currentProgress = Math.round(50 + (pct / 100) * 50);
             updateMyMsg("", { isAnalyzing: true, analyzeProgress: currentProgress });
           }
         );
@@ -364,9 +393,9 @@ export default function MainWorkspace() {
         // 更新文件状态
         updateUploadedFile(tempId, {
           status: "ready",
-          sessionId: result.session_id,
+          sessionId: mergedSessionId,
           dfInfo: {
-            row_count: merged.totalRowCount,
+            row_count: mergeData.totalRows || merged.totalRowCount,
             col_count: merged.colCount,
             columns: merged.fields.map(f => ({
               name: f.name,
@@ -376,13 +405,11 @@ export default function MainWorkspace() {
               inferred_type: f.type || "text",
             })),
             preview: merged.preview || [],
-            file_size_kb: 0, // 虚拟文件，无实际大小
+            file_size_kb: 0,
           },
-          // 保存全量行（用于前端导出）
-          allRows: merged.allRows || undefined,
         });
 
-      // 更新消息的 sessionId，用于前端导出时查找对应文件
+      // 更新消息的 sessionId，用于前端导出
       updateMessageById(assistantMsgId, "", { sessionId: result.session_id }, taskId);
 
         // 更新任务标题
@@ -2265,7 +2292,20 @@ function MessageBubble({
             )}
             {/* Download button */}
             <button
-              onClick={() => {
+              onClick={async () => {
+                // 优先：从 sessionId 导出完整数据（V3.0 ResultSet）
+                if (message.sessionId) {
+                  try {
+                    toast.info("正在导出完整数据...");
+                    const result = await exportFromSession(message.sessionId);
+                    window.open(result.downloadUrl);
+                    toast.success(`已导出 ${result.rowCount.toLocaleString()} 行数据`);
+                  } catch (err: any) {
+                    toast.error(err.message || "导出失败");
+                  }
+                  return;
+                }
+                // 原有逻辑
                 if (message.download_url) {
                   // Direct S3 URL download (merge/payslip/attendance)
                   const a = document.createElement("a");
@@ -2288,7 +2328,7 @@ function MessageBubble({
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "rgba(52,211,153,0.1)"}
             >
               <Download size={14} />
-              下载 {message.report_filename}
+              下载 {message.report_filename || "完整数据"}
             </button>
           </motion.div>
         )}
