@@ -269,16 +269,14 @@ export async function chunkedUpload(
   return finalResponse as UploadResponse;
 }
 
-// ── Smart Upload: auto-select chunked or direct based on file size ────────────────
+// ── Smart Upload: always use chunked upload for consistency ───────────────────
 
 export async function smartUpload(
   file: File,
   onProgress?: (percent: number) => void
 ): Promise<UploadResponse> {
-  if (file.size > LARGE_FILE_THRESHOLD_BYTES) {
-    return chunkedUpload(file, onProgress);
-  }
-  return uploadFile(file, onProgress);
+  // 统一走分块上传，确保后端有完整数据，Pipeline 正常运行
+  return chunkedUpload(file, onProgress);
 }
 
 // ── Upload Parsed (frontend-parsed data, no server XLSX processing) ──────────
