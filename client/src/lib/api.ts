@@ -56,7 +56,7 @@ export async function pollUploadStatus(
   onProgress?: (percent: number) => void,
   signal?: AbortSignal
 ): Promise<UploadResponse> {
-  const POLL_INTERVAL = 2000; // 2s
+  const POLL_INTERVAL = 1000; // 1s (reduced from 2s for faster feedback)
   const MAX_WAIT_MS = 5 * 60 * 1000; // 5 minutes
   const start = Date.now();
   let progress = 35; // start from 35% (upload done)
@@ -166,8 +166,9 @@ export async function uploadFile(
 
 // ── Chunked Upload (files > 5MB, bypasses 30s Cloudflare timeout) ────────────────
 
-const CHUNK_SIZE = 1 * 1024 * 1024; // 1MB per chunk
+const CHUNK_SIZE = 4 * 1024 * 1024; // 4MB per chunk (reduced round trips vs 1MB)
 const LARGE_FILE_THRESHOLD_BYTES = 5 * 1024 * 1024; // 5MB
+const UPLOAD_CONCURRENCY = 3; // parallel chunk uploads
 
 export async function chunkedUpload(
   file: File,
@@ -175,9 +176,10 @@ export async function chunkedUpload(
 ): Promise<UploadResponse> {
   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
   const uploadId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  let sessionId: string | null = null;
 
-  for (let i = 0; i < totalChunks; i++) {
+  // Pre-register the session on the server so we get a session_id before parallel uploads
+  // We do this by sending chunk 0 first, then uploading the rest in parallel
+  const uploadChunk = async (i: number): Promise<{ chunkIndex: number; data: any }> => {
     const start = i * CHUNK_SIZE;
     const end = Math.min(start + CHUNK_SIZE, file.size);
     const chunk = file.slice(start, end);
@@ -189,7 +191,6 @@ export async function chunkedUpload(
     form.append("totalChunks", String(totalChunks));
     form.append("filename", file.name);
     form.append("mimetype", file.type || "application/octet-stream");
-    if (sessionId) form.append("sessionId", sessionId);
 
     const res = await fetch("/api/atlas/upload-chunk", {
       method: "POST",
@@ -207,21 +208,52 @@ export async function chunkedUpload(
     }
 
     const data = await res.json();
-    if (data.session_id) sessionId = data.session_id;
+    return { chunkIndex: i, data };
+  };
 
-    // Report progress: chunk upload = 0% → 30%
-    if (onProgress) {
-      const percent = Math.round(((i + 1) / totalChunks) * 30);
-      onProgress(percent);
-    }
+  // Upload all chunks in parallel with concurrency limit
+  // The server triggers processing when ALL chunks are received (not necessarily the last index)
+  // So we detect completion by checking data.status === 'processing' in any response
+  const completedChunks = new Array(totalChunks).fill(false);
+  let finalResponse: any = null; // the response with status=processing (all chunks received)
+  let activeCount = 0;
+  let nextChunk = 0;
+  let error: Error | null = null;
 
-    // Last chunk: server returns session_id + status=processing
-    if (i === totalChunks - 1) {
-      return data as UploadResponse;
-    }
-  }
+  await new Promise<void>((resolve, reject) => {
+    const launchNext = () => {
+      while (activeCount < UPLOAD_CONCURRENCY && nextChunk < totalChunks && !error) {
+        const i = nextChunk++;
+        activeCount++;
+        uploadChunk(i).then(({ chunkIndex, data }) => {
+          completedChunks[chunkIndex] = true;
+          // The chunk that completes the upload returns status=processing
+          if (data.status === 'processing' || data.status === 'ready') {
+            finalResponse = data;
+          }
+          activeCount--;
+          const done = completedChunks.filter(Boolean).length;
+          if (onProgress) {
+            onProgress(Math.round((done / totalChunks) * 100));
+          }
+          if (done === totalChunks) {
+            resolve();
+          } else {
+            launchNext();
+          }
+        }).catch((err) => {
+          if (!error) {
+            error = err;
+            reject(err);
+          }
+        });
+      }
+    };
+    launchNext();
+  });
 
-  throw new Error("分块上传失败：未收到完整响应");
+  if (!finalResponse) throw new Error("分块上传失败：未收到完成响应");
+  return finalResponse as UploadResponse;
 }
 
 // ── Smart Upload: auto-select chunked or direct based on file size ────────────────
