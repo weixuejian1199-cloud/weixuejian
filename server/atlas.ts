@@ -1143,7 +1143,9 @@ export function registerAtlasRoutes(app: Express) {
             (data as any).__xlsxMeta = { totalRowCount: parsed.totalRowCount, columnStats: parsed.columnStats };
           }
           const xlsxMeta = (data as any).__xlsxMeta;
-          const dfInfo = buildDataFrameInfo(data, sheetNames, xlsxMeta?.totalRowCount, xlsxMeta?.columnStats);
+          const totalRowCount = data.length;
+          const previewData = data.slice(0, 500);
+          const dfInfo = buildDataFrameInfo(previewData, sheetNames, totalRowCount);
 
           // 3c. Normalize field names (P1-A: synonym mapping, non-destructive)
           const scenarioHint = detectScenario(dfInfo.fields);
@@ -1154,12 +1156,12 @@ export function registerAtlasRoutes(app: Express) {
             dividend:   ["员工姓名"],
           };
           const requiredFields = requiredByScenario[scenarioHint.type] || [];
-          const { normalizedData, injectedFields, fieldMapping } = normalizeFieldNames(data, requiredFields);
+          const { normalizedData, injectedFields, fieldMapping } = normalizeFieldNames(previewData, requiredFields);
           const workingData = normalizedData;
 
           // 3d. Update session with parsed info
           await updateSession(sessionId, {
-            rowCount: dfInfo.row_count,
+            rowCount: totalRowCount,
             colCount: dfInfo.col_count,
             dfInfo: dfInfo as any,
           }).catch(() => {});
