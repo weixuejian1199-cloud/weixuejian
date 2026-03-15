@@ -76,11 +76,19 @@ export async function storagePut(
   const key = normalizeKey(relKey);
   const uploadUrl = buildUploadUrl(baseUrl, key);
   const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
-  const response = await fetch(uploadUrl, {
+
+  const TIMEOUT_MS = 120 * 1000;
+  const uploadPromise = fetch(uploadUrl, {
     method: "POST",
     headers: buildAuthHeaders(apiKey),
     body: formData,
   });
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`Storage upload timeout after ${TIMEOUT_MS}ms`)), TIMEOUT_MS);
+  });
+
+  const response = await Promise.race([uploadPromise, timeoutPromise]);
 
   if (!response.ok) {
     const message = await response.text().catch(() => response.statusText);
