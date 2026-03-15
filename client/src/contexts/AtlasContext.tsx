@@ -346,8 +346,12 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
             // Truncate very long content to avoid quota issues
             content: m.content.length > 10000 ? m.content.slice(0, 10000) + '...' : m.content,
           })),
-          // Don't persist file binary data
-          uploadedFiles: t.uploadedFiles.map(f => ({ ...f })),
+          // Don't persist file binary data or large in-memory arrays
+          uploadedFiles: t.uploadedFiles.map(f => {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { allRows, categoryGroupedTop20, ...rest } = f;
+            return rest; // 排除全量行和分类统计，避免 localStorage 超配额
+          }),
         }));
         localStorage.setItem("atlas_tasks", JSON.stringify(toStore));
       } catch (e) {

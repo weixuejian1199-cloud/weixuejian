@@ -2233,7 +2233,10 @@ function MessageBubble({
                         className="text-xs transition-colors hover:text-green-600"
                         style={{ color: "var(--atlas-text-3)" }}
                       >
-                        导出 Excel（{(uploadedFiles ?? []).find((f: import("@/contexts/AtlasContext").UploadedFile) => f.sessionId === message.sessionId)?.allRows?.length || message.tableData?.[0]?.rows?.length} 行）
+                        导出 Excel（{(() => {
+                          const f = (uploadedFiles ?? []).find((f: import("@/contexts/AtlasContext").UploadedFile) => f.sessionId === message.sessionId);
+                          return (f?.allRows?.length ?? f?.dfInfo?.row_count ?? message.tableData?.[0]?.rows?.length ?? 0).toLocaleString();
+                        })()} 行）
                       </button>
                     </div>
                   )}
