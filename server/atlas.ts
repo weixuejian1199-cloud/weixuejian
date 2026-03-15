@@ -3050,8 +3050,11 @@ ${dataTable}`}
       const fileStats: Array<{ name: string; platform: string; rowCount: number }> = [];
       const platformKeywords = ["淘宝","天猫","京东","拼多多","抖音","快手","1688","闲鱼","苏宁","唯品会","小红书"];
       for (const { session, id } of valid) {
-        const data = await loadSessionData(id);
-        if (!data) continue;
+        const resultSet = await getResultSetForSession(id);
+        if (!resultSet || resultSet.standardizedRows.length === 0) {
+          console.warn(`[Atlas] No ResultSet for session ${id}, skipping`);
+          continue;
+        }
         const filename = (session as { originalName?: string } | undefined)?.originalName ?? id;
         const baseName = filename.replace(/\.[^.]+$/, "");
         let platform = platform_names?.[id] || "";
@@ -3059,9 +3062,9 @@ ${dataTable}`}
           const found = platformKeywords.find(k => baseName.includes(k));
           platform = found || baseName;
         }
-        const rowsWithSource = data.map(row => ({ ...row, "来源平台": platform }));
+        const rowsWithSource = resultSet.standardizedRows.map(row => ({ ...row, "来源平台": platform }));
         allRows.push(...rowsWithSource);
-        fileStats.push({ name: filename, platform, rowCount: data.length });
+        fileStats.push({ name: filename, platform, rowCount: resultSet.rowCount });
       }
       if (allRows.length === 0) {
         res.status(400).json({ error: "所有文件数据均为空" });
