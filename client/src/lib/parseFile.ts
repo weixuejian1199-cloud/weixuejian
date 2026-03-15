@@ -701,6 +701,7 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
       fields: [],
       preview: [],
       sampleRows: [],
+      allRows: [],
     };
   }
 

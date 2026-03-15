@@ -2208,10 +2208,10 @@ function MessageBubble({
                       <button
                         onClick={() => {
                           // 前端导出完整数据
-                          const headers = message.tableData[0]?.headers || [];
+                          const headers = message.tableData?.[0]?.headers || [];
                           // 查找对应文件的全量行
-                          const file = readyFiles.find(f => f.sessionId === message.session_id);
-                          const allRows = file?.allRows || message.tableData[0]?.rows || [];
+                          const file = (uploadedFiles ?? []).find((f: import("@/contexts/AtlasContext").UploadedFile) => f.sessionId === message.sessionId);
+                          const allRows = file?.allRows || message.tableData?.[0]?.rows || [];
                           
                           if (allRows.length === 0) {
                             toast.error("没有可导出的数据");
@@ -2219,20 +2219,21 @@ function MessageBubble({
                           }
 
                           // 转换为 Excel 格式
-                          const rows = allRows.map((row: Record<string, unknown>) =>
+                          const typedRows = allRows as Record<string, unknown>[];
+                          const rows = typedRows.map((row) =>
                             headers.map(h => row[h] ?? "")
                           );
                           
                           const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
                           const wb = XLSX.utils.book_new();
-                          XLSX.utils.book_append_sheet(wb, ws, message.tableData[0]?.name || "数据");
-                          XLSX.writeFile(wb, `${message.tableData[0]?.name || "数据"}.xlsx`);
-                          toast.success(`已导出 ${allRows.length} 行（全量数据）`);
+                          XLSX.utils.book_append_sheet(wb, ws, message.tableData?.[0]?.name || "数据");
+                          XLSX.writeFile(wb, `${message.tableData?.[0]?.name || "数据"}.xlsx`);
+                          toast.success(`已导出 ${(allRows as unknown[]).length} 行（全量数据）`);
                         }}
                         className="text-xs transition-colors hover:text-green-600"
                         style={{ color: "var(--atlas-text-3)" }}
                       >
-                        导出 Excel（{readyFiles.find(f => f.sessionId === message.session_id)?.allRows?.length || message.tableData[0]?.rows?.length} 行）
+                        导出 Excel（{(uploadedFiles ?? []).find((f: import("@/contexts/AtlasContext").UploadedFile) => f.sessionId === message.sessionId)?.allRows?.length || message.tableData?.[0]?.rows?.length} 行）
                       </button>
                     </div>
                   )}
