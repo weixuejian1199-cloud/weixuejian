@@ -24,6 +24,7 @@ import { parseFile, mergeParsedFiles, type DataQuality } from "@/lib/parseFile";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
+import * as XLSX from "xlsx";
 
 // Helper: strip <suggestions> block from text and parse into SuggestedAction[]
 function parseSuggestionsHelper(text: string): { cleanText: string; suggestions: SuggestedAction[] } {
@@ -215,10 +216,15 @@ export default function MainWorkspace() {
           preview: result.df_info.preview || [],
           file_size_kb: Math.round(file.size / 1024),
         },
+        // 保存全量行（用于前端导出）
+        allRows: parsed.allRows || undefined,
         // D方案：将前端预计算的分类字段全量统计存入 UploadedFile
         // 用于 AtlasTableRenderer 导出时提供完整数据集，避免只导出 AI 展示层的前20行
         categoryGroupedTop20: parsed.categoryGroupedTop20 || undefined,
       });
+
+      // 更新消息的 sessionId，用于前端导出时查找对应文件
+      updateMessageById(assistantMsgId, "", { sessionId: result.session_id }, taskId);
 
       // Update current task title with filename (use first file's name)
       if (taskId) {
@@ -372,7 +378,12 @@ export default function MainWorkspace() {
             preview: merged.preview || [],
             file_size_kb: 0, // 虚拟文件，无实际大小
           },
+          // 保存全量行（用于前端导出）
+          allRows: merged.allRows || undefined,
         });
+
+      // 更新消息的 sessionId，用于前端导出时查找对应文件
+      updateMessageById(assistantMsgId, "", { sessionId: result.session_id }, taskId);
 
         // 更新任务标题
         const currentTask = tasks.find(t => t.id === taskId);
@@ -2190,10 +2201,39 @@ function MessageBubble({
                   </table>
                   {message.tableData[0]?.rows?.length > 20 && (
                     <div
-                      className="px-3 py-2 text-xs text-center"
+                      className="px-3 py-2 text-xs text-center flex items-center justify-between"
                       style={{ color: "var(--atlas-text-3)", borderTop: "1px solid var(--atlas-border)" }}
                     >
-                      仅显示前 20 行，下载 Excel 查看完整数据
+                      <span>仅显示前 20 行</span>
+                      <button
+                        onClick={() => {
+                          // 前端导出完整数据
+                          const headers = message.tableData[0]?.headers || [];
+                          // 查找对应文件的全量行
+                          const file = readyFiles.find(f => f.sessionId === message.session_id);
+                          const allRows = file?.allRows || message.tableData[0]?.rows || [];
+                          
+                          if (allRows.length === 0) {
+                            toast.error("没有可导出的数据");
+                            return;
+                          }
+
+                          // 转换为 Excel 格式
+                          const rows = allRows.map((row: Record<string, unknown>) =>
+                            headers.map(h => row[h] ?? "")
+                          );
+                          
+                          const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+                          const wb = XLSX.utils.book_new();
+                          XLSX.utils.book_append_sheet(wb, ws, message.tableData[0]?.name || "数据");
+                          XLSX.writeFile(wb, `${message.tableData[0]?.name || "数据"}.xlsx`);
+                          toast.success(`已导出 ${allRows.length} 行（全量数据）`);
+                        }}
+                        className="text-xs transition-colors hover:text-green-600"
+                        style={{ color: "var(--atlas-text-3)" }}
+                      >
+                        导出 Excel（{readyFiles.find(f => f.sessionId === message.session_id)?.allRows?.length || message.tableData[0]?.rows?.length} 行）
+                      </button>
                     </div>
                   )}
                 </div>
