@@ -20,7 +20,7 @@ import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTab
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, smartUpload, type SuggestedAction } from "@/lib/api";
-import { parseFile, type DataQuality } from "@/lib/parseFile"; // v14.2-groupby-fix
+import { parseFile, mergeParsedFiles, type DataQuality } from "@/lib/parseFile"; // v14.2-groupby-fix
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
@@ -272,13 +272,149 @@ export default function MainWorkspace() {
     }
   }, [addUploadedFile, updateUploadedFile, addMessage, updateMessageById, setIsGenerating, activeTaskId, tasks, updateTask]);
 
-  const handleFiles = useCallback((files: FileList | File[]) => {
+  const handleFiles = useCallback(async (files: FileList | File[]) => {
     // Ensure we have an active task
     // Note: createNewTask() returns the new task ID synchronously (before React re-renders)
     // We pass it explicitly to processFile to avoid the stale activeTaskId closure issue
     const taskId = activeTaskId || createNewTask();
-    Array.from(files).forEach(file => processFile(file, taskId));
-  }, [processFile, activeTaskId, createNewTask]);
+    const fileArray = Array.from(files);
+
+    // 如果只有一个文件，直接处理
+    if (fileArray.length === 1) {
+      processFile(fileArray[0], taskId);
+      return;
+    }
+
+    // 多文件：先合并再上传
+    try {
+      toast.info(`正在合并 ${fileArray.length} 个文件...`);
+
+      // 解析所有文件
+      const parsedResults = await Promise.all(
+        fileArray.map(file => parseFile(file))
+      );
+
+      // 合并数据（基于"主订单编号"去重）
+      const merged = mergeParsedFiles(parsedResults, "主订单编号");
+
+      // 计算合并后的关键指标
+      const totalOrders = merged.totalRowCount;
+      const amountField = merged.fields.find(f => f.name.includes("商品金额") || f.name.includes("订单应付金额"));
+      const totalAmount = amountField?.sum ? `¥${Math.round(amountField.sum).toLocaleString()}` : "未知";
+      const avgOrderValue = amountField?.avg ? `¥${amountField.avg.toFixed(2)}` : "未知";
+
+      // 创建合并后的临时文件（用于上传）
+      const mergedBlob = new Blob(
+        [JSON.stringify(merged.sampleRows)],
+        { type: "application/json" }
+      );
+      const mergedFile = new File([mergedBlob], "合并数据.json", { type: "application/json" });
+
+      // 添加合并后的文件记录
+      const tempId = nanoid();
+      addUploadedFile({
+        id: tempId,
+        name: `合并数据（去重后 ${totalOrders.toLocaleString()} 行）`,
+        size: mergedFile.size,
+        status: "uploading",
+        uploadedAt: new Date(),
+        uploadProgress: 0,
+      }, taskId);
+
+      // 添加用户消息
+      addMessage({ role: "user", content: `[合并文件] ${fileArray.map(f => f.name).join(" + ")} → 去重后 ${totalOrders.toLocaleString()} 行` } as any, taskId);
+
+      // 添加助手消息（展示合并结果）
+      const assistantMsgId = addMessage({
+        role: "assistant",
+        content: `✅ 已合并 ${fileArray.length} 个文件，基于"主订单编号"去重。
+
+**关键指标：**
+- 📊 订单数：${totalOrders.toLocaleString()} 单
+- 💰 总销售额：${totalAmount}
+- 🛒 平均客单价：${avgOrderValue}
+
+正在分析数据...`,
+        isAnalyzing: true,
+        analyzeProgress: 10,
+        isStreaming: false,
+      } as any, taskId);
+
+      // 上传合并后的数据
+      let currentProgress = 10;
+      const updateMyMsg = (content: string, extra?: Partial<Message>) =>
+        updateMessageById(assistantMsgId, content, extra, taskId);
+
+      try {
+        // 上传合并后的数据（使用 smartUpload）
+        const uploadResult = await smartUpload(mergedFile, (percent) => {
+          currentProgress = Math.round(10 + (percent / 100) * 30);
+          updateMyMsg("", { isAnalyzing: true, analyzeProgress: currentProgress });
+        });
+
+        // 轮询处理结果
+        currentProgress = 40;
+        const result = await pollUploadStatus(
+          uploadResult.session_id,
+          (pct) => {
+            currentProgress = Math.round(40 + (pct / 100) * 60);
+            updateMyMsg("", { isAnalyzing: true, analyzeProgress: currentProgress });
+          }
+        );
+
+        // 更新文件状态
+        updateUploadedFile(tempId, {
+          status: "ready",
+          sessionId: result.session_id,
+          dfInfo: {
+            row_count: merged.totalRowCount,
+            col_count: merged.colCount,
+            columns: merged.fields.map(f => ({
+              name: f.name,
+              dtype: f.dtype,
+              non_null_count: f.type === "numeric" ? f.count : f.unique_count - f.null_count,
+              sample_values: f.sample || [],
+              inferred_type: f.type || "text",
+            })),
+            preview: merged.preview || [],
+            file_size_kb: Math.round(mergedFile.size / 1024),
+          },
+        });
+
+        // 更新任务标题
+        const currentTask = tasks.find(t => t.id === taskId);
+        if (currentTask && currentTask.title === "新建任务") {
+          updateTask(taskId, { title: `合并数据（${totalOrders.toLocaleString()} 行）` });
+        }
+
+        // 显示分析结果
+        setTimeout(() => {
+          const analysisText = result.ai_analysis ||
+            `这是一份数据文件，共 ${merged.totalRowCount.toLocaleString()} 行、${merged.colCount} 列。`;
+          const { cleanText, suggestions } = parseSuggestionsHelper(analysisText);
+          updateMyMsg(cleanText, {
+            isAnalyzing: false,
+            analyzeProgress: 100,
+            isStreaming: false,
+            suggestedActions: suggestions.length > 0 ? suggestions : DEFAULT_ACTIONS,
+          });
+        }, 1000);
+
+        toast.success(`合并成功！共 ${totalOrders.toLocaleString()} 条订单`);
+
+      } catch (err: any) {
+        updateMyMsg(`上传失败：${(err as any).message || "请重试"}`, {
+          isAnalyzing: false,
+          analyzeProgress: 0,
+        });
+        updateUploadedFile(tempId, { status: "error" });
+        toast.error(`上传失败：${err.message}`);
+      }
+
+    } catch (err: any) {
+      toast.error(`文件解析失败：${err.message}`);
+    }
+  }, [processFile, activeTaskId, createNewTask, addUploadedFile, addMessage, updateMessageById, tasks, updateTask]);
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
   const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); };

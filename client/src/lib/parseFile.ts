@@ -568,6 +568,100 @@ function detectType(values: unknown[]): "numeric" | "text" | "datetime" {
   return "text";
 }
 
+/**
+ * 合并多个已解析文件的数据，并去重
+ * @param parsedFiles - 已解析的文件列表
+ * @param keyField - 用于去重的字段名（如"主订单编号"）
+ * @returns 合并后的 ParsedFileData
+ */
+export function mergeParsedFiles(
+  parsedFiles: ParsedFileData[],
+  keyField: string = "主订单编号"
+): ParsedFileData {
+  if (parsedFiles.length === 0) {
+    return {
+      filename: "merged",
+      totalRowCount: 0,
+      colCount: 0,
+      fields: [],
+      preview: [],
+      sampleRows: [],
+    };
+  }
+
+  if (parsedFiles.length === 1) {
+    return parsedFiles[0];
+  }
+
+  // 合并所有行
+  const allRows = parsedFiles.flatMap(f => f.sampleRows);
+  const totalRowCount = allRows.length;
+
+  if (totalRowCount === 0) {
+    return parsedFiles[0];
+  }
+
+  // 去重：基于 keyField，保留第一次出现的记录
+  const seenKeys = new Set<string>();
+  const deduplicatedRows: Record<string, unknown>[] = [];
+
+  for (const row of allRows) {
+    const key = String(row[keyField] ?? "");
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      deduplicatedRows.push(row);
+    }
+  }
+
+  // 合并字段统计（取所有文件的字段并集）
+  const fieldMap = new Map<string, ParsedField>();
+
+  for (const parsed of parsedFiles) {
+    for (const field of parsed.fields) {
+      const existing = fieldMap.get(field.name);
+      if (existing) {
+        // 合并统计
+        if (field.sum !== undefined && existing.sum !== undefined) {
+          existing.sum += field.sum;
+        }
+        if (field.min !== undefined && existing.min !== undefined) {
+          existing.min = Math.min(existing.min, field.min);
+        }
+        if (field.max !== undefined && existing.max !== undefined) {
+          existing.max = Math.max(existing.max, field.max);
+        }
+        if (field.count !== undefined && existing.count !== undefined) {
+          existing.count += field.count;
+        }
+        if (field.null_count !== undefined) {
+          existing.null_count += field.null_count;
+        }
+        if (existing.avg !== undefined && existing.sum !== undefined && existing.count !== undefined) {
+          existing.avg = existing.sum / existing.count;
+        }
+      } else {
+        fieldMap.set(field.name, { ...field });
+      }
+    }
+  }
+
+  const fields = Array.from(fieldMap.values());
+  const colCount = fields.length;
+  const headers = fields.map(f => f.name);
+
+  // 取第一个文件的列名作为标准
+  const preview = deduplicatedRows.slice(0, 10);
+
+  return {
+    filename: "合并数据",
+    totalRowCount: deduplicatedRows.length,
+    colCount,
+    fields,
+    preview,
+    sampleRows: deduplicatedRows.slice(0, 500), // 限制 500 行
+  };
+}
+
 export async function parseFile(file: File): Promise<ParsedFileData> {
   const buffer = await file.arrayBuffer();
   const ext = file.name.split(".").pop()?.toLowerCase();
