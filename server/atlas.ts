@@ -3116,80 +3116,9 @@ ${dataTable}`}
         buffer,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
-
-      // 创建 merged session 用于对话
-      const mergedSessionId = nanoid();
-      const userId = (req as any).userId || 0;
-      const mergedFilename = `合并_${valid.length}个文件.xlsx`;
-      const mergedFileKey = `atlas-merged/${mergedSessionId}.xlsx`;
-
-      await createSession({
-        id: mergedSessionId,
-        userId,
-        filename: mergedFileKey,
-        originalName: mergedFilename,
-        fileKey: mergedFileKey,
-        fileUrl: reportUrl,
-        fileSizeKb: Math.ceil(buffer.length / 1024),
-        rowCount: allRows.length,
-        colCount: Object.keys(allRows[0] || {}).length,
-        dfInfo: {
-          row_count: allRows.length,
-          col_count: Object.keys(allRows[0] || {}).length,
-          fields: Object.keys(allRows[0] || {}).map(col => ({
-            name: col,
-            type: "text",
-            dtype: "object",
-            null_count: 0,
-            unique_count: 0,
-            sample: [],
-          })),
-          preview: allRows.slice(0, 500),
-        },
-        isMerged: 1,
-        status: "uploading",
-        pipelineStatus: "running",
-        pipelineStartedAt: new Date(),
-      });
-
-      // 后台运行 Pipeline 生成 ResultSet
-      setImmediate(async () => {
-        try {
-          const mergedBuffer = buffer;
-          const mergedData = allRows;
-
-          await updateSession(mergedSessionId, {
-            fileUrl: reportUrl,
-            rowCount: mergedData.length,
-            colCount: Object.keys(mergedData[0] || {}).length,
-          });
-
-          const xlsxBuffer = Buffer.from(XLSX.write(
-            XLSX.utils.book_new(),
-            { type: "buffer", bookType: "xlsx" }
-          ));
-
-          await runPipelineInBackground(
-            mergedSessionId,
-            userId,
-            mergedBuffer,
-            mergedFilename,
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          );
-        } catch (err) {
-          console.error(`[Atlas] Pipeline failed for merged session ${mergedSessionId}:`, err);
-          await updateSession(mergedSessionId, {
-            pipelineStatus: "failed",
-            pipelineError: String(err),
-            pipelineFinishedAt: new Date(),
-          }).catch(() => {});
-        }
-      });
-
-      res.json({
+       res.json({
         downloadUrl: reportUrl,
         reportId,
-        session_id: mergedSessionId,
         totalRows: allRows.length,
         files: fileStats,
         message: "已合并 " + valid.length + " 个文件，共 " + allRows.length + " 行数据",
@@ -3212,13 +3141,9 @@ ${dataTable}`}
     userId: number;
   }>();
 
-  // Lock set to prevent race condition: parallel chunks arriving simultaneously
-  // all trying to initialize the same uploadId. Only the first one should create the session.
-  const chunkInitLock = new Set<string>();
   // Clean up stale chunk stores every 10 minutes
   setInterval(() => {
     chunkStore.clear();
-    chunkInitLock.clear();
   }, 10 * 60_000);
 
   app.post("/api/atlas/upload-chunk", optionalAuth, uploadChunk.single("chunk"), async (req: Request, res: Response) => {
@@ -3237,11 +3162,8 @@ ${dataTable}`}
         return;
       }
 
-      // Initialize store for this uploadId on first chunk.
-      // Use chunkInitLock to prevent race condition: if multiple parallel chunks arrive
-      // simultaneously before the store is initialized, only the first one creates the session.
-      if (!chunkStore.has(uploadId) && !chunkInitLock.has(uploadId)) {
-        chunkInitLock.add(uploadId); // claim the lock
+      // Initialize store for this uploadId on first chunk
+      if (!chunkStore.has(uploadId)) {
         const sessionId = nanoid();
         const userId = (req as any).userId || 0;
         const ext = (filename || "file").split(".").pop()?.toLowerCase() || "xlsx";
@@ -3270,15 +3192,6 @@ ${dataTable}`}
           sessionId,
           userId,
         });
-        chunkInitLock.delete(uploadId); // release lock after store is ready
-      } else if (chunkInitLock.has(uploadId)) {
-        // Another request is initializing this uploadId — wait briefly then retry
-        await new Promise(r => setTimeout(r, 200));
-        if (!chunkStore.has(uploadId)) {
-          // Still not initialized — return error
-          res.status(500).json({ error: "Upload session initialization conflict, please retry" });
-          return;
-        }
       }
 
       const entry = chunkStore.get(uploadId)!;

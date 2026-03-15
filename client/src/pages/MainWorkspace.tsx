@@ -154,16 +154,21 @@ export default function MainWorkspace() {
 
     // 进度定时器引用（用于清理）
     let currentProgress = 5;
+
     try {
-      // Phase 1 + 1b: parseFile 和 smartUpload 并行执行，节省等待时间
+      // Phase 1: 前端本地解析 Excel/CSV（仅用于预览展示，不传给后端）
       updateMyMsg("", { isAnalyzing: true, analyzeProgress: 8 });
       updateUploadedFile(tempId, { uploadProgress: 5 });
 
-      // 并行启动：前端解析 + 后端上传同时进行
-      const parsePromise = parseFile(file);
-      const uploadPromise = smartUpload(file, (percent) => {
-        // 上传进度映射到 5%➒20%（与解析并行，不互相阻塞）
-        const mappedProgress = Math.round(5 + (percent / 100) * 15);
+      const parsed = await parseFile(file);
+
+      currentProgress = 20;
+      updateMyMsg("", { isAnalyzing: true, analyzeProgress: 20 });
+      updateUploadedFile(tempId, { uploadProgress: 20 });
+
+      // Phase 1b: 上传原始文件到后端（触发 Pipeline 生成完整 ResultSet）
+      const uploadResult = await smartUpload(file, (percent) => {
+        const mappedProgress = Math.round(20 + (percent / 100) * 10);
         if (mappedProgress > currentProgress) {
           currentProgress = mappedProgress;
           updateMyMsg("", { isAnalyzing: true, analyzeProgress: currentProgress });
@@ -171,12 +176,9 @@ export default function MainWorkspace() {
         }
       });
 
-       // 等待两者并行完成
-      const [parsed, uploadResult] = await Promise.all([parsePromise, uploadPromise]);
+      // Phase 2: poll for async processing result (30% → 100%)
       currentProgress = 30;
       updateMyMsg("", { isAnalyzing: true, analyzeProgress: 30 });
-      updateUploadedFile(tempId, { uploadProgress: 30 });
-      // Phase 2: poll for async processing result (30% → 100%)
       let resultShown = false;
 
       // If upload already returned full result (sync mode), use it directly
