@@ -3198,7 +3198,14 @@ ${dataTable}`}
       // Background processing (identical logic to /upload)
       setImmediate(async () => {
         try {
-          const { url: fileUrl } = await storagePut(fileKey, buffer, mimeType);
+          // Upload original file to S3 (with 90s timeout to prevent hang on large files)
+          const s3UploadTimeout = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`S3 upload timed out after 90s for file: ${originalname}`)), 90_000)
+          );
+          const { url: fileUrl } = await Promise.race([
+            storagePut(fileKey, buffer, mimeType),
+            s3UploadTimeout,
+          ]);
           await updateSession(sessionId, { fileUrl }).catch(() => {});
 
           // Use worker thread for XLSX so the main event loop is never blocked (prevents 503 on large files)
@@ -3213,7 +3220,9 @@ ${dataTable}`}
             (data as any).__xlsxMeta = { totalRowCount: parsed.totalRowCount, columnStats: parsed.columnStats };
           }
           const xlsxMeta = (data as any).__xlsxMeta;
-          const dfInfo = buildDataFrameInfo(data, sheetNames, xlsxMeta?.totalRowCount, xlsxMeta?.columnStats);
+          const totalRowCount = data.length;
+          const previewData = data.slice(0, 500);
+          const dfInfo = buildDataFrameInfo(previewData, sheetNames, totalRowCount);
           const scenarioHint = detectScenario(dfInfo.fields);
           const requiredByScenario: Record<string, string[]> = {
             payroll:    ["基本工资", "员工姓名"],
@@ -3222,11 +3231,13 @@ ${dataTable}`}
             dividend:   ["员工姓名"],
           };
           const requiredFields = requiredByScenario[scenarioHint.type] || [];
-          const { normalizedData, injectedFields, fieldMapping } = normalizeFieldNames(data, requiredFields);
+          const { normalizedData, injectedFields, fieldMapping } = normalizeFieldNames(previewData, requiredFields);
           const workingData = normalizedData;
 
-          await updateSession(sessionId, { rowCount: dfInfo.row_count, colCount: dfInfo.col_count, dfInfo: dfInfo as any }).catch(() => {});
+          await updateSession(sessionId, { rowCount: totalRowCount, colCount: dfInfo.col_count, dfInfo: dfInfo as any }).catch(() => {});
           await storeSessionData(sessionId, workingData);
+
+          runPipelineInBackground(sessionId, userId, buffer, originalname, mimeType).catch(err => console.warn(`[Pipeline] Background pipeline failed (non-blocking):`, err?.message));
 
           const scenario = detectScenario(dfInfo.fields);
           const keyMetrics = computeKeyMetrics(workingData, scenario, dfInfo);
