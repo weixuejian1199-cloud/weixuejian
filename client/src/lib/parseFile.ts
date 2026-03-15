@@ -158,6 +158,7 @@ export interface ParsedFileData {
   fields: ParsedField[];
   preview: Record<string, unknown>[]; // first 500 rows
   sampleRows: Record<string, unknown>[]; // first 20 rows for AI prompt
+  allRows: Record<string, unknown>[]; // 全量行（用于前端导出）
   // The dimension field used for groupedTop5 (e.g. "达人昵称")
   groupByField?: string;
   // All detected dimension fields by priority tier (for multi-dim grouping)
@@ -586,6 +587,7 @@ export function mergeParsedFiles(
       fields: [],
       preview: [],
       sampleRows: [],
+      allRows: [],
     };
   }
 
@@ -593,8 +595,8 @@ export function mergeParsedFiles(
     return parsedFiles[0];
   }
 
-  // 合并所有行
-  const allRows = parsedFiles.flatMap(f => f.sampleRows);
+  // 合并所有行（全量）
+  const allRows = parsedFiles.flatMap(f => f.allRows || f.sampleRows || []);
   const totalRowCount = allRows.length;
 
   if (totalRowCount === 0) {
@@ -659,6 +661,7 @@ export function mergeParsedFiles(
     fields,
     preview,
     sampleRows: deduplicatedRows.slice(0, 500), // 限制 500 行
+    allRows: deduplicatedRows, // 全量行（用于前端导出）
   };
 }
 
@@ -937,6 +940,7 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     fields,
     preview,
     sampleRows,
+    allRows: rows, // 全量行（用于前端导出）
     groupByField: groupByField ?? undefined,
     allGroupByFields: allGroupByFields.length > 0 ? allGroupByFields : undefined,
     dataQuality,

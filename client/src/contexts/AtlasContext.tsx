@@ -46,6 +46,7 @@ export interface UploadedFile {
   status: "uploading" | "ready" | "error";
   uploadedAt: Date;
   uploadProgress?: number; // 0-100, only meaningful when status === "uploading"
+  allRows?: Record<string, unknown>[]; // 全量行（用于前端导出）
   /**
    * 系统预计算的分类字段全量统计（来自 parseFile.computeCategoryStats）。
    * key: 字段名（如「收货省份」「支付方式」），value: 全量统计条目数组。
@@ -71,6 +72,7 @@ export interface Message {
   report_filename?: string;
   download_url?: string;
   tableData?: TableSheet[];
+  sessionId?: string; // 关联的 session ID，用于前端导出时查找对应文件的全量行
   thinkingSteps?: string[];  // Steps shown in "思考过程" panel
   suggestedActions?: Array<{ icon: string; label: string; prompt: string }>;  // Quick action buttons
   isHidden?: boolean;  // Hidden messages (auto-triggered, not shown in UI)
