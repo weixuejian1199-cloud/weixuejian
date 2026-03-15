@@ -24,6 +24,7 @@ import { parseFile, mergeParsedFiles, type DataQuality } from "@/lib/parseFile";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
+import * as XLSX from "xlsx";
 
 // Helper: strip <suggestions> block from text and parse into SuggestedAction[]
 function parseSuggestionsHelper(text: string): { cleanText: string; suggestions: SuggestedAction[] } {
@@ -222,6 +223,9 @@ export default function MainWorkspace() {
         categoryGroupedTop20: parsed.categoryGroupedTop20 || undefined,
       });
 
+      // 更新消息的 sessionId，用于前端导出时查找对应文件
+      updateMessageById(assistantMsgId, "", { sessionId: result.session_id }, taskId);
+
       // Update current task title with filename (use first file's name)
       if (taskId) {
         const currentTask = tasks.find(t => t.id === taskId);
@@ -377,6 +381,9 @@ export default function MainWorkspace() {
           // 保存全量行（用于前端导出）
           allRows: merged.allRows || undefined,
         });
+
+      // 更新消息的 sessionId，用于前端导出时查找对应文件
+      updateMessageById(assistantMsgId, "", { sessionId: result.session_id }, taskId);
 
         // 更新任务标题
         const currentTask = tasks.find(t => t.id === taskId);
