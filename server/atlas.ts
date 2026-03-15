@@ -3028,6 +3028,37 @@ ${dataTable}`}
       if (!res.headersSent) res.status(500).json({ error: err.message });
     }
   });
+
+  // GET /api/atlas/export/:sessionId — 从 ResultSet 导出完整数据
+  app.get("/api/atlas/export/:sessionId", optionalAuth, async (req: Request, res: Response) => {
+    try {
+      const { sessionId } = req.params;
+      
+      // 从数据库读取 ResultSet
+      const resultSet = await getResultSetForSession(sessionId);
+      if (!resultSet || !resultSet.rowCount) {
+        res.status(404).json({ error: "数据已过期或不存在，请重新上传" });
+        return;
+      }
+
+      // 调用 delivery 层导出
+      const exportResult = await exportFromResultSet(resultSet, {
+        format: "xlsx",
+        includeSummary: true,
+      });
+
+      // 返回下载链接
+      res.json({
+        downloadUrl: exportResult.url,
+        fileName: exportResult.fileName,
+        rowCount: resultSet.rowCount,
+      });
+    } catch (err: any) {
+      console.error("[Atlas] Export error:", err);
+      res.status(500).json({ error: err.message || "导出失败" });
+    }
+  });
+
   // POST /api/atlas/merge (P1-C) - merge multiple sessions into one Excel
   app.post("/api/atlas/merge", optionalAuth, async (req: Request, res: Response) => {
     try {

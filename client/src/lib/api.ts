@@ -269,6 +269,29 @@ export async function uploadParsed(
   return data as UploadResponse;
 }
 
+// ── Export from ResultSet (V3.0) ─────────────────────────────────────────────
+
+export interface ExportFromSessionResult {
+  downloadUrl: string;
+  fileName: string;
+  rowCount: number;
+}
+
+export async function exportFromSession(sessionId: string): Promise<ExportFromSessionResult> {
+  const res = await fetch(`/api/atlas/export/${sessionId}`, {
+    method: "GET",
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    let msg = `导出失败: HTTP ${res.status}`;
+    try { const err = await res.json(); msg = err.error || msg; } catch {}
+    throw new Error(msg);
+  }
+
+  return res.json();
+}
+
 // ── Chat (streaming) ──────────────────────────────────────────────────────────
 
 export interface ChatStreamOptions {
