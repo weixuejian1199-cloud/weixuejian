@@ -3490,6 +3490,24 @@ ${dataTable}`}
         status: "processing",
         df_info: dfInfo,
       });
+
+      // ★ 新增：自动触发小虾米处理文件
+      setImmediate(async () => {
+        try {
+          console.log(`[Atlas] 触发小虾米处理文件：${originalname} (${sessionId})`);
+
+          // 调用小虾米，传递文件信息
+          await callOpenClaw({
+            message: `用户上传了文件：${originalname}\n\n文件信息：\n- 行数：${parsed.totalRowCount}\n- 列数：${parsed.colCount}\n- 字段：${parsed.fields.map(f => f.name).join(', ')}\n\n请启动 subagent 处理这个文件，完成以下任务：\n1. 解析文件（前端已解析，数据在 preview 中）\n2. 如果是多个文件，合并并去重（基于主订单编号）\n3. 计算关键指标（订单数、销售额等）\n4. 返回 JSON 格式的结果给前端\n\nSession ID: ${sessionId}`,
+            user_id: String(userId),
+            source: "atlas-auto-trigger",
+          }, String(userId));
+
+          console.log(`[Atlas] 小虾米已触发：${sessionId}`);
+        } catch (err) {
+          console.error(`[Atlas] 调用小虾米失败：${sessionId}`, err);
+        }
+      });
       setImmediate(async () => {
         try {
           const workingData = parsed.preview || [];;
