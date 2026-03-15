@@ -19,7 +19,7 @@ import { Streamdown } from "streamdown";
 import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTableRenderer";
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, smartUpload, type SuggestedAction } from "@/lib/api";
+import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, uploadParsed, type SuggestedAction } from "@/lib/api";
 import { parseFile, mergeParsedFiles, type DataQuality } from "@/lib/parseFile"; // v14.2-groupby-fix
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -165,8 +165,8 @@ export default function MainWorkspace() {
       updateMyMsg("", { isAnalyzing: true, analyzeProgress: 20 });
       updateUploadedFile(tempId, { uploadProgress: 20 });
 
-      // Phase 1b: 直接上传原始文件 buffer（让后端解析全量数据）
-      const uploadResult = await smartUpload(file, (percent) => {
+      // Phase 1b: 只上传前端统计结果，不传原始行数据
+      const uploadResult = await uploadParsed(parsed, (percent) => {
         const mappedProgress = Math.round(20 + (percent / 100) * 10);
         if (mappedProgress > currentProgress) {
           currentProgress = mappedProgress;
@@ -303,19 +303,12 @@ export default function MainWorkspace() {
       const totalAmount = amountField?.sum ? `¥${Math.round(amountField.sum).toLocaleString()}` : "未知";
       const avgOrderValue = amountField?.avg ? `¥${amountField.avg.toFixed(2)}` : "未知";
 
-      // 创建合并后的临时文件（用于上传）
-      const mergedBlob = new Blob(
-        [JSON.stringify(merged.sampleRows)],
-        { type: "application/json" }
-      );
-      const mergedFile = new File([mergedBlob], "合并数据.json", { type: "application/json" });
-
-      // 添加合并后的文件记录
+      // 添加合并后的文件记录（虚拟文件，不创建真实文件）
       const tempId = nanoid();
       addUploadedFile({
         id: tempId,
         name: `合并数据（去重后 ${totalOrders.toLocaleString()} 行）`,
-        size: mergedFile.size,
+        size: 0, // 虚拟文件，无实际大小
         status: "uploading",
         uploadedAt: new Date(),
         uploadProgress: 0,
@@ -340,14 +333,14 @@ export default function MainWorkspace() {
         isStreaming: false,
       } as any, taskId);
 
-      // 上传合并后的数据
+      // 上传合并后的统计数据（不创建合并文件，直接上传 ParsedFileData）
       let currentProgress = 10;
       const updateMyMsg = (content: string, extra?: Partial<Message>) =>
         updateMessageById(assistantMsgId, content, extra, taskId);
 
       try {
-        // 上传合并后的数据（使用 smartUpload）
-        const uploadResult = await smartUpload(mergedFile, (percent) => {
+        // 直接上传合并后的统计数据（使用 uploadParsed）
+        const uploadResult = await uploadParsed(merged, (percent) => {
           currentProgress = Math.round(10 + (percent / 100) * 30);
           updateMyMsg("", { isAnalyzing: true, analyzeProgress: currentProgress });
         });
@@ -377,7 +370,7 @@ export default function MainWorkspace() {
               inferred_type: f.type || "text",
             })),
             preview: merged.preview || [],
-            file_size_kb: Math.round(mergedFile.size / 1024),
+            file_size_kb: 0, // 虚拟文件，无实际大小
           },
         });
 
