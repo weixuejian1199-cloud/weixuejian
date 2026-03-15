@@ -372,7 +372,7 @@ export default function MainWorkspace() {
             columns: merged.fields.map(f => ({
               name: f.name,
               dtype: f.dtype,
-              non_null_count: f.type === "numeric" ? f.count : f.unique_count - f.null_count,
+              non_null_count: f.unique_count - f.null_count,
               sample_values: f.sample || [],
               inferred_type: f.type || "text",
             })),

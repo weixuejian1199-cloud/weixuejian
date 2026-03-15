@@ -630,14 +630,13 @@ export function mergeParsedFiles(
         if (field.max !== undefined && existing.max !== undefined) {
           existing.max = Math.max(existing.max, field.max);
         }
-        if (field.count !== undefined && existing.count !== undefined) {
-          existing.count += field.count;
-        }
         if (field.null_count !== undefined) {
           existing.null_count += field.null_count;
         }
-        if (existing.avg !== undefined && existing.sum !== undefined && existing.count !== undefined) {
-          existing.avg = existing.sum / existing.count;
+        // Recalculate avg from merged sum and non-null count
+        if (existing.sum !== undefined) {
+          const nonNullCount = deduplicatedRows.length - existing.null_count;
+          existing.avg = nonNullCount > 0 ? existing.sum / nonNullCount : 0;
         }
       } else {
         fieldMap.set(field.name, { ...field });
