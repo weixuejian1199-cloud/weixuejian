@@ -1365,7 +1365,7 @@ export function registerAtlasRoutes(app: Express) {
           const finalResult = {
             session_id: sessionId,
             filename: originalname,
-            file_url: fileUrl,
+            file_url: null,
             status: "ready",
             df_info: {
               row_count: dfInfo.row_count,
