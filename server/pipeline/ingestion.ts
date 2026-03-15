@@ -268,14 +268,54 @@ export function step3FormatParse(
     // 使用第一个 Sheet（后续可扩展多 Sheet 支持）
     const sheetName = sheetNames[0];
     const sheet = workbook.Sheets[sheetName];
+
+    // ── 自动检测表头行（与 xlsxWorker 逻辑一致）──────────────────────────
+    // 部分平台导出文件（如抖音小店）在第1行有标题行，真正的表头在第2行或更后。
+    // 策略：先用第0行解析，若发现 __EMPTY 列则扫描第1-5行找真正的表头行。
+    let headerRowIndex = 0;
+    if (ext !== ".csv") {
+      const firstPass: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, {
+        defval: "",
+        raw: false,
+        range: 0,
+      });
+      const hasEmptyHeaders =
+        firstPass.length > 0 &&
+        Object.keys(firstPass[0]).some(k => k.startsWith("__EMPTY"));
+      if (hasEmptyHeaders) {
+        for (let r = 1; r <= 5; r++) {
+          const candidate: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, {
+            defval: "",
+            raw: false,
+            range: r,
+          });
+          if (
+            candidate.length > 0 &&
+            !Object.keys(candidate[0]).some(k => k.startsWith("__EMPTY")) &&
+            Object.keys(candidate[0]).some(k => k.trim() !== "")
+          ) {
+            headerRowIndex = r;
+            ctx.errors.push({
+              level: ErrorLevel.INFO,
+              step: 3,
+              code: "I4009",
+              message: `检测到标题行，表头从第 ${r + 1} 行开始（跳过前 ${r} 行）`,
+            });
+            break;
+          }
+        }
+      }
+    }
+
     const rawData: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, {
       defval: "",
       raw: false,
+      range: headerRowIndex,
     });
 
     if (rawData.length === 0) {
       ctx.errors.push({
-        level: ErrorLevel.CRITICAL,
+        level: ErrorLevel.FATAL,
         step: 3,
         code: "E2004",
         message: "数据行数为 0（表头存在但无数据）",

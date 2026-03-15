@@ -211,18 +211,31 @@ export async function chunkedUpload(
     return { chunkIndex: i, data };
   };
 
-  // Upload all chunks in parallel with concurrency limit
-  // The server triggers processing when ALL chunks are received (not necessarily the last index)
-  // So we detect completion by checking data.status === 'processing' in any response
+  // STEP 1: Send chunk 0 first (serial) to initialize the session on the server.
+  // This prevents a race condition where multiple parallel chunks all try to create
+  // the session simultaneously (server's chunkStore.has() check is not atomic).
+  const { data: chunk0Data } = await uploadChunk(0);
+  if (onProgress) onProgress(Math.round(1 / totalChunks * 100));
+  let finalResponse: any = null;
+  if (chunk0Data.status === 'processing' || chunk0Data.status === 'ready') {
+    finalResponse = chunk0Data; // single-chunk file
+  }
+
+  if (totalChunks === 1) {
+    if (!finalResponse) throw new Error("分块上传失败：未收到完成响应");
+    return finalResponse as UploadResponse;
+  }
+
+  // STEP 2: Upload remaining chunks in parallel (chunks 1..totalChunks-1)
   const completedChunks = new Array(totalChunks).fill(false);
-  let finalResponse: any = null; // the response with status=processing (all chunks received)
+  completedChunks[0] = true; // chunk 0 already done
   let activeCount = 0;
-  let nextChunk = 0;
-  let error: Error | null = null;
+  let nextChunk = 1; // start from chunk 1
+  let uploadError: Error | null = null;
 
   await new Promise<void>((resolve, reject) => {
     const launchNext = () => {
-      while (activeCount < UPLOAD_CONCURRENCY && nextChunk < totalChunks && !error) {
+      while (activeCount < UPLOAD_CONCURRENCY && nextChunk < totalChunks && !uploadError) {
         const i = nextChunk++;
         activeCount++;
         uploadChunk(i).then(({ chunkIndex, data }) => {
@@ -242,8 +255,8 @@ export async function chunkedUpload(
             launchNext();
           }
         }).catch((err) => {
-          if (!error) {
-            error = err;
+          if (!uploadError) {
+            uploadError = err;
             reject(err);
           }
         });

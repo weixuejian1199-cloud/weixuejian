@@ -3141,9 +3141,13 @@ ${dataTable}`}
     userId: number;
   }>();
 
+  // Lock set to prevent race condition: parallel chunks arriving simultaneously
+  // all trying to initialize the same uploadId. Only the first one should create the session.
+  const chunkInitLock = new Set<string>();
   // Clean up stale chunk stores every 10 minutes
   setInterval(() => {
     chunkStore.clear();
+    chunkInitLock.clear();
   }, 10 * 60_000);
 
   app.post("/api/atlas/upload-chunk", optionalAuth, uploadChunk.single("chunk"), async (req: Request, res: Response) => {
@@ -3162,8 +3166,11 @@ ${dataTable}`}
         return;
       }
 
-      // Initialize store for this uploadId on first chunk
-      if (!chunkStore.has(uploadId)) {
+      // Initialize store for this uploadId on first chunk.
+      // Use chunkInitLock to prevent race condition: if multiple parallel chunks arrive
+      // simultaneously before the store is initialized, only the first one creates the session.
+      if (!chunkStore.has(uploadId) && !chunkInitLock.has(uploadId)) {
+        chunkInitLock.add(uploadId); // claim the lock
         const sessionId = nanoid();
         const userId = (req as any).userId || 0;
         const ext = (filename || "file").split(".").pop()?.toLowerCase() || "xlsx";
@@ -3192,6 +3199,15 @@ ${dataTable}`}
           sessionId,
           userId,
         });
+        chunkInitLock.delete(uploadId); // release lock after store is ready
+      } else if (chunkInitLock.has(uploadId)) {
+        // Another request is initializing this uploadId — wait briefly then retry
+        await new Promise(r => setTimeout(r, 200));
+        if (!chunkStore.has(uploadId)) {
+          // Still not initialized — return error
+          res.status(500).json({ error: "Upload session initialization conflict, please retry" });
+          return;
+        }
       }
 
       const entry = chunkStore.get(uploadId)!;
