@@ -1119,15 +1119,12 @@ export function registerAtlasRoutes(app: Express) {
       // 3. All heavy work (S3 upload + parse + AI) runs in background (non-blocking)
       setImmediate(async () => {
         try {
-          // 3a. Upload original file to S3 (with 90s timeout to prevent hang on large files)
-          const s3UploadTimeout = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error(`S3 upload timed out after 90s for file: ${originalname}`)), 90_000)
-          );
-          const { url: fileUrl } = await Promise.race([
-            storagePut(fileKey, buffer, mimetype),
-            s3UploadTimeout,
-          ]);
-          await updateSession(sessionId, { fileUrl }).catch(() => {});
+          // 3a. Skip S3 upload - Pipeline uses buffer directly
+          // const { url: fileUrl } = await Promise.race([
+          //   storagePut(fileKey, buffer, mimetype),
+          //   s3UploadTimeout,
+          // ]);
+          // await updateSession(sessionId, { fileUrl }).catch(() => {});
 
           // 3b. Parse data
           // Use worker thread for XLSX so the main event loop is never blocked (prevents 503 on large files)
