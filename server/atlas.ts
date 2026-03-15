@@ -3200,17 +3200,17 @@ ${dataTable}`}
       // Background processing (identical logic to /upload)
       setImmediate(async () => {
         try {
-          // Upload original file to S3 (with 90s timeout to prevent hang on large files)
-          const s3UploadTimeout = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error(`S3 upload timed out after 90s for file: ${originalname}`)), 90_000)
-          );
-          const { url: fileUrl } = await Promise.race([
-            storagePut(fileKey, buffer, mimeType),
-            s3UploadTimeout,
-          ]);
-          await updateSession(sessionId, { fileUrl }).catch(() => {});
+          // Task 1: Upload original file to S3 (background, no wait)
+          const s3UploadPromise = storagePut(fileKey, buffer, mimeType)
+            .then(async ({ url }) => {
+              await updateSession(sessionId, { fileUrl: url }).catch(() => {});
+              console.log(`[Atlas] S3 upload complete for session ${sessionId}`);
+            })
+            .catch(err => {
+              console.error(`[Atlas] S3 upload failed for session ${sessionId}:`, err?.message);
+            });
 
-          // Use worker thread for XLSX so the main event loop is never blocked (prevents 503 on large files)
+          // Task 2: Parse + AI analysis (in parallel, use memory buffer)
           let data: Record<string, unknown>[];
           let sheetNames: string[] | undefined;
           if (ext === "csv") {
@@ -3239,7 +3239,12 @@ ${dataTable}`}
           await updateSession(sessionId, { rowCount: totalRowCount, colCount: dfInfo.col_count, dfInfo: dfInfo as any }).catch(() => {});
           await storeSessionData(sessionId, workingData);
 
-          runPipelineInBackground(sessionId, userId, buffer, originalname, mimeType).catch(err => console.warn(`[Pipeline] Background pipeline failed (non-blocking):`, err?.message));
+          // Task 3: Start Pipeline (wait for S3 to complete)
+          s3UploadPromise.then(() => {
+            console.log(`[Atlas] Pipeline starting after S3 upload complete for session ${sessionId}`);
+            runPipelineInBackground(sessionId, userId, buffer, originalname, mimeType)
+              .catch(err => console.warn(`[Pipeline] Background pipeline failed (non-blocking):`, err?.message));
+          });
 
           const scenario = detectScenario(dfInfo.fields);
           const keyMetrics = computeKeyMetrics(workingData, scenario, dfInfo);
@@ -3346,7 +3351,7 @@ ${dataTable}`}
           suggestedActions.push({ icon: "✨", label: "自定义需求", prompt: "" });
 
           const finalResult = {
-            session_id: sessionId, filename: originalname, file_url: fileUrl, status: "ready",
+            session_id: sessionId, filename: originalname, file_url: "", status: "ready",
             df_info: { row_count: dfInfo.row_count, col_count: dfInfo.col_count, fields: dfInfo.fields, preview: dfInfo.preview },
             ai_analysis: aiAnalysis, suggested_actions: suggestedActions, quality_issues: qualityIssues,
             outlier_details: outlierDetails.length > 0 ? outlierDetails : undefined,
