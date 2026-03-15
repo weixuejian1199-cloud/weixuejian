@@ -3200,17 +3200,7 @@ ${dataTable}`}
       // Background processing (identical logic to /upload)
       setImmediate(async () => {
         try {
-          // Task 1: Upload original file to S3 (background, no wait)
-          const s3UploadPromise = storagePut(fileKey, buffer, mimeType)
-            .then(async ({ url }) => {
-              await updateSession(sessionId, { fileUrl: url }).catch(() => {});
-              console.log(`[Atlas] S3 upload complete for session ${sessionId}`);
-            })
-            .catch(err => {
-              console.error(`[Atlas] S3 upload failed for session ${sessionId}:`, err?.message);
-            });
-
-          // Task 2: Parse + AI analysis (in parallel, use memory buffer)
+          // Use worker thread for XLSX so the main event loop is never blocked (prevents 503 on large files)
           let data: Record<string, unknown>[];
           let sheetNames: string[] | undefined;
           if (ext === "csv") {
@@ -3239,12 +3229,9 @@ ${dataTable}`}
           await updateSession(sessionId, { rowCount: totalRowCount, colCount: dfInfo.col_count, dfInfo: dfInfo as any }).catch(() => {});
           await storeSessionData(sessionId, workingData);
 
-          // Task 3: Start Pipeline (wait for S3 to complete)
-          s3UploadPromise.then(() => {
-            console.log(`[Atlas] Pipeline starting after S3 upload complete for session ${sessionId}`);
-            runPipelineInBackground(sessionId, userId, buffer, originalname, mimeType)
-              .catch(err => console.warn(`[Pipeline] Background pipeline failed (non-blocking):`, err?.message));
-          });
+          // Start Pipeline (uses buffer directly, no S3 needed)
+          runPipelineInBackground(sessionId, userId, buffer, originalname, mimeType)
+            .catch(err => console.warn(`[Pipeline] Background pipeline failed (non-blocking):`, err?.message));
 
           const scenario = detectScenario(dfInfo.fields);
           const keyMetrics = computeKeyMetrics(workingData, scenario, dfInfo);
