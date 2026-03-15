@@ -339,21 +339,33 @@ export default function MainWorkspace() {
         isStreaming: false,
       } as any, taskId);
 
-      // 每个文件分别 smartUpload，然后调 /api/atlas/merge 合并 session
-      let currentProgress = 10;
+      // 每个文件分别 smartUpload + 轮询至 ready，然后调 /api/atlas/merge 合并 session
       const updateMyMsg = (content: string, extra?: Partial<Message>) =>
         updateMessageById(assistantMsgId, content, extra, taskId);
 
       try {
-        // 分别上传每个原始文件
+        // 分别上传每个原始文件，并等待 Pipeline 处理完成
         const sessionIds: string[] = [];
         const platform_names: Record<string, string> = {};
         for (let i = 0; i < fileArray.length; i++) {
           const file = fileArray[i];
-          updateMyMsg("", { isAnalyzing: true, analyzeProgress: Math.round(10 + (i / fileArray.length) * 30) });
+          const uploadProgress = Math.round(10 + (i / fileArray.length) * 25);
+          updateMyMsg("", { isAnalyzing: true, analyzeProgress: uploadProgress });
           
-          const result = await smartUpload(file);
-          sessionIds.push(result.session_id);
+          // 上传文件（分块或直接）
+          const uploadResult = await smartUpload(file);
+          sessionIds.push(uploadResult.session_id);
+          
+          // 等待该文件的 Pipeline 处理完成
+          const pollProgress = Math.round(35 + (i / fileArray.length) * 30);
+          updateMyMsg("", { isAnalyzing: true, analyzeProgress: pollProgress });
+          await pollUploadStatus(
+            uploadResult.session_id,
+            (pct) => {
+              const mapped = Math.round(pollProgress + (pct / 100) * (30 / fileArray.length));
+              updateMyMsg("", { isAnalyzing: true, analyzeProgress: Math.min(mapped, 65) });
+            }
+          );
           
           // 添加到上传文件列表
           addUploadedFile({
@@ -361,14 +373,14 @@ export default function MainWorkspace() {
             name: file.name,
             size: file.size,
             status: "ready",
-            sessionId: result.session_id,
+            sessionId: uploadResult.session_id,
             uploadedAt: new Date(),
             uploadProgress: 100,
           }, taskId);
         }
 
-        // 合并 session
-        updateMyMsg("", { isAnalyzing: true, analyzeProgress: 40 });
+        // 所有文件 Pipeline 已完成，调用合并接口
+        updateMyMsg("", { isAnalyzing: true, analyzeProgress: 70 });
         const mergeRes = await fetch("/api/atlas/merge", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -378,24 +390,15 @@ export default function MainWorkspace() {
         const mergeData = await mergeRes.json();
         if (!mergeRes.ok) throw new Error(mergeData.error || "合并失败");
 
-        const mergedSessionId = mergeData.session_id;
-
-        // 轮询合并后的处理结果
-        currentProgress = 50;
-        const result = await pollUploadStatus(
-          mergedSessionId,
-          (pct) => {
-            currentProgress = Math.round(50 + (pct / 100) * 50);
-            updateMyMsg("", { isAnalyzing: true, analyzeProgress: currentProgress });
-          }
-        );
+        // 合并接口同步完成，直接使用结果（无需轮询）
+        const actualTotalRows = mergeData.totalRows || totalOrders;
 
         // 更新文件状态
         updateUploadedFile(tempId, {
           status: "ready",
-          sessionId: mergedSessionId,
+          sessionId: sessionIds[0], // 使用第一个 session 作为代表
           dfInfo: {
-            row_count: mergeData.totalRows || merged.totalRowCount,
+            row_count: actualTotalRows,
             col_count: merged.colCount,
             columns: merged.fields.map(f => ({
               name: f.name,
@@ -409,29 +412,40 @@ export default function MainWorkspace() {
           },
         });
 
-      // 更新消息的 sessionId，用于前端导出
-      updateMessageById(assistantMsgId, "", { sessionId: result.session_id }, taskId);
+        // 更新消息，附带下载链接
+        updateMessageById(assistantMsgId, "", {
+          download_url: mergeData.downloadUrl,
+          report_filename: `合并数据_${new Date().toISOString().slice(0, 10)}.xlsx`,
+        }, taskId);
 
         // 更新任务标题
         const currentTask = tasks.find(t => t.id === taskId);
         if (currentTask && currentTask.title === "新建任务") {
-          updateTask(taskId, { title: `合并数据（${totalOrders.toLocaleString()} 行）` });
+          updateTask(taskId, { title: `合并数据（${actualTotalRows.toLocaleString()} 行）` });
         }
 
         // 显示分析结果
-        setTimeout(() => {
-          const analysisText = result.ai_analysis ||
-            `这是一份数据文件，共 ${merged.totalRowCount.toLocaleString()} 行、${merged.colCount} 列。`;
-          const { cleanText, suggestions } = parseSuggestionsHelper(analysisText);
-          updateMyMsg(cleanText, {
-            isAnalyzing: false,
-            analyzeProgress: 100,
-            isStreaming: false,
-            suggestedActions: suggestions.length > 0 ? suggestions : DEFAULT_ACTIONS,
-          });
-        }, 1000);
+        const fileTableLines = [
+          `✅ 已合并 ${fileArray.length} 个文件，共 **${actualTotalRows.toLocaleString()}** 行数据`,
+          ``,
+          `| 文件 | 来源平台 | 行数 |`,
+          `|------|---------|------|`,
+          ...(mergeData.files || []).map((f: { name: string; platform: string; rowCount: number }) =>
+            `| ${f.name} | ${f.platform} | ${f.rowCount.toLocaleString()} |`
+          ),
+        ].join("\n");
+        updateMyMsg(fileTableLines, {
+          isAnalyzing: false,
+          analyzeProgress: 100,
+          isStreaming: false,
+          suggestedActions: [
+            { icon: "📊", label: "生成汇总报表", prompt: "帮我把合并后的数据生成汇总报表" },
+            { icon: "🔍", label: "各平台对比", prompt: "帮我对比各平台的销售数据" },
+            { icon: "✨", label: "自定义需求", prompt: "" },
+          ],
+        });
 
-        toast.success(`合并成功！共 ${totalOrders.toLocaleString()} 条订单`);
+        toast.success(`合并成功！共 ${actualTotalRows.toLocaleString()} 条订单`);
 
       } catch (err: any) {
         updateMyMsg(`上传失败：${(err as any).message || "请重试"}`, {
