@@ -3116,9 +3116,80 @@ ${dataTable}`}
         buffer,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
-       res.json({
+
+      // 创建 merged session 用于对话
+      const mergedSessionId = nanoid();
+      const userId = (req as any).userId || 0;
+      const mergedFilename = `合并_${valid.length}个文件.xlsx`;
+      const mergedFileKey = `atlas-merged/${mergedSessionId}.xlsx`;
+
+      await createSession({
+        id: mergedSessionId,
+        userId,
+        filename: mergedFileKey,
+        originalName: mergedFilename,
+        fileKey: mergedFileKey,
+        fileUrl: reportUrl,
+        fileSizeKb: Math.ceil(buffer.length / 1024),
+        rowCount: allRows.length,
+        colCount: Object.keys(allRows[0] || {}).length,
+        dfInfo: {
+          row_count: allRows.length,
+          col_count: Object.keys(allRows[0] || {}).length,
+          fields: Object.keys(allRows[0] || {}).map(col => ({
+            name: col,
+            type: "text",
+            dtype: "object",
+            null_count: 0,
+            unique_count: 0,
+            sample: [],
+          })),
+          preview: allRows.slice(0, 500),
+        },
+        isMerged: 1,
+        status: "uploading",
+        pipelineStatus: "running",
+        pipelineStartedAt: new Date(),
+      });
+
+      // 后台运行 Pipeline 生成 ResultSet
+      setImmediate(async () => {
+        try {
+          const mergedBuffer = buffer;
+          const mergedData = allRows;
+
+          await updateSession(mergedSessionId, {
+            fileUrl: reportUrl,
+            rowCount: mergedData.length,
+            colCount: Object.keys(mergedData[0] || {}).length,
+          });
+
+          const xlsxBuffer = Buffer.from(XLSX.write(
+            XLSX.utils.book_new(),
+            { type: "buffer", bookType: "xlsx" }
+          ));
+
+          await runPipelineInBackground(
+            mergedSessionId,
+            userId,
+            mergedBuffer,
+            mergedFilename,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          );
+        } catch (err) {
+          console.error(`[Atlas] Pipeline failed for merged session ${mergedSessionId}:`, err);
+          await updateSession(mergedSessionId, {
+            pipelineStatus: "failed",
+            pipelineError: String(err),
+            pipelineFinishedAt: new Date(),
+          }).catch(() => {});
+        }
+      });
+
+      res.json({
         downloadUrl: reportUrl,
         reportId,
+        session_id: mergedSessionId,
         totalRows: allRows.length,
         files: fileStats,
         message: "已合并 " + valid.length + " 个文件，共 " + allRows.length + " 行数据",
