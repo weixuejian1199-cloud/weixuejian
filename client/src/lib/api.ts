@@ -244,11 +244,14 @@ export async function uploadParsed(
 ): Promise<UploadResponse> {
   if (onProgress) onProgress(10);
 
+  // 排除 allRows（全量行仅用于前端导出，不发给后端，避免 413 超限）
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { allRows: _allRows, ...parsedForServer } = parsed as ParsedFileData & { allRows?: unknown[] };
   const res = await fetch("/api/atlas/upload-parsed", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify(parsed),
+    body: JSON.stringify(parsedForServer),
   });
 
   if (onProgress) onProgress(30);
