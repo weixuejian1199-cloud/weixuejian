@@ -4152,7 +4152,6 @@ ${dataTable}`}
       res.status(500).json({ error: err.message || "Debug test-pipeline failed" });
     }
   });
-}
 
   // ── POST /api/atlas/sanitize-export ──────────────────────────────────────
   // 去敏导出：参考 Kimi 工作路径，删除敏感字段和无关字段，保留核心运营字段
@@ -4262,3 +4261,4 @@ ${dataTable}`}
     }
   });
 
+}
