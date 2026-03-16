@@ -19,7 +19,7 @@ import { Streamdown } from "streamdown";
 import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTableRenderer";
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, uploadParsed, smartUpload, exportFromSession, type SuggestedAction } from "@/lib/api", { sanitizeExport, type SanitizeExportResponse };
+import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, uploadParsed, smartUpload, exportFromSession, type SuggestedAction, sanitizeExport, type SanitizeExportResponse } from "@/lib/api";
 import { parseFile, mergeParsedFiles, type DataQuality } from "@/lib/parseFile"; // v14.2-groupby-fix
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
