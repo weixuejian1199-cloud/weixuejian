@@ -56,7 +56,7 @@ export async function pollUploadStatus(
   onProgress?: (percent: number) => void,
   signal?: AbortSignal
 ): Promise<UploadResponse> {
-  const POLL_INTERVAL = 2000; // 2s
+  const POLL_INTERVAL = 1000; // 1s (reduced from 2s for faster feedback)
   const MAX_WAIT_MS = 5 * 60 * 1000; // 5 minutes
   const start = Date.now();
   let progress = 35; // start from 35% (upload done)
@@ -166,8 +166,9 @@ export async function uploadFile(
 
 // ── Chunked Upload (files > 5MB, bypasses 30s Cloudflare timeout) ────────────────
 
-const CHUNK_SIZE = 1 * 1024 * 1024; // 1MB per chunk
+const CHUNK_SIZE = 4 * 1024 * 1024; // 4MB per chunk (reduced round trips vs 1MB)
 const LARGE_FILE_THRESHOLD_BYTES = 5 * 1024 * 1024; // 5MB
+const UPLOAD_CONCURRENCY = 3; // parallel chunk uploads
 
 export async function chunkedUpload(
   file: File,
@@ -175,9 +176,10 @@ export async function chunkedUpload(
 ): Promise<UploadResponse> {
   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
   const uploadId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  let sessionId: string | null = null;
 
-  for (let i = 0; i < totalChunks; i++) {
+  // Pre-register the session on the server so we get a session_id before parallel uploads
+  // We do this by sending chunk 0 first, then uploading the rest in parallel
+  const uploadChunk = async (i: number): Promise<{ chunkIndex: number; data: any }> => {
     const start = i * CHUNK_SIZE;
     const end = Math.min(start + CHUNK_SIZE, file.size);
     const chunk = file.slice(start, end);
@@ -189,7 +191,6 @@ export async function chunkedUpload(
     form.append("totalChunks", String(totalChunks));
     form.append("filename", file.name);
     form.append("mimetype", file.type || "application/octet-stream");
-    if (sessionId) form.append("sessionId", sessionId);
 
     const res = await fetch("/api/atlas/upload-chunk", {
       method: "POST",
@@ -207,33 +208,75 @@ export async function chunkedUpload(
     }
 
     const data = await res.json();
-    if (data.session_id) sessionId = data.session_id;
+    return { chunkIndex: i, data };
+  };
 
-    // Report progress: chunk upload = 0% → 30%
-    if (onProgress) {
-      const percent = Math.round(((i + 1) / totalChunks) * 30);
-      onProgress(percent);
-    }
-
-    // Last chunk: server returns session_id + status=processing
-    if (i === totalChunks - 1) {
-      return data as UploadResponse;
-    }
+  // STEP 1: Send chunk 0 first (serial) to initialize the session on the server.
+  // This prevents a race condition where multiple parallel chunks all try to create
+  // the session simultaneously (server's chunkStore.has() check is not atomic).
+  const { data: chunk0Data } = await uploadChunk(0);
+  if (onProgress) onProgress(Math.round(1 / totalChunks * 100));
+  let finalResponse: any = null;
+  if (chunk0Data.status === 'processing' || chunk0Data.status === 'ready') {
+    finalResponse = chunk0Data; // single-chunk file
   }
 
-  throw new Error("分块上传失败：未收到完整响应");
+  if (totalChunks === 1) {
+    if (!finalResponse) throw new Error("分块上传失败：未收到完成响应");
+    return finalResponse as UploadResponse;
+  }
+
+  // STEP 2: Upload remaining chunks in parallel (chunks 1..totalChunks-1)
+  const completedChunks = new Array(totalChunks).fill(false);
+  completedChunks[0] = true; // chunk 0 already done
+  let activeCount = 0;
+  let nextChunk = 1; // start from chunk 1
+  let uploadError: Error | null = null;
+
+  await new Promise<void>((resolve, reject) => {
+    const launchNext = () => {
+      while (activeCount < UPLOAD_CONCURRENCY && nextChunk < totalChunks && !uploadError) {
+        const i = nextChunk++;
+        activeCount++;
+        uploadChunk(i).then(({ chunkIndex, data }) => {
+          completedChunks[chunkIndex] = true;
+          // The chunk that completes the upload returns status=processing
+          if (data.status === 'processing' || data.status === 'ready') {
+            finalResponse = data;
+          }
+          activeCount--;
+          const done = completedChunks.filter(Boolean).length;
+          if (onProgress) {
+            onProgress(Math.round((done / totalChunks) * 100));
+          }
+          if (done === totalChunks) {
+            resolve();
+          } else {
+            launchNext();
+          }
+        }).catch((err) => {
+          if (!uploadError) {
+            uploadError = err;
+            reject(err);
+          }
+        });
+      }
+    };
+    launchNext();
+  });
+
+  if (!finalResponse) throw new Error("分块上传失败：未收到完成响应");
+  return finalResponse as UploadResponse;
 }
 
-// ── Smart Upload: auto-select chunked or direct based on file size ────────────────
+// ── Smart Upload: always use chunked upload for consistency ───────────────────
 
 export async function smartUpload(
   file: File,
   onProgress?: (percent: number) => void
 ): Promise<UploadResponse> {
-  if (file.size > LARGE_FILE_THRESHOLD_BYTES) {
-    return chunkedUpload(file, onProgress);
-  }
-  return uploadFile(file, onProgress);
+  // 统一走分块上传，确保后端有完整数据，Pipeline 正常运行
+  return chunkedUpload(file, onProgress);
 }
 
 // ── Upload Parsed (frontend-parsed data, no server XLSX processing) ──────────
