@@ -4057,3 +4057,116 @@ ${dataTable}`}
     }
   });
 }
+
+  // ── POST /api/atlas/sanitize-export ──────────────────────────────────────
+  // 去敏导出：删除敏感字段和无关字段，保留核心运营字段
+  
+  app.post("/api/atlas/sanitize-export", optionalAuth, async (req: Request, res: Response) => {
+    try {
+      const { session_id } = req.body as { session_id: string };
+      
+      if (!session_id) {
+        res.status(400).json({ error: "session_id required" });
+        return;
+      }
+      
+      const session = await getSession(session_id);
+      if (!session) {
+        res.status(404).json({ error: "Session not found" });
+        return;
+      }
+      
+      const data = await loadSessionData(session_id);
+      if (!data || data.length === 0) {
+        res.status(404).json({ error: "No data found" });
+        return;
+      }
+      
+      // 字段分类规则
+      const sensitivePatterns = [
+        /手机 | 电话 | 联系 | 收件 | 发货 | 地址 | 街道 | 区 | 县 | 门牌/i,
+        /收件人 | 发货人 | 昵称 | 姓名 | 实名/i,
+        /身份证 | 护照 | 驾照 | 证件/i,
+        /银行卡 | 账户 | 账号 | 流水/i,
+      ];
+      
+      const irrelevantPatterns = [
+        /快递 | 物流 | 运单 | 发货时间 | 发货主体/i,
+        /平台优惠 | 商家优惠 | 达人优惠 | 支付优惠 | 优惠明细/i,
+        /补贴明细 | 服务商 | 渠道分成 | 其他分成/i,
+        /货号 | 拼团 | 运费 | 售后编号 | 商品 ID| 达人 ID/i,
+      ];
+      
+      const coreFields = [
+        /订单编号 | 主订单/i,
+        /商品 | 商家编码 | 数量 | 金额 | 实付 | 应付/i,
+        /时间 | 提交 | 支付 | 完成 | 状态 | 取消 | 售后/i,
+        /省 | 市 | 达人 | 广告 | 渠道/i,
+        /动账 | 佣金 | 服务费 | 推广费 | 招商/i,
+      ];
+      
+      const allColumns = Object.keys(data[0]);
+      const removedFields: string[] = [];
+      const keptFields: string[] = [];
+      
+      for (const col of allColumns) {
+        const isSensitive = sensitivePatterns.some(p => p.test(col));
+        const isIrrelevant = irrelevantPatterns.some(p => p.test(col));
+        const isCore = coreFields.some(p => p.test(col));
+        
+        if (isSensitive || isIrrelevant) {
+          removedFields.push(col);
+        } else {
+          keptFields.push(col);
+        }
+      }
+      
+      // 构建精简数据
+      const sanitizedData = data.map(row => {
+        const newRow: Record<string, unknown> = {};
+        for (const col of keptFields) {
+          newRow[col] = row[col];
+        }
+        return newRow;
+      });
+      
+      // 生成 Excel
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(sanitizedData);
+      XLSX.utils.book_append_sheet(wb, ws, "精简数据");
+      
+      // 添加字段对照表
+      const mappingData = [
+        ["字段类型", "原字段数", "精简后", "删除数"],
+        ["总字段", allColumns.length.toString(), keptFields.length.toString(), removedFields.length.toString()],
+        ["", "", "", ""],
+        ["已删除的字段"],
+        ...removedFields.map(f => [f]),
+      ];
+      const wsMapping = XLSX.utils.aoa_to_sheet(mappingData);
+      XLSX.utils.book_append_sheet(wb, wsMapping, "字段对照");
+      
+      const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+      const reportId = nanoid();
+      const { url: reportUrl } = await storagePut(
+        `atlas-sanitized/${reportId}.xlsx`,
+        buffer,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      
+      res.json({
+        downloadUrl: reportUrl,
+        reportId,
+        originalColumns: allColumns.length,
+        sanitizedColumns: keptFields.length,
+        removedColumns: removedFields.length,
+        removedFields,
+        keptFields,
+        fileSizeKb: Math.ceil(buffer.length / 1024),
+      });
+    } catch (err: any) {
+      console.error("[Atlas] Sanitize export error:", err);
+      res.status(500).json({ error: err.message || "去敏导出失败" });
+    }
+  });
+

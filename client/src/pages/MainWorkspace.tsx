@@ -14,12 +14,12 @@ import {
   Upload, X, FileSpreadsheet, Sparkles, Send,
   Download, Loader2, Copy, Check, BarChart2, Paperclip,
   ChevronRight, Square, ChevronDown,
-} from "lucide-react";
+Shield, } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTableRenderer";
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, uploadParsed, smartUpload, exportFromSession, type SuggestedAction } from "@/lib/api";
+import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, uploadParsed, smartUpload, exportFromSession, type SuggestedAction } from "@/lib/api", { sanitizeExport, type SanitizeExportResponse };
 import { parseFile, mergeParsedFiles, type DataQuality } from "@/lib/parseFile"; // v14.2-groupby-fix
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -2342,6 +2342,53 @@ function MessageBubble({
               <Download size={14} />
               下载 {message.report_filename || "完整数据"}
             </button>
+            
+            {/* 去敏导出按钮 */}
+            {message.sessionId && (
+              <button
+                onClick={async () => {
+                  try {
+                    toast.info("正在精简数据...");
+                    const result = await sanitizeExport(message.sessionId!);
+                    toast.success(`已删除 ${result.removedColumns} 个字段，文件大小 ${result.fileSizeKb}KB`);
+                    
+                    // 显示精简结果
+                    const confirmMsg = `✅ 数据精简完成！
+
+**精简成果：**
+- 原字段数：${result.originalColumns} 个
+- 精简后：${result.sanitizedColumns} 个
+- 删除：${result.removedColumns} 个
+
+**已删除的字段类型：**
+${result.removedFields.slice(0, 10).map(f => `- ${f}`).join('\n')}
+${result.removedFields.length > 10 ? `\n... 等共 ${result.removedFields.length} 个字段` : ''}
+
+**保留的核心字段：**
+${result.keptFields.slice(0, 10).map(f => `- ${f}`).join('\n')}
+${result.keptFields.length > 10 ? `\n... 等共 ${result.keptFields.length} 个字段` : ''}`;
+
+                    updateLastMessage(confirmMsg, {
+                      download_url: result.downloadUrl,
+                      report_filename: `精简版_${new Date().toISOString().slice(0, 10)}.xlsx`,
+                    } as any);
+                  } catch (err: any) {
+                    toast.error(err.message || "去敏导出失败");
+                  }
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all text-sm"
+                style={{
+                  background: "rgba(79,110,247,0.1)",
+                  border: "1px solid rgba(79,110,247,0.25)",
+                  color: "var(--atlas-primary)",
+                }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(79,110,247,0.18)"}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "rgba(79,110,247,0.1)"}
+              >
+                <Shield size={14} />
+                去敏导出
+              </button>
+            )}
           </motion.div>
         )}
 

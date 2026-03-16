@@ -568,3 +568,33 @@ export async function savePersonalTemplate(tmpl: {
 export async function deletePersonalTemplate(id: string): Promise<void> {
   await fetch(`/api/atlas/templates/${id}`, { method: "DELETE", credentials: "include" });
 }
+
+// ── Sanitize Export (去敏导出) ──────────────────────────────────────────────
+
+export interface SanitizeExportResponse {
+  downloadUrl: string;
+  reportId: string;
+  originalColumns: number;
+  sanitizedColumns: number;
+  removedColumns: number;
+  removedFields: string[];
+  keptFields: string[];
+  fileSizeKb: number;
+}
+
+export async function sanitizeExport(sessionId: string): Promise<SanitizeExportResponse> {
+  const res = await fetch("/api/atlas/sanitize-export", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+  
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try { const err = await res.json(); msg = err.error || msg; } catch {}
+    throw new Error(msg);
+  }
+  
+  return await res.json();
+}
