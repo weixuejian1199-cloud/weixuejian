@@ -9,38 +9,6 @@
 
 import * as XLSX from "xlsx";
 
-// ── SPU 标准化映射表 ──────────────────────────────────────────────────────────
-// 格式：{ 原始商品名: 标准 SPU 名称 }
-// 规则：
-//   - 命中映射表 → 合并到标准名称
-//   - 未命中 → 保持原名，不自动猜测合并
-//   - 后续由业务方持续补充，不在运行时做模糊推断
-export const SPU_MAPPING: Record<string, string> = {
-  // 一条根 2包 系列（去渠道前缀/仓库前缀，保留核心名称+规格）
-  "【胡说老王专属】中国台湾金门一条根-3片/包*2包-(（抖店nj）一条根2包)": "一条根2包",
-  "【胡说老王专属】中国台湾金门一条根-3片/包*2包-((抖店nj）一条根2包)": "一条根2包",
-  "（抖店nj）一条根2包": "一条根2包",
-  "【抖店】新一条根2包": "一条根2包",
-  // 一条根 8包 系列
-  "【胡说老王专属】中国台湾金门一条根-3片/包*8包-(（抖店nj）一条根8包)": "一条根8包",
-  "【胡说老王专属】中国台湾金门一条根-3片/包*8包-((抖店nj）一条根8包)": "一条根8包",
-  "（抖店nj）一条根8包": "一条根8包",
-  "【抖店】新一条根8包": "一条根8包",
-  // TODO: 后续由业务方补充更多映射
-};
-
-/**
- * 将商品名标准化：命中 SPU_MAPPING 则返回标准名称，否则返回原名。
- * 不做模糊匹配，不做 AI 猜测，严格精确匹配。
- */
-export function normalizeSPU(productName: string): string {
-  return SPU_MAPPING[productName.trim()] ?? productName.trim();
-}
-
-// 组合装统计入口的稳定 key
-export const COMBO_ORDERS_KEY = "combo_orders";
-export const COMBO_ORDERS_DISPLAY = "组合装订单";
-
 export interface ColumnStat {
   sum: number;
   min: number;
@@ -68,6 +36,9 @@ export interface CategoryGroupedEntry {
   count: number;   // row count in this category
   sum?: number;    // sum of primary numeric field (optional)
   avg?: number;    // avg of primary numeric field (optional)
+  // 修复项 C：结构化字段元数据（仅在数组第一个元素中存在，用于导出匹配）
+  fieldName?: string;    // 原始字段名（如「收货省份」），辅助信息
+  categoryKey?: string;  // 标准化 key（如 "province"），用于导出强绑定
 }
 
 export interface ParsedField {
@@ -167,13 +138,17 @@ export interface ParsedFileData {
   // Category stats: full-dataset GROUP BY stats for ALL categorical fields
   // Key = field name (e.g. "省份", "支付方式"), Value = top20 entries
   categoryGroupedTop20?: Record<string, CategoryGroupedEntry[]>;
+  // 修复项 B：全量数据行，用于 upload-parsed 存储到 S3（替代 preview 作为业务真源）
+  // 仅当 totalRowCount ≤ MAX_FULL_ROWS_INLINE (3000) 时填充，超出时不内联（避免 HTTP 413）
+  allRows?: Record<string, unknown>[];
 }
 
 const PREVIEW_ROWS = 500;
 const SAMPLE_ROWS = 20;
-// Store top 50 for grouping so AI can return Top10/Top20/Top50 accurately
-// Increased from 20 to fix city/product dimension truncation (e.g. 22 cities only showing 20)
-const GROUPED_TOP_N = 50;
+// 修复 #1: 提高阈值，让绝大多数文件走内联路径
+const MAX_FULL_ROWS_INLINE = 50_000; // 5 万行以内约 5-10MB JSON
+// Store top 20 for grouping so AI can return Top10/Top20 accurately
+const GROUPED_TOP_N = 20;
 
 /**
  * Priority-tiered dimension field detection.
@@ -333,6 +308,46 @@ const FREE_TEXT_FIELD_KEYWORDS = [
   "remark", "address", "description", "comment", "note",
 ];
 
+/**
+ * 修复项 C：字段名关键词 → 标准 category_key 映射表
+ * 用于为分类字段分配结构化 key，让前端导出能精确匹配，不依赖 AI 文案命名
+ * 匹配顺序：按数组顺序逐个检查，第一个命中的关键词决定 key
+ */
+const CATEGORY_KEY_MAP: Array<{ keywords: string[]; key: string }> = [
+  { keywords: ["省", "省份"], key: "province" },
+  { keywords: ["城市", "市"], key: "city" },
+  { keywords: ["地区", "区域", "地域"], key: "region" },
+  { keywords: ["国家"], key: "country" },
+  { keywords: ["支付", "付款", "结算"], key: "payment_method" },
+  { keywords: ["订单状态", "订单类型"], key: "order_status" },
+  { keywords: ["状态"], key: "status" },
+  { keywords: ["类型"], key: "type" },
+  { keywords: ["类别", "品类", "分类"], key: "category" },
+  { keywords: ["渠道"], key: "channel" },
+  { keywords: ["来源"], key: "source" },
+  { keywords: ["平台"], key: "platform" },
+  { keywords: ["门店"], key: "store" },
+  { keywords: ["仓库", "仓"], key: "warehouse" },
+  { keywords: ["等级", "级别"], key: "level" },
+  { keywords: ["性别"], key: "gender" },
+  { keywords: ["标签"], key: "tag" },
+  { keywords: ["行业"], key: "industry" },
+  { keywords: ["部门"], key: "department" },
+  { keywords: ["岗位", "职位"], key: "position" },
+];
+
+/**
+ * 修复项 C：根据字段名分配标准 category_key
+ * 匹配失败时返回 "field__{fieldName}"（确保唯一性）
+ */
+function getCategoryKey(fieldName: string): string {
+  for (const { keywords, key } of CATEGORY_KEY_MAP) {
+    if (keywords.some(kw => fieldName.includes(kw))) return key;
+  }
+  // 匹配失败：使用字段名本身作为 key（加前缀避免与标准 key 冲突）
+  return `field__${fieldName}`;
+}
+
 const MAX_CATEGORY_FIELDS = 20;
 
 /**
@@ -409,11 +424,22 @@ function computeCategoryStats(
       .sort((a, b) => b[1] - a[1])
       .slice(0, GROUPED_TOP_N);
 
-    result[h] = sorted.map(([label, count]) => {
+    // 修复项 C：分配标准 category_key，用于前端导出强绑定
+    const categoryKey = getCategoryKey(h);
+    // 使用 category_key 作为 result 的 key，同一 key 可能对应多个字段（如多个包含「省」的字段）
+    // 如果已存在相同 key，附加字段名区分
+    const resultKey = result[categoryKey] ? `${categoryKey}__${h}` : categoryKey;
+
+    result[resultKey] = sorted.map(([label, count], idx) => {
       const entry: CategoryGroupedEntry = { label, count };
       if (primaryNumericField && sumMap.has(label)) {
         entry.sum = sumMap.get(label)!;
         entry.avg = entry.sum / count;
+      }
+      // 修复项 C：在第一个 entry 中注入字段元数据（前端导出匹配用）
+      if (idx === 0) {
+        entry.fieldName = h;         // 原始字段名（如「收货省份」）
+        entry.categoryKey = resultKey; // 实际使用的 key
       }
       return entry;
     });
@@ -591,10 +617,19 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     rows = XLSX.utils.sheet_to_json(ws, { defval: null });
   }
 
-  // P3：过滤全空行（文件末尾空白行、中间分隔行），使 totalRowCount 与服务端口径对齐
+  // ── 修复项 A：过滤全空行，与服务端 atlas.ts 第248行逻辑对齐 ──
+  // 全空行（如文件末尾空白行、中间分隔行）会导致 totalRowCount 虚高，
+  // 使 categoryGroupedTop20 的 count 校验失效。
+  const rawRowCount = rows.length; // 过滤前原始行数，用于行数差异日志
   rows = rows.filter(row =>
     Object.values(row).some(v => v !== null && v !== undefined && v !== "")
   );
+  const filteredCount = rawRowCount - rows.length;
+  if (filteredCount > 0) {
+    console.info(
+      `[ATLAS 空行过滤] ${file.name}: 原始 ${rawRowCount} 行，过滤 ${filteredCount} 个全空行，有效行数 ${rows.length}`
+    );
+  }
 
   const totalRowCount = rows.length;
   if (totalRowCount === 0) {
@@ -707,39 +742,12 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
           representativeGroupedTopN = field.groupedTop5;
         }
       }
-      // Product-dimension groupedTop5: GROUP BY 选购商品, SUM numeric field, TOP50
-      // P2: 商品口径分离：含分号的行进入组合装池，不含分号的行进入单品池
-      // 单品池经 SPU_MAPPING 标准化后再做 GROUP BY
+      // Product-dimension groupedTop5: GROUP BY 选购商品, SUM numeric field, TOP20
+      // Only compute if productGroupByField is different from the primary groupByField
       if (productGroupByField && productGroupByField !== groupByField) {
-        // 分离单品和组合装
-        const singleRows: Record<string, unknown>[] = [];
-        const comboRows: Record<string, unknown>[] = [];
-        for (const row of rows) {
-          const productVal = row[productGroupByField];
-          if (productVal === null || productVal === undefined || productVal === "") continue;
-          const productStr = String(productVal);
-          if (productStr.includes(";") || productStr.includes("；")) {
-            comboRows.push(row);
-          } else {
-            singleRows.push(row);
-          }
-        }
-        // 单品池：先用 SPU_MAPPING 标准化商品名，再做 GROUP BY
-        const normalizedSingleRows = singleRows.map(row => ({
-          ...row,
-          [productGroupByField]: normalizeSPU(String(row[productGroupByField] ?? "")),
-        }));
-        const productGroupedResult = computeGroupedTopN(normalizedSingleRows, h, productGroupByField, file.name);
+        const productGroupedResult = computeGroupedTopN(rows, h, productGroupByField, file.name);
         field.productGroupedTop5 = productGroupedResult.entries;
         field.productGroupByField = productGroupByField;
-        // 组合装池：单独统计订单数和金额（不拆分到任何主品）
-        // 存入 field 上的临时属性，后面在 mergedCategoryGroupedTop20 里统一写入
-        const comboSum = comboRows.reduce((s, row) => {
-          const v = Number(row[h]);
-          return isNaN(v) ? s : s + v;
-        }, 0);
-        (field as unknown as Record<string, unknown>)._comboOrderCount = comboRows.length;
-        (field as unknown as Record<string, unknown>)._comboOrderSum = comboSum;
       } else if (productGroupByField && productGroupByField === groupByField) {
         // If product field IS the primary groupBy field, reuse groupedTop5 as productGroupedTop5
         field.productGroupedTop5 = field.groupedTop5;
@@ -787,56 +795,22 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
   const preview = rows.slice(0, PREVIEW_ROWS);
   const sampleRows = rows.slice(0, SAMPLE_ROWS);
 
-  // P4a：将达人/商品 Top20 合并进 categoryGroupedTop20，让三级匹配逻辑能命中这两个维度
-  // groupedTop5 实际存的是 Top20（GROUPED_TOP_N=20），字段名是历史命名残留
-  const mergedCategoryGroupedTop20: Record<string, CategoryGroupedEntry[]> = { ...categoryGroupedTop20 };
+  // 修复项 B：分流规则
+  // ≤ 50000 行：内联传输全量数据，服务端直接存 S3（替代 preview 作为业务真源）
+  // > 50000 行：不内联，避免 JSON body 超出部署层反向代理限制（HTTP 413）
+  //   全量 rows 存入 _allRowsRef，前端通过 upload-rows 分批上传到服务端
+  //   全量统计（sum/avg/max/min/groupedTop5/categoryGroupedTop20）仍来自前端预计算，准确性不受影响
+  const MAX_FULL_ROWS_INLINE = MAX_FULL_ROWS_INLINE;
+  const allRows: Record<string, unknown>[] | undefined =
+    totalRowCount <= MAX_FULL_ROWS_INLINE ? rows : undefined;
 
-  // 将达人维度 groupedTop5 合并进去（以 groupByField 为 key）
-  if (groupByField) {
-    // 取所有数値字段中最主要的那个的 groupedTop5
-    const talentField = fields.find(f => f.groupByField === groupByField && f.groupedTop5 && f.groupedTop5.length > 0);
-    if (talentField?.groupedTop5 && !mergedCategoryGroupedTop20[groupByField]) {
-      mergedCategoryGroupedTop20[groupByField] = talentField.groupedTop5.map(e => ({
-        label: e.label,
-        count: 0, // groupedTop5 没有行数统计，用 0 占位
-        sum: e.sum,
-        avg: undefined,
-      }));
-    }
-  }
-
-  // 将商品维度 productGroupedTop5 合并进去（以 productGroupByField 为 key）
-  if (productGroupByField) {
-    const productField = fields.find(f => f.productGroupByField === productGroupByField && f.productGroupedTop5 && f.productGroupedTop5.length > 0);
-    if (productField?.productGroupedTop5 && !mergedCategoryGroupedTop20[productGroupByField]) {
-      mergedCategoryGroupedTop20[productGroupByField] = productField.productGroupedTop5.map(e => ({
-        label: e.label,
-        count: 0,
-        sum: e.sum,
-        avg: undefined,
-      }));
-    }
-    // P2：组合装订单单独写入，使用稳定 key COMBO_ORDERS_KEY
-    // 取主要数値字段中统计到的组合装订单数和金额
-    const primaryProductField = fields.find(f =>
-      f.productGroupByField === productGroupByField &&
-      (f as unknown as Record<string, unknown>)._comboOrderCount !== undefined
+  if (totalRowCount > MAX_FULL_ROWS_INLINE) {
+    console.info(
+      `[ATLAS 分流] ${file.name}: 行数 ${totalRowCount} > ${MAX_FULL_ROWS_INLINE}，内联跳过，将通过 upload-rows 分批上传全量数据`
     );
-    if (primaryProductField) {
-      const comboCount = (primaryProductField as unknown as Record<string, unknown>)._comboOrderCount as number;
-      const comboSum = (primaryProductField as unknown as Record<string, unknown>)._comboOrderSum as number;
-      if (comboCount > 0) {
-        mergedCategoryGroupedTop20[COMBO_ORDERS_KEY] = [{
-          label: COMBO_ORDERS_DISPLAY,
-          count: comboCount,
-          sum: comboSum,
-          avg: comboCount > 0 ? comboSum / comboCount : 0,
-        }];
-      }
-    }
   }
 
-  return {
+  const result: ParsedFileData = {
     filename: file.name,
     totalRowCount,
     colCount,
@@ -846,6 +820,15 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     groupByField: groupByField ?? undefined,
     allGroupByFields: allGroupByFields.length > 0 ? allGroupByFields : undefined,
     dataQuality,
-    categoryGroupedTop20: Object.keys(mergedCategoryGroupedTop20).length > 0 ? mergedCategoryGroupedTop20 : undefined,
+    categoryGroupedTop20: Object.keys(categoryGroupedTop20).length > 0 ? categoryGroupedTop20 : undefined,
+    allRows,
   };
+
+  // 大文件：将全量 rows 存入 _allRowsRef，供前端分批上传使用
+  // （不内联到 upload-parsed，避免 HTTP 413）
+  if (totalRowCount > MAX_FULL_ROWS_INLINE) {
+    (result as any)._allRowsRef = rows;
+  }
+
+  return result;
 }

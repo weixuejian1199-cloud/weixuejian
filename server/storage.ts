@@ -76,10 +76,12 @@ export async function storagePut(
   const key = normalizeKey(relKey);
   const uploadUrl = buildUploadUrl(baseUrl, key);
   const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
+  // 修复 #1: 添加 60 秒超时，避免网络不佳时永久挂起
   const response = await fetch(uploadUrl, {
     method: "POST",
     headers: buildAuthHeaders(apiKey),
     body: formData,
+    signal: AbortSignal.timeout(60_000),
   });
 
   if (!response.ok) {

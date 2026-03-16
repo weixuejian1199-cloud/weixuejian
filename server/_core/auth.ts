@@ -26,7 +26,11 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 // ── JWT Session ───────────────────────────────────────────────────────────────
 
 function getSecretKey() {
-  return new TextEncoder().encode(ENV.cookieSecret || "atlas-fallback-secret-change-in-prod");
+  // 修复：移除 fallback secret，强制要求配置 JWT_SECRET
+  if (!ENV.cookieSecret) {
+    throw new Error("JWT_SECRET environment variable is required in production");
+  }
+  return new TextEncoder().encode(ENV.cookieSecret);
 }
 
 export interface SessionPayload {
