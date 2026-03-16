@@ -159,10 +159,11 @@ export default function MainWorkspace() {
       updateMyMsg("", { isAnalyzing: true, analyzeProgress: 8 });
       updateUploadedFile(tempId, { uploadProgress: 5 });
 
-      // 并行启动：前端解析 + 后端上传同时进行
+      // 并行启动：前端解析（本地统计）+ 后端上传同时进行
+      // parseFile 做本地统计（allRows/categoryGroupedTop20），不阻塞主流程
       const parsePromise = parseFile(file);
-      const uploadPromise = smartUpload(file, (percent) => {
-        // 上传进度映射到 5%➒20%（与解析并行，不互相阻塞）
+      const uploadResult = await smartUpload(file, (percent) => {
+        // 上传进度映射到 5%→20%
         const mappedProgress = Math.round(5 + (percent / 100) * 15);
         if (mappedProgress > currentProgress) {
           currentProgress = mappedProgress;
@@ -170,9 +171,7 @@ export default function MainWorkspace() {
           updateUploadedFile(tempId, { uploadProgress: mappedProgress });
         }
       });
-
-       // 等待两者并行完成
-      const [parsed, uploadResult] = await Promise.all([parsePromise, uploadPromise]);
+      // 上传完成后立即进入轮询，不等 parseFile（parseFile 在后台继续跑）
       currentProgress = 30;
       updateMyMsg("", { isAnalyzing: true, analyzeProgress: 30 });
       updateUploadedFile(tempId, { uploadProgress: 30 });
@@ -197,6 +196,9 @@ export default function MainWorkspace() {
           }
         );
       }
+
+      // 等待 parseFile 完成（此时轮询已结束，大概率 parseFile 也跑完了）
+      const parsed = await parsePromise;
 
       updateUploadedFile(tempId, {
         status: "ready",

@@ -74,9 +74,8 @@ function parseExcel(buffer: Buffer, filename: string): WorkerOutput {
     const sheetNames = workbook.SheetNames;
     const sheets: SheetInfo[] = [];
     
-    // 处理所有 sheet
-    for (const sheetName of sheetNames) {
-      const sheet = workbook.Sheets[sheetName];
+    // 只处理第一个 sheet
+    const sheet = workbook.Sheets[sheetNames[0]];
 
     // ── Step 1: Determine header row ──────────────────────────────────────
     // Try row 1 first; if it has __EMPTY columns, scan rows 2-6
