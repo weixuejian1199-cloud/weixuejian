@@ -4059,7 +4059,8 @@ ${dataTable}`}
 }
 
   // ── POST /api/atlas/sanitize-export ──────────────────────────────────────
-  // 去敏导出：删除敏感字段和无关字段，保留核心运营字段
+  // 去敏导出：参考 Kimi 工作路径，删除敏感字段和无关字段，保留核心运营字段
+  // 生成两个版本：精简版（仅数据）+ 完整版（含字段对照表）
   
   app.post("/api/atlas/sanitize-export", optionalAuth, async (req: Request, res: Response) => {
     try {
@@ -4082,20 +4083,15 @@ ${dataTable}`}
         return;
       }
       
-      // 字段分类规则
-      const sensitivePatterns = [
-        /手机 | 电话 | 联系 | 收件 | 发货 | 地址 | 街道 | 区 | 县 | 门牌/i,
-        /收件人 | 发货人 | 昵称 | 姓名 | 实名/i,
-        /身份证 | 护照 | 驾照 | 证件/i,
-        /银行卡 | 账户 | 账号 | 流水/i,
-      ];
-      
-      const irrelevantPatterns = [
-        /快递 | 物流 | 运单 | 发货时间 | 发货主体/i,
-        /平台优惠 | 商家优惠 | 达人优惠 | 支付优惠 | 优惠明细/i,
-        /补贴明细 | 服务商 | 渠道分成 | 其他分成/i,
-        /货号 | 拼团 | 运费 | 售后编号 | 商品 ID| 达人 ID/i,
-      ];
+      // 字段分类规则（参考 Kimi 工作路径）
+      const removeReasons: Record<string, RegExp[]> = {
+        "敏感信息": [/手机 | 电话 | 联系 | 收件 | 发货 | 地址 | 街道 | 区 | 县 | 门牌/i, /收件人 | 发货人 | 昵称 | 姓名 | 实名/i, /身份证 | 护照 | 驾照 | 证件/i, /银行卡 | 账户 | 账号 | 流水/i],
+        "物流信息": [/快递 | 物流 | 运单 | 发货时间 | 发货主体 | 是否修改过地址/i],
+        "地址冗余": [/^[区 ] 县 | 街道 | 乡镇/i],
+        "优惠明细": [/平台优惠 | 商家优惠 | 达人优惠 | 支付优惠 | 优惠明细/i],
+        "补贴明细": [/补贴 | 服务商佣金 | 渠道分成 | 其他分成/i],
+        "运营无关": [/货号 | 拼团 | 运费 | 售后编号 | 商品 ID| 达人 ID| 动账流水号 | 渠道分成/i],
+      };
       
       const coreFields = [
         /订单编号 | 主订单/i,
@@ -4135,16 +4131,16 @@ ${dataTable}`}
       const ws = XLSX.utils.json_to_sheet(sanitizedData);
       XLSX.utils.book_append_sheet(wb, ws, "精简数据");
       
-      // 添加字段对照表
-      const mappingData = [
-        ["字段类型", "原字段数", "精简后", "删除数"],
-        ["总字段", allColumns.length.toString(), keptFields.length.toString(), removedFields.length.toString()],
-        ["", "", "", ""],
-        ["已删除的字段"],
-        ...removedFields.map(f => [f]),
+      // 添加字段对照表（参考 Kimi 工作路径）
+      const comparisonData = [
+        ["原始字段名", "是否保留", "删除原因"],
+        ...allColumns.map(col => {
+          const removed = removedFields.find(r => r === col);
+          return [col, removed ? "✗" : "✓", removed ? "敏感/无关字段" : ""];
+        }),
       ];
-      const wsMapping = XLSX.utils.aoa_to_sheet(mappingData);
-      XLSX.utils.book_append_sheet(wb, wsMapping, "字段对照");
+      const wsMapping = XLSX.utils.aoa_to_sheet(comparisonData);
+      XLSX.utils.book_append_sheet(wb, wsMapping, "字段对照表");
       
       const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
       const reportId = nanoid();
