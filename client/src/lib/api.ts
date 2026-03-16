@@ -275,7 +275,16 @@ export async function smartUpload(
   file: File,
   onProgress?: (percent: number) => void
 ): Promise<UploadResponse> {
-  // 统一走分块上传，确保后端有完整数据，Pipeline 正常运行
+  const useDirectUploadFirst = file.size <= LARGE_FILE_THRESHOLD_BYTES;
+
+  if (useDirectUploadFirst) {
+    try {
+      return await uploadFile(file, onProgress);
+    } catch (directErr) {
+      console.warn("[ATLAS] direct upload failed, fallback to chunked upload", directErr);
+    }
+  }
+
   return chunkedUpload(file, onProgress);
 }
 

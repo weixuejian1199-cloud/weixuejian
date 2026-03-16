@@ -89,7 +89,7 @@ async function optionalAuth(req: Request, _res: Response, next: NextFunction) {
 //   - kimi-k2.5            ：大文件模型，超长上下文，适合万行以上大表格
 // 阈值：数据超过 10000 行自动切换到 kimi-k2.5，10000 行以下统一用 qwen3-max
 
-const DASHSCOPE_API_KEY = process.env.DASHSCOPE_API_KEY || "sk-sp-de13f1c47cec44c48c42a4ed182c7a01";
+const DASHSCOPE_API_KEY = process.env.DASHSCOPE_API_KEY || "";
 const DASHSCOPE_BASE_URL = process.env.DASHSCOPE_BASE_URL || "https://coding.dashscope.aliyuncs.com/v1";
 const LARGE_FILE_THRESHOLD = 10000; // rows — auto-switch to kimi-k2.5 above this threshold
 
@@ -682,6 +682,7 @@ interface KeyMetric {
   value: string | number;
   field: string;
   type: "sum" | "avg" | "max" | "min" | "count" | "top" | "pct";
+  unit?: string;
 }
 
 interface PrecomputedFieldStat {
@@ -3695,7 +3696,7 @@ ${dataTable}`}
       }).catch(err => console.warn(`[Pipeline] Failed to write running status for ${sessionId}:`, err?.message));
       console.log(`[Pipeline] upload-parsed: pipelineStatus=running for session ${sessionId}`);
       // 生成快速报告
-      const quickReport = generateQuickReport(sourceData, dfInfo, originalname);
+      const quickReport = generateQuickReport(parsed.preview || [], dfInfo, originalname);
       
       res.json({
         session_id: sessionId,
@@ -4178,25 +4179,32 @@ ${dataTable}`}
         return;
       }
       
-      // 字段分类规则（参考 Kimi 工作路径）
+      const resultSet = await getResultSetForSession(session_id);
+      const sourceRows = resultSet?.standardizedRows?.length ? resultSet.standardizedRows : data;
+
+      // 字段分类规则（参考 Kimi / 扣子 的“先结构化、再裁剪”路径）
       const removeReasons: Record<string, RegExp[]> = {
-        "敏感信息": [/手机 | 电话 | 联系 | 收件 | 发货 | 地址 | 街道 | 区 | 县 | 门牌/i, /收件人 | 发货人 | 昵称 | 姓名 | 实名/i, /身份证 | 护照 | 驾照 | 证件/i, /银行卡 | 账户 | 账号 | 流水/i],
-        "物流信息": [/快递 | 物流 | 运单 | 发货时间 | 发货主体 | 是否修改过地址/i],
-        "地址冗余": [/^[区 ] 县 | 街道 | 乡镇/i],
-        "优惠明细": [/平台优惠 | 商家优惠 | 达人优惠 | 支付优惠 | 优惠明细/i],
-        "补贴明细": [/补贴 | 服务商佣金 | 渠道分成 | 其他分成/i],
-        "运营无关": [/货号 | 拼团 | 运费 | 售后编号 | 商品 ID| 达人 ID| 动账流水号 | 渠道分成/i],
+        "敏感信息": [
+          /(手机|手机号|电话|联系电话|联系方式|收件人|发货人|姓名|昵称|实名)/i,
+          /(地址|收货地址|详细地址|街道|门牌|身份证|护照|驾照|证件)/i,
+          /(银行卡|银行账户|账号|账户|流水)/i,
+        ],
+        "物流信息": [/(快递|物流|运单|发货时间|发货主体|是否修改过地址)/i],
+        "地址冗余": [/^(区|县|街道|乡镇)$/i],
+        "优惠明细": [/(平台优惠|商家优惠|达人优惠|支付优惠|优惠明细)/i],
+        "补贴明细": [/(补贴|服务商佣金|渠道分成|其他分成)/i],
+        "运营无关": [/(货号|拼团|运费|售后编号|商品ID|达人ID|动账流水号|渠道分成)/i],
       };
-      
+
       const coreFields = [
-        /订单编号 | 主订单/i,
-        /商品 | 商家编码 | 数量 | 金额 | 实付 | 应付/i,
-        /时间 | 提交 | 支付 | 完成 | 状态 | 取消 | 售后/i,
-        /省 | 市 | 达人 | 广告 | 渠道/i,
-        /动账 | 佣金 | 服务费 | 推广费 | 招商/i,
+        /(订单编号|主订单)/i,
+        /(商品|商家编码|数量|金额|实付|应付)/i,
+        /(时间|提交|支付|完成|状态|取消|售后)/i,
+        /(省|市|达人|广告|渠道)/i,
+        /(动账|佣金|服务费|推广费|招商)/i,
       ];
-      
-      const allColumns = Object.keys(data[0]);
+
+      const allColumns = Object.keys(sourceRows[0] || data[0] || {});
       const removedFields: string[] = [];
       const keptFields: string[] = [];
       
@@ -4221,7 +4229,7 @@ ${dataTable}`}
       }
       
       // 构建精简数据
-      const sanitizedData = data.map(row => {
+      const sanitizedData = sourceRows.map(row => {
         const newRow: Record<string, unknown> = {};
         for (const col of keptFields) {
           newRow[col] = row[col];
@@ -4261,6 +4269,8 @@ ${dataTable}`}
         removedColumns: removedFields.length,
         removedFields,
         keptFields,
+        sourceRowCount: sourceRows.length,
+        usedResultSet: !!resultSet?.standardizedRows?.length,
         fileSizeKb: Math.ceil(buffer.length / 1024),
       });
     } catch (err: any) {

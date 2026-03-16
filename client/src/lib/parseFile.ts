@@ -139,9 +139,6 @@ export interface ParsedFileData {
   // Category stats: full-dataset GROUP BY stats for ALL categorical fields
   // Key = field name (e.g. "省份", "支付方式"), Value = top20 entries
   categoryGroupedTop20?: Record<string, CategoryGroupedEntry[]>;
-  // 修复项 B：全量数据行，用于 upload-parsed 存储到 S3（替代 preview 作为业务真源）
-  // 仅当 totalRowCount ≤ MAX_FULL_ROWS_INLINE (3000) 时填充，超出时不内联（避免 HTTP 413）
-  allRows?: Record<string, unknown>[];
 }
 
 const PREVIEW_ROWS = 500;
@@ -897,13 +894,13 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
   // > 50000 行：不内联，避免 JSON body 超出部署层反向代理限制（HTTP 413）
   //   全量 rows 存入 _allRowsRef，前端通过 upload-rows 分批上传到服务端
   //   全量统计（sum/avg/max/min/groupedTop5/categoryGroupedTop20）仍来自前端预计算，准确性不受影响
-  const MAX_FULL_ROWS_INLINE = MAX_FULL_ROWS_INLINE;
+  const inlineRowLimit = MAX_FULL_ROWS_INLINE;
   const allRows: Record<string, unknown>[] | undefined =
-    totalRowCount <= MAX_FULL_ROWS_INLINE ? rows : undefined;
+    totalRowCount <= inlineRowLimit ? rows : undefined;
 
-  if (totalRowCount > MAX_FULL_ROWS_INLINE) {
+  if (totalRowCount > inlineRowLimit) {
     console.info(
-      `[ATLAS 分流] ${file.name}: 行数 ${totalRowCount} > ${MAX_FULL_ROWS_INLINE}，内联跳过，将通过 upload-rows 分批上传全量数据`
+      `[ATLAS 分流] ${file.name}: 行数 ${totalRowCount} > ${inlineRowLimit}，内联跳过，将通过 upload-rows 分批上传全量数据`
     );
   }
 
@@ -919,12 +916,11 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     allGroupByFields: allGroupByFields.length > 0 ? allGroupByFields : undefined,
     dataQuality,
     categoryGroupedTop20: Object.keys(categoryGroupedTop20).length > 0 ? categoryGroupedTop20 : undefined,
-    allRows,
   };
 
   // 大文件：将全量 rows 存入 _allRowsRef，供前端分批上传使用
   // （不内联到 upload-parsed，避免 HTTP 413）
-  if (totalRowCount > MAX_FULL_ROWS_INLINE) {
+  if (totalRowCount > inlineRowLimit) {
     (result as any)._allRowsRef = rows;
   }
 

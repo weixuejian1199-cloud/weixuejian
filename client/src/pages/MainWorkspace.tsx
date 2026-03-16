@@ -162,15 +162,37 @@ export default function MainWorkspace() {
       // 并行启动：前端解析（本地统计）+ 后端上传同时进行
       // parseFile 做本地统计（allRows/categoryGroupedTop20），不阻塞主流程
       const parsePromise = parseFile(file);
-      const uploadResult = await smartUpload(file, (percent) => {
-        // 上传进度映射到 5%→20%
-        const mappedProgress = Math.round(5 + (percent / 100) * 15);
-        if (mappedProgress > currentProgress) {
-          currentProgress = mappedProgress;
-          updateMyMsg("", { isAnalyzing: true, analyzeProgress: currentProgress });
-          updateUploadedFile(tempId, { uploadProgress: mappedProgress });
-        }
-      });
+      let parsedCache: Awaited<ReturnType<typeof parseFile>> | null = null;
+      parsePromise.then((parsed) => {
+        parsedCache = parsed;
+      }).catch(() => {});
+
+      let uploadResult;
+      try {
+        uploadResult = await smartUpload(file, (percent) => {
+          // 上传进度映射到 5%→20%
+          const mappedProgress = Math.round(5 + (percent / 100) * 15);
+          if (mappedProgress > currentProgress) {
+            currentProgress = mappedProgress;
+            updateMyMsg("", { isAnalyzing: true, analyzeProgress: currentProgress });
+            updateUploadedFile(tempId, { uploadProgress: mappedProgress });
+          }
+        });
+      } catch (uploadErr: any) {
+        const parsedFallback = parsedCache ?? await parsePromise;
+        updateMyMsg("上传链路异常，正在切换本地解析直传模式...", {
+          isAnalyzing: true,
+          analyzeProgress: Math.max(currentProgress, 18),
+        });
+        uploadResult = await uploadParsed(parsedFallback, (percent) => {
+          const mappedProgress = Math.round(18 + (percent / 100) * 12);
+          if (mappedProgress > currentProgress) {
+            currentProgress = mappedProgress;
+            updateMyMsg("上传链路异常，正在切换本地解析直传模式...", { isAnalyzing: true, analyzeProgress: mappedProgress });
+            updateUploadedFile(tempId, { uploadProgress: mappedProgress });
+          }
+        });
+      }
       // 上传完成后立即进入轮询，不等 parseFile（parseFile 在后台继续跑）
       currentProgress = 30;
       updateMyMsg("", { isAnalyzing: true, analyzeProgress: 30 });
@@ -352,8 +374,14 @@ export default function MainWorkspace() {
           const uploadProgress = Math.round(10 + (i / fileArray.length) * 25);
           updateMyMsg("", { isAnalyzing: true, analyzeProgress: uploadProgress });
           
-          // 上传文件（分块或直接）
-          const uploadResult = await smartUpload(file);
+          // 上传文件（分块或直接），失败时回退到前端解析直传
+          let uploadResult;
+          try {
+            uploadResult = await smartUpload(file);
+          } catch {
+            const parsedFallback = await parseFile(file);
+            uploadResult = await uploadParsed(parsedFallback);
+          }
           sessionIds.push(uploadResult.session_id);
           
           // 等待该文件的 Pipeline 处理完成
@@ -1107,6 +1135,8 @@ export default function MainWorkspace() {
                        onQuickAction={isLastAssistant && !msg.isStreaming ? handleQuickAction : undefined}
                        isLastAssistant={isLastAssistant}
                        uploadedFiles={uploadedFiles}
+                       updateMessageById={updateMessageById}
+                       activeTaskId={activeTaskId ?? undefined}
                      />
                   );
                 })}
@@ -1586,12 +1616,16 @@ function MessageBubble({
   onQuickAction,
   isLastAssistant,
   uploadedFiles,
+  updateMessageById,
+  activeTaskId,
 }: {
   message: Message & { suggestedActions?: SuggestedAction[] };
   onDownload: (id: string, filename: string) => void;
   onQuickAction?: (prompt: string) => void;
   isLastAssistant?: boolean;
   uploadedFiles?: import("@/contexts/AtlasContext").UploadedFile[];
+  updateMessageById?: (id: string, content: string, extra: any, taskId?: string) => void;
+  activeTaskId?: string;
 }) {
   const [copied, setCopied] = useState(false);
   const [showTable, setShowTable] = useState(true);
@@ -2370,10 +2404,10 @@ ${result.removedFields.length > 10 ? `\n... 等共 ${result.removedFields.length
 ${result.keptFields.slice(0, 10).map(f => `- ${f}`).join('\n')}
 ${result.keptFields.length > 10 ? `\n... 等共 ${result.keptFields.length} 个字段` : ''}`;
 
-                    updateLastMessage(confirmMsg, {
+                    updateMessageById?.(message.id, confirmMsg, {
                       download_url: result.downloadUrl,
                       report_filename: `精简版_${new Date().toISOString().slice(0, 10)}.xlsx`,
-                    } as any);
+                    } as any, activeTaskId);
                   } catch (err: any) {
                     toast.error(err.message || "去敏导出失败");
                   }
