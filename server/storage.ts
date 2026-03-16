@@ -76,13 +76,20 @@ export async function storagePut(
   const key = normalizeKey(relKey);
   const uploadUrl = buildUploadUrl(baseUrl, key);
   const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
-  // 修复 #1: 添加 60 秒超时，避免网络不佳时永久挂起
-  const response = await fetch(uploadUrl, {
+
+  // ⭐ FIX: 大文件上传超时时间从 120s 增加到 600s（10 分钟）
+  const TIMEOUT_MS = 600 * 1000;
+  const uploadPromise = fetch(uploadUrl, {
     method: "POST",
     headers: buildAuthHeaders(apiKey),
     body: formData,
-    signal: AbortSignal.timeout(60_000),
   });
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`Storage upload timeout after ${TIMEOUT_MS}ms`)), TIMEOUT_MS);
+  });
+
+  const response = await Promise.race([uploadPromise, timeoutPromise]);
 
   if (!response.ok) {
     const message = await response.text().catch(() => response.statusText);

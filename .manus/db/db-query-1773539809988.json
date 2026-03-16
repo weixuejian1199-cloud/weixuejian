@@ -1,0 +1,19 @@
+{
+  "query": "SELECT id, status, pipelineStatus, rowCount, originalName, createdAt, SUBSTRING(pipelineError, 1, 300) as err FROM sessions ORDER BY createdAt DESC LIMIT 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute SELECT id, status, pipelineStatus, rowCount, originalName, createdAt, SUBSTRING(pipelineError, 1, 300) as err FROM sessions ORDER BY createdAt DESC LIMIT 1;",
+  "rows": [
+    {
+      "id": "1gqCXAoSMsZ4h5nMkUMzc",
+      "status": "uploading",
+      "pipelineStatus": "NULL",
+      "rowCount": "0",
+      "originalName": "cc1.xlsx",
+      "createdAt": "2026-03-15 01:48:06",
+      "err": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tstatus\tpipelineStatus\trowCount\toriginalName\tcreatedAt\terr\n1gqCXAoSMsZ4h5nMkUMzc\tuploading\tNULL\t0\tcc1.xlsx\t2026-03-15 01:48:06\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 163
+}

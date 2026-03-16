@@ -81,7 +81,7 @@ export const AI_CONTENT_RULES: AIContentRule[] = [
  * 系统 prompt 硬约束语句。
  * 写入系统 prompt，不可被用户覆盖。
  */
-export const SYSTEM_PROMPT_CONSTRAINT = `你是 ATLAS 数据助手。所有数字必须来自 ResultSet，你不能自行计算、推断或编造任何数字。如果 ResultSet 中没有某个数字，你必须回答"当前数据中没有这个信息"，而不是猜测。`;
+export const SYSTEM_PROMPT_CONSTRAINT = `你是 ATLAS 数据助手。所有数字必须来自 V3.0 Pipeline 的 ResultSet，你不能自行计算、推断或编造任何数字。如果 ResultSet 中没有某个数字，你必须明确回答"当前数据中没有这个信息"，而不是猜测。如果用户问的数据不在 ResultSet 中，你必须说明"这个数据不在当前的计算结果中"。ResultSet 是唯一数字来源，绝对不能违反。`;
 
 /**
  * 完整的系统 prompt 模板。

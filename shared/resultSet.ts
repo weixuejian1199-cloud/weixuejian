@@ -58,6 +58,8 @@ export interface SkippedRowSample {
 
 // ── ResultSet 主结构 ──────────────────────────────────────────────
 
+export type ResultSetType = "preview" | "aggregate" | "full_detail";
+
 export interface ResultSet {
   // ── 可审计字段（8 个，A 阶段必须落进 schema）──────────────────
 
@@ -84,6 +86,9 @@ export interface ResultSet {
 
   /** ResultSet 生成时间（UTC，Unix 毫秒时间戳） */
   createdAt: number;
+
+  /** ResultSet 类型：preview=仅展示，aggregate=汇总表，full_detail=完整明细 */
+  resultType: ResultSetType;
 
   // ── 计算结果数据 ──────────────────────────────────────────────
 
@@ -146,6 +151,7 @@ export function createEmptyResultSet(jobId: string): ResultSet {
     computationVersion: COMPUTATION_VERSION,
     templateId: null,
     createdAt: Date.now(),
+    resultType: "full_detail",  // 默认类型
 
     // 计算结果
     metrics: [],

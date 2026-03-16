@@ -19,11 +19,12 @@ import { Streamdown } from "streamdown";
 import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTableRenderer";
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, uploadParsed, type SuggestedAction } from "@/lib/api";
-import { parseFile, type DataQuality } from "@/lib/parseFile"; // v14.2-groupby-fix
+import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, uploadParsed, smartUpload, exportFromSession, type SuggestedAction } from "@/lib/api";
+import { parseFile, mergeParsedFiles, type DataQuality } from "@/lib/parseFile"; // v14.2-groupby-fix
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
+import * as XLSX from "xlsx";
 
 // Helper: strip <suggestions> block from text and parse into SuggestedAction[]
 function parseSuggestionsHelper(text: string): { cleanText: string; suggestions: SuggestedAction[] } {
@@ -153,21 +154,16 @@ export default function MainWorkspace() {
 
     // 进度定时器引用（用于清理）
     let currentProgress = 5;
-
     try {
-      // Phase 1: 前端本地解析 Excel/CSV（0% → 30%，利用用户本地 CPU）
+      // Phase 1 + 1b: parseFile 和 smartUpload 并行执行，节省等待时间
       updateMyMsg("", { isAnalyzing: true, analyzeProgress: 8 });
       updateUploadedFile(tempId, { uploadProgress: 5 });
 
-      const parsed = await parseFile(file);
-
-      currentProgress = 20;
-      updateMyMsg("", { isAnalyzing: true, analyzeProgress: 20 });
-      updateUploadedFile(tempId, { uploadProgress: 20 });
-
-      // Phase 1b: 将解析结果发给服务器（只传 JSON，不传原始文件）
-      const uploadResult = await uploadParsed(parsed, (percent) => {
-        const mappedProgress = Math.round(20 + (percent / 100) * 10);
+      // 并行启动：前端解析 + 后端上传同时进行
+      const parsePromise = parseFile(file);
+      const uploadPromise = smartUpload(file, (percent) => {
+        // 上传进度映射到 5%➒20%（与解析并行，不互相阻塞）
+        const mappedProgress = Math.round(5 + (percent / 100) * 15);
         if (mappedProgress > currentProgress) {
           currentProgress = mappedProgress;
           updateMyMsg("", { isAnalyzing: true, analyzeProgress: currentProgress });
@@ -175,9 +171,12 @@ export default function MainWorkspace() {
         }
       });
 
-      // Phase 2: poll for async processing result (30% → 100%)
+       // 等待两者并行完成
+      const [parsed, uploadResult] = await Promise.all([parsePromise, uploadPromise]);
       currentProgress = 30;
       updateMyMsg("", { isAnalyzing: true, analyzeProgress: 30 });
+      updateUploadedFile(tempId, { uploadProgress: 30 });
+      // Phase 2: poll for async processing result (30% → 100%)
       let resultShown = false;
 
       // If upload already returned full result (sync mode), use it directly
@@ -215,10 +214,15 @@ export default function MainWorkspace() {
           preview: result.df_info.preview || [],
           file_size_kb: Math.round(file.size / 1024),
         },
+        // 保存全量行（用于前端导出）
+        allRows: parsed.allRows || undefined,
         // D方案：将前端预计算的分类字段全量统计存入 UploadedFile
         // 用于 AtlasTableRenderer 导出时提供完整数据集，避免只导出 AI 展示层的前20行
         categoryGroupedTop20: parsed.categoryGroupedTop20 || undefined,
       });
+
+      // 更新消息的 sessionId，用于前端导出时查找对应文件
+      updateMessageById(assistantMsgId, "", { sessionId: result.session_id }, taskId);
 
       // Update current task title with filename (use first file's name)
       if (taskId) {
@@ -272,13 +276,188 @@ export default function MainWorkspace() {
     }
   }, [addUploadedFile, updateUploadedFile, addMessage, updateMessageById, setIsGenerating, activeTaskId, tasks, updateTask]);
 
-  const handleFiles = useCallback((files: FileList | File[]) => {
+  const handleFiles = useCallback(async (files: FileList | File[]) => {
     // Ensure we have an active task
     // Note: createNewTask() returns the new task ID synchronously (before React re-renders)
     // We pass it explicitly to processFile to avoid the stale activeTaskId closure issue
     const taskId = activeTaskId || createNewTask();
-    Array.from(files).forEach(file => processFile(file, taskId));
-  }, [processFile, activeTaskId, createNewTask]);
+    const fileArray = Array.from(files);
+
+    // 如果只有一个文件，直接处理
+    if (fileArray.length === 1) {
+      processFile(fileArray[0], taskId);
+      return;
+    }
+
+    // 多文件：先合并再上传
+    try {
+      toast.info(`正在合并 ${fileArray.length} 个文件...`);
+
+      // 解析所有文件
+      const parsedResults = await Promise.all(
+        fileArray.map(file => parseFile(file))
+      );
+
+      // 合并数据（基于"主订单编号"去重）
+      const merged = mergeParsedFiles(parsedResults, "主订单编号");
+
+      // 计算合并后的关键指标
+      const totalOrders = merged.totalRowCount;
+      const amountField = merged.fields.find(f => f.name.includes("商品金额") || f.name.includes("订单应付金额"));
+      const totalAmount = amountField?.sum ? `¥${Math.round(amountField.sum).toLocaleString()}` : "未知";
+      const avgOrderValue = amountField?.avg ? `¥${amountField.avg.toFixed(2)}` : "未知";
+
+      // 添加合并后的文件记录（虚拟文件，不创建真实文件）
+      const tempId = nanoid();
+      addUploadedFile({
+        id: tempId,
+        name: `合并数据（去重后 ${totalOrders.toLocaleString()} 行）`,
+        size: 0, // 虚拟文件，无实际大小
+        status: "uploading",
+        uploadedAt: new Date(),
+        uploadProgress: 0,
+      }, taskId);
+
+      // 添加用户消息
+      addMessage({ role: "user", content: `[合并文件] ${fileArray.map(f => f.name).join(" + ")} → 去重后 ${totalOrders.toLocaleString()} 行` } as any, taskId);
+
+      // 添加助手消息（展示合并结果）
+      const assistantMsgId = addMessage({
+        role: "assistant",
+        content: `✅ 已合并 ${fileArray.length} 个文件，基于"主订单编号"去重。
+
+**关键指标：**
+- 📊 订单数：${totalOrders.toLocaleString()} 单
+- 💰 总销售额：${totalAmount}
+- 🛒 平均客单价：${avgOrderValue}
+
+正在分析数据...`,
+        isAnalyzing: true,
+        analyzeProgress: 10,
+        isStreaming: false,
+      } as any, taskId);
+
+      // 每个文件分别 smartUpload + 轮询至 ready，然后调 /api/atlas/merge 合并 session
+      const updateMyMsg = (content: string, extra?: Partial<Message>) =>
+        updateMessageById(assistantMsgId, content, extra, taskId);
+
+      try {
+        // 分别上传每个原始文件，并等待 Pipeline 处理完成
+        const sessionIds: string[] = [];
+        const platform_names: Record<string, string> = {};
+        for (let i = 0; i < fileArray.length; i++) {
+          const file = fileArray[i];
+          const uploadProgress = Math.round(10 + (i / fileArray.length) * 25);
+          updateMyMsg("", { isAnalyzing: true, analyzeProgress: uploadProgress });
+          
+          // 上传文件（分块或直接）
+          const uploadResult = await smartUpload(file);
+          sessionIds.push(uploadResult.session_id);
+          
+          // 等待该文件的 Pipeline 处理完成
+          const pollProgress = Math.round(35 + (i / fileArray.length) * 30);
+          updateMyMsg("", { isAnalyzing: true, analyzeProgress: pollProgress });
+          await pollUploadStatus(
+            uploadResult.session_id,
+            (pct) => {
+              const mapped = Math.round(pollProgress + (pct / 100) * (30 / fileArray.length));
+              updateMyMsg("", { isAnalyzing: true, analyzeProgress: Math.min(mapped, 65) });
+            }
+          );
+          
+          // 添加到上传文件列表
+          addUploadedFile({
+            id: nanoid(),
+            name: file.name,
+            size: file.size,
+            status: "ready",
+            sessionId: uploadResult.session_id,
+            uploadedAt: new Date(),
+            uploadProgress: 100,
+          }, taskId);
+        }
+
+        // 所有文件 Pipeline 已完成，调用合并接口
+        updateMyMsg("", { isAnalyzing: true, analyzeProgress: 70 });
+        const mergeRes = await fetch("/api/atlas/merge", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ session_ids: sessionIds, platform_names }),
+        });
+        const mergeData = await mergeRes.json();
+        if (!mergeRes.ok) throw new Error(mergeData.error || "合并失败");
+
+        // 合并接口同步完成，直接使用结果（无需轮询）
+        const actualTotalRows = mergeData.totalRows || totalOrders;
+
+        // 更新文件状态
+        updateUploadedFile(tempId, {
+          status: "ready",
+          sessionId: sessionIds[0], // 使用第一个 session 作为代表
+          dfInfo: {
+            row_count: actualTotalRows,
+            col_count: merged.colCount,
+            columns: merged.fields.map(f => ({
+              name: f.name,
+              dtype: f.dtype,
+              non_null_count: f.unique_count - f.null_count,
+              sample_values: f.sample || [],
+              inferred_type: f.type || "text",
+            })),
+            preview: merged.preview || [],
+            file_size_kb: 0,
+          },
+        });
+
+        // 更新消息，附带下载链接
+        updateMessageById(assistantMsgId, "", {
+          download_url: mergeData.downloadUrl,
+          report_filename: `合并数据_${new Date().toISOString().slice(0, 10)}.xlsx`,
+        }, taskId);
+
+        // 更新任务标题
+        const currentTask = tasks.find(t => t.id === taskId);
+        if (currentTask && currentTask.title === "新建任务") {
+          updateTask(taskId, { title: `合并数据（${actualTotalRows.toLocaleString()} 行）` });
+        }
+
+        // 显示分析结果
+        const fileTableLines = [
+          `✅ 已合并 ${fileArray.length} 个文件，共 **${actualTotalRows.toLocaleString()}** 行数据`,
+          ``,
+          `| 文件 | 来源平台 | 行数 |`,
+          `|------|---------|------|`,
+          ...(mergeData.files || []).map((f: { name: string; platform: string; rowCount: number }) =>
+            `| ${f.name} | ${f.platform} | ${f.rowCount.toLocaleString()} |`
+          ),
+        ].join("\n");
+        updateMyMsg(fileTableLines, {
+          isAnalyzing: false,
+          analyzeProgress: 100,
+          isStreaming: false,
+          suggestedActions: [
+            { icon: "📊", label: "生成汇总报表", prompt: "帮我把合并后的数据生成汇总报表" },
+            { icon: "🔍", label: "各平台对比", prompt: "帮我对比各平台的销售数据" },
+            { icon: "✨", label: "自定义需求", prompt: "" },
+          ],
+        });
+
+        toast.success(`合并成功！共 ${actualTotalRows.toLocaleString()} 条订单`);
+
+      } catch (err: any) {
+        updateMyMsg(`上传失败：${(err as any).message || "请重试"}`, {
+          isAnalyzing: false,
+          analyzeProgress: 0,
+        });
+        updateUploadedFile(tempId, { status: "error" });
+        toast.error(`上传失败：${err.message}`);
+      }
+
+    } catch (err: any) {
+      toast.error(`文件解析失败：${err.message}`);
+    }
+  }, [processFile, activeTaskId, createNewTask, addUploadedFile, addMessage, updateMessageById, tasks, updateTask]);
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
   const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); };
@@ -2061,10 +2240,43 @@ function MessageBubble({
                   </table>
                   {message.tableData[0]?.rows?.length > 20 && (
                     <div
-                      className="px-3 py-2 text-xs text-center"
+                      className="px-3 py-2 text-xs text-center flex items-center justify-between"
                       style={{ color: "var(--atlas-text-3)", borderTop: "1px solid var(--atlas-border)" }}
                     >
-                      仅显示前 20 行，下载 Excel 查看完整数据
+                      <span>仅显示前 20 行</span>
+                      <button
+                        onClick={() => {
+                          // 前端导出完整数据
+                          const headers = message.tableData?.[0]?.headers || [];
+                          // 查找对应文件的全量行
+                          const file = (uploadedFiles ?? []).find((f: import("@/contexts/AtlasContext").UploadedFile) => f.sessionId === message.sessionId);
+                          const allRows = file?.allRows || message.tableData?.[0]?.rows || [];
+                          
+                          if (allRows.length === 0) {
+                            toast.error("没有可导出的数据");
+                            return;
+                          }
+
+                          // 转换为 Excel 格式
+                          const typedRows = allRows as Record<string, unknown>[];
+                          const rows = typedRows.map((row) =>
+                            headers.map(h => row[h] ?? "")
+                          );
+                          
+                          const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+                          const wb = XLSX.utils.book_new();
+                          XLSX.utils.book_append_sheet(wb, ws, message.tableData?.[0]?.name || "数据");
+                          XLSX.writeFile(wb, `${message.tableData?.[0]?.name || "数据"}.xlsx`);
+                          toast.success(`已导出 ${(allRows as unknown[]).length} 行（全量数据）`);
+                        }}
+                        className="text-xs transition-colors hover:text-green-600"
+                        style={{ color: "var(--atlas-text-3)" }}
+                      >
+                        导出 Excel（{(() => {
+                          const f = (uploadedFiles ?? []).find((f: import("@/contexts/AtlasContext").UploadedFile) => f.sessionId === message.sessionId);
+                          return (f?.allRows?.length ?? f?.dfInfo?.row_count ?? message.tableData?.[0]?.rows?.length ?? 0).toLocaleString();
+                        })()} 行）
+                      </button>
                     </div>
                   )}
                 </div>
@@ -2092,7 +2304,20 @@ function MessageBubble({
             )}
             {/* Download button */}
             <button
-              onClick={() => {
+              onClick={async () => {
+                // 优先：从 sessionId 导出完整数据（V3.0 ResultSet）
+                if (message.sessionId) {
+                  try {
+                    toast.info("正在导出完整数据...");
+                    const result = await exportFromSession(message.sessionId);
+                    window.open(result.downloadUrl);
+                    toast.success(`已导出 ${result.rowCount.toLocaleString()} 行数据`);
+                  } catch (err: any) {
+                    toast.error(err.message || "导出失败");
+                  }
+                  return;
+                }
+                // 原有逻辑
                 if (message.download_url) {
                   // Direct S3 URL download (merge/payslip/attendance)
                   const a = document.createElement("a");
@@ -2115,7 +2340,7 @@ function MessageBubble({
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "rgba(52,211,153,0.1)"}
             >
               <Download size={14} />
-              下载 {message.report_filename}
+              下载 {message.report_filename || "完整数据"}
             </button>
           </motion.div>
         )}

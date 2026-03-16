@@ -1,0 +1,37 @@
+{
+  "query": "SELECT id, status, pipelineStatus, SUBSTRING(pipelineError, 1, 300) as pipelineError, rowCount, originalName, createdAt FROM sessions ORDER BY createdAt DESC LIMIT 3;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute SELECT id, status, pipelineStatus, SUBSTRING(pipelineError, 1, 300) as pipelineError, rowCount, originalName, createdAt FROM sessions ORDER BY createdAt DESC LIMIT 3;",
+  "rows": [
+    {
+      "id": "1gqCXAoSMsZ4h5nMkUMzc",
+      "status": "uploading",
+      "pipelineStatus": "NULL",
+      "pipelineError": "NULL",
+      "rowCount": "0",
+      "originalName": "cc1.xlsx",
+      "createdAt": "2026-03-15 01:48:06"
+    },
+    {
+      "id": "LnmkYGLeLIttCuAtL8dXM",
+      "status": "uploading",
+      "pipelineStatus": "running",
+      "pipelineError": "NULL",
+      "rowCount": "0",
+      "originalName": "cc1.xlsx",
+      "createdAt": "2026-03-14 15:10:43"
+    },
+    {
+      "id": "ThnfI16NudErhnM2Cc3Ky",
+      "status": "error",
+      "pipelineStatus": "running",
+      "pipelineError": "NULL",
+      "rowCount": "0",
+      "originalName": "cc1.xlsx",
+      "createdAt": "2026-03-14 15:04:44"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tstatus\tpipelineStatus\tpipelineError\trowCount\toriginalName\tcreatedAt\n1gqCXAoSMsZ4h5nMkUMzc\tuploading\tNULL\tNULL\t0\tcc1.xlsx\t2026-03-15 01:48:06\nLnmkYGLeLIttCuAtL8dXM\tuploading\trunning\tNULL\t0\tcc1.xlsx\t2026-03-14 15:10:43\nThnfI16NudErhnM2Cc3Ky\terror\trunning\tNULL\t0\tcc1.xlsx\t2026-03-14 15:04:44\n",
+  "stderr": "",
+  "execution_time_ms": 712
+}

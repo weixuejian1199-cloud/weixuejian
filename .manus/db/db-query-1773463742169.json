@@ -1,0 +1,45 @@
+{
+  "query": "SELECT id, status, pipelineStatus, resultSetId, createdAt FROM sessions ORDER BY createdAt DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute SELECT id, status, pipelineStatus, resultSetId, createdAt FROM sessions ORDER BY createdAt DESC LIMIT 5;",
+  "rows": [
+    {
+      "id": "gY8LLGC92qSQVbmxw7eIQ",
+      "status": "ready",
+      "pipelineStatus": "NULL",
+      "resultSetId": "NULL",
+      "createdAt": "2026-03-14 04:47:47"
+    },
+    {
+      "id": "_6AMP2ilROR_ZGacppsKi",
+      "status": "ready",
+      "pipelineStatus": "NULL",
+      "resultSetId": "NULL",
+      "createdAt": "2026-03-14 04:35:23"
+    },
+    {
+      "id": "x5psofOzfxxFM1HWXZh2u",
+      "status": "ready",
+      "pipelineStatus": "NULL",
+      "resultSetId": "NULL",
+      "createdAt": "2026-03-14 04:33:51"
+    },
+    {
+      "id": "QoHeb9Z1ch0L7zHXgojlV",
+      "status": "ready",
+      "pipelineStatus": "success",
+      "resultSetId": "VTBxPSsY2M0N",
+      "createdAt": "2026-03-14 04:19:24"
+    },
+    {
+      "id": "zCxJj-3gtAeqOes1abzj-",
+      "status": "ready",
+      "pipelineStatus": "NULL",
+      "resultSetId": "NULL",
+      "createdAt": "2026-03-14 03:45:47"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tstatus\tpipelineStatus\tresultSetId\tcreatedAt\ngY8LLGC92qSQVbmxw7eIQ\tready\tNULL\tNULL\t2026-03-14 04:47:47\n_6AMP2ilROR_ZGacppsKi\tready\tNULL\tNULL\t2026-03-14 04:35:23\nx5psofOzfxxFM1HWXZh2u\tready\tNULL\tNULL\t2026-03-14 04:33:51\nQoHeb9Z1ch0L7zHXgojlV\tready\tsuccess\tVTBxPSsY2M0N\t2026-03-14 04:19:24\nzCxJj-3gtAeqOes1abzj-\tready\tNULL\tNULL\t2026-03-14 03:45:47\n",
+  "stderr": "",
+  "execution_time_ms": 698
+}

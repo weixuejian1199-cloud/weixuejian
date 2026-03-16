@@ -172,19 +172,14 @@ export default function Sidebar() {
       toast.info(`${mod.label} 即将上线，敬请期待`);
       return;
     }
-    // For available modules, send a message to the chat
+    // Navigate to the corresponding page
     if (mod.action === "template") {
-      createNewTask();
-      setActiveNav("home");
-      // Will be handled by MainWorkspace to auto-send template message
-      toast.info("请在对话框中选择模板");
+      setActiveNav("templates");
     } else if (mod.action === "hr") {
-      createNewTask();
-      setActiveNav("home");
-      toast.info("请在对话框中选择 HR 功能");
+      setActiveNav("hr");
     }
     if (isMobile) setSidebarOpen(false);
-  }, [createNewTask, setActiveNav, isMobile, setSidebarOpen]);
+  }, [setActiveNav, isMobile, setSidebarOpen]);
 
   const collapsed = !sidebarOpen;
 

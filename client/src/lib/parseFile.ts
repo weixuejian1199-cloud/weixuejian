@@ -129,6 +129,7 @@ export interface ParsedFileData {
   fields: ParsedField[];
   preview: Record<string, unknown>[]; // first 500 rows
   sampleRows: Record<string, unknown>[]; // first 20 rows for AI prompt
+  allRows: Record<string, unknown>[]; // 全量行（用于前端导出）
   // The dimension field used for groupedTop5 (e.g. "达人昵称")
   groupByField?: string;
   // All detected dimension fields by priority tier (for multi-dim grouping)
@@ -594,6 +595,101 @@ function detectType(values: unknown[]): "numeric" | "text" | "datetime" {
   return "text";
 }
 
+/**
+ * 合并多个已解析文件的数据，并去重
+ * @param parsedFiles - 已解析的文件列表
+ * @param keyField - 用于去重的字段名（如"主订单编号"）
+ * @returns 合并后的 ParsedFileData
+ */
+export function mergeParsedFiles(
+  parsedFiles: ParsedFileData[],
+  keyField: string = "主订单编号"
+): ParsedFileData {
+  if (parsedFiles.length === 0) {
+    return {
+      filename: "merged",
+      totalRowCount: 0,
+      colCount: 0,
+      fields: [],
+      preview: [],
+      sampleRows: [],
+      allRows: [],
+    };
+  }
+
+  if (parsedFiles.length === 1) {
+    return parsedFiles[0];
+  }
+
+  // 合并所有行（全量）
+  const allRows = parsedFiles.flatMap(f => f.allRows || f.sampleRows || []);
+  const totalRowCount = allRows.length;
+
+  if (totalRowCount === 0) {
+    return parsedFiles[0];
+  }
+
+  // 去重：基于 keyField，保留第一次出现的记录
+  const seenKeys = new Set<string>();
+  const deduplicatedRows: Record<string, unknown>[] = [];
+
+  for (const row of allRows) {
+    const key = String(row[keyField] ?? "");
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      deduplicatedRows.push(row);
+    }
+  }
+
+  // 合并字段统计（取所有文件的字段并集）
+  const fieldMap = new Map<string, ParsedField>();
+
+  for (const parsed of parsedFiles) {
+    for (const field of parsed.fields) {
+      const existing = fieldMap.get(field.name);
+      if (existing) {
+        // 合并统计
+        if (field.sum !== undefined && existing.sum !== undefined) {
+          existing.sum += field.sum;
+        }
+        if (field.min !== undefined && existing.min !== undefined) {
+          existing.min = Math.min(existing.min, field.min);
+        }
+        if (field.max !== undefined && existing.max !== undefined) {
+          existing.max = Math.max(existing.max, field.max);
+        }
+        if (field.null_count !== undefined) {
+          existing.null_count += field.null_count;
+        }
+        // Recalculate avg from merged sum and non-null count
+        if (existing.sum !== undefined) {
+          const nonNullCount = deduplicatedRows.length - existing.null_count;
+          existing.avg = nonNullCount > 0 ? existing.sum / nonNullCount : 0;
+        }
+      } else {
+        fieldMap.set(field.name, { ...field });
+      }
+    }
+  }
+
+  const fields = Array.from(fieldMap.values());
+  const colCount = fields.length;
+  const headers = fields.map(f => f.name);
+
+  // 取第一个文件的列名作为标准
+  const preview = deduplicatedRows.slice(0, 10);
+
+  return {
+    filename: "合并数据",
+    totalRowCount: deduplicatedRows.length,
+    colCount,
+    fields,
+    preview,
+    sampleRows: deduplicatedRows.slice(0, 500), // 限制 500 行
+    allRows: deduplicatedRows, // 全量行（用于前端导出）
+  };
+}
+
 export async function parseFile(file: File): Promise<ParsedFileData> {
   const buffer = await file.arrayBuffer();
   const ext = file.name.split(".").pop()?.toLowerCase();
@@ -640,6 +736,7 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
       fields: [],
       preview: [],
       sampleRows: [],
+      allRows: [],
     };
   }
 
@@ -817,6 +914,7 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     fields,
     preview,
     sampleRows,
+    allRows: rows, // 全量行（用于前端导出）
     groupByField: groupByField ?? undefined,
     allGroupByFields: allGroupByFields.length > 0 ? allGroupByFields : undefined,
     dataQuality,

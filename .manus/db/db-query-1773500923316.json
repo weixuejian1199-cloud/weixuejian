@@ -1,0 +1,55 @@
+{
+  "query": "SELECT id, status, pipelineStatus, pipelineError, rowCount, originalName, createdAt FROM sessions ORDER BY createdAt DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user UpQ6nzGwi5FMPrH.root --database CRyFQH5qGudysyWQuRqoNj --execute SELECT id, status, pipelineStatus, pipelineError, rowCount, originalName, createdAt FROM sessions ORDER BY createdAt DESC LIMIT 5;",
+  "rows": [
+    {
+      "id": "ThnfI16NudErhnM2Cc3Ky",
+      "status": "error",
+      "pipelineStatus": "running",
+      "pipelineError": "NULL",
+      "rowCount": "0",
+      "originalName": "cc1.xlsx",
+      "createdAt": "2026-03-14 15:04:44"
+    },
+    {
+      "id": "yHYsNp6lfO6tJq3Fu1h0w",
+      "status": "ready",
+      "pipelineStatus": "success",
+      "pipelineError": "NULL",
+      "rowCount": "27727",
+      "originalName": "cc1_sim.xlsx",
+      "createdAt": "2026-03-14 14:57:54"
+    },
+    {
+      "id": "1a68LC6BwTBr-sopzL46s",
+      "status": "ready",
+      "pipelineStatus": "success",
+      "pipelineError": "NULL",
+      "rowCount": "772",
+      "originalName": "店铺C店流水_3.xlsx",
+      "createdAt": "2026-03-14 14:49:06"
+    },
+    {
+      "id": "SvUxjLcUJJa35f9EpJSKp",
+      "status": "ready",
+      "pipelineStatus": "success",
+      "pipelineError": "NULL",
+      "rowCount": "653",
+      "originalName": "店铺B店流水_2.xlsx",
+      "createdAt": "2026-03-14 14:49:01"
+    },
+    {
+      "id": "Foyx7x8bW-hBXe1JB8cuc",
+      "status": "ready",
+      "pipelineStatus": "success",
+      "pipelineError": "NULL",
+      "rowCount": "386",
+      "originalName": "店铺A店流水_1.xlsx",
+      "createdAt": "2026-03-14 14:48:58"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tstatus\tpipelineStatus\tpipelineError\trowCount\toriginalName\tcreatedAt\nThnfI16NudErhnM2Cc3Ky\terror\trunning\tNULL\t0\tcc1.xlsx\t2026-03-14 15:04:44\nyHYsNp6lfO6tJq3Fu1h0w\tready\tsuccess\tNULL\t27727\tcc1_sim.xlsx\t2026-03-14 14:57:54\n1a68LC6BwTBr-sopzL46s\tready\tsuccess\tNULL\t772\t店铺C店流水_3.xlsx\t2026-03-14 14:49:06\nSvUxjLcUJJa35f9EpJSKp\tready\tsuccess\tNULL\t653\t店铺B店流水_2.xlsx\t2026-03-14 14:49:01\nFoyx7x8bW-hBXe1JB8cuc\tready\tsuccess\tNULL\t386\t店铺A店流水_1.xlsx\t2026-03-14 14:48:58\n",
+  "stderr": "",
+  "execution_time_ms": 670
+}
