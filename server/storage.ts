@@ -1,70 +1,29 @@
-// Preconfigured storage helpers for Manus WebDev templates
-// Uses the Biz-provided storage proxy (Authorization: Bearer <token>)
+// Local file storage for ATLAS
+// Stores files in /root/atlas-report/storage/ directory
 
+import fs from 'fs';
+import path from 'path';
 import { ENV } from './_core/env';
 
-type StorageConfig = { baseUrl: string; apiKey: string };
+const STORAGE_DIR = path.join(process.cwd(), 'storage');
 
-function getStorageConfig(): StorageConfig {
-  const baseUrl = ENV.forgeApiUrl;
-  const apiKey = ENV.forgeApiKey;
-
-  if (!baseUrl || !apiKey) {
-    throw new Error(
-      "Storage proxy credentials missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY"
-    );
-  }
-
-  return { baseUrl: baseUrl.replace(/\/+$/, ""), apiKey };
-}
-
-function buildUploadUrl(baseUrl: string, relKey: string): URL {
-  const url = new URL("v1/storage/upload", ensureTrailingSlash(baseUrl));
-  url.searchParams.set("path", normalizeKey(relKey));
-  return url;
-}
-
-async function buildDownloadUrl(
-  baseUrl: string,
-  relKey: string,
-  apiKey: string
-): Promise<string> {
-  const downloadApiUrl = new URL(
-    "v1/storage/downloadUrl",
-    ensureTrailingSlash(baseUrl)
-  );
-  downloadApiUrl.searchParams.set("path", normalizeKey(relKey));
-  const response = await fetch(downloadApiUrl, {
-    method: "GET",
-    headers: buildAuthHeaders(apiKey),
-  });
-  return (await response.json()).url;
-}
-
-function ensureTrailingSlash(value: string): string {
-  return value.endsWith("/") ? value : `${value}/`;
+// Ensure storage directory exists
+if (!fs.existsSync(STORAGE_DIR)) {
+  fs.mkdirSync(STORAGE_DIR, { recursive: true });
 }
 
 function normalizeKey(relKey: string): string {
-  return relKey.replace(/^\/+/, "");
+  return relKey.replace(/^\/+/, "").replace(/\//g, '_');
 }
 
-function toFormData(
-  data: Buffer | Uint8Array | string,
-  contentType: string,
-  fileName: string
-): FormData {
-  const blob =
-    typeof data === "string"
-      ? new Blob([data], { type: contentType })
-      : new Blob([data as any], { type: contentType });
-  const form = new FormData();
-  form.append("file", blob, fileName || "file");
-  return form;
+function getFilePath(relKey: string): string {
+  const key = normalizeKey(relKey);
+  return path.join(STORAGE_DIR, key);
 }
 
-function buildAuthHeaders(apiKey: string): HeadersInit {
-  return { Authorization: `Bearer ${apiKey}` };
+function getPublicUrl(relKey: string): string {
+  // For local storage, return a relative path that can be served by Express
+  return `/api/storage/${normalizeKey(relKey)}`;
 }
 
 export async function storagePut(
@@ -72,54 +31,46 @@ export async function storagePut(
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream"
 ): Promise<{ key: string; url: string }> {
-  const { baseUrl, apiKey } = getStorageConfig();
+  const filePath = getFilePath(relKey);
   const key = normalizeKey(relKey);
-  const uploadUrl = buildUploadUrl(baseUrl, key);
-  const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
-
-  // ⭐ FIX: 大文件上传超时时间从 120s 增加到 600s（10 分钟）
-  const TIMEOUT_MS = 600 * 1000;
-  const uploadPromise = fetch(uploadUrl, {
-    method: "POST",
-    headers: buildAuthHeaders(apiKey),
-    body: formData,
-  });
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error(`Storage upload timeout after ${TIMEOUT_MS}ms`)), TIMEOUT_MS);
-  });
-
-  const response = await Promise.race([uploadPromise, timeoutPromise]);
-
-  if (!response.ok) {
-    const message = await response.text().catch(() => response.statusText);
-    throw new Error(
-      `Storage upload failed (${response.status} ${response.statusText}): ${message}`
-    );
+  
+  // Ensure parent directory exists
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
-  const url = (await response.json()).url;
-  return { key, url };
+
+  // Write file to disk
+  const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data as string);
+  await fs.promises.writeFile(filePath, buffer);
+  
+  console.log(`[Storage] Wrote ${buffer.length} bytes to ${filePath}`);
+  
+  return { key, url: getPublicUrl(relKey) };
 }
 
-export async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {
-  const { baseUrl, apiKey } = getStorageConfig();
+export async function storageGet(relKey: string): Promise<{ key: string; url: string }> {
   const key = normalizeKey(relKey);
   return {
     key,
-    url: await buildDownloadUrl(baseUrl, key, apiKey),
+    url: getPublicUrl(relKey),
   };
 }
 
 export async function storageDelete(relKey: string): Promise<void> {
-  const { baseUrl, apiKey } = getStorageConfig();
-  const key = normalizeKey(relKey);
-  const deleteUrl = new URL("v1/storage/delete", ensureTrailingSlash(baseUrl));
-  deleteUrl.searchParams.set("path", key);
-  const response = await fetch(deleteUrl, {
-    method: "DELETE",
-    headers: buildAuthHeaders(apiKey),
-  });
-  if (!response.ok) {
-    console.warn(`[Storage] Delete failed for key ${key}: ${response.status}`);
+  const filePath = getFilePath(relKey);
+  try {
+    if (fs.existsSync(filePath)) {
+      await fs.promises.unlink(filePath);
+      console.log(`[Storage] Deleted ${filePath}`);
+    }
+  } catch (err) {
+    console.warn(`[Storage] Delete failed for ${filePath}:`, err);
   }
+}
+
+// Helper to read file content (for local storage)
+export async function storageReadFile(relKey: string): Promise<Buffer> {
+  const filePath = getFilePath(relKey);
+  return await fs.promises.readFile(filePath);
 }

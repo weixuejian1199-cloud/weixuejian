@@ -3,6 +3,7 @@ import express from "express";
 import compression from "compression";
 import { createServer } from "http";
 import net from "net";
+import path from "path";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import rateLimit from "express-rate-limit";
 import { registerChatRoutes } from "./chat";
@@ -78,6 +79,8 @@ async function startServer() {
   app.use("/api/admin", adminApiRouter);
   // Bot management API (飞书机器人模式)
   app.use("/api/bots", botRouter);
+  // Local storage file serving
+  app.use("/api/storage", express.static(path.join(process.cwd(), 'storage')));
   // tRPC API
   app.use(
     "/api/trpc",
