@@ -129,8 +129,8 @@ export default function MainWorkspace() {
       toast.error(`不支持 .${ext} 格式，请上传 Excel 或 CSV`);
       return;
     }
-    if (file.size > 50 * 1024 * 1024) {
-      toast.error(`${file.name} 超过 50MB 限制`);
+    if (file.size > 500 * 1024 * 1024) {
+      toast.error(`${file.name} 超过 500MB 限制`);
       return;
     }
 

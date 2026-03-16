@@ -110,7 +110,7 @@ const DEFAULT_ACCEPT = [
   "application/pdf",
 ];
 
-const DEFAULT_MAX_SIZE = 10 * 1024 * 1024; // 10MB
+const DEFAULT_MAX_SIZE = 500 * 1024 * 1024; // 10MB
 
 // ============================================================================
 // HOOK
