@@ -835,6 +835,92 @@ async function storeSessionData(sessionId: string, data: Record<string, unknown>
   await storagePut(DATA_KEY(sessionId), JSON.stringify(data), "application/json");
 }
 
+// ── Quick Report Generator ──────────────────────────────────────────────────
+// 生成经营数据分析报告（文字版，直接在对话中展示）
+
+function generateQuickReport(data: Record<string, unknown>[], dfInfo: DataFrameInfo, filename: string) {
+  const metrics = computeKeyMetrics(data, detectScenario(dfInfo.fields), dfInfo);
+  
+  // 商品 TOP5
+  const productField = dfInfo.fields.find(f => /商品 | 产品 | 品名/i.test(f.name));
+  const amountField = dfInfo.fields.find(f => /金额 | 销售额 | 应付 | 实付/i.test(f.name) && f.type === 'numeric');
+  
+  const productStats: Record<string, { count: number; amount: number }> = {};
+  for (const row of data) {
+    const product = String(row[productField?.name || ''] || '未知商品');
+    const amount = Number(row[amountField?.name || '']) || 0;
+    if (!productStats[product]) productStats[product] = { count: 0, amount: 0 };
+    productStats[product].count++;
+    productStats[product].amount += amount;
+  }
+  
+  const productTop5 = Object.entries(productStats)
+    .sort((a, b) => b[1].amount - a[1].amount)
+    .slice(0, 5)
+    .map(([name, stats], i) => ({ rank: i + 1, name, count: stats.count, amount: stats.amount }));
+  
+  // 地域 TOP10
+  const regionField = dfInfo.fields.find(f => /省 | 市 | 地区 | 区域/i.test(f.name));
+  const regionStats: Record<string, { count: number; amount: number }> = {};
+  for (const row of data) {
+    const region = String(row[regionField?.name || ''] || '未知');
+    const amount = Number(row[amountField?.name || '']) || 0;
+    if (!regionStats[region]) regionStats[region] = { count: 0, amount: 0 };
+    regionStats[region].count++;
+    regionStats[region].amount += amount;
+  }
+  
+  const regionTop10 = Object.entries(regionStats)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 10)
+    .map(([name, stats], i) => ({ rank: i + 1, name, count: stats.count, amount: stats.amount }));
+  
+  // AI 生成经营建议
+  const aiSuggestions: string[] = [];
+  if (productTop5.length > 0) {
+    const topProduct = productTop5[0].name;
+    aiSuggestions.push(`🎯 <b>商品策略</b>：主推"${topProduct.slice(0, 20)}..."等爆款商品，销量占比最高`);
+  }
+  if (regionTop10.length > 0) {
+    const topRegion = regionTop10[0].name;
+    aiSuggestions.push(`🌏 <b>地域策略</b>：重点维护"${topRegion}"市场（占比${Math.round(regionTop10[0].count / dfInfo.row_count * 100)}%）`);
+  }
+  const avgOrder = metrics.find(m => m.name === '平均客单价');
+  if (avgOrder) {
+    aiSuggestions.push(`💰 <b>价格策略</b>：平均客单价¥${avgOrder.value}，可通过组合装提升`);
+  }
+  aiSuggestions.push(`📢 <b>营销策略</b>：分析销售高峰时段，针对性投放广告`);
+  
+  // 生成报告文本
+  const report = `📊 <b>经营数据分析报告</b>
+━━━━━━━━━━━━━━━━━━━━
+
+🎯 <b>核心指标</b>
+${metrics.map(m => `├─ ${m.name}: ${m.value}${m.unit || ''}`).join('\n')}
+
+🛒 <b>商品销售 TOP 5</b>
+${productTop5.map(p => `${p.rank}. ${p.name.slice(0, 30)}...  ${p.count}单  ¥${p.amount.toLocaleString()}`).join('\n')}
+
+📍 <b>地域订单 TOP 10</b>
+${regionTop10.map(r => `${r.rank}. ${r.name}  ${r.count.toLocaleString()}单  ¥${r.amount.toLocaleString()}`).join('\n')}
+
+💡 <b>经营建议</b>
+${aiSuggestions.map(s => `• ${s}`).join('\n')}
+
+━━━━━━━━━━━━━━━━━━━━
+<small>数据时间：${new Date().toISOString().slice(0, 10)} | 分析师：ATLAS 🤖</small>`;
+
+  return {
+    report,
+    metrics,
+    productTop5,
+    regionTop10,
+    suggestions: aiSuggestions,
+  };
+}
+
+
+
 async function loadSessionData(sessionId: string): Promise<Record<string, unknown>[] | null> {
   try {
     const { url } = await storageGet(DATA_KEY(sessionId));
@@ -3608,12 +3694,22 @@ ${dataTable}`}
         pipelineFinishedAt: null,
       }).catch(err => console.warn(`[Pipeline] Failed to write running status for ${sessionId}:`, err?.message));
       console.log(`[Pipeline] upload-parsed: pipelineStatus=running for session ${sessionId}`);
+      // 生成快速报告
+      const quickReport = generateQuickReport(sourceData, dfInfo, originalname);
+      
       res.json({
         session_id: sessionId,
         filename: originalname,
         file_url: "",
         status: "processing",
         df_info: dfInfo,
+        ai_analysis: quickReport.report,
+        suggested_actions: [
+          { icon: "📊", label: "查看完整报告", prompt: "帮我生成详细的经营分析报告" },
+          { icon: "🛒", label: "商品分析", prompt: "分析商品销售情况" },
+          { icon: "📍", label: "地域分析", prompt: "分析地域分布情况" },
+          { icon: "✨", label: "自定义需求", prompt: "" },
+        ],
       });
 
       // ★ 新增：自动触发小虾米处理文件
