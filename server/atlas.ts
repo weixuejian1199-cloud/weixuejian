@@ -1226,9 +1226,9 @@ export function registerAtlasRoutes(app: Express) {
             (data as any).__xlsxMeta = { totalRowCount: parsed.totalRowCount, columnStats: parsed.columnStats };
           }
           const xlsxMeta = (data as any).__xlsxMeta;
-          const totalRowCount = data.length;
+          const totalRowCount = xlsxMeta?.totalRowCount ?? data.length;
           const previewData = data.slice(0, 500);
-          const dfInfo = buildDataFrameInfo(previewData, sheetNames, totalRowCount);
+          const dfInfo = buildDataFrameInfo(previewData, sheetNames, totalRowCount, xlsxMeta?.columnStats);
 
           console.log(`[Atlas] 📊 Upload parsed: ${totalRowCount} rows total, storing full data (not 500 preview)`);
 
@@ -3420,9 +3420,9 @@ ${dataTable}`}
             (data as any).__xlsxMeta = { totalRowCount: parsed.totalRowCount, columnStats: parsed.columnStats };
           }
           const xlsxMeta = (data as any).__xlsxMeta;
-          const totalRowCount = data.length;
+          const totalRowCount = xlsxMeta?.totalRowCount ?? data.length;
           const previewData = data.slice(0, 500);
-          const dfInfo = buildDataFrameInfo(previewData, sheetNames, totalRowCount);
+          const dfInfo = buildDataFrameInfo(previewData, sheetNames, totalRowCount, xlsxMeta?.columnStats);
           const scenarioHint = detectScenario(dfInfo.fields);
           const requiredByScenario: Record<string, string[]> = {
             payroll:    ["基本工资", "员工姓名"],
@@ -3431,7 +3431,7 @@ ${dataTable}`}
             dividend:   ["员工姓名"],
           };
           const requiredFields = requiredByScenario[scenarioHint.type] || [];
-          const { normalizedData, injectedFields, fieldMapping } = normalizeFieldNames(previewData, requiredFields);
+          const { normalizedData, injectedFields, fieldMapping } = normalizeFieldNames(data, requiredFields);
           const workingData = normalizedData;
 
           await updateSession(sessionId, { rowCount: totalRowCount, colCount: dfInfo.col_count, dfInfo: dfInfo as any }).catch(() => {});
@@ -4200,6 +4200,14 @@ ${dataTable}`}
       const removedFields: string[] = [];
       const keptFields: string[] = [];
       
+      const sensitivePatterns = removeReasons["敏感信息"] || [];
+      const irrelevantPatterns = [
+        ...(removeReasons["物流信息"] || []),
+        ...(removeReasons["地址冗余"] || []),
+        ...(removeReasons["优惠明细"] || []),
+        ...(removeReasons["补贴明细"] || []),
+        ...(removeReasons["运营无关"] || []),
+      ];
       for (const col of allColumns) {
         const isSensitive = sensitivePatterns.some(p => p.test(col));
         const isIrrelevant = irrelevantPatterns.some(p => p.test(col));
