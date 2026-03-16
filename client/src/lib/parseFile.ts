@@ -145,6 +145,8 @@ export interface ParsedFileData {
 
 const PREVIEW_ROWS = 500;
 const SAMPLE_ROWS = 20;
+// 修复 #1: 提高阈值，让绝大多数文件走内联路径
+const MAX_FULL_ROWS_INLINE = 50_000; // 5 万行以内约 5-10MB JSON
 // Store top 20 for grouping so AI can return Top10/Top20 accurately
 const GROUPED_TOP_N = 20;
 
@@ -794,11 +796,11 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
   const sampleRows = rows.slice(0, SAMPLE_ROWS);
 
   // 修复项 B：分流规则
-  // ≤ 3000 行：内联传输全量数据，服务端直接存 S3（替代 preview 作为业务真源）
-  // > 3000 行：不内联，避免 JSON body 超出部署层反向代理限制（HTTP 413）
+  // ≤ 50000 行：内联传输全量数据，服务端直接存 S3（替代 preview 作为业务真源）
+  // > 50000 行：不内联，避免 JSON body 超出部署层反向代理限制（HTTP 413）
   //   全量 rows 存入 _allRowsRef，前端通过 upload-rows 分批上传到服务端
   //   全量统计（sum/avg/max/min/groupedTop5/categoryGroupedTop20）仍来自前端预计算，准确性不受影响
-  const MAX_FULL_ROWS_INLINE = 3_000;
+  const MAX_FULL_ROWS_INLINE = MAX_FULL_ROWS_INLINE;
   const allRows: Record<string, unknown>[] | undefined =
     totalRowCount <= MAX_FULL_ROWS_INLINE ? rows : undefined;
 

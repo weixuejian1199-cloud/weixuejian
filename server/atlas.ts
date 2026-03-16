@@ -2510,7 +2510,8 @@ ${dataTable}`}
       const openai = createLLM();
       const fieldNames = dfInfo.fields.map((f: FieldInfo) => f.name).join(", ");
       // Pass ALL data (up to 500 rows) so AI can generate accurate reports based on real data
-      const maxReportRows = Math.min(data.length, 500);
+      // 修复 #2: 500→1000 行，让导出包含更多数据
+      const maxReportRows = Math.min(data.length, 1000);
       const allReportData = data.slice(0, maxReportRows);
       const sampleRows = JSON.stringify(allReportData, null, 2);
 
@@ -2883,7 +2884,41 @@ ${sampleRows}
         buffer,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
+
+      // 修复 #3: 创建临时 session，支持合并后对话
+      const sessionId = nanoid();
+      const userId = (req as any).userId || 0;
+      const mergedFilename = `merged-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      await createSession({
+        id: sessionId,
+        userId,
+        filename: mergedFilename,
+        originalName: `合并文件 (${valid.length}个)`,
+        fileKey: `atlas-merged-reports/${reportId}.xlsx`,
+        fileUrl: reportUrl,
+        fileSizeKb: Math.ceil(buffer.length / 1024),
+        rowCount: allRows.length,
+        colCount: allRows.length > 0 ? Object.keys(allRows[0]).length : 0,
+        dfInfo: {
+          row_count: allRows.length,
+          col_count: allRows.length > 0 ? Object.keys(allRows[0]).length : 0,
+          fields: allRows.length > 0 ? Object.keys(allRows[0]).map(k => ({
+            name: k,
+            type: typeof allRows[0][k] === 'number' ? 'numeric' : 'text',
+            dtype: typeof allRows[0][k],
+            null_count: 0,
+            unique_count: 0,
+            sample: [],
+          })) : [],
+          preview: allRows.slice(0, 200),
+        } as any,
+        isMerged: 1,
+        status: "ready",
+      });
+      // 存储合并数据到 S3，支持后续对话
+      await storeSessionData(sessionId, allRows);
        res.json({
+         session_id: sessionId, // 修复 #3: 返回 session_id 支持后续对话
         downloadUrl: reportUrl,
         reportId,
         totalRows: allRows.length,
