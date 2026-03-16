@@ -77,7 +77,8 @@ export async function storagePut(
   const uploadUrl = buildUploadUrl(baseUrl, key);
   const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
 
-  const TIMEOUT_MS = 120 * 1000;
+  // ⭐ FIX: 大文件上传超时时间从 120s 增加到 600s（10 分钟）
+  const TIMEOUT_MS = 600 * 1000;
   const uploadPromise = fetch(uploadUrl, {
     method: "POST",
     headers: buildAuthHeaders(apiKey),

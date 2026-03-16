@@ -1144,7 +1144,10 @@ export function registerAtlasRoutes(app: Express) {
           const previewData = data.slice(0, 500);
           const dfInfo = buildDataFrameInfo(previewData, sheetNames, totalRowCount);
 
+          console.log(`[Atlas] 📊 Upload parsed: ${totalRowCount} rows total, storing full data (not 500 preview)`);
+
           // 3c. Normalize field names (P1-A: synonym mapping, non-destructive)
+          // ⭐ FIX: 使用全量数据进行字段映射和存储，不再截断
           const scenarioHint = detectScenario(dfInfo.fields);
           const requiredByScenario: Record<string, string[]> = {
             payroll:    ["基本工资", "员工姓名"],
@@ -1153,8 +1156,10 @@ export function registerAtlasRoutes(app: Express) {
             dividend:   ["员工姓名"],
           };
           const requiredFields = requiredByScenario[scenarioHint.type] || [];
-          const { normalizedData, injectedFields, fieldMapping } = normalizeFieldNames(previewData, requiredFields);
+          const { normalizedData, injectedFields, fieldMapping } = normalizeFieldNames(data, requiredFields);
           const workingData = normalizedData;
+
+          console.log(`[Atlas] 📦 Normalized ${workingData.length} rows, storing to S3...`);
 
           // 3d. Update session with parsed info
           await updateSession(sessionId, {
@@ -1164,7 +1169,9 @@ export function registerAtlasRoutes(app: Express) {
           }).catch(() => {});
 
           // 3e. Persist parsed data to S3 (for AI chat — survives restarts)
+          // ⭐ FIX: 存储全量数据，不再限制 500 行
           await storeSessionData(sessionId, workingData);
+          console.log(`[Atlas] ✅ Stored ${workingData.length} rows to S3`);
 
           // 5b. Detect scenario + compute key metrics (pure code, no AI dependency)
           const scenario = detectScenario(dfInfo.fields);

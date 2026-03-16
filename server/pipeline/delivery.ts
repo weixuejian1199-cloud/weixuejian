@@ -67,11 +67,18 @@ export async function exportFromResultSet(
   console.log(`[Delivery] 🔍 [DEBUG] export format: ${format}`);
   console.log(`[Delivery] 🔍 [DEBUG] includeSummary: ${includeSummary}`);
   console.log(`[Delivery] 🔍 [DEBUG] includeCleaningLog: ${includeCleaningLog}`);
+  
+  // ⭐ FIX: 验证数据完整性
+  if (resultSet.rowCount !== resultSet.standardizedRows.length) {
+    console.error(`[Delivery] ❌ CRITICAL: rowCount (${resultSet.rowCount}) !== standardizedRows.length (${resultSet.standardizedRows.length})`);
+  }
 
   // 确定文件名
   const baseName = options.fileName || generateFileName(resultSet);
   const ext = format === "xlsx" ? ".xlsx" : ".csv";
   const fullFileName = `${baseName}${ext}`;
+
+  console.log(`[Delivery] 📦 Exporting ${resultSet.standardizedRows.length} rows to ${fullFileName}`);
 
   // 创建工作簿
   const workbook = XLSX.utils.book_new();

@@ -371,7 +371,7 @@ export async function saveResultSet(
     const s3Key = `atlas-resultsets/${rs.jobId}/data.json`;
     try {
       const dataJson = JSON.stringify(rs.standardizedRows);
-      console.log(`[Pipeline] 💾 Uploading data rows to S3, size: ${dataJson.length} bytes`);
+      console.log(`[Pipeline] 💾 Uploading ${rs.standardizedRows.length} rows to S3, size: ${dataJson.length} bytes`);
       await storagePut(s3Key, Buffer.from(dataJson), "application/json");
       dataS3Key = s3Key;
       console.log(`[Pipeline] ✅ Data rows uploaded to S3: ${s3Key}`);
@@ -380,6 +380,8 @@ export async function saveResultSet(
       // ⭐ S3 落盘失败是 V3.0 导出的必要条件，必须抛出错误
       throw new Error(`Failed to upload standardizedRows to S3: ${err?.message}`);
     }
+  } else {
+    console.error(`[Pipeline] ❌ WARNING: No standardizedRows to save for session ${sessionId}`);
   }
 
   // 2. 将元数据存到 DB
