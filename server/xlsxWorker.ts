@@ -28,11 +28,21 @@ interface ColumnStats {
   sample: (string | number)[]; // first 5 non-null values
 }
 
+interface SheetInfo {
+  name: string;
+  rowCount: number;
+  colCount: number;
+  columns: string[];
+  preview: Record<string, unknown>[];
+}
+
 interface WorkerOutput {
-  /** First 200 rows (for AI analysis and preview) */
+  /** First 200 rows (for AI analysis and preview) - from first sheet */
   data: Record<string, unknown>[];
   sheetNames: string[];
-  /** Total row count (accurate, full scan) */
+  /** All sheets info */
+  sheets: SheetInfo[];
+  /** Total row count (accurate, full scan) - all sheets combined */
   totalRowCount: number;
   /** Per-column statistics computed from ALL rows */
   columnStats: Record<string, {
@@ -62,7 +72,11 @@ function parseExcel(buffer: Buffer, filename: string): WorkerOutput {
       dense: true,  // use dense mode for better memory efficiency
     });
     const sheetNames = workbook.SheetNames;
-    const sheet = workbook.Sheets[sheetNames[0]];
+    const sheets: SheetInfo[] = [];
+    
+    // 处理所有 sheet
+    for (const sheetName of sheetNames) {
+      const sheet = workbook.Sheets[sheetName];
 
     // ── Step 1: Determine header row ──────────────────────────────────────
     // Try row 1 first; if it has __EMPTY columns, scan rows 2-6
