@@ -124,7 +124,7 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
     // ── Layer 3: Computation ──────────────────────────────────────
     const sourceFiles: SourceFileInfo[] = ingestionResults.map(r => ({
       fileName: r.originalFileName,
-      s3Key: r.fileUrl,
+      s3Key: r.s3Key,
       totalRows: r.dataRows + 1,
       dataRows: r.dataRows,
       fieldCount: r.headers.length,

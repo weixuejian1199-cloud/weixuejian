@@ -463,6 +463,8 @@ export interface IngestionResult {
   unmappedFields: string[];
   /** S3 文件 URL */
   fileUrl: string;
+  /** S3 文件路径（用于 storageReadFile） */
+  s3Key: string;
   /** 原始文件名 */
   originalFileName: string;
   /** 数据行数 */
@@ -505,6 +507,7 @@ export async function runIngestion(
     fieldMapping: step5.mappedFields,
     unmappedFields: step5.unmappedFields,
     fileUrl: step1.s3Url,
+    s3Key: step1.s3Key,
     originalFileName,
     dataRows: step3.dataRows,
   };
