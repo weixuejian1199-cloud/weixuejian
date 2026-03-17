@@ -1495,7 +1495,7 @@ export function registerAtlasRoutes(app: Express) {
             }
           }
 
-          const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+          const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx", compression: true }) as Buffer;
           const reportId = nanoid();
           const { url: reportUrl } = await storagePut(
             `atlas-sanitized/${reportId}.xlsx`,
@@ -3118,7 +3118,7 @@ ${dataTable}`}
         ["合计", "", allRows.length],
       ];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), "合并概览");
-      const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+      const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx", compression: true }) as Buffer;
       const reportId = nanoid();
       const { url: reportUrl } = await storagePut(
         "atlas-merged-reports/" + reportId + ".xlsx",
@@ -3175,7 +3175,7 @@ ${dataTable}`}
 
           const xlsxBuffer = Buffer.from(XLSX.write(
             XLSX.utils.book_new(),
-            { type: "buffer", bookType: "xlsx" }
+            { type: "buffer", bookType: "xlsx", compression: true }
           ));
 
           await runPipelineInBackground(
