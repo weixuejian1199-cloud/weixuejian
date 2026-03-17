@@ -330,13 +330,10 @@ export default function MainWorkspace() {
             "",
             removedDisplay,
             "",
-            `📊 共 ${result.sourceRowCount.toLocaleString()} 行数据`,
-            `✅ 去敏完成，已自动下载（精简版 ${result.simpleSizeKb}KB + 完整版含对照表 ${result.fullSizeKb}KB）`,
+            `📊 共 ${result.sourceRowCount.toLocaleString()} 行数据，去敏完成`,
           ].join("\n");
 
-          updateLastMessage(summary);
-          window.open(result.simpleUrl, "_blank");
-          window.open(result.fullUrl, "_blank");
+          updateLastMessage(summary, { sanitizeUrls: { simpleUrl: result.simpleUrl, fullUrl: result.fullUrl } } as any);
         } catch (err: any) {
           updateLastMessage(`去敏导出失败：${err.message || "未知错误"}`);
         }
@@ -2059,7 +2056,7 @@ function MessageBubble({
         {/* Download button + Task Complete Rating */}
         {/* Case 1: report_id exists → use proxy download via /api/atlas/download/:reportId */}
         {/* Case 2: download_url exists (merge/payslip/attendance) → direct S3 URL download */}
-        {((message.report_id && message.report_filename) || (message.download_url && message.report_filename)) && (
+        {((message.report_id && message.report_filename) || (message.download_url && message.report_filename) || (message as any).sanitizeUrls) && (
           <motion.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
@@ -2074,7 +2071,7 @@ function MessageBubble({
               />
             )}
             {/* Download button */}
-            <button
+            {(message.report_id || message.download_url || message.sessionId) && <button
               onClick={async () => {
                 // 优先：从 sessionId 导出完整数据（V3.0 ResultSet）
                 if (message.sessionId) {
@@ -2112,7 +2109,7 @@ function MessageBubble({
             >
               <Download size={14} />
               下载 {message.report_filename || "完整数据"}
-            </button>
+            </button>}
             
             {/* 去敏导出按钮 */}
             {message.sessionId && (
@@ -2140,6 +2137,29 @@ function MessageBubble({
                 <Shield size={14} />
                 去敏导出
               </button>
+            )}
+            {/* 去敏结果下载按钮 */}
+            {(message as any).sanitizeUrls && (
+              <>
+                <a
+                  href={(message as any).sanitizeUrls.simpleUrl}
+                  download
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all text-sm"
+                  style={{ background: "rgba(79,110,247,0.1)", border: "1px solid rgba(79,110,247,0.25)", color: "var(--atlas-primary)", textDecoration: "none" }}
+                >
+                  <Download size={14} />
+                  下载精简版
+                </a>
+                <a
+                  href={(message as any).sanitizeUrls.fullUrl}
+                  download
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all text-sm"
+                  style={{ background: "rgba(79,110,247,0.1)", border: "1px solid rgba(79,110,247,0.25)", color: "var(--atlas-primary)", textDecoration: "none" }}
+                >
+                  <Download size={14} />
+                  下载完整版（含对照表）
+                </a>
+              </>
             )}
           </motion.div>
         )}

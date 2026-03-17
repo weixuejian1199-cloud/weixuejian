@@ -71,6 +71,7 @@ export interface Message {
   report_id?: string;
   report_filename?: string;
   download_url?: string;
+  sanitizeUrls?: { simpleUrl: string; fullUrl: string }; // 去敏导出下载链接
   tableData?: TableSheet[];
   sessionId?: string; // 关联的 session ID，用于前端导出时查找对应文件的全量行
   thinkingSteps?: string[];  // Steps shown in "思考过程" panel
