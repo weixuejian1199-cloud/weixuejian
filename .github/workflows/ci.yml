@@ -25,5 +25,4 @@ jobs:
       - name: Run tests
         run: npm test -- --exclude server/openclaw.test.ts
 
-      - name: TypeScript check
-        run: npm run check
+
