@@ -1433,6 +1433,85 @@ export function registerAtlasRoutes(app: Express) {
       // Return conversation_id in header so frontend can track it
       res.setHeader("X-Conversation-Id", convId);
 
+      // ── 去敏指令拦截：检测到去敏/脱敏关键词时，直接走代码路径，不走 AI ──────
+      const SANITIZE_KEYWORDS = /去敏|脱敏|隐私|合并去敏导出/;
+      if (SANITIZE_KEYWORDS.test(message) && allSessionIds.length > 0) {
+        res.setHeader("Content-Type", "text/plain; charset=utf-8");
+        res.setHeader("Transfer-Encoding", "chunked");
+        res.flushHeaders();
+        try {
+          const targetSessionId = allSessionIds[0]!;
+          const session = await getSession(targetSessionId);
+          if (!session) {
+            res.write("❌ 未找到对应的数据文件，请先上传文件再执行去敏导出。");
+            res.end();
+            return;
+          }
+          const data = await loadSessionData(targetSessionId);
+          if (!data || data.length === 0) {
+            res.write("❌ 数据为空，无法执行去敏导出。");
+            res.end();
+            return;
+          }
+          res.write("⏳ 正在处理全量数据去敏导出，请稍候...");
+
+          const resultSet = await getResultSetForSession(targetSessionId);
+          const sourceRows = resultSet?.standardizedRows?.length ? resultSet.standardizedRows : data;
+
+          const removePatterns = [
+            /(手机|手机号|电话|联系电话|联系方式|收件人|发货人|姓名|昵称|实名)/i,
+            /(地址|收货地址|详细地址|街道|门牌|身份证|护照|驾照|证件)/i,
+            /(银行卡|银行账户|账号|账户|流水)/i,
+            /(快递|物流|运单|发货时间|发货主体|是否修改过地址)/i,
+            /^(区|县|街道|乡镇)$/i,
+            /(平台优惠|商家优惠|达人优惠|支付优惠|优惠明细)/i,
+            /(补贴|服务商佣金|渠道分成|其他分成)/i,
+            /(货号|拼团|运费|售后编号|商品ID|达人ID|动账流水号|渠道分成)/i,
+          ];
+
+          const allColumns = Object.keys(sourceRows[0] || data[0] || {});
+          const removedFields: string[] = [];
+          const keptFields: string[] = [];
+          for (const col of allColumns) {
+            if (removePatterns.some(p => p.test(col))) {
+              removedFields.push(col);
+            } else {
+              keptFields.push(col);
+            }
+          }
+
+          const sanitizedData = sourceRows.map(row => {
+            const newRow: Record<string, unknown> = {};
+            for (const col of keptFields) newRow[col] = row[col];
+            return newRow;
+          });
+
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sanitizedData), "精简数据");
+          const comparisonData = [
+            ["原始字段名", "是否保留", "删除原因"],
+            ...allColumns.map(col => [col, removedFields.includes(col) ? "✗" : "✓", removedFields.includes(col) ? "敏感/无关字段" : ""]),
+          ];
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(comparisonData), "字段对照表");
+
+          const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+          const reportId = nanoid();
+          const { url: reportUrl } = await storagePut(
+            `atlas-sanitized/${reportId}.xlsx`,
+            buffer,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          );
+
+          const replyText = `\n\n✅ 去敏导出完成！\n\n- 原始行数：${sourceRows.length.toLocaleString()} 行\n- 保留字段：${keptFields.length} 个\n- 删除字段：${removedFields.length} 个（${removedFields.slice(0, 5).join("、")}${removedFields.length > 5 ? "等" : ""}）\n\n📥 [点击下载去敏文件](${reportUrl})`;
+          res.write(replyText);
+        } catch (sanitizeErr: any) {
+          console.error("[Atlas/chat] Sanitize intercept error:", sanitizeErr);
+          res.write(`\n\n❌ 去敏导出失败：${sanitizeErr?.message || "未知错误"}，请使用页面上的"去敏导出"按钮重试。`);
+        }
+        res.end();
+        return;
+      }
+
       // ── No-file mode: general conversation without data ──────────────────
       if (!allSessionIds.length) {
         const userId = (req as any).userId || 0;
