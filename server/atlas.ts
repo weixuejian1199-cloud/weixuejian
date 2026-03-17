@@ -4123,7 +4123,7 @@ ${dataTable}`}
         if (!s3Key) continue;
 
         const fileBuffer = await storageReadFile(s3Key);
-        const workbook = XLSX.read(fileBuffer, { type: "buffer", raw: false });
+        const workbook = XLSX.read(fileBuffer, { type: "buffer", raw: false, cellStyles: false, cellFormula: false, cellHTML: false });
 
         for (const sheetName of workbook.SheetNames) {
           const sheet = workbook.Sheets[sheetName];
@@ -4166,8 +4166,8 @@ ${dataTable}`}
 
       const reportId = nanoid();
       const [simpleBuf, fullBuf] = [
-        XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer,
-        XLSX.write(wbFull, { type: "buffer", bookType: "xlsx" }) as Buffer,
+        XLSX.write(wb, { type: "buffer", bookType: "xlsx", compression: true }) as Buffer,
+        XLSX.write(wbFull, { type: "buffer", bookType: "xlsx", compression: true }) as Buffer,
       ];
       const mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
       const [{ url: simpleUrl }, { url: fullUrl }] = await Promise.all([
