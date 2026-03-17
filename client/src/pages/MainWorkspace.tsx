@@ -174,6 +174,15 @@ export default function MainWorkspace() {
         },
       });
 
+      // Background: parse locally for allRows + categoryGroupedTop20 (used by frontend export)
+      // Non-blocking — does not affect upload success/failure
+      parseFile(file).then(parsed => {
+        updateUploadedFile(tempId, {
+          allRows: parsed.allRows || undefined,
+          categoryGroupedTop20: parsed.categoryGroupedTop20 || undefined,
+        });
+      }).catch(() => {/* non-critical, ignore */});
+
       // Update task title with filename
       const currentTask = tasks.find(t => t.id === taskId);
       if (currentTask && currentTask.title === "新建任务") {
