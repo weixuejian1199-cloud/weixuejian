@@ -2124,9 +2124,9 @@ function MessageBubble({
                   try {
                     toast.info("正在生成去敏文件（全量数据）...");
                     const result = await sanitizeExport(message.sessionId!);
-                    // 直接触发下载
-                    window.open(result.downloadUrl, "_blank");
-                    toast.success(`去敏导出成功：${result.sourceRowCount.toLocaleString()} 行，已删除 ${result.removedColumns} 个敏感字段`);
+                    window.open(result.simpleUrl, "_blank");
+                    window.open(result.fullUrl, "_blank");
+                    toast.success(`去敏导出成功：${result.sourceRowCount.toLocaleString()} 行，已删除 ${result.removedColumns} 个敏感字段（精简版 ${result.simpleSizeKb}KB + 完整版 ${result.fullSizeKb}KB）`);
                   } catch (err: any) {
                     toast.error(err.message || "去敏导出失败");
                   }

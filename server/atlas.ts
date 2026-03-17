@@ -1,11 +1,11 @@
 /**
- * ATLAS Core API Routes  (V7.1 — Persistent Sessions)
+ * ATLAS Core API Routes  (V7.1 - Persistent Sessions)
  * ─────────────────────────────────────────────────────────────────
  * Endpoints:
- *   POST /api/atlas/upload      — Upload Excel/CSV → S3 → parse → AI analysis
- *   POST /api/atlas/chat        — Streaming AI chat about uploaded data
- *   POST /api/atlas/generate-report — Generate Excel report → S3 → download URL
- *   GET  /api/atlas/download/:reportId — Redirect to S3 download URL
+ *   POST /api/atlas/upload      - Upload Excel/CSV → S3 → parse → AI analysis
+ *   POST /api/atlas/chat        - Streaming AI chat about uploaded data
+ *   POST /api/atlas/generate-report - Generate Excel report → S3 → download URL
+ *   GET  /api/atlas/download/:reportId - Redirect to S3 download URL
  *
  * Persistence strategy:
  *   - Parsed data rows → stored as JSON in S3 (atlas-data/<sessionId>-data.json)
@@ -78,7 +78,7 @@ async function optionalAuth(req: Request, _res: Response, next: NextFunction) {
       (req as any).atlasUser = user;
     }
   } catch {
-    // Not authenticated — proceed as anonymous (userId = 0)
+    // Not authenticated - proceed as anonymous (userId = 0)
   }
   next();
 }
@@ -91,7 +91,7 @@ async function optionalAuth(req: Request, _res: Response, next: NextFunction) {
 
 const DASHSCOPE_API_KEY = process.env.DASHSCOPE_API_KEY || "";
 const DASHSCOPE_BASE_URL = process.env.DASHSCOPE_BASE_URL || "https://coding.dashscope.aliyuncs.com/v1";
-const LARGE_FILE_THRESHOLD = 10000; // rows — auto-switch to kimi-k2.5 above this threshold
+const LARGE_FILE_THRESHOLD = 10000; // rows - auto-switch to kimi-k2.5 above this threshold
 
 function createLLM(rowCount?: number) {
   // Use DashScope if API key is configured, otherwise fall back to Manus Forge
@@ -131,7 +131,7 @@ function selectModel(rowCount?: number): string {
   return "gemini-2.5-flash";
 }
 
-// ── Multer (memory storage — no disk writes) ──────────────────────────────────
+// ── Multer (memory storage - no disk writes) ──────────────────────────────────
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -152,7 +152,7 @@ const upload = multer({
   },
 });
 
-// ── Multer for chunk uploads (no fileFilter — chunks are raw binary) ──────────
+// ── Multer for chunk uploads (no fileFilter - chunks are raw binary) ──────────
 const uploadChunk = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB per chunk
@@ -174,11 +174,11 @@ interface FieldInfo {
   min?: number;
   // Full-dataset top5 (value-descending), each entry: { value, rowIndex }
   top5?: Array<{ value: number; rowIndex: number }>;
-  // Grouped top5: GROUP BY dimension field, SUM numeric field, TOP5 by sum — from full dataset
+  // Grouped top5: GROUP BY dimension field, SUM numeric field, TOP5 by sum - from full dataset
   groupedTop5?: Array<{ label: string; sum: number; source?: string }>;
   // Which dimension field was used for groupedTop5
   groupByField?: string;
-  // T7: sum of ALL valid (non-placeholder) groups — used to compute null-nickname amount
+  // T7: sum of ALL valid (non-placeholder) groups - used to compute null-nickname amount
   // null_nickname_amount = field.sum - validGroupSum
   validGroupSum?: number;
   // Product-dimension groupedTop5 (GROUP BY 选购商品) for product Top queries
@@ -226,7 +226,7 @@ function parseExcelBuffer(buffer: Buffer, filename: string): { data: Record<stri
     raw: false,
   });
 
-  // Detect __EMPTY columns — means the real header is not on row 1
+  // Detect __EMPTY columns - means the real header is not on row 1
   // Try rows 2-6 as header until we find one with meaningful column names
   const hasEmptyHeaders = data.length > 0 &&
     Object.keys(data[0]).some(k => k.startsWith("__EMPTY"));
@@ -678,7 +678,7 @@ function serverComputeGroupedTopN(
     if (isNaN(numVal)) continue;
     const key = String(groupVal).trim();
     // Filter out placeholder values from groupBy ranking
-    if (key === "" || key === "-" || key === "—" || key === "--" || key === "——" ||
+    if (key === "" || key === "-" || key === "-" || key === "--" || key === "--" ||
         key === "N/A" || key === "n/a" || key === "NA" || key === "na" ||
         key === "无" || key === "null" || key === "NULL" || key === "None" || key === "none") continue;
     groupSums.set(key, (groupSums.get(key) ?? 0) + numVal);
@@ -716,7 +716,7 @@ function computeKeyMetrics(
   const metrics: KeyMetric[] = [];
   const numericFields = dfInfo.fields.filter(f => f.type === "numeric");
 
-  // Always add row count — use dfInfo.row_count (full count) when available, else data.length
+  // Always add row count - use dfInfo.row_count (full count) when available, else data.length
   const totalRowCount = dfInfo.row_count > 0 ? dfInfo.row_count : data.length;
   metrics.push({ name: "数据总行数", value: totalRowCount, field: "_count", type: "count" });
 
@@ -855,11 +855,11 @@ async function storeSessionData(sessionId: string, data: Record<string, unknown>
 
 function generateQuickReport(data: Record<string, unknown>[], dfInfo: DataFrameInfo, filename: string) {
   const metrics = computeKeyMetrics(data, detectScenario(dfInfo.fields), dfInfo);
-  
+
   // 商品 TOP5
   const productField = dfInfo.fields.find(f => /商品 | 产品 | 品名/i.test(f.name));
   const amountField = dfInfo.fields.find(f => /金额 | 销售额 | 应付 | 实付/i.test(f.name) && f.type === 'numeric');
-  
+
   const productStats: Record<string, { count: number; amount: number }> = {};
   for (const row of data) {
     const product = String(row[productField?.name || ''] || '未知商品');
@@ -868,12 +868,12 @@ function generateQuickReport(data: Record<string, unknown>[], dfInfo: DataFrameI
     productStats[product].count++;
     productStats[product].amount += amount;
   }
-  
+
   const productTop5 = Object.entries(productStats)
     .sort((a, b) => b[1].amount - a[1].amount)
     .slice(0, 5)
     .map(([name, stats], i) => ({ rank: i + 1, name, count: stats.count, amount: stats.amount }));
-  
+
   // 地域 TOP10
   const regionField = dfInfo.fields.find(f => /省 | 市 | 地区 | 区域/i.test(f.name));
   const regionStats: Record<string, { count: number; amount: number }> = {};
@@ -884,12 +884,12 @@ function generateQuickReport(data: Record<string, unknown>[], dfInfo: DataFrameI
     regionStats[region].count++;
     regionStats[region].amount += amount;
   }
-  
+
   const regionTop10 = Object.entries(regionStats)
     .sort((a, b) => b[1].count - a[1].count)
     .slice(0, 10)
     .map(([name, stats], i) => ({ rank: i + 1, name, count: stats.count, amount: stats.amount }));
-  
+
   // AI 生成经营建议
   const aiSuggestions: string[] = [];
   if (productTop5.length > 0) {
@@ -905,7 +905,7 @@ function generateQuickReport(data: Record<string, unknown>[], dfInfo: DataFrameI
     aiSuggestions.push(`💰 <b>价格策略</b>：平均客单价¥${avgOrder.value}，可通过组合装提升`);
   }
   aiSuggestions.push(`📢 <b>营销策略</b>：分析销售高峰时段，针对性投放广告`);
-  
+
   // 生成报告文本
   const report = `📊 <b>经营数据分析报告</b>
 ━━━━━━━━━━━━━━━━━━━━
@@ -947,7 +947,7 @@ async function loadSessionData(sessionId: string): Promise<Record<string, unknow
 
 
 // ── Expert System Prompt Builder ─────────────────────────────────────────────
-// Core AI knowledge base — persists across model changes.
+// Core AI knowledge base - persists across model changes.
 // All professional capabilities are injected here as system prompt.
 
 function buildExpertSystemPrompt(extraContext = "", dataContext = "") {
@@ -1107,7 +1107,7 @@ ${dataContext}
 - 「工资条生成」：每人一行，包含应发、扣款明细、实发，展示全部员工（不得截断）
 - 「考勤汇总」：每人一行，包含实际出勤、迟到次数、早退次数、缺勤天数，展示全部员工
 - 「入离职分析」：按月分组，计算入职人数、离职人数、净增人数、离职率
-- 「平均工资」：按部门分组，计算平均应发/实发，标识超出平均工资–50%的异常项
+- 「平均工资」：按部门分组，计算平均应发/实发，标识超出平均工资-50%的异常项
 - 「绩效排名」：按绩效分数降序，标识优秀/合格/待改进三个层次，展示全部员工
 
 【数量词歧义消除规则（必须遵守）】
@@ -1184,7 +1184,7 @@ export function registerAtlasRoutes(app: Express) {
       const userId = (req as any).userId || 0;
       const fileSizeKb = Math.ceil(buffer.length / 1024);
 
-      // 1. Create session record immediately (status=uploading) — no blocking S3/parse
+      // 1. Create session record immediately (status=uploading) - no blocking S3/parse
       await createSession({
         id: sessionId,
         userId,
@@ -1207,7 +1207,7 @@ export function registerAtlasRoutes(app: Express) {
         pipelineFinishedAt: null,
       }).catch(err => console.warn(`[Pipeline] Failed to write running status for ${sessionId}:`, err?.message));
       console.log(`[Pipeline] Status set to running for session ${sessionId}`);
-      // 2. Return immediately — client starts polling /api/atlas/status/:sessionId
+      // 2. Return immediately - client starts polling /api/atlas/status/:sessionId
       res.json({
         session_id: sessionId,
         filename: originalname,
@@ -1278,7 +1278,7 @@ export function registerAtlasRoutes(app: Express) {
             dfInfo: dfInfo as any,
           }).catch(() => {});
 
-          // 3e. Persist parsed data to S3 (for AI chat — survives restarts)
+          // 3e. Persist parsed data to S3 (for AI chat - survives restarts)
           // ⭐ FIX: 存储全量数据，不再限制 500 行
           await storeSessionData(sessionId, workingData);
           console.log(`[Atlas] ✅ Stored ${workingData.length} rows to S3`);
@@ -1292,7 +1292,7 @@ export function registerAtlasRoutes(app: Express) {
             `【${s.name}】${s.dfInfo.row_count}行×${s.dfInfo.col_count}列，字段：${s.dfInfo.fields.slice(0, 8).map(f => f.name).join('、')}`
           ).join('；');
 
-          // 5c. Store final result to S3 for polling — no AI analysis, just file metadata
+          // 5c. Store final result to S3 for polling - no AI analysis, just file metadata
           const finalResult = {
             session_id: sessionId,
             filename: originalname,
@@ -1305,7 +1305,7 @@ export function registerAtlasRoutes(app: Express) {
               preview: dfInfo.preview,
               sheets: allSheetsDfInfo,  // all sheets info
             },
-            // No ai_analysis — analysis happens when user sends message
+            // No ai_analysis - analysis happens when user sends message
             ai_analysis: null,
             suggested_actions: [],
             sheets_summary: sheetsSummary,
@@ -1332,7 +1332,7 @@ export function registerAtlasRoutes(app: Express) {
   });
 
   // ── POST /api/atlas/chat ──────────────────────────────────────────────────
-  // Streaming text response — works with OR without uploaded data
+  // Streaming text response - works with OR without uploaded data
 
   app.post("/api/atlas/chat", optionalAuth, async (req: Request, res: Response) => {
     try {
@@ -1447,52 +1447,53 @@ export function registerAtlasRoutes(app: Express) {
             res.end();
             return;
           }
-          const data = await loadSessionData(targetSessionId);
-          if (!data || data.length === 0) {
-            res.write("❌ 数据为空，无法执行去敏导出。");
+
+          const resultSet = await getResultSetForSession(targetSessionId);
+          if (!resultSet?.sourceFiles?.length) {
+            res.write("❌ 未找到原始文件信息，请重新上传文件后再试。");
             res.end();
             return;
           }
+
           res.write("⏳ 正在处理全量数据去敏导出，请稍候...");
 
-          const resultSet = await getResultSetForSession(targetSessionId);
-          const sourceRows = resultSet?.standardizedRows?.length ? resultSet.standardizedRows : data;
-
-          const removePatterns = [
-            /(手机|手机号|电话|联系电话|联系方式|收件人|发货人|姓名|昵称|实名)/i,
-            /(地址|收货地址|详细地址|街道|门牌|身份证|护照|驾照|证件)/i,
-            /(银行卡|银行账户|账号|账户|流水)/i,
-            /(快递|物流|运单|发货时间|发货主体|是否修改过地址)/i,
-            /^(区|县|街道|乡镇)$/i,
-            /(平台优惠|商家优惠|达人优惠|支付优惠|优惠明细)/i,
-            /(补贴|服务商佣金|渠道分成|其他分成)/i,
-            /(货号|拼团|运费|售后编号|商品ID|达人ID|动账流水号|渠道分成)/i,
+          const removePatterns: Array<{ reason: string; pattern: RegExp }> = [
+            { reason: "敏感信息", pattern: /(手机|手机号|电话|联系电话|联系方式|收件人|发货人|姓名|昵称|实名)/ },
+            { reason: "敏感信息", pattern: /(地址|收货地址|详细地址|街道|门牌|身份证|护照|驾照|证件)/ },
+            { reason: "敏感信息", pattern: /(银行卡|银行账户|账号|账户|流水)/ },
+            { reason: "物流信息", pattern: /(快递|物流|运单|发货时间|发货主体|是否修改过地址)/ },
+            { reason: "地址冗余", pattern: /^(区|县|街道|乡镇)$/ },
+            { reason: "优惠明细", pattern: /(平台优惠|商家优惠|达人优惠|支付优惠|优惠明细)/ },
+            { reason: "补贴明细", pattern: /(补贴|服务商佣金|渠道分成|其他分成)/ },
+            { reason: "运营无关", pattern: /(货号|拼团|运费|售后编号|商品ID|达人ID|动账流水号)/ },
           ];
-
-          const allColumns = Object.keys(sourceRows[0] || data[0] || {});
-          const removedFields: string[] = [];
-          const keptFields: string[] = [];
-          for (const col of allColumns) {
-            if (removePatterns.some(p => p.test(col))) {
-              removedFields.push(col);
-            } else {
-              keptFields.push(col);
-            }
-          }
-
-          const sanitizedData = sourceRows.map(row => {
-            const newRow: Record<string, unknown> = {};
-            for (const col of keptFields) newRow[col] = row[col];
-            return newRow;
-          });
 
           const wb = XLSX.utils.book_new();
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sanitizedData), "精简数据");
-          const comparisonData = [
-            ["原始字段名", "是否保留", "删除原因"],
-            ...allColumns.map(col => [col, removedFields.includes(col) ? "✗" : "✓", removedFields.includes(col) ? "敏感/无关字段" : ""]),
-          ];
-          XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(comparisonData), "字段对照表");
+          let totalRows = 0, totalKept = 0, totalRemoved = 0;
+          const removedSample: string[] = [];
+
+          for (const srcFile of resultSet.sourceFiles) {
+            if (!srcFile.s3Key) continue;
+            const fileBuffer = await storageReadFile(srcFile.s3Key);
+            const workbook = XLSX.read(fileBuffer, { type: "buffer", raw: false });
+            for (const sheetName of workbook.SheetNames) {
+              const sheet = workbook.Sheets[sheetName];
+              const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null });
+              if (!rows.length) continue;
+              totalRows += rows.length;
+              const columns = Object.keys(rows[0]);
+              const kept: string[] = [], removed: string[] = [];
+              for (const col of columns) {
+                if (removePatterns.some(p => p.pattern.test(col))) { removed.push(col); }
+                else { kept.push(col); }
+              }
+              totalKept += kept.length;
+              totalRemoved += removed.length;
+              if (removedSample.length < 5) removedSample.push(...removed.slice(0, 5 - removedSample.length));
+              const sanitized = rows.map(row => { const r: Record<string, unknown> = {}; for (const col of kept) r[col] = row[col]; return r; });
+              XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sanitized), sheetName.slice(0, 31));
+            }
+          }
 
           const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
           const reportId = nanoid();
@@ -1502,7 +1503,7 @@ export function registerAtlasRoutes(app: Express) {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           );
 
-          const replyText = `\n\n✅ 去敏导出完成！\n\n- 原始行数：${sourceRows.length.toLocaleString()} 行\n- 保留字段：${keptFields.length} 个\n- 删除字段：${removedFields.length} 个（${removedFields.slice(0, 5).join("、")}${removedFields.length > 5 ? "等" : ""}）\n\n📥 [点击下载去敏文件](${reportUrl})`;
+          const replyText = `\n\n✅ 去敏导出完成！\n\n- 原始行数：${totalRows.toLocaleString()} 行\n- 保留字段：${totalKept} 个\n- 删除字段：${totalRemoved} 个（${removedSample.join("、")}${totalRemoved > 5 ? "等" : ""}）\n\n📥 [点击下载去敏文件](${reportUrl})`;
           res.write(replyText);
         } catch (sanitizeErr: any) {
           console.error("[Atlas/chat] Sanitize intercept error:", sanitizeErr);
@@ -1581,7 +1582,7 @@ export function registerAtlasRoutes(app: Express) {
         console.log(`  [File] id=${s!.id} | name=${s!.originalName} | db.rowCount=${s!.rowCount} | dfInfo.row_count=${di?.row_count ?? 'N/A'} | 商品金额字段=${hasProductAmt} | 应付金额字段=${hasOrderAmt} | groupedTop5字段=${groupedKeys.join(',')||'无'} | preview.length=${sampleLen}`);
       }
 
-      // ── Task B: Hard guard — refuse to fake multi-file stats with single file ─
+      // ── Task B: Hard guard - refuse to fake multi-file stats with single file ─
       const isMultiFile = allSessionIds.length > 1;
       if (isMultiFile && validSessions.length < 2) {
         console.error(`[Atlas/chat] HARD GUARD: requested ${allSessionIds.length} files but only ${validSessions.length} valid sessions found`);
@@ -1784,7 +1785,7 @@ export function registerAtlasRoutes(app: Express) {
           }
         }
         // 3. Fallback: if this profile has any groupedTop5 data at all, use the first available
-        // (only when the primary file has no exact/semantic match — prevents missing files from being skipped)
+        // (only when the primary file has no exact/semantic match - prevents missing files from being skipped)
         if (pfp.groupedTop5Map.size > 0) {
           for (const [pfpField, pfpEntries] of Array.from(pfp.groupedTop5Map.entries())) {
             if (pfpEntries.length > 0) return { entries: pfpEntries, matchedField: pfpField };
@@ -1834,7 +1835,7 @@ export function registerAtlasRoutes(app: Express) {
           }
           // Re-aggregate: sum by label across files
           // Also filter out placeholder labels that may have been stored in old sessions
-          const PLACEHOLDER_LABELS = new Set(["-", "—", "--", "——", "N/A", "n/a", "NA", "na", "无", "null", "NULL", "None", "none"]);
+          const PLACEHOLDER_LABELS = new Set(["-", "-", "--", "--", "N/A", "n/a", "NA", "na", "无", "null", "NULL", "None", "none"]);
           const unionMap = new Map<string, number>();
           for (const entry of allGroupedEntries) {
             const lbl = entry.label.trim();
@@ -1847,7 +1848,7 @@ export function registerAtlasRoutes(app: Express) {
           top5Labels = sorted.map(([label, sum]) => `${label}(${sum.toLocaleString()})`);
           top5IsFullData = true;
         } else {
-          // No groupedTop5 available — omit rather than show inaccurate sample ranking
+          // No groupedTop5 available - omit rather than show inaccurate sample ranking
           top5Labels = [];
           top5IsFullData = false;
         }
@@ -1881,7 +1882,7 @@ export function registerAtlasRoutes(app: Express) {
             nullAmountLines.push(`- 「${f.name}」中无有效${gbField}的订单金额: ${nullAmt.toFixed(2)}（= 总计${f.sum.toFixed(2)} - 有效${gbField}金额${f.validGroupSum.toFixed(2)}）`);
           }
         }
-        return `\n【${gbField}字段空值说明（重要）】\n- 字段「${gbField}」存在于数据中（字段存在，不是缺失）\n- 共有 ${affectedRows} 行的「${gbField}」値为空値或占位符（null/空字符串: ${nullOrEmpty}行，占位符如"-"/"—"/"N/A": ${placeholder}行）\n- 这些行在达人排名中被过滤，但其对应金额仍计入文件总金额\n${nullAmountLines.length > 0 ? nullAmountLines.join('\n') + '\n' : ''}- ⚠️ 禁止说「文件不包含${gbField}字段」——字段存在，只是部分行値为空\n`;
+        return `\n【${gbField}字段空值说明（重要）】\n- 字段「${gbField}」存在于数据中（字段存在，不是缺失）\n- 共有 ${affectedRows} 行的「${gbField}」値为空値或占位符（null/空字符串: ${nullOrEmpty}行，占位符如"-"/"-"/"N/A": ${placeholder}行）\n- 这些行在达人排名中被过滤，但其对应金额仍计入文件总金额\n${nullAmountLines.length > 0 ? nullAmountLines.join('\n') + '\n' : ''}- ⚠️ 禁止说「文件不包含${gbField}字段」--字段存在，只是部分行値为空\n`;
       })();
 
       // Build single-file product Top context (GROUP BY 选购商品)
@@ -2082,11 +2083,11 @@ ${lines.join('\n')}
 - 排名查询：「查销售额前10名的商品」→ 找销售额字段，降序排列，返回前10
 - 筛选查询：「找出退货率最高的店铺」→ 找退货率字段，找最大値对应的店铺
 - 聚合查询：「各店铺平均销售额是多少」→ 按店铺分组，计算均値
-- 对比查询：　1月和2月的销售额对比」→ 按月份筛选，对比两个时期
+- 对比查询： 1月和2月的销售额对比」→ 按月份筛选，对比两个时期
 - 趋势查询：「最近3个月的增长趋势」→ 按时间排序，计算环比增长率
 
 ${isMultiFile ? (() => {
-  // ── Task E: Multi-file — each file gets its own dataset_profile section ──
+  // ── Task E: Multi-file - each file gets its own dataset_profile section ──
   const sections = perFileProfiles.map((pfp, idx) => {
     const keyNumericFields = ['商品金额', '订单应付金额', '订单金额', '销售额', '金额'];
     const relevantStats = pfp.numericStats.filter(ns =>
@@ -2170,7 +2171,7 @@ ${sampleTable}`;
     if (totals.length === 1) totals.push(`总行数(全部文件): ${totalRows.toLocaleString()}`);
   }
   // ── Task F: Inject cross-file topPerformers (merged Top10) into multi-file prompt ──
-  // This was missing in af21a74 refactor — restoring parity with single-file statsContext
+  // This was missing in af21a74 refactor - restoring parity with single-file statsContext
   // E方案修复：只保留优先级最高的一个金额字段，避免双列达人排名
   // 优先级：订单应付金额 > 成交金额 > 实付金额 > 订单金额 > 商品金额 > 其他
   const AMOUNT_PRIORITY = ['订单应付金额', '成交金额', '实付金额', '订单金额', '商品金额'];
@@ -2301,7 +2302,7 @@ ${sampleTable}`;
 ${topPerformersLines}
 ══ 跨文件达人排名结束 ══` : `
 
-⚠️ 当前文件中未检测到可靠的达人分组字段，无法生成跨文件达人排名。如需达人 Top10，请确认文件中包含“达人昵称”等分组字段。`;
+⚠️ 当前文件中未检测到可靠的达人分组字段，无法生成跨文件达人排名。如需达人 Top10，请确认文件中包含"达人昵称"等分组字段。`;
 
   const productTopSection = productTopLines ? `
 
@@ -2408,7 +2409,7 @@ ${dataTable}`}
 - category_key：分类统计类表格必填，填入数据中对应的原始字段名（如 "收货省份"、"支付方式"），必须与字段名完全一致，不得缩写或改写；非分类统计类表格可不填
 - 所有数值保留2位小数，金额加「元」单位，百分比加「%」
 - 排名列（如有）必须从 1 开始连续编号，严格按 rows 数组顺序填写，禁止出现跳号（如 7、8、9）或重复序号
-- 排名列中禁止出现 "-"、"—"、"N/A"、"无" 等无效占位符
+- 排名列中禁止出现 "-"、"-"、"N/A"、"无" 等无效占位符
 
 【第三步】表格后面加1-2句简短说明，指出关键发现，如「前3名占总销售额的65%，A店铺遥遥领先。」
 说明文案必须基于表格中实际展示的数据生成，禁止描述已被过滤的无效值（如"-"、"N/A"等占位符不应出现在文案中）
@@ -2488,7 +2489,7 @@ ${dataTable}`}
           console.error("[Atlas] OpenClaw SSE failed, falling back to Qwen:", openClawErr.message);
           // If headers not yet sent (connection failed before writing), fall through silently
           // If headers already sent (30s no-data timeout mid-stream), we can't send Qwen response
-          // on the same connection — just end the response with a fallback notice
+          // on the same connection - just end the response with a fallback notice
           if (res.headersSent) {
             if (!res.writableEnded) {
               res.write(`0:${JSON.stringify("\n\n__OPENCLAW_TIMEOUT_RETRY__\n")}\n`);
@@ -2868,7 +2869,7 @@ ${dataTable}`}
   });
 
   // ── Personal Templates API (V13.7) ─────────────────────────────────────────
-  // GET /api/atlas/templates — list user's personal templates
+  // GET /api/atlas/templates - list user's personal templates
   app.get("/api/atlas/templates", optionalAuth, async (req: Request, res: Response) => {
     try {
       const userId = (req as any).userId;
@@ -2885,7 +2886,7 @@ ${dataTable}`}
     }
   });
 
-  // POST /api/atlas/templates — save a new personal template
+  // POST /api/atlas/templates - save a new personal template
   app.post("/api/atlas/templates", optionalAuth, async (req: Request, res: Response) => {
     try {
       const userId = (req as any).userId;
@@ -2905,7 +2906,7 @@ ${dataTable}`}
     }
   });
 
-  // DELETE /api/atlas/templates/:id — delete a personal template
+  // DELETE /api/atlas/templates/:id - delete a personal template
   app.delete("/api/atlas/templates/:id", optionalAuth, async (req: Request, res: Response) => {
     try {
       const userId = (req as any).userId;
@@ -2921,7 +2922,7 @@ ${dataTable}`}
     }
   });
 
-  // POST /api/atlas/templates/:id/use — use a template (stream calculation)
+  // POST /api/atlas/templates/:id/use - use a template (stream calculation)
   app.post("/api/atlas/templates/:id/use", optionalAuth, async (req: Request, res: Response) => {
     try {
       const userId = (req as any).userId;
@@ -3037,11 +3038,11 @@ ${dataTable}`}
     }
   });
 
-  // GET /api/atlas/export/:sessionId — 从 ResultSet 导出完整数据
+  // GET /api/atlas/export/:sessionId - 从 ResultSet 导出完整数据
   app.get("/api/atlas/export/:sessionId", optionalAuth, async (req: Request, res: Response) => {
     try {
       const { sessionId } = req.params;
-      
+
       // 从数据库读取 ResultSet
       const resultSet = await getResultSetForSession(sessionId);
       if (!resultSet || !resultSet.rowCount) {
@@ -3280,10 +3281,10 @@ ${dataTable}`}
         });
         chunkInitLock.delete(uploadId); // release lock after store is ready
       } else if (chunkInitLock.has(uploadId)) {
-        // Another request is initializing this uploadId — wait briefly then retry
+        // Another request is initializing this uploadId - wait briefly then retry
         await new Promise(r => setTimeout(r, 200));
         if (!chunkStore.has(uploadId)) {
-          // Still not initialized — return error
+          // Still not initialized - return error
           res.status(500).json({ error: "Upload session initialization conflict, please retry" });
           return;
         }
@@ -3301,7 +3302,7 @@ ${dataTable}`}
         return;
       }
 
-      // All chunks received — merge buffers
+      // All chunks received - merge buffers
       const buffer = Buffer.concat(entry.chunks as Buffer[]);
       const { sessionId, filename: originalname, mimetype: mimeType, userId } = entry;
       chunkStore.delete(uploadId); // free memory immediately
@@ -3311,7 +3312,7 @@ ${dataTable}`}
       const fileSizeKb = Math.ceil(buffer.length / 1024);
       await updateSession(sessionId, { filename: fileKey, fileKey, fileSizeKb }).catch(() => {});
 
-      // Return immediately — client starts polling
+      // Return immediately - client starts polling
       res.json({
         session_id: sessionId,
         filename: originalname,
@@ -3611,7 +3612,7 @@ ${dataTable}`}
       console.log(`[Pipeline] upload-parsed: pipelineStatus=running for session ${sessionId}`);
       // 生成快速报告
       const quickReport = generateQuickReport(parsed.preview || [], dfInfo, originalname);
-      
+
       res.json({
         session_id: sessionId,
         filename: originalname,
@@ -4071,121 +4072,114 @@ ${dataTable}`}
   // ── POST /api/atlas/sanitize-export ──────────────────────────────────────
   // 去敏导出：参考 Kimi 工作路径，删除敏感字段和无关字段，保留核心运营字段
   // 生成两个版本：精简版（仅数据）+ 完整版（含字段对照表）
-  
+
   app.post("/api/atlas/sanitize-export", optionalAuth, async (req: Request, res: Response) => {
     try {
       const { session_id } = req.body as { session_id: string };
-      
-      if (!session_id) {
-        res.status(400).json({ error: "session_id required" });
-        return;
-      }
-      
+      if (!session_id) { res.status(400).json({ error: "session_id required" }); return; }
+
       const session = await getSession(session_id);
-      if (!session) {
-        res.status(404).json({ error: "Session not found" });
-        return;
-      }
-      
-      const data = await loadSessionData(session_id);
-      if (!data || data.length === 0) {
-        res.status(404).json({ error: "No data found" });
-        return;
-      }
-      
+      if (!session) { res.status(404).json({ error: "Session not found" }); return; }
+
+      // ── 从 ResultSet 拿原始文件 S3 key，全量读取 ──────────────────────────
       const resultSet = await getResultSetForSession(session_id);
-      const sourceRows = resultSet?.standardizedRows?.length ? resultSet.standardizedRows : data;
+      if (!resultSet?.sourceFiles?.length) {
+        res.status(404).json({ error: "未找到原始文件信息，请重新上传" });
+        return;
+      }
 
-      // 字段分类规则（参考 Kimi / 扣子 的“先结构化、再裁剪”路径）
-      const removeReasons: Record<string, RegExp[]> = {
-        "敏感信息": [
-          /(手机|手机号|电话|联系电话|联系方式|收件人|发货人|姓名|昵称|实名)/i,
-          /(地址|收货地址|详细地址|街道|门牌|身份证|护照|驾照|证件)/i,
-          /(银行卡|银行账户|账号|账户|流水)/i,
-        ],
-        "物流信息": [/(快递|物流|运单|发货时间|发货主体|是否修改过地址)/i],
-        "地址冗余": [/^(区|县|街道|乡镇)$/i],
-        "优惠明细": [/(平台优惠|商家优惠|达人优惠|支付优惠|优惠明细)/i],
-        "补贴明细": [/(补贴|服务商佣金|渠道分成|其他分成)/i],
-        "运营无关": [/(货号|拼团|运费|售后编号|商品ID|达人ID|动账流水号|渠道分成)/i],
-      };
-
-      const coreFields = [
-        /(订单编号|主订单)/i,
-        /(商品|商家编码|数量|金额|实付|应付)/i,
-        /(时间|提交|支付|完成|状态|取消|售后)/i,
-        /(省|市|达人|广告|渠道)/i,
-        /(动账|佣金|服务费|推广费|招商)/i,
+      const removePatterns: Array<{ reason: string; pattern: RegExp }> = [
+        { reason: "敏感信息", pattern: /(手机|手机号|电话|联系电话|联系方式|收件人|发货人|姓名|昵称|实名)/ },
+        { reason: "敏感信息", pattern: /(地址|收货地址|详细地址|街道|门牌|身份证|护照|驾照|证件)/ },
+        { reason: "敏感信息", pattern: /(银行卡|银行账户|账号|账户|流水)/ },
+        { reason: "物流信息", pattern: /(快递|物流|运单|发货时间|发货主体|是否修改过地址)/ },
+        { reason: "地址冗余", pattern: /^(区|县|街道|乡镇)$/ },
+        { reason: "优惠明细", pattern: /(平台优惠|商家优惠|达人优惠|支付优惠|优惠明细)/ },
+        { reason: "补贴明细", pattern: /(补贴|服务商佣金|渠道分成|其他分成)/ },
+        { reason: "运营无关", pattern: /(货号|拼团|运费|售后编号|商品ID|达人ID|动账流水号)/ },
       ];
 
-      const allColumns = Object.keys(sourceRows[0] || data[0] || {});
-      const removedFields: string[] = [];
-      const keptFields: string[] = [];
-      
-      const sensitivePatterns = removeReasons["敏感信息"] || [];
-      const irrelevantPatterns = [
-        ...(removeReasons["物流信息"] || []),
-        ...(removeReasons["地址冗余"] || []),
-        ...(removeReasons["优惠明细"] || []),
-        ...(removeReasons["补贴明细"] || []),
-        ...(removeReasons["运营无关"] || []),
-      ];
-      for (const col of allColumns) {
-        const isSensitive = sensitivePatterns.some(p => p.test(col));
-        const isIrrelevant = irrelevantPatterns.some(p => p.test(col));
-        const isCore = coreFields.some(p => p.test(col));
-        
-        if (isSensitive || isIrrelevant) {
-          removedFields.push(col);
-        } else {
-          keptFields.push(col);
+      const classifyColumns = (columns: string[]) => {
+        const kept: string[] = [], removed: string[] = [], removeReasonMap: Record<string, string> = {};
+        for (const col of columns) {
+          const match = removePatterns.find(p => p.pattern.test(col));
+          if (match) { removed.push(col); removeReasonMap[col] = match.reason; }
+          else { kept.push(col); }
+        }
+        return { kept, removed, removeReasonMap };
+      }
+
+      // ── 遍历所有原始文件，每个文件全量解析所有 Sheet ──────────────────────
+      const wb = XLSX.utils.book_new();
+      const comparisonRows: string[][] = [["原始字段名", "数据表", "是否保留", "删除原因"]];
+      let totalSourceRows = 0;
+      let totalSanitizedCols = 0;
+      let totalRemovedCols = 0;
+
+      for (const srcFile of resultSet.sourceFiles) {
+        const s3Key = srcFile.s3Key;
+        if (!s3Key) continue;
+
+        const fileBuffer = await storageReadFile(s3Key);
+        const workbook = XLSX.read(fileBuffer, { type: "buffer", raw: false });
+
+        for (const sheetName of workbook.SheetNames) {
+          const sheet = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null });
+          if (!rows.length) continue;
+
+          totalSourceRows += rows.length;
+          const columns = Object.keys(rows[0]);
+          const { kept, removed, removeReasonMap } = classifyColumns(columns);
+          totalSanitizedCols += kept.length;
+          totalRemovedCols += removed.length;
+
+          // 精简数据 sheet
+          const sanitized = rows.map(row => {
+            const r: Record<string, unknown> = {};
+            for (const col of kept) r[col] = row[col];
+            return r;
+          });
+          const wsName = workbook.SheetNames.length > 1 ? sheetName : srcFile.fileName.replace(/\.[^.]+$/, "");
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sanitized), wsName.slice(0, 31));
+
+          // 字段对照表行
+          for (const col of columns) {
+            comparisonRows.push([col, sheetName, removed.includes(col) ? "✗" : "✓", removeReasonMap[col] || ""]);
+          }
         }
       }
-      
-      // 构建精简数据
-      const sanitizedData = sourceRows.map(row => {
-        const newRow: Record<string, unknown> = {};
-        for (const col of keptFields) {
-          newRow[col] = row[col];
-        }
-        return newRow;
-      });
-      
-      // 生成 Excel
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(sanitizedData);
-      XLSX.utils.book_append_sheet(wb, ws, "精简数据");
-      
-      // 添加字段对照表（参考 Kimi 工作路径）
-      const comparisonData = [
-        ["原始字段名", "是否保留", "删除原因"],
-        ...allColumns.map(col => {
-          const removed = removedFields.find(r => r === col);
-          return [col, removed ? "✗" : "✓", removed ? "敏感/无关字段" : ""];
-        }),
-      ];
-      const wsMapping = XLSX.utils.aoa_to_sheet(comparisonData);
-      XLSX.utils.book_append_sheet(wb, wsMapping, "字段对照表");
-      
-      const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+
+      if (wb.SheetNames.length === 0) {
+        res.status(404).json({ error: "原始文件解析失败，无有效数据" });
+        return;
+      }
+
+      // ── 精简版（无对照表）+ 完整版（含对照表）──────────────────────────────
+      const wbFull = XLSX.utils.book_new();
+      for (const name of wb.SheetNames) XLSX.utils.book_append_sheet(wbFull, wb.Sheets[name], name);
+      XLSX.utils.book_append_sheet(wbFull, XLSX.utils.aoa_to_sheet(comparisonRows), "字段对照表");
+
       const reportId = nanoid();
-      const { url: reportUrl } = await storagePut(
-        `atlas-sanitized/${reportId}.xlsx`,
-        buffer,
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      );
-      
+      const [simpleBuf, fullBuf] = [
+        XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer,
+        XLSX.write(wbFull, { type: "buffer", bookType: "xlsx" }) as Buffer,
+      ];
+      const mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      const [{ url: simpleUrl }, { url: fullUrl }] = await Promise.all([
+        storagePut(`atlas-sanitized/${reportId}-simple.xlsx`, simpleBuf, mime),
+        storagePut(`atlas-sanitized/${reportId}-full.xlsx`, fullBuf, mime),
+      ]);
+
       res.json({
-        downloadUrl: reportUrl,
+        simpleUrl,
+        fullUrl,
         reportId,
-        originalColumns: allColumns.length,
-        sanitizedColumns: keptFields.length,
-        removedColumns: removedFields.length,
-        removedFields,
-        keptFields,
-        sourceRowCount: sourceRows.length,
-        usedResultSet: !!resultSet?.standardizedRows?.length,
-        fileSizeKb: Math.ceil(buffer.length / 1024),
+        sourceRowCount: totalSourceRows,
+        sanitizedColumns: totalSanitizedCols,
+        removedColumns: totalRemovedCols,
+        simpleSizeKb: Math.ceil(simpleBuf.length / 1024),
+        fullSizeKb: Math.ceil(fullBuf.length / 1024),
       });
     } catch (err: any) {
       console.error("[Atlas] Sanitize export error:", err);

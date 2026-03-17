@@ -581,14 +581,13 @@ export async function deletePersonalTemplate(id: string): Promise<void> {
 // ── Sanitize Export (去敏导出) ──────────────────────────────────────────────
 
 export interface SanitizeExportResponse {
-  downloadUrl: string;
+  simpleUrl: string;
+  fullUrl: string;
   reportId: string;
-  originalColumns: number;
   sanitizedColumns: number;
   removedColumns: number;
-  removedFields: string[];
-  keptFields: string[];
-  fileSizeKb: number;
+  simpleSizeKb: number;
+  fullSizeKb: number;
   sourceRowCount: number;
 }
 
