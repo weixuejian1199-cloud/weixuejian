@@ -4115,6 +4115,8 @@ ${dataTable}`}
       let totalSourceRows = 0;
       let totalSanitizedCols = 0;
       let totalRemovedCols = 0;
+      const allKeptCols = new Set<string>();
+      const allRemovedCols = new Set<string>();
 
       for (const srcFile of resultSet.sourceFiles) {
         const s3Key = srcFile.s3Key;
@@ -4133,6 +4135,8 @@ ${dataTable}`}
           const { kept, removed, removeReasonMap } = classifyColumns(columns);
           totalSanitizedCols += kept.length;
           totalRemovedCols += removed.length;
+          kept.forEach(c => allKeptCols.add(c));
+          removed.forEach(c => allRemovedCols.add(c));
 
           // 精简数据 sheet
           const sanitized = rows.map(row => {
@@ -4178,6 +4182,8 @@ ${dataTable}`}
         sourceRowCount: totalSourceRows,
         sanitizedColumns: totalSanitizedCols,
         removedColumns: totalRemovedCols,
+        keptColumnNames: Array.from(allKeptCols),
+        removedColumnNames: Array.from(allRemovedCols),
         simpleSizeKb: Math.ceil(simpleBuf.length / 1024),
         fullSizeKb: Math.ceil(fullBuf.length / 1024),
       });

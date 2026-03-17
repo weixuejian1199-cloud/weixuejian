@@ -308,12 +308,35 @@ export default function MainWorkspace() {
 
     try {
       if (isSanitize && primarySessionId) {
-        updateLastMessage("正在生成去敏文件（全量数据）...");
+        // Step 1: show scanning message
+        updateLastMessage("🔍 正在扫描字段，识别敏感信息...");
         try {
           const result = await sanitizeExport(primarySessionId);
+
+          // Step 2: build process display
+          const kept = result.keptColumnNames ?? [];
+          const removed = result.removedColumnNames ?? [];
+          const keptDisplay = kept.length > 0
+            ? `✅ 保留字段（${kept.length}个）：${kept.join("、")}`
+            : `✅ 保留字段：${result.sanitizedColumns} 个`;
+          const removedDisplay = removed.length > 0
+            ? `🗑️ 删除字段（${removed.length}个）：${removed.join("、")}`
+            : `🗑️ 删除字段：${result.removedColumns} 个`;
+
+          const summary = [
+            "🔍 字段分析完成",
+            "",
+            keptDisplay,
+            "",
+            removedDisplay,
+            "",
+            `📊 共 ${result.sourceRowCount.toLocaleString()} 行数据`,
+            `✅ 去敏完成，已自动下载（精简版 ${result.simpleSizeKb}KB + 完整版含对照表 ${result.fullSizeKb}KB）`,
+          ].join("\n");
+
+          updateLastMessage(summary);
           window.open(result.simpleUrl, "_blank");
           window.open(result.fullUrl, "_blank");
-          updateLastMessage(`去敏导出成功：${result.sourceRowCount.toLocaleString()} 行，已删除 ${result.removedColumns} 个敏感字段（精简版 ${result.simpleSizeKb}KB + 完整版 ${result.fullSizeKb}KB）`);
         } catch (err: any) {
           updateLastMessage(`去敏导出失败：${err.message || "未知错误"}`);
         }

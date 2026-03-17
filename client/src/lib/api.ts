@@ -589,6 +589,8 @@ export interface SanitizeExportResponse {
   simpleSizeKb: number;
   fullSizeKb: number;
   sourceRowCount: number;
+  keptColumnNames?: string[];
+  removedColumnNames?: string[];
 }
 
 export async function sanitizeExport(sessionId: string): Promise<SanitizeExportResponse> {
