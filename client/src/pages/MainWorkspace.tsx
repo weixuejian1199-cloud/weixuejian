@@ -411,37 +411,7 @@ export default function MainWorkspace() {
             // V13.10: save conversation_id from server response
             if (returnedConvId) {
               setConversationId(returnedConvId);
-              // Start polling for 小虾米 replies (every 5s, stop after 5 min)
-              if (openClawPollRef.current) clearInterval(openClawPollRef.current);
-              lastPollTimestampRef.current = Date.now();
-              let pollCount = 0;
-              const maxPolls = 60; // 5 min
-              openClawPollRef.current = setInterval(async () => {
-                pollCount++;
-                if (pollCount > maxPolls) {
-                  clearInterval(openClawPollRef.current!);
-                  openClawPollRef.current = null;
-                  return;
-                }
-                try {
-                  const r = await fetch(
-                    `/api/atlas/chat-replies?conversationId=${returnedConvId}&after=${lastPollTimestampRef.current}`,
-                    { credentials: "include" }
-                  );
-                  if (!r.ok) return;
-                  const data = await r.json() as { messages: Array<{ id: string; content: string; createdAt: string }> };
-                  if (data.messages && data.messages.length > 0) {
-                    // Show 小虾米 reply as a new assistant message
-                    const latestMsg = data.messages[data.messages.length - 1];
-                    addMessage({ role: "assistant", content: `🦐 **小虾米回复**\n\n${latestMsg.content}` });
-                    lastPollTimestampRef.current = new Date(latestMsg.createdAt).getTime();
-                    clearInterval(openClawPollRef.current!);
-                    openClawPollRef.current = null;
-                  }
-                } catch (e) {
-                  console.warn("[Poll] chat-replies error:", e);
-                }
-              }, 5_000);
+              // 小虾米轮询已禁用（避免双回复）
             }
             // First try to extract <suggestions> block
             const { cleanText, suggestions } = parseSuggestions(finalText);
@@ -1882,13 +1852,12 @@ function MessageBubble({
                               group.some(kw => cl.includes(kw) || kw.includes(cl))
                             );
                           });
-                        if (hasCategoryHint) isCategoryTable = true;
-
                         for (const uf of (uploadedFiles ?? [])) {
                           if (!uf.categoryGroupedTop20) continue;
                           const result = tryMatchField(uf.categoryGroupedTop20, colNames, categoryKey);
                           if (result) {
                             fullRows = buildFullRows(colNames, result.fieldName, result.entries);
+                            isCategoryTable = true; // 只有 fullRows 匹配成功才标记
                             console.info(
                               `[Atlas/P1] fullRows matched via Level-${result.level}`,
                               { fieldName: result.fieldName, rows: fullRows.length }
