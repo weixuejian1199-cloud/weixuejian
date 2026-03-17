@@ -19,7 +19,7 @@ import { Streamdown } from "streamdown";
 import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTableRenderer";
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, uploadParsed, smartUpload, exportFromSession, type SuggestedAction, sanitizeExport, type SanitizeExportResponse } from "@/lib/api";
+import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, smartUpload, exportFromSession, type SuggestedAction, sanitizeExport, type SanitizeExportResponse } from "@/lib/api";
 import { parseFile, mergeParsedFiles, type DataQuality } from "@/lib/parseFile"; // v14.2-groupby-fix
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -138,17 +138,9 @@ export default function MainWorkspace() {
 
     try {
       // Silent upload — update chip progress only, no messages
-      let uploadResult;
-      try {
-        uploadResult = await smartUpload(file, (percent) => {
-          updateUploadedFile(tempId, { uploadProgress: Math.round(percent * 0.7) });
-        });
-      } catch {
-        const parsedFallback = await parseFile(file);
-        uploadResult = await uploadParsed(parsedFallback, (percent) => {
-          updateUploadedFile(tempId, { uploadProgress: Math.round(percent * 0.7) });
-        });
-      }
+      const uploadResult = await smartUpload(file, (percent) => {
+        updateUploadedFile(tempId, { uploadProgress: Math.round(percent * 0.7) });
+      });
 
       // Poll until server finishes parsing (no AI analysis now)
       const result = await pollUploadStatus(uploadResult.session_id, (pct) => {
