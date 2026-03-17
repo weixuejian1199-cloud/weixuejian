@@ -22,7 +22,7 @@ import { step8Compute, type ComputationInput } from "./computation";
 import { buildExpressionPrompt } from "./expression";
 import { createPipelineContext } from "@shared/pipeline";
 import type { SourceFileInfo } from "@shared/resultSet";
-import { storagePut, storageGet } from "../storage";
+import { storagePut, storageGet, storageReadFile } from "../storage";
 import { getDb } from "../db";
 import { resultSets, sessions } from "../../drizzle/schema";
 import type { ResultSet } from "@shared/resultSet";
@@ -456,11 +456,8 @@ export async function getResultSetForSession(
     let standardizedRows: Record<string, string | number | null>[] = [];
     if (record.dataS3Key) {
       try {
-        const { url } = await storageGet(record.dataS3Key);
-        const response = await fetch(url);
-        if (response.ok) {
-          standardizedRows = await response.json();
-        }
+        const buf = await storageReadFile(record.dataS3Key);
+        standardizedRows = JSON.parse(buf.toString());
       } catch {
         console.warn(`[Pipeline] Failed to load data rows from S3 for ${sessionId}`);
       }
@@ -522,11 +519,8 @@ export async function getResultSetById(
     let standardizedRows: Record<string, string | number | null>[] = [];
     if (record.dataS3Key) {
       try {
-        const { url } = await storageGet(record.dataS3Key);
-        const response = await fetch(url);
-        if (response.ok) {
-          standardizedRows = await response.json();
-        }
+        const buf = await storageReadFile(record.dataS3Key);
+        standardizedRows = JSON.parse(buf.toString());
       } catch {
         console.warn(`[Pipeline] Failed to load data rows from S3 for ${resultSetId}`);
       }
