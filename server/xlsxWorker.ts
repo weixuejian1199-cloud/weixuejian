@@ -129,6 +129,7 @@ function parseExcel(buffer: Buffer, filename: string): WorkerOutput {
       return {
         data: [],
         sheetNames,
+        sheets: [],
         totalRowCount: 0,
         columnStats: {},
         parseTimeMs: Date.now() - startTime,
@@ -219,6 +220,7 @@ function parseExcel(buffer: Buffer, filename: string): WorkerOutput {
     return {
       data: previewRows,
       sheetNames,
+      sheets: [],  // single-sheet compat; multi-sheet handled in xlsxWorker.mjs
       totalRowCount,
       columnStats,
       parseTimeMs,
@@ -227,6 +229,7 @@ function parseExcel(buffer: Buffer, filename: string): WorkerOutput {
     return {
       data: [],
       sheetNames: [],
+      sheets: [],
       totalRowCount: 0,
       columnStats: {},
       parseTimeMs: Date.now() - startTime,

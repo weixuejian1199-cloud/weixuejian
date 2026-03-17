@@ -118,12 +118,11 @@ export default function MainWorkspace() {
     }
   }, [input]);
 
-  // -- File processing: multiple files go into the SAME task
-  // explicitTaskId: passed from handleFiles when activeTaskId was null at call time
+  // -- File processing: silent upload to chip (no messages, no AI analysis)
+  // Analysis is triggered when user clicks Send.
   const processFile = useCallback(async (file: File, explicitTaskId?: string) => {
-    // Use explicitly passed taskId (handles the case where activeTaskId was null when handleFiles was called)
     const taskId = explicitTaskId ?? activeTaskId;
-    if (!taskId) return; // No task to attach to (should not happen)
+    if (!taskId) return;
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (!["xlsx", "xls", "csv"].includes(ext || "")) {
       toast.error(`不支持 .${ext} 格式，请上传 Excel 或 CSV`);
@@ -137,93 +136,28 @@ export default function MainWorkspace() {
     const tempId = nanoid();
     addUploadedFile({ id: tempId, name: file.name, size: file.size, status: "uploading", uploadedAt: new Date(), uploadProgress: 0 }, taskId);
 
-    // ★ 文件选择后立即插入进度条消息（覆盖上传+分析全过程）
-    addMessage({ role: "user", content: `[自动分析] ${file.name}`, isHidden: true } as any, taskId);
-    // Capture the assistant message ID to enable per-message updates (fixes concurrent upload race condition)
-    const assistantMsgId = addMessage({
-      role: "assistant",
-      content: "",
-      isAnalyzing: true,
-      analyzeProgress: 5,
-      isStreaming: false,
-    } as any, taskId);
-
-    // Helper: update THIS file's assistant message by ID (not the last message)
-    const updateMyMsg = (content: string, extra?: Partial<Message>) =>
-      updateMessageById(assistantMsgId, content, extra, taskId);
-
-    // 进度定时器引用（用于清理）
-    let currentProgress = 5;
     try {
-      // Phase 1 + 1b: parseFile 和 smartUpload 并行执行，节省等待时间
-      updateMyMsg("", { isAnalyzing: true, analyzeProgress: 8 });
-      updateUploadedFile(tempId, { uploadProgress: 5 });
-
-      // 并行启动：前端解析（本地统计）+ 后端上传同时进行
-      // parseFile 做本地统计（allRows/categoryGroupedTop20），不阻塞主流程
-      const parsePromise = parseFile(file);
-      let parsedCache: Awaited<ReturnType<typeof parseFile>> | null = null;
-      parsePromise.then((parsed) => {
-        parsedCache = parsed;
-      }).catch(() => {});
-
+      // Silent upload — update chip progress only, no messages
       let uploadResult;
       try {
         uploadResult = await smartUpload(file, (percent) => {
-          // 上传进度映射到 5%→20%
-          const mappedProgress = Math.round(5 + (percent / 100) * 15);
-          if (mappedProgress > currentProgress) {
-            currentProgress = mappedProgress;
-            updateMyMsg("", { isAnalyzing: true, analyzeProgress: currentProgress });
-            updateUploadedFile(tempId, { uploadProgress: mappedProgress });
-          }
+          updateUploadedFile(tempId, { uploadProgress: Math.round(percent * 0.7) });
         });
-      } catch (uploadErr: any) {
-        const parsedFallback = parsedCache ?? await parsePromise;
-        updateMyMsg("上传链路异常，正在切换本地解析直传模式...", {
-          isAnalyzing: true,
-          analyzeProgress: Math.max(currentProgress, 18),
-        });
+      } catch {
+        const parsedFallback = await parseFile(file);
         uploadResult = await uploadParsed(parsedFallback, (percent) => {
-          const mappedProgress = Math.round(18 + (percent / 100) * 12);
-          if (mappedProgress > currentProgress) {
-            currentProgress = mappedProgress;
-            updateMyMsg("上传链路异常，正在切换本地解析直传模式...", { isAnalyzing: true, analyzeProgress: mappedProgress });
-            updateUploadedFile(tempId, { uploadProgress: mappedProgress });
-          }
+          updateUploadedFile(tempId, { uploadProgress: Math.round(percent * 0.7) });
         });
       }
-      // 上传完成后立即进入轮询，不等 parseFile（parseFile 在后台继续跑）
-      currentProgress = 30;
-      updateMyMsg("", { isAnalyzing: true, analyzeProgress: 30 });
-      updateUploadedFile(tempId, { uploadProgress: 30 });
-      // Phase 2: poll for async processing result (30% → 100%)
-      let resultShown = false;
 
-      // If upload already returned full result (sync mode), use it directly
-      // Otherwise poll the status endpoint until ready
-      let result;
-      if (uploadResult.ai_analysis) {
-        // Sync result (processed inline)
-        result = uploadResult;
-      } else {
-        // Async result: poll status endpoint
-        result = await pollUploadStatus(
-          uploadResult.session_id,
-          (pct) => {
-            if (!resultShown) {
-              currentProgress = pct;
-              updateMyMsg("", { isAnalyzing: true, analyzeProgress: pct });
-            }
-          }
-        );
-      }
-
-      // 等待 parseFile 完成（此时轮询已结束，大概率 parseFile 也跑完了）
-      const parsed = await parsePromise;
+      // Poll until server finishes parsing (no AI analysis now)
+      const result = await pollUploadStatus(uploadResult.session_id, (pct) => {
+        updateUploadedFile(tempId, { uploadProgress: Math.round(70 + pct * 0.3) });
+      });
 
       updateUploadedFile(tempId, {
         status: "ready",
+        uploadProgress: 100,
         sessionId: result.session_id,
         dfInfo: {
           row_count: result.df_info.row_count,
@@ -238,67 +172,18 @@ export default function MainWorkspace() {
           preview: result.df_info.preview || [],
           file_size_kb: Math.round(file.size / 1024),
         },
-        // 保存全量行（用于前端导出）
-        allRows: parsed.allRows || undefined,
-        // D方案：将前端预计算的分类字段全量统计存入 UploadedFile
-        // 用于 AtlasTableRenderer 导出时提供完整数据集，避免只导出 AI 展示层的前20行
-        categoryGroupedTop20: parsed.categoryGroupedTop20 || undefined,
       });
 
-      // 更新消息的 sessionId，用于前端导出时查找对应文件
-      updateMessageById(assistantMsgId, "", { sessionId: result.session_id }, taskId);
-
-      // Update current task title with filename (use first file's name)
-      if (taskId) {
-        const currentTask = tasks.find(t => t.id === taskId);
-        if (currentTask && currentTask.title === "新建任务") {
-          updateTask(taskId, { title: result.filename });
-        }
+      // Update task title with filename
+      const currentTask = tasks.find(t => t.id === taskId);
+      if (currentTask && currentTask.title === "新建任务") {
+        updateTask(taskId, { title: result.filename });
       }
-
-      // Store suggested actions from backend
-      if (result.suggested_actions?.length) {
-        setPendingActions(result.suggested_actions);
-      } else {
-        setPendingActions(DEFAULT_ACTIONS);
-      }
-
-      // 分析结果出来后，替换为真实内容
-      const showResult = () => {
-        resultShown = true;
-        const analysisText = result.ai_analysis ||
-          `这是一份数据文件，共 ${result.df_info.row_count} 行、${result.df_info.col_count} 列。`;
-        const { cleanText, suggestions } = parseSuggestionsHelper(analysisText);
-        const finalSuggestions = suggestions.length > 0
-          ? suggestions
-          : (result.suggested_actions || DEFAULT_ACTIONS);
-        // Use updateMessageById to update THIS file's message precisely
-        updateMyMsg(cleanText, {
-          isAnalyzing: false,
-          analyzeProgress: 100,
-          isStreaming: false,
-          suggestedActions: finalSuggestions,
-          qualityIssues: result.quality_issues?.length ? result.quality_issues : undefined,
-          outlierDetails: result.outlier_details?.length ? result.outlier_details : undefined,
-          fieldMappingHint: result.field_mapping_hint?.length ? result.field_mapping_hint : undefined, // P0-C
-          // Phase 1: 达人昵称字段治理元数据（前端本地计算，随文件解析结果一起写入消息）
-          dataQuality: parsed.dataQuality,
-        });
-      };
-      // 最短展示 1.5s 动画后显示结果
-      setTimeout(showResult, 1500);
-
     } catch (err: any) {
-      // 清理（前端解析模式无定时器）
-      // 移除进度条消息（替换为错误提示）
-      updateMyMsg(`上传失败：${(err as any).message || "请重试"}`, {
-        isAnalyzing: false,
-        analyzeProgress: 0,
-      });
       updateUploadedFile(tempId, { status: "error" });
       toast.error(`${file.name} 上传失败：${err.message}`);
     }
-  }, [addUploadedFile, updateUploadedFile, addMessage, updateMessageById, setIsGenerating, activeTaskId, tasks, updateTask]);
+  }, [addUploadedFile, updateUploadedFile, activeTaskId, tasks, updateTask]);
 
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     // Ensure we have an active task
@@ -313,181 +198,10 @@ export default function MainWorkspace() {
       return;
     }
 
-    // 多文件：先合并再上传
-    try {
-      toast.info(`正在合并 ${fileArray.length} 个文件...`);
+    // 多文件：并行静默上传，每个文件独立 chip
+    fileArray.forEach(file => processFile(file, taskId));
 
-      // 解析所有文件
-      const parsedResults = await Promise.all(
-        fileArray.map(file => parseFile(file))
-      );
-
-      // 合并数据（基于"主订单编号"去重）
-      const merged = mergeParsedFiles(parsedResults, "主订单编号");
-
-      // 计算合并后的关键指标
-      const totalOrders = merged.totalRowCount;
-      const amountField = merged.fields.find(f => f.name.includes("商品金额") || f.name.includes("订单应付金额"));
-      const totalAmount = amountField?.sum ? `¥${Math.round(amountField.sum).toLocaleString()}` : "未知";
-      const avgOrderValue = amountField?.avg ? `¥${amountField.avg.toFixed(2)}` : "未知";
-
-      // 添加合并后的文件记录（虚拟文件，不创建真实文件）
-      const tempId = nanoid();
-      addUploadedFile({
-        id: tempId,
-        name: `合并数据（去重后 ${totalOrders.toLocaleString()} 行）`,
-        size: 0, // 虚拟文件，无实际大小
-        status: "uploading",
-        uploadedAt: new Date(),
-        uploadProgress: 0,
-      }, taskId);
-
-      // 添加用户消息
-      addMessage({ role: "user", content: `[合并文件] ${fileArray.map(f => f.name).join(" + ")} → 去重后 ${totalOrders.toLocaleString()} 行` } as any, taskId);
-
-      // 添加助手消息（展示合并结果）
-      const assistantMsgId = addMessage({
-        role: "assistant",
-        content: `✅ 已合并 ${fileArray.length} 个文件，基于"主订单编号"去重。
-
-**关键指标：**
-- 📊 订单数：${totalOrders.toLocaleString()} 单
-- 💰 总销售额：${totalAmount}
-- 🛒 平均客单价：${avgOrderValue}
-
-正在分析数据...`,
-        isAnalyzing: true,
-        analyzeProgress: 10,
-        isStreaming: false,
-      } as any, taskId);
-
-      // 每个文件分别 smartUpload + 轮询至 ready，然后调 /api/atlas/merge 合并 session
-      const updateMyMsg = (content: string, extra?: Partial<Message>) =>
-        updateMessageById(assistantMsgId, content, extra, taskId);
-
-      try {
-        // 分别上传每个原始文件，并等待 Pipeline 处理完成
-        const sessionIds: string[] = [];
-        const platform_names: Record<string, string> = {};
-        for (let i = 0; i < fileArray.length; i++) {
-          const file = fileArray[i];
-          const uploadProgress = Math.round(10 + (i / fileArray.length) * 25);
-          updateMyMsg("", { isAnalyzing: true, analyzeProgress: uploadProgress });
-          
-          // 上传文件（分块或直接），失败时回退到前端解析直传
-          let uploadResult;
-          try {
-            uploadResult = await smartUpload(file);
-          } catch {
-            const parsedFallback = await parseFile(file);
-            uploadResult = await uploadParsed(parsedFallback);
-          }
-          sessionIds.push(uploadResult.session_id);
-          
-          // 等待该文件的 Pipeline 处理完成
-          const pollProgress = Math.round(35 + (i / fileArray.length) * 30);
-          updateMyMsg("", { isAnalyzing: true, analyzeProgress: pollProgress });
-          await pollUploadStatus(
-            uploadResult.session_id,
-            (pct) => {
-              const mapped = Math.round(pollProgress + (pct / 100) * (30 / fileArray.length));
-              updateMyMsg("", { isAnalyzing: true, analyzeProgress: Math.min(mapped, 65) });
-            }
-          );
-          
-          // 添加到上传文件列表
-          addUploadedFile({
-            id: nanoid(),
-            name: file.name,
-            size: file.size,
-            status: "ready",
-            sessionId: uploadResult.session_id,
-            uploadedAt: new Date(),
-            uploadProgress: 100,
-          }, taskId);
-        }
-
-        // 所有文件 Pipeline 已完成，调用合并接口
-        updateMyMsg("", { isAnalyzing: true, analyzeProgress: 70 });
-        const mergeRes = await fetch("/api/atlas/merge", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ session_ids: sessionIds, platform_names }),
-        });
-        const mergeData = await mergeRes.json();
-        if (!mergeRes.ok) throw new Error(mergeData.error || "合并失败");
-
-        // 合并接口同步完成，直接使用结果（无需轮询）
-        const actualTotalRows = mergeData.totalRows || totalOrders;
-
-        // 更新文件状态
-        updateUploadedFile(tempId, {
-          status: "ready",
-          sessionId: sessionIds[0], // 使用第一个 session 作为代表
-          dfInfo: {
-            row_count: actualTotalRows,
-            col_count: merged.colCount,
-            columns: merged.fields.map(f => ({
-              name: f.name,
-              dtype: f.dtype,
-              non_null_count: f.unique_count - f.null_count,
-              sample_values: f.sample || [],
-              inferred_type: f.type || "text",
-            })),
-            preview: merged.preview || [],
-            file_size_kb: 0,
-          },
-        });
-
-        // 更新消息，附带下载链接
-        updateMessageById(assistantMsgId, "", {
-          download_url: mergeData.downloadUrl,
-          report_filename: `合并数据_${new Date().toISOString().slice(0, 10)}.xlsx`,
-        }, taskId);
-
-        // 更新任务标题
-        const currentTask = tasks.find(t => t.id === taskId);
-        if (currentTask && currentTask.title === "新建任务") {
-          updateTask(taskId, { title: `合并数据（${actualTotalRows.toLocaleString()} 行）` });
-        }
-
-        // 显示分析结果
-        const fileTableLines = [
-          `✅ 已合并 ${fileArray.length} 个文件，共 **${actualTotalRows.toLocaleString()}** 行数据`,
-          ``,
-          `| 文件 | 来源平台 | 行数 |`,
-          `|------|---------|------|`,
-          ...(mergeData.files || []).map((f: { name: string; platform: string; rowCount: number }) =>
-            `| ${f.name} | ${f.platform} | ${f.rowCount.toLocaleString()} |`
-          ),
-        ].join("\n");
-        updateMyMsg(fileTableLines, {
-          isAnalyzing: false,
-          analyzeProgress: 100,
-          isStreaming: false,
-          suggestedActions: [
-            { icon: "📊", label: "生成汇总报表", prompt: "帮我把合并后的数据生成汇总报表" },
-            { icon: "🔍", label: "各平台对比", prompt: "帮我对比各平台的销售数据" },
-            { icon: "✨", label: "自定义需求", prompt: "" },
-          ],
-        });
-
-        toast.success(`合并成功！共 ${actualTotalRows.toLocaleString()} 条订单`);
-
-      } catch (err: any) {
-        updateMyMsg(`上传失败：${(err as any).message || "请重试"}`, {
-          isAnalyzing: false,
-          analyzeProgress: 0,
-        });
-        updateUploadedFile(tempId, { status: "error" });
-        toast.error(`上传失败：${err.message}`);
-      }
-
-    } catch (err: any) {
-      toast.error(`文件解析失败：${err.message}`);
-    }
-  }, [processFile, activeTaskId, createNewTask, addUploadedFile, addMessage, updateMessageById, tasks, updateTask]);
+  }, [processFile, activeTaskId, createNewTask]);
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
   const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); };
@@ -533,7 +247,23 @@ export default function MainWorkspace() {
 
   // -- Send message (supports quick action click)
   const handleSend = useCallback(async (text?: string, isQuickAction = false) => {
-    const msg = (text || input).trim();
+    // If files are uploading, wait — don't send yet
+    const uploadingFiles = uploadedFiles.filter(f => f.status === "uploading");
+    if (uploadingFiles.length > 0) {
+      toast.info("文件上传中，请稍候...");
+      return;
+    }
+
+    const readyFilesList = uploadedFiles.filter(f => f.status === "ready");
+    const isFirstSend = messages.length === 0 && readyFilesList.length > 0;
+
+    // Auto-generate analysis prompt when user sends with files but no text
+    let msg = (text || input).trim();
+    if (!msg && isFirstSend) {
+      // Build file summary for auto-prompt
+      const fileNames = readyFilesList.map(f => f.name).join("、");
+      msg = `请帮我分析这份数据：${fileNames}`;
+    }
     if (!msg || isGenerating) return;
 
     // If no active task exists, create one first so messages have a task to attach to.
@@ -1099,6 +829,9 @@ export default function MainWorkspace() {
                 onSend={() => handleSend()}
                 onKeyDown={handleKeyDown}
                 isGenerating={isGenerating}
+                hasReadyFiles={uploadedFiles.some(f => f.status === "ready")}
+                uploadedFiles={uploadedFiles}
+                onRemoveFile={(id) => removeUploadedFile(id)}
               />
             </>
           ) : (() => {
@@ -2533,9 +2266,12 @@ type EmptyStateProps = {
   onSend: () => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
   isGenerating: boolean;
+  hasReadyFiles?: boolean;
+  uploadedFiles?: Array<{ id: string; name: string; status: string; uploadProgress?: number; dfInfo?: { row_count: number } }>;
+  onRemoveFile?: (id: string) => void;
 };
 
-function EmptyState({ onUpload, onQuickAsk, input, setInput, onSend, onKeyDown, isGenerating }: EmptyStateProps) {
+function EmptyState({ onUpload, onQuickAsk, input, setInput, onSend, onKeyDown, isGenerating, hasReadyFiles, uploadedFiles = [], onRemoveFile }: EmptyStateProps) {
   const { user } = useAuth();
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -2631,6 +2367,34 @@ function EmptyState({ onUpload, onQuickAsk, input, setInput, onSend, onKeyDown, 
               fontFamily: "inherit",
             }}
           />
+          {/* File chips — shown when files are attached */}
+          {uploadedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 px-4 pt-1 pb-1">
+              {uploadedFiles.map(f => (
+                <span
+                  key={f.id}
+                  className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full"
+                  style={{
+                    background: f.status === "ready" ? "rgba(52,211,153,0.1)" : f.status === "error" ? "rgba(239,68,68,0.1)" : "rgba(91,140,255,0.1)",
+                    color: f.status === "ready" ? "#059669" : f.status === "error" ? "#ef4444" : "#4f6ef7",
+                    border: `1px solid ${f.status === "ready" ? "rgba(52,211,153,0.25)" : f.status === "error" ? "rgba(239,68,68,0.25)" : "rgba(91,140,255,0.2)"}`,
+                  }}
+                >
+                  <FileSpreadsheet size={11} />
+                  {f.status === "uploading"
+                    ? `${f.name} ${f.uploadProgress ?? 0}%`
+                    : f.status === "ready"
+                    ? `✓ ${f.name}${f.dfInfo ? ` (${f.dfInfo.row_count.toLocaleString()}行)` : ""}`
+                    : `✗ ${f.name}`}
+                  {onRemoveFile && (
+                    <button onClick={() => onRemoveFile(f.id)} style={{ marginLeft: 2, opacity: 0.6 }}>
+                      <X size={10} />
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
           <div className="flex items-center justify-between px-4 pb-3 pt-1">
             {/* Left: + icon + upload */}
             <div className="flex items-center gap-2">
@@ -2660,15 +2424,15 @@ function EmptyState({ onUpload, onQuickAsk, input, setInput, onSend, onKeyDown, 
             {/* Right: Generate button */}
             <button
               onClick={onSend}
-              disabled={!input.trim() || isGenerating}
+              disabled={(!input.trim() && !hasReadyFiles) || isGenerating}
               className="flex items-center gap-2 px-5 py-2 rounded-2xl text-sm font-semibold transition-all"
               style={{
-                background: input.trim() && !isGenerating ? "#4f6ef7" : "#e5e7eb",
-                color: input.trim() && !isGenerating ? "#ffffff" : "#9ca3af",
+                background: (input.trim() || hasReadyFiles) && !isGenerating ? "#4f6ef7" : "#e5e7eb",
+                color: (input.trim() || hasReadyFiles) && !isGenerating ? "#ffffff" : "#9ca3af",
                 transition: "all 0.15s ease",
               }}
             >
-              Generate
+              {hasReadyFiles && !input.trim() ? "开始分析" : "Generate"}
               <ChevronRight size={14} />
             </button>
           </div>

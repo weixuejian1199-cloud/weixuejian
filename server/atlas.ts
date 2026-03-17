@@ -27,7 +27,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import Decimal from "decimal.js";
 import { ENV } from "./_core/env";
 import { createPatchedFetch } from "./_core/patchedFetch";
-import { storagePut, storageGet } from "./storage";
+import { storagePut, storageGet, storageReadFile } from "./storage";
 import { getSession, createSession, updateSession, createReport, updateReport, getReport, getSimilarExamples, getUserReports, getDb } from "./db";
 import { authenticateRequest } from "./_core/auth";
 import { isOpenClawEnabled, callOpenClaw, callOpenClawStream, getPresignedUrlsForSessions } from "./openclaw";
@@ -117,15 +117,17 @@ function createLLM(rowCount?: number) {
 }
 
 // Select model based on row count
-// NOTE: kimi-k2.5 is NOT used for initial upload analysis — it has 60-120s TTFT which causes
-// frontend polling timeouts. qwen3-max handles up to 50k rows fine for the 800-token analysis prompt.
+// 阿里百炼模型选择策略：
+// - 超大数据（>10000行）→ kimi-k2.5（长上下文 250k）
+// - 大数据（>3000行）→ MiniMax-M2.5（长上下文 1250k，适合大数据分析）
+// - 常规数据 → qwen3-max-2026-01-23（快速响应，中文业务场景最强）
+// - 聊天/对话 → glm-4.7（对话能力强）
 function selectModel(rowCount?: number): string {
   if (DASHSCOPE_API_KEY) {
-    // Always use qwen3-max for upload analysis (fast TTFT, sufficient context for 800-token output)
-    // kimi-k2.5 is reserved for future deep-analysis chat where long context is truly needed
+    if (rowCount && rowCount > 10000) return "kimi-k2.5";
+    if (rowCount && rowCount > 3000) return "MiniMax-M2.5";
     return "qwen3-max-2026-01-23";
   }
-  // Fallback to Manus Forge model
   return "gemini-2.5-flash";
 }
 
@@ -259,16 +261,28 @@ function parseExcelBuffer(buffer: Buffer, filename: string): { data: Record<stri
 // Async wrapper: runs XLSX.read in a worker thread so the main event loop is never blocked.
 // Memory-optimized: returns only first 200 rows + full-scan column statistics.
 // Worker script is pre-compiled to xlsxWorker.mjs (works in both dev and prod).
+type SheetParseResult = {
+  name: string;
+  data: Record<string, unknown>[];
+  totalRowCount: number;
+  columnStats: Record<string, {
+    sum: number; min: number; max: number;
+    count: number; nullCount: number; uniqueCount: number;
+    isNumeric: boolean; sample: (string | number)[];
+  }>;
+};
+
 type XlsxWorkerResult = {
-  data: Record<string, unknown>[];  // first 200 rows
+  data: Record<string, unknown>[];  // first 200 rows (primary sheet)
   sheetNames: string[];
-  totalRowCount: number;            // accurate full count
+  totalRowCount: number;            // accurate full count (primary sheet)
   columnStats: Record<string, {
     sum: number; min: number; max: number;
     count: number; nullCount: number; uniqueCount: number;
     isNumeric: boolean; sample: (string | number)[];
   }>;
   parseTimeMs: number;
+  sheets?: SheetParseResult[];      // all sheets (new)
 };
 
 function parseExcelBufferAsync(
@@ -924,10 +938,8 @@ ${aiSuggestions.map(s => `• ${s}`).join('\n')}
 
 async function loadSessionData(sessionId: string): Promise<Record<string, unknown>[] | null> {
   try {
-    const { url } = await storageGet(DATA_KEY(sessionId));
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    return await res.json() as Record<string, unknown>[];
+    const buf = await storageReadFile(DATA_KEY(sessionId));
+    return JSON.parse(buf.toString()) as Record<string, unknown>[];
   } catch {
     return null;
   }
@@ -1224,12 +1236,23 @@ export function registerAtlasRoutes(app: Express) {
             data = parsed.data;
             sheetNames = parsed.sheetNames;
             // Pass full-scan stats so row_count and field stats are accurate
-            (data as any).__xlsxMeta = { totalRowCount: parsed.totalRowCount, columnStats: parsed.columnStats };
+            (data as any).__xlsxMeta = {
+              totalRowCount: parsed.totalRowCount,
+              columnStats: parsed.columnStats,
+              sheets: parsed.sheets,  // all sheets
+            };
           }
           const xlsxMeta = (data as any).__xlsxMeta;
           const totalRowCount = xlsxMeta?.totalRowCount ?? data.length;
           const previewData = data.slice(0, 500);
           const dfInfo = buildDataFrameInfo(previewData, sheetNames, totalRowCount, xlsxMeta?.columnStats);
+          // Multi-sheet dfInfo: build per-sheet info for all sheets
+          const allSheetsDfInfo = xlsxMeta?.sheets
+            ? (xlsxMeta.sheets as SheetParseResult[]).map((s) => ({
+                name: s.name,
+                dfInfo: buildDataFrameInfo(s.data, [s.name], s.totalRowCount, s.columnStats),
+              }))
+            : [{ name: sheetNames?.[0] || "Sheet1", dfInfo }];
 
           console.log(`[Atlas] 📊 Upload parsed: ${totalRowCount} rows total, storing full data (not 500 preview)`);
 
@@ -1264,198 +1287,12 @@ export function registerAtlasRoutes(app: Express) {
           const scenario = detectScenario(dfInfo.fields);
           const keyMetrics = computeKeyMetrics(workingData, scenario, dfInfo);
 
-          // Build field summary for AI context
-          const fieldSummary = dfInfo.fields.slice(0, 15).map(f =>
-            `${f.name}(${f.type}, ${f.unique_count}个唯一值, 示例:${f.sample.slice(0, 3).join("/")})`
-          ).join(", ");
+          // Build sheets summary for AI chat context (stored in session, used when user sends message)
+          const sheetsSummary = allSheetsDfInfo.map(s =>
+            `【${s.name}】${s.dfInfo.row_count}行×${s.dfInfo.col_count}列，字段：${s.dfInfo.fields.slice(0, 8).map(f => f.name).join('、')}`
+          ).join('；');
 
-          // Detect data quality issues for AI context
-          // NOTE: 全表缺失値警告已移除（Phase 1 治理提示仅针对 groupByField 列，由前端 detectDataQuality 生成）
-          const qualityIssues: string[] = [];
-          if (injectedFields.length > 0) {
-            qualityIssues.push(`字段容错提示：${injectedFields.join('、')}字段在数据中缺失，已自动按 0 处理，计算结果不受影响`);
-          }
-          const mappingEntries = Object.entries(fieldMapping);
-          if (mappingEntries.length > 0) {
-            const mappingDesc = mappingEntries.map(([o, c]) => `「${o}」→「${c}」`).join('、');
-            qualityIssues.push(`字段识别提示：已自动将 ${mappingDesc} 对齐为标准字段名，计算结果不受影响`);
-          }
-          const numericFieldsForOutlier = dfInfo.fields.filter(f => f.type === "numeric");
-          const outlierWarnings: string[] = [];
-          const outlierDetails: Array<{
-            fieldName: string;
-            median: number;
-            threshold: number;
-            outlierRows: Array<{ rowIndex: number; value: number }>;
-          }> = [];
-          for (const field of numericFieldsForOutlier.slice(0, 6)) {
-            const valsWithIndex = workingData
-              .map((row, i) => ({ val: Number(row[field.name]), rowIndex: i + 2 }))
-              .filter(x => !isNaN(x.val) && x.val > 0);
-            if (valsWithIndex.length < 3) continue;
-            const sortedVals = [...valsWithIndex.map(x => x.val)].sort((a, b) => a - b);
-            const median = sortedVals[Math.floor(sortedVals.length / 2)];
-            const threshold = median * 5;
-            const outlierItems = valsWithIndex.filter(x => x.val > threshold);
-            if (outlierItems.length > 0 && median > 0) {
-              const maxVal = Math.max(...outlierItems.map(x => x.val));
-              const fmtV = (n: number) => n >= 10000 ? `${(n/10000).toFixed(1)}万` : n.toFixed(0);
-              outlierWarnings.push(`${field.name}(最高值${fmtV(maxVal)}，约为中位数${fmtV(median)}的${Math.round(maxVal/median)}倍)`);
-              outlierDetails.push({
-                fieldName: field.name,
-                median,
-                threshold,
-                outlierRows: outlierItems.slice(0, 20).map(x => ({ rowIndex: x.rowIndex, value: x.val })),
-              });
-            }
-          }
-          if (outlierWarnings.length > 0) {
-            qualityIssues.push(`⚠️ 异常高值预警：${outlierWarnings.join('；')}，建议核实数据准确性`);
-          }
-          const hasDebit = workingData.length > 0 && ("借方金额" in workingData[0] || "debit" in workingData[0]);
-          const hasCredit = workingData.length > 0 && ("贷方金额" in workingData[0] || "credit" in workingData[0]);
-          if (hasDebit && hasCredit) {
-            const debitField = "借方金额" in workingData[0] ? "借方金额" : "debit";
-            const creditField = "贷方金额" in workingData[0] ? "贷方金额" : "credit";
-            const balanceCheck = checkDebitCreditBalance(workingData, debitField, creditField);
-            if (!balanceCheck.isBalanced) {
-              qualityIssues.push(`⚠️ 借贷不平警告：借方合计 ${balanceCheck.debitTotal}，贷方合计 ${balanceCheck.creditTotal}，差异 ${balanceCheck.discrepancy}，请检查数据完整性`);
-            } else {
-              qualityIssues.push(`✅ 借贷平衡校验通过：借方 ${balanceCheck.debitTotal}，贷方 ${balanceCheck.creditTotal}`);
-            }
-          }
-
-          const numericFields = dfInfo.fields.filter(f => f.type === "numeric").map(f => f.name);
-          const metricsSummary = keyMetrics.map(m => `${m.name}: ${m.value}`).join("、");
-
-          const hasSales2 = scenario.type === "sales";
-          const hasPayroll2 = scenario.type === "payroll";
-          const hasAttendance2 = scenario.type === "attendance";
-          const hasDividend2 = scenario.type === "dividend";
-          const hasStore2 = scenario.groupFields.some(f => /门店|店铺|store|shop/.test(f.toLowerCase()));
-          const hasDate2 = scenario.dateFields.length > 0;
-          const hasName2 = scenario.groupFields.some(f => /姓名|名字|员工|name|staff/.test(f.toLowerCase()));
-
-          const fallbackTable = {
-            title: `${originalname} 关键指标`,
-            columns: ["指标名称", "指标值"],
-            rows: keyMetrics.map(m => [m.name, String(m.value)]),
-            highlight: 1,
-            sortBy: -1,
-            sortDir: "desc",
-          };
-          const fallbackTableStr = "```atlas-table\n" + JSON.stringify(fallbackTable, null, 2) + "\n```";
-
-          const fieldListStr = dfInfo.fields.slice(0, 4).map(f => f.name).join('、') + (dfInfo.fields.length > 4 ? '等' : '');
-          const qualityHint = qualityIssues.length > 0 ? '（并加一句质量提醒）' : '';
-          const uploadSystemPrompt = [
-            '你是 ATLAS，一个专业的智能数据分析助手。用户刚刚上传了文件，你必须立刻输出以下内容：',
-            '',
-            '**第一部分：一句话识别**（不超过30字）',
-            `格式：「这是一份[${scenario.name}]，共${dfInfo.row_count}行、${dfInfo.col_count}列。」${qualityHint}`,
-            '',
-            '**第二部分：关键指标表**',
-            '必须输出以下 atlas-table 格式（严格遵守）：',
-            '',
-            '\`\`\`atlas-table',
-            '{',
-            `  "title": "[${originalname}] 关键指标",`,
-            '  "columns": ["指标名称", "指标值", "说明"],',
-            '  "rows": [',
-            `    ["数据总行数", "${dfInfo.row_count}", "有效数据行"],`,
-            `    ["字段数", "${dfInfo.col_count}", "包括: ${fieldListStr}"],`,
-            `    // 在此基础上，根据实际数据补充 5-6 个最重要的业务指标（已计算值：${metricsSummary}）`,
-            '  ],',
-            '  "highlight": 1,',
-            '  "sortBy": -1,',
-            '  "sortDir": "desc"',
-            '}',
-            '\`\`\`',
-            '',
-            '**第三部分：3个分析方向**（带字段名）',
-            '格式：【①】具体操作（如「按门店汇总销售额排名」）',
-            '',
-            `数据场景：${scenario.name}，置信度：${(scenario.confidence * 100).toFixed(0)}%`,
-            `主要数值字段：${scenario.primaryFields.join('、') || '无'}`,
-            `分组字段：${scenario.groupFields.join('、') || '无'}`,
-            `已计算指标：${metricsSummary}`,
-            '',
-            '注意：',
-            '- rows 中的注释行必须删除，只保留真实数据行',
-            '- 指标值直接用已计算的真实数值，不要编造',
-            '- 输出不超过150字，不要有任何前置序言',
-          ].join('\n');
-
-          let aiAnalysis = "";
-          try {
-            const openai = createLLM();
-            // 45s timeout: qwen3-max typically responds in 5-15s; abort if exceeded to avoid frontend timeout
-            const aiAbortController = new AbortController();
-            const aiTimeoutId = setTimeout(() => aiAbortController.abort(), 45_000);
-            const result = await streamText({
-              model: openai.chat(selectModel(dfInfo.row_count)),
-              system: uploadSystemPrompt,
-              messages: [{
-                role: "user",
-                content: `文件名：${originalname}，共 ${dfInfo.row_count} 行 ${dfInfo.col_count} 列。字段：${fieldSummary}。${qualityIssues.length > 0 ? '数据质量：' + qualityIssues.join('；') : '数据质量良好'}。已计算指标：${metricsSummary}`,
-              }],
-              maxOutputTokens: 800,
-              abortSignal: aiAbortController.signal,
-            });
-            aiAnalysis = await result.text;
-            clearTimeout(aiTimeoutId);
-            if (!aiAnalysis.includes("atlas-table")) {
-              console.warn("[Atlas] AI analysis missing atlas-table, using fallback");
-              const intro = aiAnalysis.split("\n")[0] || `这是一份${scenario.name}，共${dfInfo.row_count}行、${dfInfo.col_count}列。`;
-              aiAnalysis = `${intro}\n\n${fallbackTableStr}`;
-            }
-          } catch (e) {
-            console.warn("[Atlas] AI analysis failed, using pure-code fallback:", e);
-            const qualityNote = qualityIssues.length > 0 ? `\n\n⚠️ 数据质量提醒：${qualityIssues.join('；')}` : '';
-            aiAnalysis = `这是一份**${scenario.name}**，共 ${dfInfo.row_count.toLocaleString()} 行、${dfInfo.col_count} 列。${qualityNote}\n\n${fallbackTableStr}`;
-          }
-
-          const suggestedActions: Array<{ label: string; prompt: string; icon: string }> = [];
-          const hasSales = hasSales2;
-          const hasPayroll = hasPayroll2;
-          const hasAttendance = hasAttendance2;
-          const hasDividend = hasDividend2;
-          const hasStore = hasStore2;
-          const hasDate = hasDate2;
-          const hasName = hasName2;
-
-          if (hasPayroll || (hasName && numericFields.length > 0)) {
-            suggestedActions.push({ icon: "📝", label: "生成工资条", prompt: `__PAYSLIP_INLINE__${sessionId}` });
-          }
-          if (hasDividend) {
-            const divField = numericFields.find(f => /分红|奖金|奖/.test(f)) || numericFields[0] || "奖金";
-            suggestedActions.push({ icon: "💰", label: "分红明细表", prompt: `帮我按${divField}从高到低生成分红明细表` });
-            suggestedActions.push({ icon: "🏆", label: "Top10 排名", prompt: `帮我找出${divField}最高的前10名和最低的后10名` });
-          }
-          if (hasSales) {
-            const salesField = numericFields.find(f => /销售|金额|gmv|revenue/.test(f.toLowerCase())) || numericFields[0] || "销售额";
-            suggestedActions.push({ icon: "📊", label: "销售汇总表", prompt: `帮我汇总销售数据，显示${salesField}、订单数和关键指标` });
-            if (hasStore) {
-              suggestedActions.push({ icon: "🏦", label: "门店排名", prompt: `帮我按门店分组汇总${salesField}，对比各门店表现并排名` });
-            }
-          }
-          if (hasAttendance) {
-            suggestedActions.push({ icon: "📅", label: "考勤汇总", prompt: `__ATTENDANCE_INLINE__${sessionId}` });
-          }
-          if (hasDate && !hasSales) {
-            suggestedActions.push({ icon: "📈", label: "趋势分析", prompt: "帮我按时间分析数据趋势，看看有什么规律" });
-          }
-          if (suggestedActions.length < 2) {
-            if (numericFields.length > 0) {
-              suggestedActions.push({ icon: "📊", label: "生成汇总表", prompt: `帮我汇总${numericFields.slice(0, 3).join('、')}等关键指标` });
-            } else {
-              suggestedActions.push({ icon: "📊", label: "生成汇总表", prompt: "帮我生成数据汇总表，包含关键指标和统计" });
-            }
-            suggestedActions.push({ icon: "🔍", label: "全面分析", prompt: "帮我全面分析这份数据，找出关键规律、异常值和可优化方向" });
-          }
-          suggestedActions.push({ icon: "✨", label: "自定义需求", prompt: "" });
-
-          // 5c. Store final result to S3 for polling
+          // 5c. Store final result to S3 for polling — no AI analysis, just file metadata
           const finalResult = {
             session_id: sessionId,
             filename: originalname,
@@ -1466,14 +1303,12 @@ export function registerAtlasRoutes(app: Express) {
               col_count: dfInfo.col_count,
               fields: dfInfo.fields,
               preview: dfInfo.preview,
+              sheets: allSheetsDfInfo,  // all sheets info
             },
-            ai_analysis: aiAnalysis,
-            suggested_actions: suggestedActions,
-            quality_issues: qualityIssues,
-            outlier_details: outlierDetails.length > 0 ? outlierDetails : undefined,
-            field_mapping_hint: mappingEntries.length > 0
-              ? mappingEntries.map(([original, canonical]) => ({ original, canonical }))
-              : undefined,
+            // No ai_analysis — analysis happens when user sends message
+            ai_analysis: null,
+            suggested_actions: [],
+            sheets_summary: sheetsSummary,
           };
           await storeUploadResult(sessionId, finalResult);
 
@@ -3864,7 +3699,7 @@ ${dataTable}`}
             const aiAbortController = new AbortController();
             const aiTimeoutId = setTimeout(() => aiAbortController.abort(), 45_000);
             const result = await streamText({
-              model: openai.chat("qwen3-max"),
+              model: openai.chat("qwen3-max-2026-01-23"),
               system: uploadSystemPrompt,
               messages: [{
                 role: "user",
