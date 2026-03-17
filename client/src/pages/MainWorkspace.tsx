@@ -303,8 +303,21 @@ export default function MainWorkspace() {
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
+    // Detect sanitize export intent
+    const isSanitize = /去敏/.test(msg);
+
     try {
-      if (isReport && primarySessionId) {
+      if (isSanitize && primarySessionId) {
+        updateLastMessage("正在生成去敏文件（全量数据）...");
+        try {
+          const result = await sanitizeExport(primarySessionId);
+          window.open(result.simpleUrl, "_blank");
+          window.open(result.fullUrl, "_blank");
+          updateLastMessage(`去敏导出成功：${result.sourceRowCount.toLocaleString()} 行，已删除 ${result.removedColumns} 个敏感字段（精简版 ${result.simpleSizeKb}KB + 完整版 ${result.fullSizeKb}KB）`);
+        } catch (err: any) {
+          updateLastMessage(`去敏导出失败：${err.message || "未知错误"}`);
+        }
+      } else if (isReport && primarySessionId) {
         setIsProcessing(true);
         updateLastMessage("好的，马上为您生成...");
 
