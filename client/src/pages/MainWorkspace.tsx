@@ -195,22 +195,16 @@ export default function MainWorkspace() {
   }, [addUploadedFile, updateUploadedFile, activeTaskId, tasks, updateTask]);
 
   const handleFiles = useCallback(async (files: FileList | File[]) => {
-    // Ensure we have an active task
-    // Note: createNewTask() returns the new task ID synchronously (before React re-renders)
-    // We pass it explicitly to processFile to avoid the stale activeTaskId closure issue
     const taskId = activeTaskId || createNewTask();
-    const fileArray = Array.from(files);
-
-    // 如果只有一个文件，直接处理
-    if (fileArray.length === 1) {
-      processFile(fileArray[0], taskId);
-      return;
-    }
-
-    // 多文件：并行静默上传，每个文件独立 chip
+    const fileArray = Array.from(files).filter(f => {
+      // Deduplicate: skip files already uploading/ready with same name+size
+      const isDup = uploadedFiles.some(u => u.name === f.name && u.size === f.size && u.status !== "error");
+      if (isDup) toast.info(`${f.name} 已上传，无需重复添加`);
+      return !isDup;
+    });
+    if (fileArray.length === 0) return;
     fileArray.forEach(file => processFile(file, taskId));
-
-  }, [processFile, activeTaskId, createNewTask]);
+  }, [processFile, activeTaskId, createNewTask, uploadedFiles]);
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
   const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); };
@@ -2023,36 +2017,38 @@ function MessageBubble({
                     >
                       <span>仅显示前 20 行</span>
                       <button
-                        onClick={() => {
-                          // 前端导出完整数据
-                          const headers = message.tableData?.[0]?.headers || [];
-                          // 查找对应文件的全量行
+                        onClick={async () => {
+                          // 优先走服务器导出（S3全量数据），fallback到前端allRows
                           const file = (uploadedFiles ?? []).find((f: import("@/contexts/AtlasContext").UploadedFile) => f.sessionId === message.sessionId);
-                          const allRows = file?.allRows || message.tableData?.[0]?.rows || [];
-                          
-                          if (allRows.length === 0) {
-                            toast.error("没有可导出的数据");
-                            return;
+                          const sessionId = message.sessionId || file?.sessionId;
+                          if (sessionId) {
+                            try {
+                              toast.info("正在准备全量数据导出...");
+                              const result = await exportFromSession(sessionId);
+                              window.open(result.downloadUrl, "_blank");
+                              toast.success(`已导出 ${result.rowCount.toLocaleString()} 行（全量数据）`);
+                              return;
+                            } catch {
+                              // fallback to frontend allRows
+                            }
                           }
-
-                          // 转换为 Excel 格式
+                          // Fallback: frontend allRows
+                          const headers = message.tableData?.[0]?.headers || [];
+                          const allRows = file?.allRows || message.tableData?.[0]?.rows || [];
+                          if (allRows.length === 0) { toast.error("没有可导出的数据"); return; }
                           const typedRows = allRows as Record<string, unknown>[];
-                          const rows = typedRows.map((row) =>
-                            headers.map(h => row[h] ?? "")
-                          );
-                          
-                          const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+                          const ws = XLSX.utils.aoa_to_sheet([headers, ...typedRows.map(row => headers.map(h => row[h] ?? ""))]);
                           const wb = XLSX.utils.book_new();
                           XLSX.utils.book_append_sheet(wb, ws, message.tableData?.[0]?.name || "数据");
                           XLSX.writeFile(wb, `${message.tableData?.[0]?.name || "数据"}.xlsx`);
-                          toast.success(`已导出 ${(allRows as unknown[]).length} 行（全量数据）`);
+                          toast.success(`已导出 ${allRows.length} 行`);
                         }}
                         className="text-xs transition-colors hover:text-green-600"
                         style={{ color: "var(--atlas-text-3)" }}
                       >
                         导出 Excel（{(() => {
                           const f = (uploadedFiles ?? []).find((f: import("@/contexts/AtlasContext").UploadedFile) => f.sessionId === message.sessionId);
-                          return (f?.allRows?.length ?? f?.dfInfo?.row_count ?? message.tableData?.[0]?.rows?.length ?? 0).toLocaleString();
+                          return (f?.dfInfo?.row_count ?? f?.allRows?.length ?? message.tableData?.[0]?.rows?.length ?? 0).toLocaleString();
                         })()} 行）
                       </button>
                     </div>
