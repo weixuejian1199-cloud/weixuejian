@@ -4123,11 +4123,11 @@ ${dataTable}`}
         if (!s3Key) continue;
 
         const fileBuffer = await storageReadFile(s3Key);
-        const workbook = XLSX.read(fileBuffer, { type: "buffer", raw: false, cellStyles: false, cellFormula: false, cellHTML: false });
+        const workbook = XLSX.read(fileBuffer, { type: "buffer", raw: false, cellStyles: false, cellFormula: false, cellHTML: false, cellDates: false, sheetStubs: false });
 
         for (const sheetName of workbook.SheetNames) {
           const sheet = workbook.Sheets[sheetName];
-          const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null });
+          const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { raw: false, defval: "" });
           if (!rows.length) continue;
 
           totalSourceRows += rows.length;
@@ -4140,8 +4140,8 @@ ${dataTable}`}
 
           // 精简数据 sheet
           const sanitized = rows.map(row => {
-            const r: Record<string, unknown> = {};
-            for (const col of kept) r[col] = row[col];
+            const r: Record<string, string> = {};
+            for (const col of kept) r[col] = row[col] == null ? "" : String(row[col]);
             return r;
           });
           const wsName = workbook.SheetNames.length > 1 ? sheetName : srcFile.fileName.replace(/\.[^.]+$/, "");

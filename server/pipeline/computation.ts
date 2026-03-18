@@ -80,7 +80,7 @@ export function step8Compute(
   rs.sourcePlatform = input.platform;
   rs.isMultiFile = input.isMultiFile;
   rs.fields = input.fields;
-  rs.rowCount = input.rows.length;
+  rs.rowCount = input.sourceFiles.reduce((sum, f) => sum + f.dataRows, 0);
   rs.standardizedRows = input.rows.map(row => {
     const cleanRow: Record<string, string | number | null> = {};
     for (const [key, value] of Object.entries(row)) {

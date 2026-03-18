@@ -265,15 +265,21 @@ export function step3FormatParse(
       return null;
     }
 
-    // 使用第一个 Sheet（后续可扩展多 Sheet 支持）
-    const sheetName = sheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const rawData: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, {
-      defval: "",
-      raw: false,
-    });
+    // 遍历所有 Sheet，合并行数据
+    const allRawData: Record<string, string>[] = [];
+    for (const sheetName of sheetNames) {
+      const sheet = workbook.Sheets[sheetName];
+      const sheetRows: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, {
+        defval: "",
+        raw: false,
+      });
+      for (const row of sheetRows) {
+        row.__sheetName = sheetName;
+        allRawData.push(row);
+      }
+    }
 
-    if (rawData.length === 0) {
+    if (allRawData.length === 0) {
       ctx.errors.push({
         level: ErrorLevel.CRITICAL,
         step: 3,
@@ -285,9 +291,9 @@ export function step3FormatParse(
       return null;
     }
 
-    // 提取表头
-    const headers = Object.keys(rawData[0]).filter(
-      h => h.trim() && !h.startsWith("__EMPTY")
+    // 提取表头（排除内部注入字段）
+    const headers = Object.keys(allRawData[0]).filter(
+      h => h.trim() && !h.startsWith("__EMPTY") && h !== "__sheetName"
     );
 
     if (headers.length === 0) {
@@ -304,10 +310,10 @@ export function step3FormatParse(
 
     const output: Step3Output = {
       headers,
-      rawRows: rawData,
-      totalRows: rawData.length + 1, // 含表头
-      dataRows: rawData.length,
-      sheetName,
+      rawRows: allRawData,
+      totalRows: allRawData.length + sheetNames.length, // 每个 Sheet 含一行表头
+      dataRows: allRawData.length,
+      sheetName: sheetNames[0],
       isMultiSheet: sheetNames.length > 1,
     };
 
@@ -318,7 +324,7 @@ export function step3FormatParse(
         level: ErrorLevel.INFO,
         step: 3,
         code: "I4001",
-        message: `文件包含 ${sheetNames.length} 个工作表，当前使用第一个「${sheetName}」`,
+        message: `文件包含 ${sheetNames.length} 个工作表，已全部合并处理`,
       });
     }
 
