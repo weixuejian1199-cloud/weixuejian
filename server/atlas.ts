@@ -1250,7 +1250,7 @@ export function registerAtlasRoutes(app: Express) {
           const allSheetsDfInfo = xlsxMeta?.sheets
             ? (xlsxMeta.sheets as SheetParseResult[]).map((s) => ({
                 name: s.name,
-                dfInfo: buildDataFrameInfo(s.data, [s.name], s.totalRowCount, s.columnStats),
+                dfInfo: buildDataFrameInfo(s.preview ?? [], [s.name], s.rowCount, s.columnStats),
               }))
             : [{ name: sheetNames?.[0] || "Sheet1", dfInfo }];
 
