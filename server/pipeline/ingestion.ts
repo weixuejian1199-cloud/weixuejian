@@ -265,19 +265,30 @@ export function step3FormatParse(
       return null;
     }
 
-    // 遍历所有 Sheet，拼接行数据
-    const rawData: Record<string, string>[] = [];
-    let firstSheetName = sheetNames[0];
+    // 每个 Sheet 独立解析，保留各自的字段结构
+    const allSheets: import("@shared/pipeline").SheetDataset[] = [];
     for (const sheetName of sheetNames) {
       const sheet = workbook.Sheets[sheetName];
       const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, {
         defval: "",
         raw: false,
       });
-      rawData.push(...rows);
+      const cleanRows = rows.filter(r =>
+        Object.values(r).some(v => v !== null && v !== undefined && v !== "")
+      );
+      if (cleanRows.length === 0) continue;
+
+      const sheetHeaders = Object.keys(cleanRows[0]).filter(
+        h => h.trim() && !h.startsWith("__EMPTY")
+      );
+      if (sheetHeaders.length === 0) continue;
+
+      // 每行打上来源 Sheet 标记
+      const taggedRows = cleanRows.map(r => ({ ...r, __sourceSheet: sheetName }));
+      allSheets.push({ name: sheetName, headers: sheetHeaders, rawRows: taggedRows, dataRows: cleanRows.length });
     }
 
-    if (rawData.length === 0) {
+    if (allSheets.length === 0) {
       ctx.errors.push({
         level: ErrorLevel.CRITICAL,
         step: 3,
@@ -289,10 +300,9 @@ export function step3FormatParse(
       return null;
     }
 
-    // 提取表头
-    const headers = Object.keys(rawData[0]).filter(
-      h => h.trim() && !h.startsWith("__EMPTY")
-    );
+    // 主 Sheet = 行数最多的（通常是订单数据）
+    const primarySheet = allSheets.reduce((a, b) => a.dataRows >= b.dataRows ? a : b);
+    const headers = primarySheet.headers;
 
     if (headers.length === 0) {
       ctx.errors.push({
@@ -306,23 +316,27 @@ export function step3FormatParse(
       return null;
     }
 
+    const totalDataRows = allSheets.reduce((sum, s) => sum + s.dataRows, 0);
+
     const output: Step3Output = {
       headers,
-      rawRows: rawData,
-      totalRows: rawData.length + 1, // 含表头
-      dataRows: rawData.length,
-      sheetName: firstSheetName,
-      isMultiSheet: sheetNames.length > 1,
+      rawRows: primarySheet.rawRows,
+      totalRows: totalDataRows + 1,
+      dataRows: primarySheet.dataRows,
+      sheetName: primarySheet.name,
+      isMultiSheet: allSheets.length > 1,
+      allSheets: allSheets.length > 1 ? allSheets : undefined,
     };
 
     ctx.steps.step3 = output;
 
-    if (sheetNames.length > 1) {
+    if (allSheets.length > 1) {
+      const sheetDesc = allSheets.map(s => `「${s.name}」${s.dataRows}行`).join("、");
       ctx.errors.push({
         level: ErrorLevel.INFO,
         step: 3,
         code: "I4001",
-        message: `文件包含 ${sheetNames.length} 个工作表，当前使用第一个「${firstSheetName}」`,
+        message: `文件包含 ${allSheets.length} 个工作表：${sheetDesc}，主表为「${primarySheet.name}」`,
       });
     }
 
@@ -473,6 +487,8 @@ export interface IngestionResult {
   originalFileName: string;
   /** 数据行数 */
   dataRows: number;
+  /** 多 Sheet 文件时，所有 Sheet 的独立数据集 */
+  allSheets?: import("@shared/pipeline").SheetDataset[];
 }
 
 /**
@@ -514,5 +530,6 @@ export async function runIngestion(
     s3Key: step1.s3Key,
     originalFileName,
     dataRows: step3.dataRows,
+    allSheets: step3.allSheets,
   };
 }

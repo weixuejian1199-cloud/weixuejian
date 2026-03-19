@@ -117,19 +117,32 @@ export interface Step2Output {
  * 输入：UTF-8 内容
  * 输出：原始行数据（rawRows）
  */
-export interface Step3Output {
-  /** 表头字段名列表 */
+export interface SheetDataset {
+  /** Sheet 名称 */
+  name: string;
+  /** 该 Sheet 的表头字段名 */
   headers: string[];
-  /** 原始行数据（每行是一个字段名→值的映射） */
+  /** 该 Sheet 的原始行数据 */
+  rawRows: Record<string, string>[];
+  /** 数据行数 */
+  dataRows: number;
+}
+
+export interface Step3Output {
+  /** 主 Sheet 的表头字段名列表（向后兼容） */
+  headers: string[];
+  /** 主 Sheet 的原始行数据，每行带 __sourceSheet 标记（向后兼容） */
   rawRows: Record<string, string>[];
   /** 总行数（含表头） */
   totalRows: number;
   /** 数据行数（不含表头） */
   dataRows: number;
-  /** Sheet 名称（Excel 多 Sheet 时） */
+  /** 主 Sheet 名称 */
   sheetName?: string;
   /** 是否为多 Sheet 文件 */
   isMultiSheet: boolean;
+  /** 所有 Sheet 的独立数据集（多 sheet 文件时使用） */
+  allSheets?: SheetDataset[];
 }
 
 /**

@@ -153,6 +153,15 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
     // ── Layer 4: Expression ──────────────────────────────────────
     const expression = buildExpressionPrompt(resultSet);
 
+    // 多 Sheet 补充上下文：将非主表的字段列表注入 systemPrompt
+    const allSheetsFromIngestion = ingestionResults.flatMap(r => r.allSheets ?? []);
+    if (allSheetsFromIngestion.length > 1) {
+      const secondaryDesc = allSheetsFromIngestion
+        .map(s => `【${s.name}】${s.dataRows}行，字段：${s.headers.slice(0, 12).join("、")}${s.headers.length > 12 ? "…" : ""}`)
+        .join("\n");
+      expression.systemPrompt += `\n\n## 多工作表说明\n文件包含以下工作表，请综合所有工作表数据回答问题：\n${secondaryDesc}`;
+    }
+
     return {
       context: ctx,
       resultSet,
