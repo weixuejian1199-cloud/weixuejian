@@ -1475,7 +1475,7 @@ export function registerAtlasRoutes(app: Express) {
           for (const srcFile of resultSet.sourceFiles) {
             if (!srcFile.s3Key) continue;
             const fileBuffer = await storageReadFile(srcFile.s3Key);
-            const workbook = XLSX.read(fileBuffer, { type: "buffer", raw: false });
+            const workbook = XLSX.read(fileBuffer, { type: "buffer", raw: false, cellStyles: false, cellFormula: false, cellHTML: false });
             for (const sheetName of workbook.SheetNames) {
               const sheet = workbook.Sheets[sheetName];
               const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null });
@@ -3164,8 +3164,7 @@ ${dataTable}`}
       // 后台运行 Pipeline 生成 ResultSet
       setImmediate(async () => {
         try {
-          const mergedBuffer = buffer;
-          const mergedData = allRows;
+          const mergedData = allRows as Record<string, string>[];
 
           await updateSession(mergedSessionId, {
             fileUrl: reportUrl,
@@ -3173,17 +3172,29 @@ ${dataTable}`}
             colCount: Object.keys(mergedData[0] || {}).length,
           });
 
-          const xlsxBuffer = Buffer.from(XLSX.write(
-            XLSX.utils.book_new(),
-            { type: "buffer", bookType: "xlsx", compression: true }
-          ));
+          // 用 fileStats 构建 sourceFilesOverride，保留各文件真实行数
+          const sourceFilesOverride = fileStats.map(f => ({
+            fileName: f.name,
+            s3Key: "",
+            totalRows: f.rowCount + 1,
+            dataRows: f.rowCount,
+            fieldCount: Object.keys(mergedData[0] || {}).length,
+            platform: f.platform,
+          }));
 
-          await runPipelineInBackground(
+          // 构建 identity fieldMapping（行数据已标准化）
+          const identityFieldMapping = Object.fromEntries(
+            Object.keys(mergedData[0] || {}).map(k => [k, k])
+          );
+
+          await runParsedPipelineInBackground(
             mergedSessionId,
             userId,
-            mergedBuffer,
+            mergedData,
+            identityFieldMapping,
             mergedFilename,
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            undefined,
+            sourceFilesOverride
           );
         } catch (err) {
           console.error(`[Atlas] Pipeline failed for merged session ${mergedSessionId}:`, err);

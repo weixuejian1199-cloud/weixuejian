@@ -265,13 +265,16 @@ export function step3FormatParse(
       return null;
     }
 
-    // 使用第一个 Sheet（后续可扩展多 Sheet 支持）
-    const sheetName = sheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const rawData: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, {
-      defval: "",
-      raw: false,
-    });
+    // 遍历所有 Sheet，拼接行数据
+    const rawData: Record<string, string>[] = [];
+    for (const sheetName of sheetNames) {
+      const sheet = workbook.Sheets[sheetName];
+      const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, {
+        defval: "",
+        raw: false,
+      });
+      rawData.push(...rows);
+    }
 
     if (rawData.length === 0) {
       ctx.errors.push({

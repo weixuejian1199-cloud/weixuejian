@@ -178,7 +178,8 @@ export async function runPipelineFromParsedData(
   rawRows: Record<string, string>[],
   fieldMapping: Record<string, string>,
   originalFileName: string,
-  templateId?: string
+  templateId?: string,
+  sourceFilesOverride?: SourceFileInfo[]
 ): Promise<{ success: boolean; resultSet?: ResultSet; errorSummary?: string }> {
   const jobId = nanoid(12);
   const ctx = createPipelineContext(jobId, String(userId));
@@ -213,7 +214,7 @@ export async function runPipelineFromParsedData(
     // 问题2修复：日志下移到 allFields 构建完成后，输出 union field count
     console.log(`[Pipeline]   Fields (union): ${allFields.size}`);
 
-    const sourceFiles: SourceFileInfo[] = [{
+    const sourceFiles: SourceFileInfo[] = sourceFilesOverride ?? [{
       fileName: originalFileName,
       s3Key: "",
       totalRows: rawRows.length + 1,
@@ -229,7 +230,7 @@ export async function runPipelineFromParsedData(
       skippedCount: governance.skippedCount,
       fields: Array.from(allFields),
       platform: "parsed",
-      isMultiFile: false,
+      isMultiFile: sourceFilesOverride ? sourceFilesOverride.length > 1 : false,
       templateId,
     };
 
@@ -266,7 +267,8 @@ export async function runParsedPipelineInBackground(
   rawRows: Record<string, string>[],
   fieldMapping: Record<string, string>,
   originalFileName: string,
-  templateId?: string
+  templateId?: string,
+  sourceFilesOverride?: SourceFileInfo[]
 ): Promise<void> {
   console.log(`[Pipeline] 🚀 Starting background parsed pipeline for session ${sessionId}`);
   try {
@@ -276,7 +278,8 @@ export async function runParsedPipelineInBackground(
       rawRows,
       fieldMapping,
       originalFileName,
-      templateId
+      templateId,
+      sourceFilesOverride
     );
 
     if (result.success && result.resultSet) {
