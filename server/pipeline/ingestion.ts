@@ -267,6 +267,7 @@ export function step3FormatParse(
 
     // 遍历所有 Sheet，拼接行数据
     const rawData: Record<string, string>[] = [];
+    let firstSheetName = sheetNames[0];
     for (const sheetName of sheetNames) {
       const sheet = workbook.Sheets[sheetName];
       const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, {
@@ -310,7 +311,7 @@ export function step3FormatParse(
       rawRows: rawData,
       totalRows: rawData.length + 1, // 含表头
       dataRows: rawData.length,
-      sheetName,
+      sheetName: firstSheetName,
       isMultiSheet: sheetNames.length > 1,
     };
 
@@ -321,7 +322,7 @@ export function step3FormatParse(
         level: ErrorLevel.INFO,
         step: 3,
         code: "I4001",
-        message: `文件包含 ${sheetNames.length} 个工作表，当前使用第一个「${sheetName}」`,
+        message: `文件包含 ${sheetNames.length} 个工作表，当前使用第一个「${firstSheetName}」`,
       });
     }
 

@@ -4134,7 +4134,7 @@ ${dataTable}`}
         if (!s3Key) continue;
 
         const fileBuffer = await storageReadFile(s3Key);
-        const workbook = XLSX.read(fileBuffer, { type: "buffer", raw: false, cellStyles: false, cellFormula: false, cellHTML: false });
+        const workbook = XLSX.read(fileBuffer, { type: "buffer", raw: true, sheetStubs: false });
 
         for (const sheetName of workbook.SheetNames) {
           const sheet = workbook.Sheets[sheetName];
