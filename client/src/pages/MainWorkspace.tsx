@@ -120,7 +120,7 @@ export default function MainWorkspace() {
 
   // -- File processing: silent upload to chip (no messages, no AI analysis)
   // Analysis is triggered when user clicks Send.
-  const processFile = useCallback(async (file: File, explicitTaskId?: string) => {
+  const processFile = useCallback(async (file: File, explicitTaskId?: string, shouldSetTitle = false) => {
     const taskId = explicitTaskId ?? activeTaskId;
     if (!taskId) return;
     const ext = file.name.split(".").pop()?.toLowerCase();
@@ -175,10 +175,12 @@ export default function MainWorkspace() {
         });
       }).catch(() => {/* non-critical, ignore */});
 
-      // Update task title with filename
-      const currentTask = tasks.find(t => t.id === taskId);
-      if (currentTask && currentTask.title === "新建任务") {
-        updateTask(taskId, { title: result.filename });
+      // Update task title with filename — only for the first file to avoid race condition
+      if (shouldSetTitle) {
+        const currentTask = tasks.find(t => t.id === taskId);
+        if (currentTask && currentTask.title === "新建任务") {
+          updateTask(taskId, { title: result.filename });
+        }
       }
     } catch (err: any) {
       updateUploadedFile(tempId, { status: "error" });
@@ -195,7 +197,7 @@ export default function MainWorkspace() {
       return !isDup;
     });
     if (fileArray.length === 0) return;
-    fileArray.forEach(file => processFile(file, taskId));
+    fileArray.forEach((file, idx) => processFile(file, taskId, idx === 0));
   }, [processFile, activeTaskId, createNewTask, uploadedFiles]);
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
