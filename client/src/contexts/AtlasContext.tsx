@@ -450,21 +450,21 @@ export function AtlasProvider({ children }: { children: React.ReactNode }) {
     ));
   }, [activeTaskId]);
 
+  // Search all tasks by file id to avoid stale-closure bug when activeTaskId changes
+  // (e.g. concurrent uploads to a newly created task where activeTaskId hasn't re-rendered yet)
   const updateUploadedFile = useCallback((id: string, updates: Partial<UploadedFile>) => {
-    setTasks(prev => prev.map(t =>
-      t.id === activeTaskId
-        ? { ...t, uploadedFiles: t.uploadedFiles.map(f => f.id === id ? { ...f, ...updates } : f) }
-        : t
-    ));
-  }, [activeTaskId]);
+    setTasks(prev => prev.map(t => ({
+      ...t,
+      uploadedFiles: t.uploadedFiles.map(f => f.id === id ? { ...f, ...updates } : f),
+    })));
+  }, []);
 
   const removeUploadedFile = useCallback((id: string) => {
-    setTasks(prev => prev.map(t =>
-      t.id === activeTaskId
-        ? { ...t, uploadedFiles: t.uploadedFiles.filter(f => f.id !== id) }
-        : t
-    ));
-  }, [activeTaskId]);
+    setTasks(prev => prev.map(t => ({
+      ...t,
+      uploadedFiles: t.uploadedFiles.filter(f => f.id !== id),
+    })));
+  }, []);
 
   const clearFiles = useCallback(() => {
     setTasks(prev => prev.map(t =>
