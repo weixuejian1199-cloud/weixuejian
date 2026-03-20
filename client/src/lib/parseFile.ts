@@ -301,6 +301,10 @@ const CATEGORY_FIELD_KEYWORDS = [
   "状态", "类型", "类别", "品类", "分类", "等级", "级别",
   "渠道", "来源", "平台", "门店", "仓库", "仓",
   "性别", "标签", "行业", "部门", "岗位", "职位",
+  // 电商核心维度
+  "达人", "昵称", "主播", "带货人",
+  "商品", "选购", "产品",
+  "店铺", "商家",
 ];
 
 const FREE_TEXT_FIELD_KEYWORDS = [
@@ -334,6 +338,10 @@ const CATEGORY_KEY_MAP: Array<{ keywords: string[]; key: string }> = [
   { keywords: ["行业"], key: "industry" },
   { keywords: ["部门"], key: "department" },
   { keywords: ["岗位", "职位"], key: "position" },
+  // 电商核心维度
+  { keywords: ["达人", "昵称", "主播", "带货人"], key: "influencer" },
+  { keywords: ["选购商品", "商品名", "商品标题", "商品", "产品名", "产品"], key: "product" },
+  { keywords: ["店铺", "商家"], key: "store" },
 ];
 
 /**
