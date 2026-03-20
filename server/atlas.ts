@@ -856,26 +856,48 @@ async function storeSessionData(sessionId: string, data: Record<string, unknown>
 function generateQuickReport(data: Record<string, unknown>[], dfInfo: DataFrameInfo, filename: string) {
   const metrics = computeKeyMetrics(data, detectScenario(dfInfo.fields), dfInfo);
 
-  // 商品 TOP5
-  const productField = dfInfo.fields.find(f => /商品 | 产品 | 品名/i.test(f.name));
-  const amountField = dfInfo.fields.find(f => /金额 | 销售额 | 应付 | 实付/i.test(f.name) && f.type === 'numeric');
+  // 金额字段
+  const amountField = dfInfo.fields.find(f => /金额|销售额|应付|实付|GMV|收入/i.test(f.name) && f.type === 'numeric');
 
+  // 达人/渠道 TOP5（优先级最高）
+  const influencerField = dfInfo.fields.find(f => /达人|主播|博主|渠道|来源|带货人|推广员/i.test(f.name) && f.type !== 'numeric');
+
+  // 商品 TOP5
+  const productField = influencerField ? undefined : dfInfo.fields.find(f => /商品|产品|品名|品类/i.test(f.name) && f.type !== 'numeric');
+
+  const groupField = influencerField || productField;
+  const groupLabel = influencerField ? '达人/渠道' : '商品';
+
+  const groupStats: Record<string, { count: number; amount: number }> = {};
   const productStats: Record<string, { count: number; amount: number }> = {};
   for (const row of data) {
-    const product = String(row[productField?.name || ''] || '未知商品');
-    const amount = Number(row[amountField?.name || '']) || 0;
-    if (!productStats[product]) productStats[product] = { count: 0, amount: 0 };
-    productStats[product].count++;
-    productStats[product].amount += amount;
+    if (groupField) {
+      const group = String(row[groupField.name] || (influencerField ? '未知达人' : '未知商品'));
+      const amount = Number(row[amountField?.name || '']) || 0;
+      if (!groupStats[group]) groupStats[group] = { count: 0, amount: 0 };
+      groupStats[group].count++;
+      groupStats[group].amount += amount;
+    }
+    // 兼容旧逻辑
+    if (!influencerField && productField) {
+      const product = String(row[productField.name] || '未知商品');
+      const amount = Number(row[amountField?.name || '']) || 0;
+      if (!productStats[product]) productStats[product] = { count: 0, amount: 0 };
+      productStats[product].count++;
+      productStats[product].amount += amount;
+    }
   }
 
-  const productTop5 = Object.entries(productStats)
-    .sort((a, b) => b[1].amount - a[1].amount)
+  const groupTop5 = Object.entries(groupStats)
+    .sort((a, b) => b[1].amount - a[1].amount || b[1].count - a[1].count)
     .slice(0, 5)
     .map(([name, stats], i) => ({ rank: i + 1, name, count: stats.count, amount: stats.amount }));
 
+  // 兼容旧字段
+  const productTop5 = groupTop5;
+
   // 地域 TOP10
-  const regionField = dfInfo.fields.find(f => /省 | 市 | 地区 | 区域/i.test(f.name));
+  const regionField = dfInfo.fields.find(f => /省|市|地区|区域|收货省/i.test(f.name) && f.type !== 'numeric');
   const regionStats: Record<string, { count: number; amount: number }> = {};
   for (const row of data) {
     const region = String(row[regionField?.name || ''] || '未知');
@@ -889,22 +911,6 @@ function generateQuickReport(data: Record<string, unknown>[], dfInfo: DataFrameI
     .sort((a, b) => b[1].count - a[1].count)
     .slice(0, 10)
     .map(([name, stats], i) => ({ rank: i + 1, name, count: stats.count, amount: stats.amount }));
-
-  // AI 生成经营建议
-  const aiSuggestions: string[] = [];
-  if (productTop5.length > 0) {
-    const topProduct = productTop5[0].name;
-    aiSuggestions.push(`🎯 <b>商品策略</b>：主推"${topProduct.slice(0, 20)}..."等爆款商品，销量占比最高`);
-  }
-  if (regionTop10.length > 0) {
-    const topRegion = regionTop10[0].name;
-    aiSuggestions.push(`🌏 <b>地域策略</b>：重点维护"${topRegion}"市场（占比${Math.round(regionTop10[0].count / dfInfo.row_count * 100)}%）`);
-  }
-  const avgOrder = metrics.find(m => m.name === '平均客单价');
-  if (avgOrder) {
-    aiSuggestions.push(`💰 <b>价格策略</b>：平均客单价¥${avgOrder.value}，可通过组合装提升`);
-  }
-  aiSuggestions.push(`📢 <b>营销策略</b>：分析销售高峰时段，针对性投放广告`);
 
   // 构建 atlas-table 数据概览
   const tableRows: [string, string, string][] = [
@@ -924,43 +930,62 @@ function generateQuickReport(data: Record<string, unknown>[], dfInfo: DataFrameI
 
   // 核心洞察（规则推导）
   const insights: string[] = [];
-  if (productTop5.length > 0 && amountField) {
-    const top = productTop5[0];
-    const totalAmt = metrics.find(m => /销售额|金额|GMV/i.test(m.name));
-    if (totalAmt && Number(totalAmt.value) > 0) {
-      const pct = Math.round(top.amount / Number(totalAmt.value) * 100);
-      if (pct > 0) insights.push(`• "${top.name.slice(0, 20)}" 销售额占比最高（约 ${pct}%），是核心热销商品`);
-      else insights.push(`• "${top.name.slice(0, 20)}" 销售额最高（¥${top.amount.toLocaleString()}）`);
+  const totalAmt = metrics.find(m => /销售额|金额|GMV/i.test(m.name));
+  const totalAmtVal = totalAmt ? Number(totalAmt.value) : 0;
+
+  if (groupTop5.length > 0) {
+    const top = groupTop5[0];
+    if (amountField && top.amount > 0 && totalAmtVal > 0) {
+      const pct = Math.round(top.amount / totalAmtVal * 100);
+      const amtStr = top.amount >= 10000 ? `¥${(top.amount / 10000).toFixed(1)}万` : `¥${top.amount.toLocaleString()}`;
+      insights.push(`• **${groupLabel}表现**：${top.name.slice(0, 20)} 是绝对主力：${top.count.toLocaleString()}单（${pct}%），资金贡献${amtStr}`);
     } else {
-      insights.push(`• "${top.name.slice(0, 20)}" 销售额最高（¥${top.amount.toLocaleString()}）`);
+      insights.push(`• **${groupLabel}表现**：${top.name.slice(0, 20)} 订单量最高（${top.count.toLocaleString()}单，占比${Math.round(top.count / dfInfo.row_count * 100)}%）`);
+    }
+    // TOP2-3 洞察
+    if (groupTop5.length >= 3 && totalAmtVal > 0 && amountField) {
+      const top3Total = groupTop5.slice(0, 3).reduce((s, g) => s + g.amount, 0);
+      const top3Pct = Math.round(top3Total / totalAmtVal * 100);
+      insights.push(`• **集中度分析**：前3名${groupLabel}合计贡献 ${top3Pct}% 销售额，${top3Pct > 70 ? '依赖集中，建议分散风险' : '分布相对均衡'}`);
     }
   }
+
   if (regionTop10.length > 0 && regionField) {
     const top = regionTop10[0];
     const pct = Math.round(top.count / dfInfo.row_count * 100);
-    insights.push(`• ${top.name} 是主要订单来源（占 ${pct}%），为核心市场`);
+    insights.push(`• **地域分布**：${top.name} 是主要订单来源（${top.count.toLocaleString()}单，占 ${pct}%），为核心市场`);
   }
+
   const refundM = metrics.find(m => /退款率/.test(m.name));
-  if (refundM && parseFloat(String(refundM.value)) > 5) {
-    insights.push(`• ⚠️ 退款率 ${refundM.value}%，高于正常水平（5%），建议排查退款原因`);
-  } else if (insights.length < 2) {
-    insights.push(`• 数据整体健康，共 ${dfInfo.row_count.toLocaleString()} 行有效记录`);
+  if (refundM) {
+    const refundVal = parseFloat(String(refundM.value));
+    if (refundVal > 5) {
+      insights.push(`• ⚠️ **费用结构**：退款率 ${refundM.value}%，高于正常水平（5%），建议排查退款原因`);
+    } else if (refundVal > 0) {
+      insights.push(`• **费用结构**：退款率 ${refundM.value}%，处于正常范围`);
+    }
+  }
+
+  if (insights.length < 2) {
+    insights.push(`• 数据整体健康，共 ${dfInfo.row_count.toLocaleString()} 行有效记录，${dfInfo.col_count} 个维度字段`);
   }
 
   // 战略建议（规则推导）
   const structuredSuggestions: string[] = [];
-  if (productTop5.length > 0) {
-    structuredSuggestions.push(`▶ 重点扶持 "${productTop5[0].name.slice(0, 15)}" 等头部商品，加大推广资源（依据：销售额排名第一）`);
+  if (groupTop5.length > 0) {
+    const top = groupTop5[0];
+    const amtStr = top.amount > 0 ? `¥${top.amount >= 10000 ? (top.amount / 10000).toFixed(1) + '万' : top.amount.toLocaleString()}` : `${top.count.toLocaleString()}单`;
+    structuredSuggestions.push(`▶ **扶持头部${groupLabel}**：重点投入 "${top.name.slice(0, 15)}"，加大资源倾斜（依据：${groupLabel}排名第一，贡献${amtStr}）`);
   }
   if (regionTop10.length > 0 && regionField) {
     const top = regionTop10[0];
-    structuredSuggestions.push(`▶ 在 ${top.name} 加强营销投入，巩固核心市场（依据：订单占比 ${Math.round(top.count / dfInfo.row_count * 100)}%）`);
+    structuredSuggestions.push(`▶ **深耕核心市场**：在 ${top.name} 加强营销投入，巩固优势（依据：订单占比 ${Math.round(top.count / dfInfo.row_count * 100)}%，共${top.count.toLocaleString()}单）`);
   }
   const avgOrderM = metrics.find(m => /客单价/.test(m.name));
   if (avgOrderM) {
-    structuredSuggestions.push(`▶ 当前客单价 ${avgOrderM.value}${avgOrderM.unit || ''}，可通过组合套装或满减活动提升（依据：客单价数据）`);
+    structuredSuggestions.push(`▶ **提升客单价**：当前客单价 ${avgOrderM.value}${avgOrderM.unit || ''}，可通过组合套装或满减活动提升（依据：客单价数据）`);
   } else {
-    structuredSuggestions.push(`▶ 深入分析各字段关联性，挖掘业务增长机会（依据：${dfInfo.col_count} 个数据维度）`);
+    structuredSuggestions.push(`▶ **数据深挖**：分析各维度关联性，挖掘增长机会（依据：${dfInfo.col_count} 个数据维度）`);
   }
 
   const report = `**📊 数据概览**
@@ -3552,70 +3577,12 @@ ${dataTable}`}
           const hasDate = scenario.dateFields.length > 0;
           const hasName = scenario.groupFields.some(f => /姓名|名字|员工|name|staff/.test(f.toLowerCase()));
 
-          const fallbackTable = { title: `${originalname} 关键指标`, columns: ["指标名称", "指标値"], rows: keyMetrics.map(m => [m.name, String(m.value)]), highlight: 1, sortBy: -1, sortDir: "desc", source: `基于 ${dfInfo.row_count.toLocaleString()} 行全量数据统计` };
-          const fallbackTableStr = "```atlas-table\n" + JSON.stringify(fallbackTable, null, 2) + "\n```";
-          const uploadSystemPrompt = [
-            '你是 ATLAS，一个专业的智能数据分析助手。用户刚上传了文件，请按以下四个部分输出结构化分析报告：',
-            '',
-            '**📊 数据概览**',
-            '必须输出以下 atlas-table 格式（严格遵守）：',
-            '', '```atlas-table', '{',
-            `  "title": "[${originalname}] 关键数据概览",`,
-            `  "source": "基于 ${dfInfo.row_count.toLocaleString()} 行全量数据",`,
-            '  "columns": ["指标", "数值", "说明"],',
-            '  "rows": [',
-            `    ["总行数", "${dfInfo.row_count}", "有效数据行"],`,
-            `    ["字段数", "${dfInfo.col_count}", "包括: ${fieldListStr}"],`,
-            `    // 补充 5-6 个最重要的业务指标（已计算值：${metricsSummary}）`,
-            '  ],', '  "highlight": 1,', '  "sortBy": -1,', '  "sortDir": "desc"', '}', '```',
-            '',
-            '**🎯 核心洞察**',
-            `基于数据特征，给出 2-3 条最有价值的发现，每条不超过 25 字。${qualityHint ? '注意：有数据质量问题，请在洞察中提及。' : ''}`,
-            '• 洞察1：...',
-            '• 洞察2：...',
-            '',
-            '**💡 战略建议**',
-            '给出 3 条具体可执行的建议，必须引用实际数字：',
-            '▶ 建议1：[具体行动]（依据：[具体数值]）',
-            '▶ 建议2：[具体行动]（依据：[具体数值]）',
-            '▶ 建议3：[具体行动]（依据：[具体数值]）',
-            '',
-            '**📈 图表提示**',
-            '固定输出这一行：「右上角已生成数据图表，可直接查看商品分布和销售趋势。」',
-            '',
-            `数据场景：${scenario.name}，置信度：${(scenario.confidence * 100).toFixed(0)}%`,
-            `主要数值字段：${scenario.primaryFields.join('、') || '无'}`,
-            `分组字段：${scenario.groupFields.join('、') || '无'}`,
-            `已计算指标：${metricsSummary}`,
-            '',
-            '注意：',
-            '- rows 中的注释行必须删除，只保留真实数据行',
-            '- 指标值直接用已计算的真实数值，不要编造',
-            '- 洞察和建议必须引用具体数字，不能泛泛而谈',
-          ].join('\n');
-
-          let aiAnalysis = "";
-          try {
-            const openai = createLLM();
-            // 45s timeout: qwen3-max typically responds in 5-15s; abort if exceeded to avoid frontend timeout
-            const aiAbortController = new AbortController();
-            const aiTimeoutId = setTimeout(() => aiAbortController.abort(), 45_000);
-            const result = await streamText({
-              model: openai.chat(selectModel(dfInfo.row_count)),
-              system: uploadSystemPrompt,
-              messages: [{ role: "user", content: `文件名：${originalname}，共 ${dfInfo.row_count} 行 ${dfInfo.col_count} 列。字段：${fieldSummary}。${qualityIssues.length > 0 ? '数据质量：' + qualityIssues.join('；') : '数据质量良好'}。已计算指标：${metricsSummary}` }],
-              maxOutputTokens: 1000,
-              abortSignal: aiAbortController.signal,
-            });
-            aiAnalysis = await result.text;
-            clearTimeout(aiTimeoutId);
-            if (!aiAnalysis.includes("atlas-table")) {
-              const intro = aiAnalysis.split("\n")[0] || `这是一份${scenario.name}，共${dfInfo.row_count}行、${dfInfo.col_count}列。`;
-              aiAnalysis = `${intro}\n\n${fallbackTableStr}`;
-            }
-          } catch (e) {
-            const qualityNote = qualityIssues.length > 0 ? `\n\n⚠️ 数据质量提醒：${qualityIssues.join('；')}` : '';
-            aiAnalysis = `这是一份**${scenario.name}**，共 ${dfInfo.row_count.toLocaleString()} 行、${dfInfo.col_count} 列。${qualityNote}\n\n${fallbackTableStr}`;
+          // 使用规则推导生成快报（格式稳定，不依赖 AI 格式遵循）
+          const quickReport = generateQuickReport(workingData.slice(0, 5000), dfInfo, originalname);
+          let aiAnalysis = quickReport.report;
+          // 如有数据质量问题，追加提醒
+          if (qualityIssues.length > 0) {
+            aiAnalysis += `\n\n⚠️ **数据质量提醒**：${qualityIssues.join('；')}`;
           }
 
           const suggestedActions: Array<{ label: string; prompt: string; icon: string }> = [];
@@ -3897,87 +3864,12 @@ ${dataTable}`}
           const hasStore2 = scenario.groupFields.some(f => /\u95e8\u5e97|\u5e97\u94fa|store|shop/.test(f.toLowerCase()));
           const hasName2 = scenario.groupFields.some(f => /\u59d3\u540d|\u540d\u5b57|\u5458\u5de5|name|staff/.test(f.toLowerCase()));
 
-          const fallbackTable = {
-            title: `${originalname} \u5173\u952e\u6307\u6807`,
-            columns: ["\u6307\u6807\u540d\u79f0", "\u6307\u6807\u503c"],
-            rows: keyMetrics.map(m => [m.name, String(m.value)]),
-            highlight: 1, sortBy: -1, sortDir: "desc",
-          };
-          const fallbackTableStr = "```atlas-table\n" + JSON.stringify(fallbackTable, null, 2) + "\n```";
-
-          const fieldListStr = dfInfo.fields.slice(0, 4).map(f => f.name).join('\u3001') + (dfInfo.fields.length > 4 ? '\u7b49' : '');
-          const qualityHint = qualityIssues.length > 0 ? '\uff08\u5e76\u52a0\u4e00\u53e5\u8d28\u91cf\u63d0\u9192\uff09' : '';
-
-          const uploadSystemPrompt = [
-            '你是 ATLAS，一个专业的智能数据分析助手。用户刚上传了文件，请按以下四个部分输出结构化分析报告：',
-            '',
-            '**📊 数据概览**',
-            '必须输出以下 atlas-table 格式（严格遵守）：',
-            '', '```atlas-table', '{',
-            `  "title": "[${originalname}] 关键数据概览",`,
-            `  "source": "基于 ${dfInfo.row_count.toLocaleString()} 行全量数据",`,
-            '  "columns": ["指标", "数值", "说明"],',
-            '  "rows": [',
-            `    ["总行数", "${dfInfo.row_count}", "有效数据行"],`,
-            `    ["字段数", "${dfInfo.col_count}", "包括: ${fieldListStr}"],`,
-            `    // 补充 5-6 个最重要的业务指标（已计算值：${metricsSummary}）`,
-            '  ],', '  "highlight": 1,', '  "sortBy": -1,', '  "sortDir": "desc"', '}', '```',
-            '',
-            '**🎯 核心洞察**',
-            `基于数据特征，给出 2-3 条最有价值的发现，每条不超过 25 字。${qualityHint ? '注意：有数据质量问题，请在洞察中提及。' : ''}`,
-            '• 洞察1：...',
-            '• 洞察2：...',
-            '',
-            '**💡 战略建议**',
-            '给出 3 条具体可执行的建议，必须引用实际数字：',
-            '▶ 建议1：[具体行动]（依据：[具体数值]）',
-            '▶ 建议2：[具体行动]（依据：[具体数值]）',
-            '▶ 建议3：[具体行动]（依据：[具体数值]）',
-            '',
-            '**📈 图表提示**',
-            '固定输出这一行：「右上角已生成数据图表，可直接查看商品分布和销售趋势。」',
-            '',
-            `数据场景：${scenario.name}，置信度：${(scenario.confidence * 100).toFixed(0)}%`,
-            `主要数值字段：${scenario.primaryFields.join('、') || '无'}`,
-            `分组字段：${scenario.groupFields.join('、') || '无'}`,
-            `已计算指标：${metricsSummary}`,
-            '',
-            '注意：',
-            '- rows 中的注释行必须删除，只保留真实数据行',
-            '- 指标值直接用已计算的真实数值，不要编造',
-            '- 洞察和建议必须引用具体数字，不能泛泛而谈',
-          ].join('\n');
-
-          let aiAnalysis = "";
-          try {
-            const openai = createLLM();
-            const aiAbortController = new AbortController();
-            const aiTimeoutId = setTimeout(() => aiAbortController.abort(), 45_000);
-            const result = await streamText({
-              model: openai.chat("qwen3-max-2026-01-23"),
-              system: uploadSystemPrompt,
-              messages: [{
-                role: "user",
-                content: [
-                `\u6587\u4ef6\u540d\uff1a${originalname}\uff0c\u5171 ${dfInfo.row_count.toLocaleString()} \u884c ${dfInfo.col_count} \u5217\u3002`,
-                `\u5b57\u6bb5\u5217\u8868\uff1a${fieldSummary}`,
-                numericFieldStats ? `\n\u2550\u2550 \u5168\u91cf\u7edf\u8ba1\u6458\u8981\uff08\u57fa\u4e8e ${dfInfo.row_count.toLocaleString()} \u884c\u5168\u91cf\u6570\u636e\uff0c\u975e\u6837\u672c\uff09\u2550\u2550\n\u91cd\u8981\u7ea6\u675f\uff1a\u8be2\u95ee\u603b\u91cf/\u5408\u8ba1/\u5747\u5024/\u6700\u5927/\u6700\u5c0f\u65f6\uff0c\u5fc5\u987b\u76f4\u63a5\u5f15\u7528\u4ee5\u4e0b\u5168\u91cf\u7edf\u8ba1\u5024\uff0c\u7981\u6b62\u5bf9\u6837\u672c\u91cd\u65b0\u8ba1\u7b97\u3002\n${numericFieldStats}\n\u2550\u2550 \u5168\u91cf\u7edf\u8ba1\u6458\u8981\u7ed3\u675f \u2550\u2550` : '',
-                `${qualityIssues.length > 0 ? '\n\u6570\u636e\u8d28\u91cf\uff1a' + qualityIssues.join('\uff1b') : ''}`,
-                `\n\u5df2\u8ba1\u7b97\u6307\u6807\uff1a${metricsSummary}`,
-              ].filter(Boolean).join(''),
-              }],
-              maxOutputTokens: 1000,
-              abortSignal: aiAbortController.signal,
-            });
-            aiAnalysis = await result.text;
-            clearTimeout(aiTimeoutId);
-            if (!aiAnalysis.includes("atlas-table")) {
-              const intro = aiAnalysis.split("\n")[0] || `\u8fd9\u662f\u4e00\u4efd${scenario.name}\uff0c\u5171${dfInfo.row_count}\u884c\u3001${dfInfo.col_count}\u5217\u3002`;
-              aiAnalysis = `${intro}\n\n${fallbackTableStr}`;
-            }
-          } catch (e) {
-            console.warn("[Atlas] upload-parsed AI failed, using fallback:", e);
-            aiAnalysis = `\u8fd9\u662f\u4e00\u4efd**${scenario.name}**\uff0c\u5171 ${dfInfo.row_count.toLocaleString()} \u884c\u3001${dfInfo.col_count} \u5217\u3002\n\n${fallbackTableStr}`;
+          // 使用规则推导生成快报（格式稳定，不依赖 AI 格式遵循）
+          const quickReportParsed = generateQuickReport(normalizedData.slice(0, 5000), dfInfo, originalname);
+          let aiAnalysis = quickReportParsed.report;
+          // 如有数据质量问题，追加提醒
+          if (qualityIssues.length > 0) {
+            aiAnalysis += `\n\n⚠️ **数据质量提醒**：${qualityIssues.join('；')}`;
           }
 
           const suggestedActions: Array<{ label: string; prompt: string; icon: string }> = [];
