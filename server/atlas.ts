@@ -906,31 +906,84 @@ function generateQuickReport(data: Record<string, unknown>[], dfInfo: DataFrameI
   }
   aiSuggestions.push(`📢 <b>营销策略</b>：分析销售高峰时段，针对性投放广告`);
 
-  // 生成报告文本
-  const report = `📊 <b>经营数据分析报告</b>
-━━━━━━━━━━━━━━━━━━━━
+  // 构建 atlas-table 数据概览
+  const tableRows: [string, string, string][] = [
+    ["总行数", String(dfInfo.row_count), "有效数据行"],
+    ["字段数", String(dfInfo.col_count), dfInfo.fields.slice(0, 3).map(f => f.name).join('、') + (dfInfo.col_count > 3 ? '等' : '')],
+    ...metrics.slice(0, 6).map(m => [m.name, `${m.value}${m.unit || ''}`, ""] as [string, string, string]),
+  ];
+  const tableJson = JSON.stringify({
+    title: `${filename} 关键数据概览`,
+    source: `基于 ${dfInfo.row_count.toLocaleString()} 行全量数据`,
+    columns: ["指标", "数值", "说明"],
+    rows: tableRows,
+    highlight: 1,
+    sortBy: -1,
+    sortDir: "desc",
+  }, null, 2);
 
-🎯 <b>核心指标</b>
-${metrics.map(m => `├─ ${m.name}: ${m.value}${m.unit || ''}`).join('\n')}
+  // 核心洞察（规则推导）
+  const insights: string[] = [];
+  if (productTop5.length > 0 && amountField) {
+    const top = productTop5[0];
+    const totalAmt = metrics.find(m => /销售额|金额|GMV/i.test(m.name));
+    if (totalAmt && Number(totalAmt.value) > 0) {
+      const pct = Math.round(top.amount / Number(totalAmt.value) * 100);
+      if (pct > 0) insights.push(`• "${top.name.slice(0, 20)}" 销售额占比最高（约 ${pct}%），是核心热销商品`);
+      else insights.push(`• "${top.name.slice(0, 20)}" 销售额最高（¥${top.amount.toLocaleString()}）`);
+    } else {
+      insights.push(`• "${top.name.slice(0, 20)}" 销售额最高（¥${top.amount.toLocaleString()}）`);
+    }
+  }
+  if (regionTop10.length > 0 && regionField) {
+    const top = regionTop10[0];
+    const pct = Math.round(top.count / dfInfo.row_count * 100);
+    insights.push(`• ${top.name} 是主要订单来源（占 ${pct}%），为核心市场`);
+  }
+  const refundM = metrics.find(m => /退款率/.test(m.name));
+  if (refundM && parseFloat(String(refundM.value)) > 5) {
+    insights.push(`• ⚠️ 退款率 ${refundM.value}%，高于正常水平（5%），建议排查退款原因`);
+  } else if (insights.length < 2) {
+    insights.push(`• 数据整体健康，共 ${dfInfo.row_count.toLocaleString()} 行有效记录`);
+  }
 
-🛒 <b>商品销售 TOP 5</b>
-${productTop5.map(p => `${p.rank}. ${p.name.slice(0, 30)}...  ${p.count}单  ¥${p.amount.toLocaleString()}`).join('\n')}
+  // 战略建议（规则推导）
+  const structuredSuggestions: string[] = [];
+  if (productTop5.length > 0) {
+    structuredSuggestions.push(`▶ 重点扶持 "${productTop5[0].name.slice(0, 15)}" 等头部商品，加大推广资源（依据：销售额排名第一）`);
+  }
+  if (regionTop10.length > 0 && regionField) {
+    const top = regionTop10[0];
+    structuredSuggestions.push(`▶ 在 ${top.name} 加强营销投入，巩固核心市场（依据：订单占比 ${Math.round(top.count / dfInfo.row_count * 100)}%）`);
+  }
+  const avgOrderM = metrics.find(m => /客单价/.test(m.name));
+  if (avgOrderM) {
+    structuredSuggestions.push(`▶ 当前客单价 ${avgOrderM.value}${avgOrderM.unit || ''}，可通过组合套装或满减活动提升（依据：客单价数据）`);
+  } else {
+    structuredSuggestions.push(`▶ 深入分析各字段关联性，挖掘业务增长机会（依据：${dfInfo.col_count} 个数据维度）`);
+  }
 
-📍 <b>地域订单 TOP 10</b>
-${regionTop10.map(r => `${r.rank}. ${r.name}  ${r.count.toLocaleString()}单  ¥${r.amount.toLocaleString()}`).join('\n')}
+  const report = `**📊 数据概览**
 
-💡 <b>经营建议</b>
-${aiSuggestions.map(s => `• ${s}`).join('\n')}
+\`\`\`atlas-table
+${tableJson}
+\`\`\`
 
-━━━━━━━━━━━━━━━━━━━━
-<small>数据时间：${new Date().toISOString().slice(0, 10)} | 分析师：ATLAS 🤖</small>`;
+**🎯 核心洞察**
+${insights.join('\n')}
+
+**💡 战略建议**
+${structuredSuggestions.join('\n')}
+
+**📈 图表提示**
+右上角已生成数据图表，可直接查看商品分布和销售趋势。`;
 
   return {
     report,
     metrics,
     productTop5,
     regionTop10,
-    suggestions: aiSuggestions,
+    suggestions: structuredSuggestions,
   };
 }
 
@@ -1292,7 +1345,10 @@ export function registerAtlasRoutes(app: Express) {
             `【${s.name}】${s.dfInfo.row_count}行×${s.dfInfo.col_count}列，字段：${s.dfInfo.fields.slice(0, 8).map(f => f.name).join('、')}`
           ).join('；');
 
-          // 5c. Store final result to S3 for polling - no AI analysis, just file metadata
+          // 5c. Generate quick report (Kimi-style, rule-based, no AI call)
+          const quickReport = generateQuickReport(workingData.slice(0, 2000), dfInfo, originalname);
+
+          // 5d. Store final result to S3 for polling
           const finalResult = {
             session_id: sessionId,
             filename: originalname,
@@ -1305,9 +1361,12 @@ export function registerAtlasRoutes(app: Express) {
               preview: dfInfo.preview,
               sheets: allSheetsDfInfo,  // all sheets info
             },
-            // No ai_analysis - analysis happens when user sends message
-            ai_analysis: null,
-            suggested_actions: [],
+            ai_analysis: quickReport.report,
+            suggested_actions: [
+              { icon: "📊", label: "查看完整报告", prompt: "帮我生成详细的经营分析报告" },
+              { icon: "🔍", label: "全面分析", prompt: "帮我全面分析这份数据，找出关键规律、异常值和可优化方向" },
+              { icon: "✨", label: "自定义需求", prompt: "" },
+            ],
             sheets_summary: sheetsSummary,
           };
           await storeUploadResult(sessionId, finalResult);
