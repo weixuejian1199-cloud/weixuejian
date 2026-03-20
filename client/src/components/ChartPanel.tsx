@@ -57,23 +57,25 @@ function detectCharts(categoryData: CategoryData): ChartConfig[] {
 
   for (const [field, entries] of Object.entries(categoryData)) {
     if (!entries?.length) continue;
+    // 优先用 entries[0].fieldName（原始中文字段名）匹配，fallback 用 key
+    const fieldLabel = (entries[0] as any)?.fieldName ?? field;
 
-    if (matchField(field, INFLUENCER_KEYWORDS)) {
+    if (matchField(fieldLabel, INFLUENCER_KEYWORDS)) {
       const d = sortedBySum(entries);
       if (d.length >= 2) charts.push({ fieldName: field, title: "达人销售 Top10", type: "hbar", dataKey: "sum", unit: "元", data: d });
-    } else if (matchField(field, STORE_KEYWORDS)) {
+    } else if (matchField(fieldLabel, STORE_KEYWORDS)) {
       const d = sortedBySum(entries);
       if (d.length >= 2) charts.push({ fieldName: field, title: "店铺销售对比", type: "hbar", dataKey: "sum", unit: "元", data: d });
-    } else if (matchField(field, PRODUCT_KEYWORDS)) {
+    } else if (matchField(fieldLabel, PRODUCT_KEYWORDS)) {
       const d = sortedBySum(entries);
       if (d.length >= 2) charts.push({ fieldName: field, title: "商品销售 Top10", type: "hbar", dataKey: "sum", unit: "元", data: d });
-    } else if (matchField(field, PROVINCE_KEYWORDS)) {
+    } else if (matchField(fieldLabel, PROVINCE_KEYWORDS)) {
       const d = sortedByCount(entries);
       if (d.length >= 2) charts.push({ fieldName: field, title: "省份订单分布", type: "hbar", dataKey: "count", unit: "单", data: d });
-    } else if (matchField(field, PAYMENT_KEYWORDS)) {
+    } else if (matchField(fieldLabel, PAYMENT_KEYWORDS)) {
       const d = sortedByCount(entries, 8);
       if (d.length >= 2) charts.push({ fieldName: field, title: "支付方式占比", type: "pie", dataKey: "count", unit: "单", data: d });
-    } else if (matchField(field, STATUS_KEYWORDS)) {
+    } else if (matchField(fieldLabel, STATUS_KEYWORDS)) {
       const d = sortedByCount(entries, 8);
       if (d.length >= 2) charts.push({ fieldName: field, title: "订单状态分布", type: "pie", dataKey: "count", unit: "单", data: d });
     }
