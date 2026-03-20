@@ -896,10 +896,8 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     return fields.find(f => f.type === 'numeric')?.name ?? null;
   })();
 
-  // 排除已作为 groupByField 和 productGroupByField 的字段
+  // 分类字段统计：不排除任何字段，让图表能正确检测达人昵称/选购商品等维度
   const excludeFromCategory = new Set<string>();
-  if (groupByField) excludeFromCategory.add(groupByField);
-  if (productGroupByField) excludeFromCategory.add(productGroupByField);
 
   const categoryGroupedTop20 = computeCategoryStats(
     rows,

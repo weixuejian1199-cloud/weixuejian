@@ -1575,11 +1575,14 @@ export function registerAtlasRoutes(app: Express) {
           XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filtered), "导出数据");
           const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx", compression: true, bookSST: true }) as Buffer;
           const reportId = nanoid();
-          const { url: exportUrl } = await storagePut(
+          const { url: exportRelUrl } = await storagePut(
             `atlas-custom-export/${reportId}.xlsx`,
             buffer,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           );
+          const exportUrl = exportRelUrl.startsWith("http")
+            ? exportRelUrl
+            : `${req.protocol}://${req.get("host")}${exportRelUrl}`;
 
           const reply = `\n\n✅ 自定义字段导出完成！\n\n**保留字段（${colArray.length} 个）**：${colArray.join("、")}\n\n**数据行数**：${filtered.length.toLocaleString()} 行\n\n📥 [点击下载](${exportUrl})`;
           res.write(reply);
@@ -3618,6 +3621,8 @@ ${dataTable}`}
         categoryGroupedTop20?: Record<string, Array<{ label: string; count: number; sum?: number; avg?: number }>>;
         // 次要 sheet 数据（资金 sheet 等）
         secondarySheets?: Array<{ name: string; headers: string[]; rawRows: Record<string, string>[]; dataRows: number }>;
+        // 全量行数据（≤ 50000 行时由前端发送，供自定义导出使用）
+        allRows?: Record<string, unknown>[];
       };
 
       if (!parsed || !parsed.filename || !parsed.fields) {
@@ -3738,7 +3743,7 @@ ${dataTable}`}
       });
       setImmediate(async () => {
         try {
-          const workingData = parsed.preview || [];;
+          const workingData = parsed.allRows || parsed.preview || [];
           const scenarioHint = detectScenario(dfInfo.fields);
           const requiredByScenario: Record<string, string[]> = {
             payroll:    ["\u57fa\u672c\u5de5\u8d44", "\u5458\u5de5\u59d3\u540d"],

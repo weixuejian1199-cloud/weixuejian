@@ -21,7 +21,7 @@ import {
   PanelLeftClose, PanelLeftOpen,
   Gift, MoreHorizontal, Search,
   Share2, Trash2, Pencil, Copy, Check,
-  FileText, BarChart3, Users, FolderOpen,
+  FileText, BarChart3, Users, FolderOpen, BookOpen,
 } from "lucide-react";
 import { useAtlas } from "@/contexts/AtlasContext";
 import { trpc } from "@/lib/trpc";
@@ -36,6 +36,7 @@ const SIDEBAR_COLLAPSED = 48;
 const FUNCTION_MODULES = [
   { id: "templates", icon: FileText, label: "模板库", available: true, action: "template" },
   { id: "hr", icon: Users, label: "HR 中心", available: true, action: "hr" },
+  { id: "library", icon: BookOpen, label: "库", available: true, action: "library" },
   { id: "datahub", icon: BarChart3, label: "数据中枢", available: false },
   { id: "files", icon: FolderOpen, label: "文件", available: false },
 ] as const;
@@ -177,6 +178,8 @@ export default function Sidebar() {
       setActiveNav("templates");
     } else if (mod.action === "hr") {
       setActiveNav("hr");
+    } else if (mod.action === "library") {
+      setActiveNav("library");
     }
     if (isMobile) setSidebarOpen(false);
   }, [setActiveNav, isMobile, setSidebarOpen]);
