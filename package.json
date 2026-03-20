@@ -1,6 +1,6 @@
 {
   "name": "atlas-report",
-  "version": "3.2.14",
+  "version": "3.3.3",
   "type": "module",
   "license": "MIT",
   "scripts": {

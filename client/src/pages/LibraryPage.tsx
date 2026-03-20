@@ -7,13 +7,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Archive, FileText, Download, Search, X,
   CheckCircle2, AlertCircle, Calendar, Database, Trash2, FileSpreadsheet,
-  Rows3, RefreshCw, Loader2,
+  Rows3, RefreshCw, Loader2, Table2,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAtlas } from "@/contexts/AtlasContext";
 import { toast } from "sonner";
+import { STANDARD_FIELDS } from "@shared/fieldAliases";
 
-type Tab = "sessions" | "reports";
+type Tab = "sessions" | "reports" | "fields";
 type FilterStatus = "all" | "completed" | "failed";
 
 // ── Sessions Tab ──────────────────────────────────────────────────────────────
@@ -404,6 +405,76 @@ function ReportsTab({
   );
 }
 
+// ── Fields Tab ────────────────────────────────────────────────────────────────
+
+function FieldsTab({ query }: { query: string }) {
+  const lq = query.toLowerCase();
+  const filtered = STANDARD_FIELDS.filter(f =>
+    !lq ||
+    f.name.toLowerCase().includes(lq) ||
+    f.displayName.includes(lq) ||
+    f.description.includes(lq) ||
+    [...f.aliases.common, ...f.aliases.douyin, ...f.aliases.tmall, ...f.aliases.pdd, ...f.aliases.jd].some(a => a.includes(lq))
+  );
+
+  const typeLabel: Record<string, string> = {
+    string: "文本",
+    number: "数值",
+    integer: "整数",
+    datetime: "日期",
+  };
+
+  return (
+    <div className="mt-4">
+      <p className="text-xs mb-4" style={{ color: "var(--atlas-text-3)" }}>
+        共 {STANDARD_FIELDS.length} 个标准字段，覆盖抖音、天猫、拼多多、京东平台别名
+      </p>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid var(--atlas-border)" }}>
+              {["标准字段名", "显示名称", "类型", "说明", "别名（抖音/通用）"].map(h => (
+                <th key={h} style={{ textAlign: "left", padding: "6px 10px", color: "var(--atlas-text-3)", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((f, i) => (
+              <tr
+                key={f.name}
+                style={{
+                  borderBottom: "1px solid var(--atlas-border)",
+                  background: i % 2 === 0 ? "transparent" : "var(--atlas-surface)",
+                }}
+              >
+                <td style={{ padding: "6px 10px", color: "var(--atlas-accent)", fontFamily: "monospace", whiteSpace: "nowrap" }}>{f.name}</td>
+                <td style={{ padding: "6px 10px", color: "var(--atlas-text)", fontWeight: 500, whiteSpace: "nowrap" }}>{f.displayName}</td>
+                <td style={{ padding: "6px 10px", color: "var(--atlas-text-3)", whiteSpace: "nowrap" }}>
+                  <span style={{ padding: "2px 6px", borderRadius: 4, background: "var(--atlas-surface)", border: "1px solid var(--atlas-border)", fontSize: 11 }}>
+                    {typeLabel[f.type] ?? f.type}
+                  </span>
+                </td>
+                <td style={{ padding: "6px 10px", color: "var(--atlas-text-2)" }}>{f.description}</td>
+                <td style={{ padding: "6px 10px", color: "var(--atlas-text-3)", maxWidth: 200 }}>
+                  <span style={{ fontSize: 11 }}>
+                    {[...f.aliases.douyin, ...f.aliases.common].slice(0, 4).join("、")}
+                    {f.aliases.douyin.length + f.aliases.common.length > 4 ? "…" : ""}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {filtered.length === 0 && (
+          <div className="text-center py-12" style={{ color: "var(--atlas-text-3)", fontSize: 13 }}>
+            没有匹配的字段
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function LibraryPage() {
@@ -418,6 +489,7 @@ export default function LibraryPage() {
   const TABS = [
     { id: "sessions" as Tab, label: "数据文件", icon: Database, count: sessions.length },
     { id: "reports" as Tab, label: "报表归档", icon: Archive, count: reports.length },
+    { id: "fields" as Tab, label: "字段对照", icon: Table2, count: STANDARD_FIELDS.length },
   ];
 
   return (
@@ -547,8 +619,10 @@ export default function LibraryPage() {
           >
             {tab === "sessions" ? (
               <SessionsTab query={query} />
-            ) : (
+            ) : tab === "reports" ? (
               <ReportsTab query={query} filterStatus={filterStatus} />
+            ) : (
+              <FieldsTab query={query} />
             )}
           </motion.div>
         </AnimatePresence>

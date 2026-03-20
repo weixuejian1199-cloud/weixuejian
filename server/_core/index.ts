@@ -60,6 +60,8 @@ const uploadLimiter = rateLimit({
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  // Trust Nginx reverse proxy: use X-Forwarded-For for req.ip (rate limiting)
+  app.set("trust proxy", 1);
   // Configure body parser with larger size limit for file uploads
   app.use(compression());
   app.use(express.json({ limit: "50mb" }));

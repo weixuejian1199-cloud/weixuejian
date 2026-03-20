@@ -1495,7 +1495,7 @@ export function registerAtlasRoutes(app: Express) {
             }
           }
 
-          const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx", compression: true }) as Buffer;
+          const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx", compression: true, bookSST: true }) as Buffer;
           const reportId = nanoid();
           const { url: reportUrl } = await storagePut(
             `atlas-sanitized/${reportId}.xlsx`,
@@ -3118,7 +3118,7 @@ ${dataTable}`}
         ["合计", "", allRows.length],
       ];
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), "合并概览");
-      const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx", compression: true }) as Buffer;
+      const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx", compression: true, bookSST: true }) as Buffer;
       const reportId = nanoid();
       const { url: reportUrl } = await storagePut(
         "atlas-merged-reports/" + reportId + ".xlsx",
@@ -3538,6 +3538,8 @@ ${dataTable}`}
         dataQuality?: Record<string, unknown>;
         // Category stats: full-dataset GROUP BY stats for ALL categorical fields
         categoryGroupedTop20?: Record<string, Array<{ label: string; count: number; sum?: number; avg?: number }>>;
+        // 次要 sheet 数据（资金 sheet 等）
+        secondarySheets?: Array<{ name: string; headers: string[]; rawRows: Record<string, string>[]; dataRows: number }>;
       };
 
       if (!parsed || !parsed.filename || !parsed.fields) {
@@ -3684,7 +3686,10 @@ ${dataTable}`}
             userId,
             rawRowsForPipeline,
             fieldMapping,
-            originalname
+            originalname,
+            undefined,
+            undefined,
+            parsed.secondarySheets
           ).catch(err => console.error(`[Pipeline] runParsedPipelineInBackground failed for ${sessionId}:`, err?.message));
           await updateSession(sessionId, {
             rowCount: dfInfo.row_count,
@@ -4177,8 +4182,8 @@ ${dataTable}`}
 
       const reportId = nanoid();
       const [simpleBuf, fullBuf] = [
-        XLSX.write(wb, { type: "buffer", bookType: "xlsx", compression: true }) as Buffer,
-        XLSX.write(wbFull, { type: "buffer", bookType: "xlsx", compression: true }) as Buffer,
+        XLSX.write(wb, { type: "buffer", bookType: "xlsx", compression: true, bookSST: true }) as Buffer,
+        XLSX.write(wbFull, { type: "buffer", bookType: "xlsx", compression: true, bookSST: true }) as Buffer,
       ];
       const mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
       const [{ url: simpleUrl }, { url: fullUrl }] = await Promise.all([

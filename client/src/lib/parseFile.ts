@@ -139,6 +139,8 @@ export interface ParsedFileData {
   // Category stats: full-dataset GROUP BY stats for ALL categorical fields
   // Key = field name (e.g. "省份", "支付方式"), Value = top20 entries
   categoryGroupedTop20?: Record<string, CategoryGroupedEntry[]>;
+  // 次要 sheet 数据（多 sheet Excel 中非主 sheet，用于资金指标计算）
+  secondarySheets?: Array<{ name: string; headers: string[]; rawRows: Record<string, string>[]; dataRows: number }>;
 }
 
 const PREVIEW_ROWS = 500;
@@ -692,6 +694,7 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
   const ext = file.name.split(".").pop()?.toLowerCase();
 
   let rows: Record<string, unknown>[];
+  let secondarySheets: Array<{ name: string; headers: string[]; rawRows: Record<string, string>[]; dataRows: number }> | undefined;
 
   if (ext === "csv") {
     const text = new TextDecoder("utf-8").decode(buffer);
@@ -708,6 +711,27 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     });
     const ws = wb.Sheets[wb.SheetNames[0]];
     rows = XLSX.utils.sheet_to_json(ws, { defval: null });
+
+    // 多 sheet 文件：解析次要 sheet 用于资金指标计算
+    if (wb.SheetNames.length > 1) {
+      const secSheets: typeof secondarySheets = [];
+      for (let i = 1; i < wb.SheetNames.length; i++) {
+        const sheetName = wb.SheetNames[i];
+        const secWs = wb.Sheets[sheetName];
+        const secRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(secWs, { defval: null });
+        if (secRows.length === 0) continue;
+        const secHeaders = Object.keys(secRows[0]);
+        const secRawRows = secRows.slice(0, 60_000).map(row => {
+          const r: Record<string, string> = {};
+          for (const [k, v] of Object.entries(row)) {
+            r[k] = v === null || v === undefined ? "" : String(v);
+          }
+          return r;
+        });
+        secSheets.push({ name: sheetName, headers: secHeaders, rawRows: secRawRows, dataRows: secRows.length });
+      }
+      if (secSheets.length > 0) secondarySheets = secSheets;
+    }
   }
 
   // ── 修复项 A：过滤全空行，与服务端 atlas.ts 第248行逻辑对齐 ──
@@ -916,6 +940,7 @@ export async function parseFile(file: File): Promise<ParsedFileData> {
     allGroupByFields: allGroupByFields.length > 0 ? allGroupByFields : undefined,
     dataQuality,
     categoryGroupedTop20: Object.keys(categoryGroupedTop20).length > 0 ? categoryGroupedTop20 : undefined,
+    secondarySheets,
   };
 
   // 大文件：将全量 rows 存入 _allRowsRef，供前端分批上传使用

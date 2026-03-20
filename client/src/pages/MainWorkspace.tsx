@@ -17,6 +17,7 @@ import {
 Shield, } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { AtlasTableRenderer, parseAtlasTableBlocks } from "@/components/AtlasTableRenderer";
+import { ChartPanel } from "@/components/ChartPanel";
 import { useAtlas, type UploadedFile, type Message } from "@/contexts/AtlasContext";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { pollUploadStatus, chatStream, generateReport, getDownloadUrl, smartUpload, exportFromSession, type SuggestedAction, sanitizeExport, type SanitizeExportResponse } from "@/lib/api";
@@ -78,6 +79,7 @@ export default function MainWorkspace() {
   // Store suggested actions from last upload (per-session)
   const [pendingActions, setPendingActions] = useState<SuggestedAction[]>([]);
   const [showMorePanel, setShowMorePanel] = useState(false);
+  const [showCharts, setShowCharts] = useState(false);
   // V13.10: track conversation_id for persistence and 小虾米 reply polling
   const [conversationId, setConversationId] = useState<string | undefined>(undefined);
   const openClawPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -799,6 +801,19 @@ export default function MainWorkspace() {
           </div>
         )}
 
+        {uploadedFiles.some(f => f.categoryGroupedTop20) && (
+          <button
+            onClick={() => setShowCharts(v => !v)}
+            className="text-xs transition-colors flex items-center gap-1"
+            style={{ color: showCharts ? "var(--atlas-accent)" : "var(--atlas-text-3)" }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = showCharts ? "var(--atlas-accent)" : "var(--atlas-text-2)"}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = showCharts ? "var(--atlas-accent)" : "var(--atlas-text-3)"}
+          >
+            <BarChart2 size={12} />
+            图表
+          </button>
+        )}
+
         {(hasAnyFiles || messages.length > 0) && (
           <button
             onClick={() => { clearFiles(); clearMessages(); setPendingActions([]); }}
@@ -811,6 +826,27 @@ export default function MainWorkspace() {
           </button>
         )}
       </div>
+
+      {/* Chart panel - collapsible, shown when files have category data */}
+      {showCharts && (() => {
+        const merged: Record<string, Array<{ label: string; count: number; sum?: number; avg?: number }>> = {};
+        for (const f of uploadedFiles) {
+          if (!f.categoryGroupedTop20) continue;
+          for (const [k, v] of Object.entries(f.categoryGroupedTop20)) {
+            if (!merged[k]) { merged[k] = v; } else {
+              // merge: accumulate counts/sums
+              const map = new Map(merged[k].map(e => [e.label, { ...e }]));
+              for (const e of v) {
+                const ex = map.get(e.label);
+                if (ex) { ex.count += e.count; ex.sum = (ex.sum ?? 0) + (e.sum ?? 0); }
+                else { map.set(e.label, { ...e }); }
+              }
+              merged[k] = Array.from(map.values());
+            }
+          }
+        }
+        return <ChartPanel categoryGroupedTop20={merged} onClose={() => setShowCharts(false)} />;
+      })()}
 
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto">
