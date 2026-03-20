@@ -17,6 +17,8 @@
 import { nanoid } from "nanoid";
 import { type PipelineContext, createPipelineContext, ErrorLevel } from "@shared/pipeline";
 import type { ResultSet, SourceFileInfo } from "@shared/resultSet";
+import { normalizeFieldNames } from "@shared/fieldAliases";
+import { computeFundMetrics } from "@shared/metrics";
 import { runIngestion, type IngestionResult } from "./ingestion";
 import { runGovernance, type GovernanceResult } from "./governance";
 import { step8Compute, type ComputationInput } from "./computation";
@@ -150,6 +152,12 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
 
     const resultSet = step8Compute(ctx, computationInput);
 
+    // ── 资金 Sheet 处理：提取次要 sheet 中的资金指标 ──────────────────
+    const fundMetrics = extractFundMetricsFromSecondarySheets(ctx, ingestionResults);
+    if (fundMetrics.length > 0) {
+      resultSet.metrics = [...resultSet.metrics, ...fundMetrics];
+    }
+
     // ── Layer 4: Expression ──────────────────────────────────────
     const expression = buildExpressionPrompt(resultSet);
 
@@ -270,6 +278,64 @@ function determinePlatform(results: IngestionResult[]): string {
   if (platforms.size === 0) return "unknown";
   if (platforms.size === 1) return Array.from(platforms)[0];
   return "mixed";
+}
+
+// ── 资金 Sheet 指标提取 ───────────────────────────────────────────
+
+/**
+ * 从次要 sheet（非主订单 sheet）中提取资金相关指标。
+ * 识别规则：sheet 的标准字段包含 settlement_amount / commission / platform_fee，
+ * 且该 sheet 不是当前文件的主 sheet（主 sheet 已被主流程处理）。
+ */
+function extractFundMetricsFromSecondarySheets(
+  ctx: PipelineContext,
+  ingestionResults: IngestionResult[]
+) {
+  const allFundMetrics: import("@shared/metrics").MetricResult[] = [];
+
+  for (const result of ingestionResults) {
+    if (!result.allSheets || result.allSheets.length <= 1) continue;
+
+    const primarySheetName = result.primarySheetName;
+
+    for (const sheet of result.allSheets) {
+      // 跳过主 sheet（已被主流程处理）
+      if (sheet.name === primarySheetName) continue;
+
+      // 检查该 sheet 是否有资金相关字段
+      const { mapped } = normalizeFieldNames(sheet.headers);
+      const stdFields = new Set(Object.values(mapped));
+
+      const hasFundFields =
+        stdFields.has("settlement_amount") ||
+        stdFields.has("commission") ||
+        stdFields.has("platform_fee");
+
+      if (!hasFundFields) continue;
+
+      // 对资金 sheet 做 governance（清洗 + 去重）
+      const fundGovernance = runGovernance(
+        ctx,
+        sheet.rawRows as Record<string, string>[],
+        mapped
+      );
+      if (fundGovernance.rows.length === 0) continue;
+
+      // 计算资金指标
+      const metrics = computeFundMetrics(fundGovernance.rows);
+      if (metrics.length > 0) {
+        allFundMetrics.push(...metrics);
+        ctx.errors.push({
+          level: ErrorLevel.INFO,
+          step: 8,
+          code: "I4009",
+          message: `资金指标计算完成：从「${sheet.name}」提取 ${metrics.length} 个指标（${fundGovernance.rows.length} 行资金数据）`,
+        });
+      }
+    }
+  }
+
+  return allFundMetrics;
 }
 
 // ── 错误输出 ──────────────────────────────────────────────────────

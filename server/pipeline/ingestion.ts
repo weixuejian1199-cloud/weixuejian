@@ -489,6 +489,8 @@ export interface IngestionResult {
   dataRows: number;
   /** 多 Sheet 文件时，所有 Sheet 的独立数据集 */
   allSheets?: import("@shared/pipeline").SheetDataset[];
+  /** 主 Sheet 名称（行数最多的 sheet），用于区分资金等次要 sheet */
+  primarySheetName?: string;
 }
 
 /**
@@ -531,5 +533,6 @@ export async function runIngestion(
     originalFileName,
     dataRows: step3.dataRows,
     allSheets: step3.allSheets,
+    primarySheetName: step3.sheetName,
   };
 }

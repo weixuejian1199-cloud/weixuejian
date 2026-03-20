@@ -394,6 +394,77 @@ export function computeAllMetrics(rows: StandardRow[]): MetricResult[] {
 }
 
 /**
+ * 计算资金相关指标（从资金明细 sheet）。
+ * 仅在数据包含 settlement_amount、commission 或 platform_fee 字段时触发。
+ * 用于多 sheet 文件中"资金明细"表的独立计算。
+ */
+export function computeFundMetrics(rows: StandardRow[]): MetricResult[] {
+  const hasSettlement = rows.some(r => r.settlement_amount != null && r.settlement_amount !== "");
+  const hasCommission = rows.some(r => r.commission != null && r.commission !== "");
+  const hasPlatformFee = rows.some(r => r.platform_fee != null && r.platform_fee !== "");
+
+  if (!hasSettlement && !hasCommission && !hasPlatformFee) return [];
+
+  const results: MetricResult[] = [];
+
+  let totalSettlement = new Decimal(0);
+  let totalCommission = new Decimal(0);
+  let totalPlatformFee = new Decimal(0);
+
+  for (const row of rows) {
+    const s = toDecimal(row.settlement_amount);
+    if (s) totalSettlement = totalSettlement.plus(s);
+    const c = toDecimal(row.commission);
+    if (c) totalCommission = totalCommission.plus(c);
+    const f = toDecimal(row.platform_fee);
+    if (f) totalPlatformFee = totalPlatformFee.plus(f);
+  }
+
+  if (hasSettlement) {
+    results.push({
+      name: "total_settlement",
+      displayName: "总结算金额",
+      value: totalSettlement.toFixed(2),
+      unit: "元",
+      formula: "SUM(settlement_amount)",
+    });
+  }
+
+  if (hasCommission) {
+    results.push({
+      name: "total_commission",
+      displayName: "总佣金支出",
+      value: totalCommission.toFixed(2),
+      unit: "元",
+      formula: "SUM(commission)",
+    });
+  }
+
+  if (hasPlatformFee) {
+    results.push({
+      name: "total_platform_fee",
+      displayName: "总平台服务费",
+      value: totalPlatformFee.toFixed(2),
+      unit: "元",
+      formula: "SUM(platform_fee)",
+    });
+  }
+
+  if (hasSettlement && (hasCommission || hasPlatformFee)) {
+    const netIncome = totalSettlement.minus(totalCommission).minus(totalPlatformFee);
+    results.push({
+      name: "estimated_net_income",
+      displayName: "预估净收入",
+      value: netIncome.toFixed(2),
+      unit: "元",
+      formula: "total_settlement - SUM(commission) - SUM(platform_fee)",
+    });
+  }
+
+  return results;
+}
+
+/**
  * 分组求和辅助函数。
  * 按 groupField 分组，对 sumField 求和，按金额降序排列。
  */

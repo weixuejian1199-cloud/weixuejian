@@ -20,8 +20,11 @@ import { runPipeline, type PipelineInput } from "./index";
 import { runGovernance } from "./governance";
 import { step8Compute, type ComputationInput } from "./computation";
 import { buildExpressionPrompt } from "./expression";
-import { createPipelineContext } from "@shared/pipeline";
+import { createPipelineContext, type PipelineContext } from "@shared/pipeline";
+import { normalizeFieldNames } from "@shared/fieldAliases";
+import { computeFundMetrics } from "@shared/metrics";
 import type { SourceFileInfo } from "@shared/resultSet";
+import type { SheetDataset } from "@shared/pipeline";
 import { storagePut, storageGet, storageReadFile } from "../storage";
 import { getDb } from "../db";
 import { resultSets, sessions } from "../../drizzle/schema";
@@ -179,7 +182,8 @@ export async function runPipelineFromParsedData(
   fieldMapping: Record<string, string>,
   originalFileName: string,
   templateId?: string,
-  sourceFilesOverride?: SourceFileInfo[]
+  sourceFilesOverride?: SourceFileInfo[],
+  secondarySheets?: SheetDataset[]
 ): Promise<{ success: boolean; resultSet?: ResultSet; errorSummary?: string }> {
   const jobId = nanoid(12);
   const ctx = createPipelineContext(jobId, String(userId));
@@ -237,6 +241,15 @@ export async function runPipelineFromParsedData(
     const resultSet = step8Compute(ctx, computationInput);
     console.log(`[Pipeline] ✅ Computation done: ${resultSet.metrics.length} metrics, ${resultSet.rowCount} rows`);
 
+    // ── 资金 Sheet 处理（可选，来自 upload-parsed 携带的次要 sheet 数据）──────────
+    if (secondarySheets && secondarySheets.length > 0) {
+      const fundMetrics = extractFundMetricsFromSheets(ctx, secondarySheets);
+      if (fundMetrics.length > 0) {
+        resultSet.metrics = [...resultSet.metrics, ...fundMetrics];
+        console.log(`[Pipeline] ✅ Fund metrics added: ${fundMetrics.length} metrics from secondary sheets`);
+      }
+    }
+
     // ── Layer 4: Expression（构建 AI prompt，同步执行 + try/catch 隔离）────────────────────
     // 问题4修复：加 try/catch 隔离，失败记录日志但不中断主链路
     try {
@@ -268,7 +281,8 @@ export async function runParsedPipelineInBackground(
   fieldMapping: Record<string, string>,
   originalFileName: string,
   templateId?: string,
-  sourceFilesOverride?: SourceFileInfo[]
+  sourceFilesOverride?: SourceFileInfo[],
+  secondarySheets?: SheetDataset[]
 ): Promise<void> {
   console.log(`[Pipeline] 🚀 Starting background parsed pipeline for session ${sessionId}`);
   try {
@@ -279,7 +293,8 @@ export async function runParsedPipelineInBackground(
       fieldMapping,
       originalFileName,
       templateId,
-      sourceFilesOverride
+      sourceFilesOverride,
+      secondarySheets
     );
 
     if (result.success && result.resultSet) {
@@ -498,6 +513,45 @@ export async function getResultSetForSession(
     console.error(`[Pipeline] Failed to get ResultSet for session ${sessionId}: ${err?.message}`);
     return null;
   }
+}
+
+// ── 资金 Sheet 指标提取（bridge 层辅助函数）──────────────────────────
+
+/**
+ * 从次要 sheet 数据集中提取资金相关指标。
+ * 用于 upload-parsed 流程，当前端传递了次要 sheet 数据时调用。
+ */
+function extractFundMetricsFromSheets(
+  ctx: PipelineContext,
+  sheets: SheetDataset[]
+): import("@shared/metrics").MetricResult[] {
+  const allFundMetrics: import("@shared/metrics").MetricResult[] = [];
+
+  for (const sheet of sheets) {
+    const { mapped } = normalizeFieldNames(sheet.headers);
+    const stdFields = new Set(Object.values(mapped));
+
+    const hasFundFields =
+      stdFields.has("settlement_amount") ||
+      stdFields.has("commission") ||
+      stdFields.has("platform_fee");
+
+    if (!hasFundFields) continue;
+
+    const fundGovernance = runGovernance(
+      ctx,
+      sheet.rawRows as Record<string, string>[],
+      mapped
+    );
+    if (fundGovernance.rows.length === 0) continue;
+
+    const metrics = computeFundMetrics(fundGovernance.rows);
+    if (metrics.length > 0) {
+      allFundMetrics.push(...metrics);
+    }
+  }
+
+  return allFundMetrics;
 }
 
 /**
