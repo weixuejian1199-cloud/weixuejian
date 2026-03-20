@@ -144,7 +144,7 @@ export default function MainWorkspace() {
         updateUploadedFile(tempId, { uploadProgress: Math.round(percent * 0.7) });
       });
 
-      // Poll until server finishes parsing (no AI analysis now)
+      // Poll until server finishes parsing and AI analysis is ready
       const result = await pollUploadStatus(uploadResult.session_id, (pct) => {
         updateUploadedFile(tempId, { uploadProgress: Math.round(70 + pct * 0.3) });
       });
@@ -167,6 +167,18 @@ export default function MainWorkspace() {
           file_size_kb: Math.round(file.size / 1024),
         },
       });
+
+      // Show AI analysis report as a message in chat
+      if (result.ai_analysis && result.ai_analysis !== "数据已就绪，可以开始分析。") {
+        addMessage({
+          role: "assistant",
+          content: result.ai_analysis,
+          suggestedActions: result.suggested_actions || [],
+          qualityIssues: result.quality_issues,
+          outlierDetails: result.outlier_details,
+          fieldMappingHint: result.field_mapping_hint,
+        }, taskId);
+      }
 
       // Background: parse locally for allRows + categoryGroupedTop20 (used by frontend export)
       // Non-blocking — does not affect upload success/failure
