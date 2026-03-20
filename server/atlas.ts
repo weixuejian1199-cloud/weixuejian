@@ -1513,6 +1513,84 @@ export function registerAtlasRoutes(app: Express) {
         return;
       }
 
+      // ── 自定义字段导出拦截：检测到"保留X字段导出"意图时直接执行 ─────────────
+      const CUSTOM_EXPORT_RE = /(?:仅需|只需|仅|只).*?(?:保留|需要|提取).*?(?:导出|明细|数据)|(?:保留)[\s\S]{0,100}(?:字段|列)[\s\S]{0,30}(?:导出|明细)/;
+      if (CUSTOM_EXPORT_RE.test(message) && allSessionIds.length > 0) {
+        res.setHeader("Content-Type", "text/plain; charset=utf-8");
+        res.setHeader("Transfer-Encoding", "chunked");
+        res.flushHeaders();
+        try {
+          const targetSessionId = allSessionIds[0]!;
+          const fileData = await loadSessionData(targetSessionId);
+          if (!fileData || fileData.length === 0) {
+            res.write("❌ 未找到数据，请重新上传文件后再试。");
+            res.end();
+            return;
+          }
+
+          // 从消息中提取请求保留的字段名（中文分隔符拆分）
+          const fieldTokens = message
+            .replace(/等.*?(字段|列|数据|明细|导出).*/g, "")
+            .split(/[，、,\s、；;]+/)
+            .map(t => t.replace(/[：:""''《》【】\(\)（）\[\]#@!！?？。.]/g, "").trim())
+            .filter(t => t.length >= 2 && t.length <= 20)
+            .filter(t => !/^(仅需|只需|只保留|仅保留|保留|导出|明细|字段|数据|列|核心|需要|提取|帮我|请|我|的|和|与|等)$/.test(t));
+
+          const actualCols = Object.keys(fileData[0]);
+
+          // 模糊匹配：找到实际列名中包含请求词的列
+          const matchedCols = new Set<string>();
+          for (const token of fieldTokens) {
+            const tokenLower = token.toLowerCase();
+            // 精确优先
+            const exact = actualCols.find(c => c.toLowerCase() === tokenLower);
+            if (exact) { matchedCols.add(exact); continue; }
+            // 包含匹配
+            for (const col of actualCols) {
+              if (col.toLowerCase().includes(tokenLower) || tokenLower.includes(col.toLowerCase())) {
+                matchedCols.add(col);
+              }
+            }
+          }
+
+          if (matchedCols.size === 0) {
+            // 没有匹配，输出可用字段提示，让用户重新指定
+            const colList = actualCols.slice(0, 30).join("、");
+            res.write(`⚠️ 未能识别到您指定的字段。\n\n当前文件包含以下字段：\n${colList}${actualCols.length > 30 ? "…" : ""}\n\n请用以上字段名重新说明需要保留哪些字段。`);
+            res.end();
+            return;
+          }
+
+          res.write(`⏳ 正在导出 ${matchedCols.size} 个字段的全量数据（${fileData.length.toLocaleString()} 行）...`);
+
+          // 生成过滤后的数据
+          const colArray = Array.from(matchedCols);
+          const filtered = fileData.map(row => {
+            const r: Record<string, unknown> = {};
+            for (const col of colArray) r[col] = row[col] ?? "";
+            return r;
+          });
+
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filtered), "导出数据");
+          const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx", compression: true, bookSST: true }) as Buffer;
+          const reportId = nanoid();
+          const { url: exportUrl } = await storagePut(
+            `atlas-custom-export/${reportId}.xlsx`,
+            buffer,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          );
+
+          const reply = `\n\n✅ 自定义字段导出完成！\n\n**保留字段（${colArray.length} 个）**：${colArray.join("、")}\n\n**数据行数**：${filtered.length.toLocaleString()} 行\n\n📥 [点击下载](${exportUrl})`;
+          res.write(reply);
+        } catch (exportErr: any) {
+          console.error("[Atlas/chat] Custom export error:", exportErr);
+          res.write(`\n\n❌ 导出失败：${exportErr?.message || "未知错误"}`);
+        }
+        res.end();
+        return;
+      }
+
       // ── No-file mode: general conversation without data ──────────────────
       if (!allSessionIds.length) {
         const userId = (req as any).userId || 0;
