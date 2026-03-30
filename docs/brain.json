@@ -1,6 +1,6 @@
 {
   "projectName": "企业AI工作站",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "lastUpdated": "2026-03-30",
 
   "projectBrief": {
@@ -39,29 +39,74 @@
         "先规则后模型，AI逐步参与判断节点",
         "ACI不背业务结果，只对'判断与合规执行链'负责"
       ],
-      "phase1Scenario": "判断是否具备进入退货审核流程的前置条件。只输出'建议/不建议+理由'，不执行任何动作",
-      "judgmentRules": [
-        "规则1: 订单未收货(ProcessNode<3) → 不进退货审核，引导取消订单",
-        "规则2: 收货超过7天 → 不建议退货，但提示可申诉",
-        "规则3: 食品/生鲜类商品 → 加严（已拆封不可退）",
-        "规则4: 同一用户30天内退货≥3次 → 标记欺诈嫌疑，升级人工",
-        "规则5: 金额>500 → 无论如何升级人工"
-      ],
-      "riskGates": {
-        "退款/补偿": "P0，必须人审",
-        "情绪激动": "立即升级",
-        "欺诈嫌疑": "立即升级",
-        "不确定case": "直接转人工"
+      "phase1Scenario": "判断是否具备进入退货审核流程的前置条件。只输出'建议/不建议+理由'，不执行任何动作。executionAllowed硬编码false",
+      "processNodeEnum": {
+        "_instruction": "Phase 1启动前必须用ztdy OrderPageList真实数据校验此映射",
+        "0": "待付款(PENDING_PAYMENT)",
+        "1": "已付款/待审核(PAID)",
+        "2": "待发货(PENDING_SHIPMENT) — ztdy已确认",
+        "3": "已发货/运输中(SHIPPED)",
+        "4": "已收货/已签收(RECEIVED)",
+        "5": "已完成(COMPLETED)",
+        "receivedThreshold": "ProcessNode >= 4 视为已收货",
+        "rule1Threshold": "ProcessNode < 3 视为未发货，引导取消"
       },
+      "judgmentRules": [
+        "规则1: 订单未收货(ProcessNode<3) → REJECT，引导取消订单",
+        "规则2: 收货超过7天 → REJECT_WITH_APPEAL，不建议但可申诉",
+        "规则3: 食品/生鲜已拆封 → REJECT，不可退",
+        "规则4: 同一用户30天内退货≥3次 → ESCALATE，欺诈嫌疑升级人工",
+        "规则5: 金额>500 → ESCALATE，升级人工"
+      ],
+      "rulePriorityMatrix": {
+        "_instruction": "多规则同时触发时按优先级执行，高优先级命中即决策，所有触发规则均记录在triggeredRules中",
+        "P0_安全闸门": ["GATE_EMOTION(情绪激动)", "GATE_FRAUD(欺诈嫌疑)", "GATE_REFUND_REQUEST(退款意图)", "GATE_LOW_CONFIDENCE(AI置信度<0.7)"],
+        "P1_合规拦截": ["RULE_05(金额>500)", "RULE_04(30天退货>=3)"],
+        "P2_业务规则": ["RULE_01(未收货ProcessNode<3)"],
+        "P3_品类时效": ["RULE_03(食品已拆封)", "RULE_02(收货>7天)"],
+        "P4_默认": "无规则触发 → APPROVE",
+        "conflictResolution": "同优先级取更严格结果（如P3中RULE_03无申诉通道 > RULE_02可申诉）"
+      },
+      "judgmentOutputSchema": {
+        "decision": "APPROVE | REJECT | REJECT_WITH_APPEAL | ESCALATE",
+        "reason": "人可读判断理由(中文100字内)",
+        "reasonForCustomer": "给买家的话术(50字内)",
+        "riskLevel": "LOW | MEDIUM | HIGH | CRITICAL",
+        "triggeredRules": "[{code, priority, description, evidence}]",
+        "confidence": "0-1浮点数，<0.7自动ESCALATE，0.7-0.85标记MEDIUM",
+        "context": "订单快照(processNode/amount/daysSinceReceived/returnCount/emotionKeywords等)",
+        "executionAllowed": "Phase 1硬编码false",
+        "disclaimer": "仅供参考，最终决定由人工客服做出"
+      },
+      "riskGates": {
+        "退款/补偿": "P0，检测关键词(退款/赔偿/补偿等)，立即ESCALATE",
+        "情绪激动": "P0，高强度词(投诉/律师/12315等)任一命中或中强度词>=2个，立即ESCALATE",
+        "欺诈嫌疑": "P0，30天退货>=3次 或 历史退货率>50% 或 收货<2小时退货，立即ESCALATE",
+        "不确定case": "P0，AI置信度<0.7 或 数据缺失/矛盾 或 图片语音消息，直接转人工"
+      },
+      "decisionTreeFlow": "收到退货申请 → ①情绪/退款意图检测(P0) → ②获取订单数据(失败则ESCALATE) → ③数据完整性检查(置信度扣减) → ④欺诈检测(P1) → ⑤金额检查(P1) → ⑥未收货检查(P2) → ⑦食品拆封检查(P3) → ⑧超7天检查(P3) → ⑨默认APPROVE(P4)",
       "evolution": "Phase 1(人在环+SOP跑通) → Phase 2(半自动，低风险可自动) → Phase 3(模板化复制更多场景)",
-      "promotionGate": "Phase 1→2必须满足：陪练结果连续稳定2周 + 关键指标不波动",
+      "promotionGate": {
+        "observationWindow": "连续14个自然日",
+        "minSampleSize": "至少100笔退货判断，不足则延长观察期",
+        "coreKPIs": {
+          "judgmentAccuracy": ">=90%（AI判断vs人工最终决策一致率）",
+          "escalateReasonableRate": ">=80%（AI发起ESCALATE中人工确认合理的比例）",
+          "missedEscalateRate": "<5%（应升级但AI未升级的比例）",
+          "avgJudgmentTime": "<3秒",
+          "riskGateInterceptRate": "100%（不可妥协）"
+        },
+        "stabilityDefinition": "单日准确率不低于76.5%，不得出现连续3天下降趋势，任何一天违规重置观察窗口",
+        "grayRelease": "Phase 2a:低风险APPROVE自动(金额<100非食品) → 2b:中风险(100-500) → 2c:全量APPROVE自动但REJECT仍需人审",
+        "approvalProcess": "系统自动生成晋升报告 + 创始人手动审批"
+      },
       "integration": "第三方团队帮接入消息通道（类似七鱼/美恰模式），我们提供接口，可拿到消息、订单、工单等所有数据"
     },
     "dualEngines": {
       "_description": "企业AI工作站的两条手臂。这是整个系统最核心的能力架构，缺一不可。",
       "claudeCode": {
         "role": "最强大脑 — 造产品+可以做一切",
-        "deployment": "阿里云服务器tmux保活，通过Bridge API从小程序/飞书/任何通道远程可达",
+        "deployment": "阿里云ECS + PM2进程守护 + Agent SDK(@anthropic-ai/claude-agent-sdk) + 自建Bridge API(Express) + 飞书SDK(@larksuiteoapi/node-sdk)，ADR-028",
         "capability": "读写代码、执行命令、Git操作、架构决策、查数据、管业务——什么都能干。能力远大于OpenClaw",
         "model": "Claude Opus 4.6",
         "users": "老板（驾驶舱）+ 9人研发团队",
@@ -99,13 +144,13 @@
       "atlas": "ATLAS(WebSocket IM+SSE+文件流+监控) → 选择性合并到对话通道和驾驶舱，Phase 3。注意：OpenClaw不在ATLAS而在Qiyao",
       "shishi": "时皙商城(27表/207验收/22页面) → 已决策合并(ADR-022)，技术栈迁移(NestJS→Express, MySQL→PostgreSQL, uni-app→Taro)，Phase 2-3"
     },
-    "currentStatus": "Phase 1a 进行中。脚手架已完成(US-P1a-001 ✅)。v2.1更新：明确双引擎架构(Claude Code+OpenClaw)，Phase 1b用OpenClaw飞书替代Taro前端验证AI对话能力。下一步：Wave 2 三路并行(Schema精简版/健康检查/Docker)。"
+    "currentStatus": "Phase 1a 进行中。脚手架已完成并提交(US-P1a-001 ✅ commit 9b60167)。v2.2更新：CTO全面审查完成(17个P0已修复方案)，排期修正为Option A(加时间不砍功能)，Bridge API选型完成(ADR-028 Agent SDK+自建Bridge)，ACI决策树完整设计。下一步：Wave 2 三路并行(Schema精简版/健康检查/Docker)。"
   },
 
   "currentPhase": "Phase 1a",
-  "phaseGoal": "Phase 1a（第1-2周）：项目脚手架+精简Schema(AI/系统层)+健康检查API+Docker本地环境+MallAdapter接入ztdy-open真实数据；Phase 1b（第3-5周）：JWT认证+多租户+AI对话引擎(百炼Qwen+SSE+tool_call)+5个运营查询真实场景+ACI客服MVP(退货审核判断)+OpenClaw飞书接入(替代Taro前端验证)+限流+备份",
-  "phaseDeadline": "2026-05-02",
-  "phaseNote": "宁慢勿糙原则：Phase 1a目标4月11日，Phase 1b目标5月2日（从原4周延长至5周，新增AI对话+客服MVP）。方案先行——方案不清晰不开工，每次新对话对方案理解必须一致。",
+  "phaseGoal": "Phase 1a（第1-3周）：项目脚手架+精简Schema(AI/系统层)+健康检查API+Docker本地环境+MallAdapter接入ztdy-open真实数据；Phase 1b（第4-9周）：JWT认证+多租户+AI对话引擎(百炼Qwen+SSE+tool_call)+5个运营查询真实场景+ACI客服MVP(退货审核判断)+双飞书对接(Agent SDK Bridge+OpenClaw)+限流+备份",
+  "phaseDeadline": "2026-06-06",
+  "phaseNote": "v2.2排期修正(CTO审查结论)：Phase 1a目标4月20日，Phase 1b目标6月6日。原估15-18工作日→修正为30-35工作日（加入Critic审查时间+工作量重估+Wave并行性修正）。决策：加时间不砍功能。方案先行——方案不清晰不开工。",
 
   "activeTasks": [
     {
@@ -248,11 +293,13 @@
         "exclude": "不做写操作（Phase 2第三方配合开放）、不做数据落库（Phase 1从API实时读）"
       },
       "priority": "P0",
-      "blockedBy": ["US-P1a-001"],
+      "blockedBy": ["US-P1a-001", "US-P1a-002"],
       "blocks": ["US-P1b-003", "US-P1b-004", "US-P1b-005"],
       "wave": 3,
       "phase": "1a",
-      "createdAt": "2026-03-30"
+      "createdAt": "2026-03-30",
+      "updatedAt": "2026-03-30",
+      "updateNote": "v2.2: blockedBy补充US-P1a-002(Redis缓存层依赖Schema/Docker)，工作量从2天修正为5天"
     },
     {
       "id": "US-P1b-001",
@@ -492,12 +539,12 @@
   ],
 
   "executionPlan": {
-    "description": "Phase 1 执行波次图（1a+1b合并视图）：同波次任务可并行，跨波次必须串行",
+    "description": "Phase 1 执行波次图（v2.2 CTO审查后修正版）：含Critic审查时间、工作量重估、并行性修正",
     "waves": [
       {
         "wave": 1,
         "tasks": ["US-P1a-001"],
-        "description": "地基：项目脚手架 ✅ 已完成",
+        "description": "地基：项目脚手架 ✅ 已完成并提交(commit 9b60167)",
         "parallel": false,
         "estimatedDays": 1,
         "phase": "1a",
@@ -506,61 +553,117 @@
       {
         "wave": 2,
         "tasks": ["US-P1a-002", "US-P1a-005", "US-P1a-006"],
-        "description": "三路并行：Data Agent做Schema精简版 / BE Agent做健康检查 / DevOps Agent做Docker",
+        "description": "三路并行：Data Agent做Schema精简版 / BE Agent做健康检查 / DevOps Agent做Docker。注意：005的Redis连通性测试需006的Docker先启动，可先写逻辑后联调",
         "parallel": true,
-        "estimatedDays": 2,
+        "estimatedDays": 3,
+        "phase": "1a"
+      },
+      {
+        "wave": "2.5",
+        "tasks": ["Critic审查Wave2"],
+        "description": "方案审查+代码审查，三个US的Schema/API/Docker",
+        "estimatedDays": 1,
         "phase": "1a"
       },
       {
         "wave": 3,
         "tasks": ["US-P1a-009"],
-        "description": "数据通道：MallAdapter接入ztdy-open 6个API，打通真实数据",
+        "description": "数据通道：MallAdapter接入ztdy-open 6个API + Redis缓存 + 聚合工具函数",
         "parallel": false,
-        "estimatedDays": 2,
+        "estimatedDays": 5,
+        "phase": "1a",
+        "note": "v2.2修正：从2天改为5天。6个API端点需真实联调+Zod校验+缓存层+聚合函数，不是简单转发"
+      },
+      {
+        "wave": "3.5",
+        "tasks": ["Critic审查Wave3"],
+        "description": "MallAdapter方案+代码审查",
+        "estimatedDays": 1,
         "phase": "1a"
       },
       {
-        "wave": "--- Phase 1b 分界线 ---",
+        "wave": "--- Phase 1b 分界线 --- 目标交付：2026-06-06",
         "tasks": [],
-        "description": "以下任务进入Phase 1b，Phase 1a交付后开始"
+        "description": "Phase 1a交付后开始Phase 1b"
       },
       {
         "wave": 4,
         "tasks": ["US-P1b-001"],
-        "description": "认证：JWT+微信登录，用户能进系统",
+        "description": "认证：JWT RS256 + 微信登录 + Redis黑名单。AC补充：JWT payload必须包含{tenantId,userId,role}",
         "parallel": false,
         "estimatedDays": 2,
         "phase": "1b"
       },
       {
         "wave": 5,
-        "tasks": ["US-P1b-002", "US-P1b-003"],
-        "description": "并行：多租户隔离 + AI对话引擎（百炼Qwen+SSE+tool_call）",
-        "parallel": true,
-        "estimatedDays": 3,
+        "tasks": ["US-P1b-002"],
+        "description": "多租户隔离：Prisma middleware自动注入tenantId + 禁止$executeRaw + 隔离测试",
+        "parallel": false,
+        "estimatedDays": 2,
         "phase": "1b"
       },
       {
         "wave": 6,
-        "tasks": ["US-P1b-004", "US-P1b-005", "US-P1b-006"],
-        "description": "三路并行：5个运营场景 / ACI客服MVP / OpenClaw飞书接入",
-        "parallel": true,
-        "estimatedDays": 3,
+        "tasks": ["US-P1b-003"],
+        "description": "AI对话引擎：百炼Qwen + SSE + tool_call + System Prompt。v2.2修正：从3天改为6天，tool_call和Prompt设计需多轮迭代",
+        "parallel": false,
+        "estimatedDays": 6,
+        "phase": "1b",
+        "note": "关键路径上最重的任务"
+      },
+      {
+        "wave": "6.5",
+        "tasks": ["Critic审查Wave4-6"],
+        "description": "JWT+多租户+AI对话引擎 方案+代码审查",
+        "estimatedDays": 2,
         "phase": "1b"
       },
       {
         "wave": 7,
+        "tasks": ["US-P1b-004"],
+        "description": "5个运营查询真实场景验证",
+        "parallel": false,
+        "estimatedDays": 2,
+        "phase": "1b"
+      },
+      {
+        "wave": 8,
+        "tasks": ["US-P1b-005"],
+        "description": "ACI客服MVP：退货审核判断决策树(已完整设计) + 5条规则硬编码 + 风险闸门",
+        "parallel": false,
+        "estimatedDays": 3,
+        "phase": "1b"
+      },
+      {
+        "wave": 9,
+        "tasks": ["US-P1b-006"],
+        "description": "双飞书对接：飞书号1(Agent SDK Bridge→Claude Code) + 飞书号2(OpenClaw迁移)。Bridge API约600-800行核心代码",
+        "parallel": false,
+        "estimatedDays": 5,
+        "phase": "1b",
+        "note": "创始人核心需求，Agent SDK + @larksuiteoapi/node-sdk + PM2进程守护"
+      },
+      {
+        "wave": "9.5",
+        "tasks": ["Critic审查Wave7-9"],
+        "description": "运营场景+ACI+飞书 方案+代码审查",
+        "estimatedDays": 2,
+        "phase": "1b"
+      },
+      {
+        "wave": 10,
         "tasks": ["US-P1b-007", "US-P1b-008"],
-        "description": "收尾：限流中间件 + 数据库备份（部署前必须完成）",
+        "description": "收尾：限流中间件 + 数据库备份",
         "parallel": true,
         "estimatedDays": 2,
         "phase": "1b"
       }
     ],
-    "totalEstimatedDays": "15-18个工作日（含Critic双重审查时间）",
-    "criticalPath": "US-P1a-001 → US-P1a-002 → US-P1b-001 → US-P1b-002 → US-P1b-003 → US-P1b-004/005/006",
-    "phase1aDeliverable": "可运行的后端+Docker环境+6个ztdy API已接通+健康检查可访问",
-    "phase1bDeliverable": "老板在飞书说一句话→OpenClaw→AI查ztdy真实数据→飞书回复真实数字；客服消息→ACI判断退货→飞书确认"
+    "totalEstimatedDays": "30-35个工作日（含Critic双重审查5天 + 工作量重估）",
+    "criticalPath": "001(done) → 002 → 009 → P1b-001 → P1b-002 → P1b-003(6天最重) → P1b-005 → P1b-006(5天) → P1b-007/008",
+    "phase1aDeliverable": "可运行的后端+Docker环境+6个ztdy API已接通+健康检查可访问（目标4月20日）",
+    "phase1bDeliverable": "飞书号1→Claude Code可对话；飞书号2→OpenClaw→AI查ztdy真实数据→飞书回复；ACI退货审核判断可工作（目标6月6日）",
+    "v22ChangeLog": "CTO审查修正：(1)MallAdapter 2天→5天 (2)AI对话引擎 3天→6天 (3)Wave6三路并行拆为串行Wave7/8/9 (4)插入Critic审查Wave (5)总工期15-18天→30-35天"
   },
 
   "backlog": [
@@ -949,6 +1052,28 @@
       "reason": "v1.0 Phase 1全是中间件（Schema/JWT/多租户/Docker/备份/限流），4月底交付一个完美的空壳——没有AI对话、没有业务数据、无法演示。v2.0调整：(1)Schema精简为AI/系统层（商品/订单从API读不落库）(2)新增MallAdapter接入真实数据(3)新增AI对话引擎+5个运营场景+ACI客服MVP+前端对话页(4)备份/限流降级到1b后段。Phase 1交付标准从'基础设施完备'变为'老板能对AI说话看到真实数据+客服能做退货判断'。同时坚持方案先行原则——方案不清晰不开工",
       "status": "accepted",
       "date": "2026-03-30"
+    },
+    {
+      "id": "ADR-028",
+      "title": "Bridge API选型：Agent SDK直连 + 轻量自建Bridge + 飞书官方SDK",
+      "reason": "CTO审查确认Bridge API是飞书号1→Claude Code链路的核心缺失项。调研结论：(1)Claude Agent SDK(@anthropic-ai/claude-agent-sdk)是TypeScript原生，AsyncGenerator流式输出，与项目技术栈完全一致，能力等同Claude Code CLI但集成更优；(2)飞书官方SDK(@larksuiteoapi/node-sdk)内置验签+事件订阅+消息收发；(3)弃选cc-connect(有死锁bug+复杂度过高)和裸Anthropic API(无文件系统/Bash/Agent循环能力)；(4)异步方案：飞书Webhook→立即ack(200ms)→发'处理中'卡片→Agent SDK异步执行→流式更新卡片→最终推送结果；(5)进程守护PM2自动重启；(6)核心代码约600-800行，实施约1周",
+      "techStack": {
+        "claudeCodeIntegration": "@anthropic-ai/claude-agent-sdk (query() AsyncGenerator)",
+        "feishuSDK": "@larksuiteoapi/node-sdk (EventDispatcher + im.message.create/patch)",
+        "httpFramework": "Express 4 (项目已有)",
+        "processManager": "PM2 (自动重启+日志+内存监控)",
+        "taskQueue": "内存Map (Phase 1单机够用，Phase 2可升级Redis)",
+        "asyncFlow": "Webhook→ack→BullMQ/内存队列→Agent SDK→流式卡片更新→最终结果推送"
+      },
+      "status": "accepted",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "ADR-029",
+      "title": "ACI退货审核决策树：完整规则优先级 + ProcessNode枚举 + 输出Schema + 晋升KPI",
+      "reason": "CTO审查发现4个P0：规则无优先级/ProcessNode未定义/输出格式未定义/跨数据源风险。完整设计方案：(1)ProcessNode 0-5六级枚举(需用真实数据校验)；(2)优先级P0安全闸门>P1合规>P2业务>P3品类时效>P4默认APPROVE；(3)输出ACIReturnJudgment含decision/reason/riskLevel/triggeredRules/confidence/context；(4)风险闸门：情绪关键词检测+欺诈多信号+置信度<0.7自动转人工；(5)晋升KPI：14天>=100笔，准确率>=90%，漏升级<5%，闸门拦截100%，灰度放权",
+      "status": "accepted",
+      "date": "2026-03-30"
     }
   ],
 
@@ -1256,6 +1381,23 @@
   ],
 
   "changeHistory": [
+    {
+      "version": "2.2.0",
+      "date": "2026-03-30",
+      "author": "CTO(Claude Code)",
+      "summary": "CTO全面审查 + 排期修正 + Bridge API选型 + ACI决策树完整设计",
+      "changes": [
+        "六路团队并行审查(Data/BE/AI/通讯/DevOps/PM)，发现17个P0+15个P1+8个P2",
+        "ADR-028: Bridge API选型确定——Agent SDK + 自建Bridge + 飞书官方SDK + PM2守护",
+        "ADR-029: ACI决策树完整设计——ProcessNode枚举/规则优先级矩阵/输出JSON Schema/风险闸门检测/晋升KPI",
+        "排期修正Option A(加时间不砍功能): Phase 1a→4月20日, Phase 1b→6月6日, 总工期30-35工作日",
+        "executionPlan重构: Wave6三路并行拆为串行Wave7/8/9, 插入Critic审查Wave, MallAdapter 2天→5天, AI对话3天→6天",
+        "US-P1a-009 blockedBy补充US-P1a-002(隐性依赖修正)",
+        "aciHub完整更新: processNodeEnum/rulePriorityMatrix/judgmentOutputSchema/riskGates检测规则/promotionGate量化KPI",
+        "dualEngines.claudeCode.deployment更新为Agent SDK方案",
+        "US-P1a-001补提交(commit 9b60167)"
+      ]
+    },
     {
       "version": "2.1.0",
       "date": "2026-03-30",
