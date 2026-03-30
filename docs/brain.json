@@ -1,6 +1,6 @@
 {
   "projectName": "企业AI工作站",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "lastUpdated": "2026-03-30",
 
   "projectBrief": {
@@ -157,7 +157,7 @@
   },
 
   "securityDesign": {
-    "authentication": "JWT RS256, access 15min, refresh 7d, Redis黑名单",
+    "authentication": "JWT HS256(Phase 1临时) → RS256(Phase 1b US-P1b-001升级), access 15min, refresh 7d, Redis黑名单(fail-secure: Redis不可用=拒绝请求503)",
     "authorization": "RBAC + tenantId隔离, 权限检查在API Gateway统一执行",
     "rateLimiting": "登录5次/min(IP), API 100次/min(user), 聚合查询10次/hour(tenant)",
     "injection": "Prisma ORM防SQL注入 + Zod输入验证 + DOMPurify输出清理",
@@ -269,7 +269,7 @@
     {
       "id": "US-P1a-006",
       "title": "Docker Compose 本地开发环境",
-      "status": "pending",
+      "status": "done",
       "assignee": "DevOps Agent",
       "story": "AS 开发团队 I WANT 一键启动的本地开发环境 SO THAT 任何Agent/开发者可以快速启动完整的开发环境",
       "ac": [
@@ -297,7 +297,7 @@
     {
       "id": "US-P1a-009",
       "title": "MallAdapter — 接入ztdy-open商城API",
-      "status": "pending",
+      "status": "done",
       "assignee": "BE Agent",
       "story": "AS AI系统 I WANT 通过统一适配器访问现有商城真实数据 SO THAT AI对话和客服判断基于真实业务数据",
       "ac": [
@@ -338,12 +338,12 @@
         "AC-01: RS256 非对称签名，密钥对安全存储（环境变量或阿里云KMS）",
         "AC-02: Access Token 有效期 15 分钟，Refresh Token 有效期 7 天",
         "AC-03: Token 刷新端点 POST /api/v1/auth/refresh 实现 Refresh Token Rotation",
-        "AC-04: Redis Token 黑名单机制：登出/角色变更时 token 立即失效",
+        "AC-04: Redis Token 黑名单机制：登出/角色变更时 token 立即失效（基础检查已在US-P1a-010 auth.ts实现，本US补充写入逻辑）",
         "AC-05: 微信小程序登录端点 POST /api/v1/auth/wechat-login 实现完整流程（code→openid→查库→签发JWT）",
         "AC-06: 手机号绑定端点 POST /api/v1/auth/bindPhone（新用户首次登录）",
-        "AC-07: auth middleware 校验 JWT 签名+过期时间+黑名单，注入 req.user（tenantId, userId, role）",
+        "AC-07: auth middleware 升级为 RS256 签名校验（基础HS256中间件已在US-P1a-010实现，本US升级签名算法+密钥对管理）",
         "AC-08: 认证失败统一返回 401，格式遵循统一响应规范",
-        "AC-09: 登录接口 Rate Limiting 5次/分钟（IP级）",
+        "AC-09: 登录接口 Rate Limiting 5次/分钟（IP级）（基础滑动窗口限流器已在US-P1a-010实现，本US配置登录专用限流规则）",
         "AC-默认-01: session_key 不下发前端",
         "AC-默认-02: 所有认证相关操作写入 AuditLog"
       ],
@@ -376,7 +376,7 @@
         "AC-默认-01: 覆盖率 100%（多租户隔离层）"
       ],
       "scope": {
-        "include": "tenant中间件（硬编码默认租户）、Prisma查询自动注入tenantId、基础隔离逻辑",
+        "include": "tenant中间件已在US-P1a-010/011实现(fail-secure,无默认fallback)。本US聚焦：Prisma查询自动注入tenantId(middleware或封装函数)、硬编码时皙默认租户ID、基础隔离逻辑",
         "exclude": "不做RLS策略脚本（Phase 2）、不做多租户隔离测试（Phase 2引入第二租户时）、不做 dataScope 细粒度（Phase 2）"
       },
       "priority": "P0",
@@ -509,22 +509,22 @@
     },
     {
       "id": "US-P1b-007",
-      "title": "Rate Limiting 中间件",
+      "title": "Rate Limiting 增强（多维度+按路由配置）",
       "status": "pending",
       "assignee": "BE Agent",
-      "story": "AS 平台运维 I WANT API限流机制 SO THAT 单个租户或用户无法通过大量请求影响平台稳定性",
+      "story": "AS 平台运维 I WANT 细粒度的API限流机制 SO THAT 不同接口可以有不同的限流策略",
       "ac": [
-        "AC-01: 基于 Redis 滑动窗口算法实现限流",
-        "AC-02: 租户级限流：100 req/min",
-        "AC-03: 用户级限流：30 req/min",
-        "AC-04: 超限返回 429 Too Many Requests + Retry-After header",
+        "AC-01: 基础Redis滑动窗口限流已在US-P1a-010实现(fail-secure)，本US在此基础上增强",
+        "AC-02: 租户级限流：100 req/min（在现有用户级限流基础上新增维度）",
+        "AC-03: 用户级限流：30 req/min（调整现有默认值）",
+        "AC-04: 超限返回 429 Too Many Requests + Retry-After header（补充Retry-After）",
         "AC-05: 限流配置可通过环境变量调整",
         "AC-06: 限流中间件可按路由灵活配置（不同接口不同限制）",
         "AC-07: AI对话接口（/api/v1/ai/*）专项限流：10 req/min（用户级），AI调用成本高，必须限流",
         "AC-默认-01: API 响应时间 < 500ms（限流检查本身 < 5ms）"
       ],
       "scope": {
-        "include": "Redis滑动窗口限流、租户级+用户级限流、AI对话接口专项限流、429响应",
+        "include": "在现有rate-limit.ts基础上增强：租户级限流维度、按路由差异化配置、AI接口专项限流、Retry-After header",
         "exclude": "不做IP级限流（已在US-P1b-001登录接口实现）"
       },
       "priority": "P1",
@@ -640,19 +640,22 @@
       },
       {
         "wave": "2.5",
-        "tasks": ["Critic审查Wave2"],
-        "description": "方案审查+代码审查，三个US的Schema/API/Docker",
-        "estimatedDays": 1,
-        "phase": "1a"
+        "tasks": ["Critic审查Wave2", "US-P1a-010", "US-P1a-011"],
+        "description": "方案审查+代码审查 + 安全中间件套件(US-P1a-010) + 安全基线重构(US-P1a-011, fail-secure+类型安全+Schema对齐) ✅ 全部完成",
+        "estimatedDays": 2,
+        "phase": "1a",
+        "status": "done",
+        "note": "US-P1a-010(commit 280be5b): 安全中间件套件+35测试。US-P1a-011(commit e512f5f): fail-secure重构+错误码注册表+40测试"
       },
       {
         "wave": 3,
         "tasks": ["US-P1a-009"],
-        "description": "数据通道：MallAdapter接入ztdy-open 6个API + Redis缓存 + 聚合工具函数",
+        "description": "数据通道：MallAdapter接入ztdy-open 6个API + Redis缓存 + 聚合工具函数 ✅ 完成",
         "parallel": false,
         "estimatedDays": 5,
         "phase": "1a",
-        "note": "v2.2修正：从2天改为5天。6个API端点需真实联调+Zod校验+缓存层+聚合函数，不是简单转发"
+        "status": "done",
+        "note": "RULE-17砍功能：不做基类/工厂/Rate limiter/预计算/快照/三层校验。用原生fetch零新依赖。91测试全绿。"
       },
       {
         "wave": "3.5",
@@ -745,8 +748,8 @@
       }
     ],
     "totalEstimatedDays": "30-35个工作日（含Critic双重审查5天 + 工作量重估 + 多租户简化节省1天）",
-    "criticalPath": "001(done) → 002/005/006 → 009 → P1b-006(飞书,5天,提前) → P1b-001 → P1b-002(简化) → P1b-003(6天最重) → P1b-004 → P1b-005 → P1b-007/008",
-    "phase1aDeliverable": "可运行的后端+Docker环境+6个ztdy API已接通+健康检查可访问+百炼tool_call已验证+Bridge API原型已验证（目标4月20日）",
+    "criticalPath": "001(✅) → 002/005/006(✅) → 010/011(✅安全基线) → 009(✅MallAdapter) → SPIKE-001/002(下一步) → P1b-006(飞书) → P1b-001 → P1b-002 → P1b-003(6天最重) → P1b-004 → P1b-005 → P1b-007/008",
+    "phase1aDeliverable": "可运行的后端+Docker环境+安全中间件套件(fail-secure)+错误码注册表(38码)+Schema 21表+40测试全绿+6个ztdy API已接通+健康检查可访问+百炼tool_call已验证+Bridge API原型已验证（目标4月20日）",
     "phase1bDeliverable": "飞书号1→Claude Code可对话（最先交付）；飞书号2→OpenClaw→AI查ztdy真实数据→飞书回复；ACI退货审核判断可工作+判断记录可回放（目标6月6日）",
     "v23ChangeLog": "9人团队全面审查v2.3：(1)双飞书Wave9→Wave4（验证通道先行）(2)多租户Phase1简化（硬编码默认租户，节省1天）(3)新增SPIKE-001/002在Phase1a验证技术风险(4)删除供应商对账(BL-002/BL-011)(5)新增AiJudgmentRecord表(6)AI幻觉防护写入AI对话引擎(7)直达模式跳过Master Agent(8)E2E冒烟测试(9)MallAdapter按数据类型差异化缓存TTL(10)ACI标注数据集30-50个case"
   },
@@ -1325,9 +1328,10 @@
       { "code": "AUTH_PHONE_REQUIRED",    "httpStatus": 400, "message": "需要绑定手机号" }
     ],
     "tenant": [
-      { "code": "TENANT_NOT_FOUND",       "httpStatus": 404, "message": "租户不存在" },
+      { "code": "TENANT_NOT_FOUND",       "httpStatus": 403, "message": "租户不存在或已停用" },
       { "code": "TENANT_SUSPENDED",       "httpStatus": 403, "message": "租户已停用" },
-      { "code": "TENANT_QUOTA_EXCEEDED",  "httpStatus": 429, "message": "租户配额已用尽" }
+      { "code": "TENANT_QUOTA_EXCEEDED",  "httpStatus": 429, "message": "租户配额已用尽" },
+      { "code": "TENANT_MISMATCH",        "httpStatus": 403, "message": "租户ID不匹配" }
     ],
     "permission": [
       { "code": "PERMISSION_DENIED",      "httpStatus": 403, "message": "权限不足" },
@@ -1346,7 +1350,7 @@
       { "code": "ERP_UNAUTHORIZED",       "httpStatus": 502, "message": "ERP认证失败" },
       { "code": "ERP_RATE_LIMITED",        "httpStatus": 502, "message": "ERP接口限频" },
       { "code": "ERP_TIMEOUT",            "httpStatus": 504, "message": "ERP接口超时" },
-      { "code": "ERP_SYNC_FAILED",        "httpStatus": 500, "message": "数据同步失败" }
+      { "code": "ERP_SYNC_FAILED",        "httpStatus": 502, "message": "ERP数据同步失败" }
     ],
     "mall": [
       { "code": "MALL_API_UNAUTHORIZED",   "httpStatus": 502, "message": "商城API认证失败" },
@@ -1383,9 +1387,7 @@
     "quota": [
       { "code": "API_QUOTA_EXCEEDED",     "httpStatus": 429, "message": "API配额超限" }
     ],
-    "multiTenant": [
-      { "code": "TENANT_MISMATCH",        "httpStatus": 403, "message": "租户ID不匹配" }
-    ],
+    "_multiTenantMerged": "TENANT_MISMATCH已合并到tenant分组",
     "sse": [
       { "code": "SSE_RECONNECT",          "httpStatus": 200, "message": "SSE重连中" }
     ]

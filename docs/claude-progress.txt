@@ -1,51 +1,92 @@
 # 进度接力
 
 ## 最后更新
-- 时间：2026-03-30 16:25
-- Agent：CTO Agent（安全基线重构）
-- 任务：Wave 2.5b — US-P1a-011 安全基线重构（fail-secure + 类型安全 + Schema对齐）
+- 时间：2026-03-30 17:00
+- Agent：CTO Agent（Wave 3 MallAdapter）
+- 任务：US-P1a-009 MallAdapter — 接入ztdy-open商城6个API
 
 ## 本次完成
 
-### US-P1a-011 安全基线重构（6个AC全部完成）
+### US-P1a-009 MallAdapter（12个AC全部完成）
 
-#### AC-01: 安全降级策略重构（fail-secure原则）
-- 重写 auth.ts — Redis黑名单改async/await，失败返回503（非放行）
-- 重写 rate-limit.ts — Redis不可用返回503，pipeline结果类型安全校验
-- 重写 tenant.ts — tenantId缺失返回403，删除默认fallback
-- 重写3个对应测试文件，行为从"降级放行"改为"fail-secure拒绝"
+#### AC-01: MallAdapter类实现
+- 新建 adapters/erp/mall-adapter.ts — 统一封装6个ztdy-open端点
+- 构造函数读取env.ZTDY_API_BASE_URL + env.ZTDY_API_KEY
+- _callApi核心方法：缓存检查→API调用(含重试)→Zod校验→缓存写入→降级fallback
+- healthCheck()方法验证API可用性
 
-#### AC-02: 中间件架构重构
-- 重构 app.ts — protectedRouter独立Router，消除startsWith路径匹配绕过
-- 优雅关闭补Prisma.$disconnect()，Promise.allSettled并行关闭依赖
-- 健康检查加2秒超时保护（withTimeout工具函数）
+#### AC-02: Zod Schema校验
+- 新建 adapters/erp/schemas.ts — ztdyEnvelopeSchema + 6个实体schema + 5个过滤器schema
+- 所有API响应必须通过Zod校验，异常数据跳过（部分失败不影响有效数据）
+- 全部记录校验失败时抛MALL_DATA_INVALID
 
-#### AC-03: 类型安全加固
-- 新建 lib/error-codes.ts — 38个错误码注册表，ErrorCode类型编译时校验
-- 重写 response.ts — sendError的code参数改为ErrorCode类型，消除类型强转
-- 修复全部7个ESLint error（统一import type）+ 1个warning（多余eslint-disable）
+#### AC-03~08: 6个查询方法
+- getUsers(filters) — 146万用户，支持keyword/levelId筛选
+- getOrders(filters) — 95万订单，支持日期范围/状态/供应商/用户筛选
+- getItems(filters) — 8466商品，支持keyword/isShelf筛选
+- getSuppliers(filters) — 1142供应商，支持keyword筛选
+- getSupplierWithdraws(filters) — 8454条提现，支持日期/状态筛选
+- getUserWithdraws(filters) — 28730条用户提现，支持日期/状态筛选
+- 所有方法返回统一PaginatedResult<T>（含pagination/source/cachedAt）
 
-#### AC-04: 环境变量验证体系重建
-- env.ts 从8个变量扩展到覆盖.env.example全部变量（按Phase分组）
-- 新增：JWT_ACCESS_EXPIRES_IN / JWT_REFRESH_EXPIRES_IN / DASHSCOPE_BASE_URL / DASHSCOPE_MODEL / 微信/阿里云/ERP全组
+#### AC-09: 统一错误处理
+- 新建 adapters/erp/errors.ts — MallApiError自定义错误类
+- 错误码映射：MALL_API_UNAUTHORIZED/TIMEOUT/ERROR/DATA_INVALID
+- 网络错误重试1次（间隔2秒），401和数据校验失败不重试
+- API全部失败→尝试过期缓存→缓存也没有→抛错（fail-secure）
 
-#### AC-05: Schema与brain.json对齐
-- AiJudgmentRecord 补 disclaimer 字段
-- CSTicket 补 aiJudgmentId 外键 + humanReviewedAt/humanComments 字段
-- CSSessionStatus 补3个中间状态（ai_judging/pending_human_review/escalated）
-- CSTicketStatus 补2个中间状态（ai_judging/awaiting_human_confirmation）
-- AiJudgmentRecord 补3个索引（sessionId/riskLevel+createdAt/confidence+createdAt）
+#### AC-10: Redis缓存
+- 新建 adapters/erp/cache.ts — buildCacheKey/getCache/setCache
+- 差异化TTL：orders 5min / items 30min / users 60min / suppliers 30min
+- 缓存key格式：v1:mall:{tenantId}:{method}:{sha256(sortedParams)[0:16]}
+- fail-secure：Redis读写失败只记日志，不影响API调用
 
-#### AC-06: 文档同步
-- brain.json: US-P1a-010→done, 新增US-P1a-011记录, 决策说明
-- CLAUDE.md v2.5: 新增RULE-19(fail-secure)/RULE-20(不接受补丁)
-- progress.txt: 本文件
+#### AC-11: 聚合查询工具函数
+- 新建 services/mall/aggregates.ts
+- getSalesStats(dateRange) — 总金额/订单数/平均客单价
+- getTopSuppliers(metric, limit) — 按orderCount或amount排行
+- getOrderStatusDistribution(dateRange?) — 按processNode统计分布
+- 限量实时聚合：最多100页(10万条)，返回completeness标记
+- 结果缓存10分钟
+
+#### AC-默认-01: API密钥环境变量
+- ZTDY_API_BASE_URL / ZTDY_API_KEY 已在env.ts中定义（US-P1a-011）
+- MallAdapter构造函数读取，缺失时warn日志+MALL_API_UNAUTHORIZED
+
+#### AC-默认-02: AuditLog
+- Phase 1全只读，AuditLog写入预留到Phase 1b写操作时实现
+
+### 新增文件清单
+```
+adapters/erp/
+  types.ts         # 统一输出类型 + 过滤器 + 聚合结果
+  schemas.ts       # Zod schemas (6实体 + 5过滤器 + 信封)
+  errors.ts        # MallApiError自定义错误类
+  cache.ts         # Redis缓存工具 (key生成 + get/set + TTL)
+  mall-adapter.ts  # MallAdapter核心类 + 6方法 + healthCheck
+services/mall/
+  aggregates.ts    # 3个聚合查询函数
+__tests__/adapters/
+  cache.test.ts         # 16个测试
+  mall-adapter.test.ts  # 26个测试
+__tests__/services/
+  mall-aggregates.test.ts  # 9个测试
+```
+
+### 设计决策（RULE-17 砍功能）
+- 不做 ERPAdapterBase 抽象基类（Phase 2有第二个adapter再抽象）
+- 不做 AdapterFactory 工厂（同上）
+- 不做 Rate limiter / Quota manager 独立模块
+- 不做 BullMQ 预计算 cron job
+- 不做 PostgreSQL 快照表（L4降级）
+- 不做 三层缓存校验（写时Zod校验足够）
+- 用Node 20+ 原生fetch，零新依赖
 
 ## 验证结果
 - TypeScript编译：0 errors
 - ESLint：0 errors, 0 warnings
-- Prisma validate：通过
-- Vitest：40/40 passed（从35增加到40）
+- Vitest：91/91 passed（从40增加到91）
+- brain.json: v2.5.1
 
 ## 历史完成
 - US-P1a-001 ✅ 脚手架（commit 9b60167）
@@ -53,11 +94,12 @@
 - US-P1a-005 ✅ 健康检查API（commit 88d84ba）→ 充血安全中间件
 - US-P1a-006 ✅ Docker（commit 471a5ac）→ 加固安全配置
 - US-P1a-010 ✅ 安全中间件套件 + 代码充血（commit 280be5b）
-- US-P1a-011 ✅ 安全基线重构（本次）
+- US-P1a-011 ✅ 安全基线重构（commit e512f5f）
+- US-P1a-009 ✅ MallAdapter接入ztdy-open 6个API（本次）
 
-## Wave 2.5b 全部完成 ✅
+## Wave 3 完成 ✅
 
 ## 下一步
-- Wave 3：US-P1a-009 MallAdapter接入ztdy-open 6个API（预计5天）
 - Wave 3.5：两个技术Spike（百炼tool_call验证 + Bridge API原型）
-- Phase 1b Wave 1：US-P1b-001 JWT RS256升级 + 微信登录流
+- Phase 1b Wave 1：US-P1b-006 双飞书对接
+- Phase 1b Wave 2：US-P1b-001 JWT RS256升级 + 微信登录流

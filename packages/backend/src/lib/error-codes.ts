@@ -9,8 +9,8 @@ export const ERROR_CODES = {
   AUTH_INVALID_TOKEN: { httpStatus: 401, message: '无效的访问令牌' },
   AUTH_TOKEN_EXPIRED: { httpStatus: 401, message: '访问令牌已过期' },
   AUTH_TOKEN_BLACKLISTED: { httpStatus: 401, message: '令牌已被吊销' },
-  AUTH_REFRESH_INVALID: { httpStatus: 401, message: '刷新令牌无效' },
-  AUTH_WECHAT_CODE_INVALID: { httpStatus: 401, message: '微信授权码无效' },
+  AUTH_REFRESH_INVALID: { httpStatus: 401, message: '刷新令牌无效或已过期' },
+  AUTH_WECHAT_CODE_INVALID: { httpStatus: 400, message: '微信登录code无效' },
   AUTH_PHONE_REQUIRED: { httpStatus: 400, message: '需要绑定手机号' },
 
   // === 租户 ===
@@ -33,8 +33,8 @@ export const ERROR_CODES = {
   AUTH_RATE_LIMITED: { httpStatus: 429, message: '登录尝试过于频繁' },
 
   // === ERP ===
-  ERP_UNAUTHORIZED: { httpStatus: 502, message: 'ERP授权失败' },
-  ERP_RATE_LIMITED: { httpStatus: 502, message: 'ERP接口限流' },
+  ERP_UNAUTHORIZED: { httpStatus: 502, message: 'ERP认证失败' },
+  ERP_RATE_LIMITED: { httpStatus: 502, message: 'ERP接口限频' },
   ERP_TIMEOUT: { httpStatus: 504, message: 'ERP接口超时' },
   ERP_SYNC_FAILED: { httpStatus: 502, message: 'ERP数据同步失败' },
 
@@ -61,11 +61,11 @@ export const ERROR_CODES = {
   // === 工具 ===
   TOOL_TIMEOUT: { httpStatus: 504, message: '工具执行超时' },
   TOOL_DEGRADED: { httpStatus: 200, message: '工具部分降级' },
-  TOOL_CHAIN_PARTIAL: { httpStatus: 200, message: '工具链部分执行' },
+  TOOL_CHAIN_PARTIAL: { httpStatus: 207, message: '链式调用部分失败' },
 
   // === ACI ===
   ACI_RULE_CONFLICT: { httpStatus: 500, message: 'ACI规则冲突' },
-  ACI_DATA_INCOMPLETE: { httpStatus: 400, message: 'ACI判断数据不完整' },
+  ACI_DATA_INCOMPLETE: { httpStatus: 422, message: 'ACI判断数据不完整' },
 
   // === 缓存 ===
   CACHE_STALE: { httpStatus: 200, message: '缓存数据可能过期' },
