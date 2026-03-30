@@ -1,6 +1,6 @@
 {
   "projectName": "企业AI工作站",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "lastUpdated": "2026-03-30",
 
   "projectBrief": {
@@ -49,7 +49,9 @@
         "4": "已收货/已签收(RECEIVED)",
         "5": "已完成(COMPLETED)",
         "receivedThreshold": "ProcessNode >= 4 视为已收货",
-        "rule1Threshold": "ProcessNode < 3 视为未发货，引导取消"
+        "rule1Threshold": "ProcessNode < 3 视为未发货，引导取消",
+        "validationStatus": "pending — Phase 1a启动前必须用ztdy真实数据验证",
+        "validationScript": "scripts/validate-process-node.ts"
       },
       "judgmentRules": [
         "规则1: 订单未收货(ProcessNode<3) → REJECT，引导取消订单",
@@ -61,11 +63,11 @@
       "rulePriorityMatrix": {
         "_instruction": "多规则同时触发时按优先级执行，高优先级命中即决策，所有触发规则均记录在triggeredRules中",
         "P0_安全闸门": ["GATE_EMOTION(情绪激动)", "GATE_FRAUD(欺诈嫌疑)", "GATE_REFUND_REQUEST(退款意图)", "GATE_LOW_CONFIDENCE(AI置信度<0.7)"],
-        "P1_合规拦截": ["RULE_05(金额>500)", "RULE_04(30天退货>=3)"],
+        "P1_合规拦截": ["RULE_04(30天退货>=3,P1a)", "RULE_05(金额>500,P1b)"],
         "P2_业务规则": ["RULE_01(未收货ProcessNode<3)"],
         "P3_品类时效": ["RULE_03(食品已拆封)", "RULE_02(收货>7天)"],
         "P4_默认": "无规则触发 → APPROVE",
-        "conflictResolution": "同优先级取更严格结果（如P3中RULE_03无申诉通道 > RULE_02可申诉）"
+        "conflictResolution": "同优先级取更严格结果（如P3中RULE_03无申诉通道 > RULE_02可申诉）。同优先级内按子优先级排序，安全类(欺诈) > 业务类(金额)，即P1a > P1b"
       },
       "judgmentOutputSchema": {
         "decision": "APPROVE | REJECT | REJECT_WITH_APPEAL | ESCALATE",
@@ -80,7 +82,14 @@
       },
       "riskGates": {
         "退款/补偿": "P0，检测关键词(退款/赔偿/补偿等)，立即ESCALATE",
-        "情绪激动": "P0，高强度词(投诉/律师/12315等)任一命中或中强度词>=2个，立即ESCALATE",
+        "情绪激动": {
+          "description": "P0，高强度词任一命中或中强度词>=2个，立即ESCALATE",
+          "emotionKeywords": {
+            "high": ["投诉", "律师", "12315", "工商", "法院", "曝光", "媒体", "消协"],
+            "medium": ["不满意", "差评", "太慢了", "骗人", "坑人", "垃圾", "举报", "失望", "生气", "无语", "恶心", "后悔", "上当"],
+            "negationExclusion": "包含否定词(不想/不会/没有/并非)修饰情绪词时不计入"
+          }
+        },
         "欺诈嫌疑": "P0，30天退货>=3次 或 历史退货率>50% 或 收货<2小时退货，立即ESCALATE",
         "不确定case": "P0，AI置信度<0.7 或 数据缺失/矛盾 或 图片语音消息，直接转人工"
       },
@@ -144,7 +153,25 @@
       "atlas": "ATLAS(WebSocket IM+SSE+文件流+监控) → 选择性合并到对话通道和驾驶舱，Phase 3。注意：OpenClaw不在ATLAS而在Qiyao",
       "shishi": "时皙商城(27表/207验收/22页面) → 已决策合并(ADR-022)，技术栈迁移(NestJS→Express, MySQL→PostgreSQL, uni-app→Taro)，Phase 2-3"
     },
-    "currentStatus": "Phase 1a 进行中。脚手架已完成(US-P1a-001 ✅ commit 9b60167)。v2.3更新：9人团队全面审查完成 — 双飞书对接从Wave9提前到Wave4(验证通道先行)、多租户Phase1简化(节省1天)、供应商对账模块删除(BL-002/BL-011)、新增Phase1a技术Spike(百炼tool_call+Bridge API原型)、AiJudgmentRecord结构化判断记录、AI幻觉防护写入对话引擎、直达模式跳过Master Agent、E2E冒烟测试。下一步：Wave 2 三路并行(Schema精简版/健康检查/Docker)。"
+    "currentStatus": "Phase 1a 进行中。脚手架已完成(US-P1a-001 ✅ commit 9b60167)。v2.3更新：9人团队全面审查完成 — 双飞书对接从Wave9提前到Wave4(验证通道先行)、多租户Phase1简化(节省1天)、供应商对账模块删除(BL-002/BL-011)、新增Phase1a技术Spike(百炼tool_call+Bridge API原型)、AiJudgmentRecord结构化判断记录、AI幻觉防护写入对话引擎、直达模式跳过Master Agent、E2E冒烟测试。v2.4更新：全面审查补强 — ACI规则冲突修复、中强度词枚举、安全设计方案、前后端接口契约、工具错误处理框架、团队流程补强。下一步：Wave 2 三路并行(Schema精简版/健康检查/Docker)。"
+  },
+
+  "securityDesign": {
+    "authentication": "JWT RS256, access 15min, refresh 7d, Redis黑名单",
+    "authorization": "RBAC + tenantId隔离, 权限检查在API Gateway统一执行",
+    "rateLimiting": "登录5次/min(IP), API 100次/min(user), 聚合查询10次/hour(tenant)",
+    "injection": "Prisma ORM防SQL注入 + Zod输入验证 + DOMPurify输出清理",
+    "encryption": "传输TLS1.2+ / 存储AES-256-GCM / 密钥阿里云KMS",
+    "cors": "白名单: api.cebrenis.com, app.cebrenis.com, localhost:3000(dev)",
+    "csrf": "SameSite=Strict + X-Requested-With header验证",
+    "audit": "所有敏感操作写AuditLog, 保留365天"
+  },
+
+  "missingRoles": {
+    "_note": "v2.4审查后识别的缺失岗位，规划在Phase 2补充",
+    "securityAgent": "安全合规Agent — 密钥轮换/数据加密/审计/PIPL合规",
+    "sreAgent": "SRE Agent — 监控告警/容量规划/性能优化",
+    "customerSuccessAgent": "客户成功Agent — SLA追踪/用户反馈/续约"
   },
 
   "currentPhase": "Phase 1a",
@@ -538,6 +565,29 @@
       "createdAt": "2026-03-29",
       "updatedAt": "2026-03-30",
       "updateNote": "从Phase 1a移至Phase 1b wave 6（部署前完成即可），原ID US-P1a-007"
+    },
+    {
+      "id": "US-P1a-010",
+      "title": "安全中间件套件 + 代码充血",
+      "status": "in_progress",
+      "assignee": "BE Agent + DevOps Agent",
+      "story": "AS 安全工程师 I WANT 完整的安全中间件套件 SO THAT 系统在Phase 1就具备企业级安全防护",
+      "ac": [
+        "AC-01: JWT认证中间件(RS256签名验证+Redis黑名单)",
+        "AC-02: 租户隔离中间件(tenantId强制校验)",
+        "AC-03: 速率限制中间件(Redis滑动窗口)",
+        "AC-04: 请求日志中间件(结构化访问日志)",
+        "AC-05: 环境变量Zod验证(启动时校验所有必需变量)",
+        "AC-06: CORS白名单配置",
+        "AC-07: Docker安全加固(密码环境变量化+Redis认证)",
+        "AC-08: 基础测试套件(middleware+routes+utils至少15个测试)"
+      ],
+      "priority": "P0",
+      "blockedBy": ["US-P1a-001"],
+      "blocks": ["US-P1b-001"],
+      "wave": "2.5",
+      "phase": "1a",
+      "createdAt": "2026-03-30"
     }
   ],
 
@@ -1238,6 +1288,27 @@
     "system": [
       { "code": "INTERNAL_ERROR",         "httpStatus": 500, "message": "服务器内部错误" },
       { "code": "SERVICE_UNAVAILABLE",    "httpStatus": 503, "message": "服务暂不可用" }
+    ],
+    "tool": [
+      { "code": "TOOL_TIMEOUT",           "httpStatus": 504, "message": "工具调用超时" },
+      { "code": "TOOL_DEGRADED",          "httpStatus": 200, "message": "工具降级返回缓存数据" },
+      { "code": "TOOL_CHAIN_PARTIAL",     "httpStatus": 207, "message": "链式调用部分失败" }
+    ],
+    "aci": [
+      { "code": "ACI_RULE_CONFLICT",      "httpStatus": 500, "message": "ACI规则冲突" },
+      { "code": "ACI_DATA_INCOMPLETE",    "httpStatus": 422, "message": "ACI判断数据不完整" }
+    ],
+    "cache": [
+      { "code": "CACHE_STALE",            "httpStatus": 200, "message": "缓存数据过期" }
+    ],
+    "quota": [
+      { "code": "API_QUOTA_EXCEEDED",     "httpStatus": 429, "message": "API配额超限" }
+    ],
+    "multiTenant": [
+      { "code": "TENANT_MISMATCH",        "httpStatus": 403, "message": "租户ID不匹配" }
+    ],
+    "sse": [
+      { "code": "SSE_RECONNECT",          "httpStatus": 200, "message": "SSE重连中" }
     ]
   },
 
@@ -1466,6 +1537,22 @@
   ],
 
   "changeHistory": [
+    {
+      "version": "2.4.0",
+      "date": "2026-03-30",
+      "author": "CTO(Claude Code)",
+      "summary": "全面审查补强：ACI规则冲突修复、中强度情绪词枚举、安全设计方案、前后端接口契约、工具错误处理框架、团队流程补强",
+      "changes": [
+        "ACI rulePriorityMatrix P1规则增加子优先级：RULE_04(欺诈,P1a) > RULE_05(金额,P1b)，conflictResolution补充说明",
+        "riskGates.情绪激动补充emotionKeywords枚举：high(8词)/medium(13词)+否定词排除规则",
+        "processNodeEnum增加validationStatus和validationScript字段",
+        "errorCodes补全7类9个错误码：TOOL_TIMEOUT/TOOL_DEGRADED/TOOL_CHAIN_PARTIAL/ACI_RULE_CONFLICT/ACI_DATA_INCOMPLETE/CACHE_STALE/API_QUOTA_EXCEEDED/TENANT_MISMATCH/SSE_RECONNECT",
+        "新增securityDesign段落：JWT/RBAC/限流/注入防护/加密/CORS/CSRF/审计",
+        "新增missingRoles段落：识别3个缺失岗位(安全合规/SRE/客户成功)规划Phase 2",
+        "新增US-P1a-010：安全中间件套件+代码充血(8个AC)",
+        "创建08-前后端接口契约.md：统一响应格式/分页规范/12种AI消息类型JSON Schema/核心API端点签名"
+      ]
+    },
     {
       "version": "2.3.0",
       "date": "2026-03-30",

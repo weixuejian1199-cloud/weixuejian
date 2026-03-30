@@ -5,12 +5,15 @@ import { redis } from '../lib/redis.js';
 import { sendSuccess } from '../utils/response.js';
 import { childLogger } from '../utils/logger.js';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve, dirname } from 'node:path';
+
+const isProduction = process.env['NODE_ENV'] === 'production';
 
 function loadPackageVersion(): string {
   try {
-    // Works in both CJS and ESM contexts
-    const pkgPath = resolve(__dirname, '../../package.json');
+    // Node16 module 下 __dirname 可用（CJS 输出）
+    // 如果未来切换到 ESM，改用 fileURLToPath(import.meta.url)
+    const pkgPath = resolve(dirname(__filename), '../../package.json');
     const content = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string };
     return content.version;
   } catch {
@@ -74,16 +77,23 @@ basicHealthRouter.get('/', async (req: Request, res: Response, _next: NextFuncti
 
 /**
  * GET /api/v1/health — 详细健康检查，含版本、运行时间、环境
+ * 生产环境隐藏 version 和 environment 详情
  */
 detailHealthRouter.get('/', async (req: Request, res: Response, _next: NextFunction) => {
   const { components, allHealthy } = await checkComponents(req.requestId);
-  sendSuccess(res, {
+
+  const data: Record<string, unknown> = {
     status: allHealthy ? 'healthy' : 'degraded',
-    version: appVersion,
-    uptime: process.uptime(),
-    environment: process.env['NODE_ENV'] ?? 'development',
     components,
-  });
+  };
+
+  if (!isProduction) {
+    data['version'] = appVersion;
+    data['uptime'] = process.uptime();
+    data['environment'] = process.env['NODE_ENV'] ?? 'development';
+  }
+
+  sendSuccess(res, data);
 });
 
 export { basicHealthRouter, detailHealthRouter };

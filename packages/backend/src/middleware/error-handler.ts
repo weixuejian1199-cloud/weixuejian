@@ -3,6 +3,8 @@ import { ZodError } from 'zod';
 import { sendError } from '../utils/response.js';
 import { childLogger } from '../utils/logger.js';
 
+const isProduction = process.env['NODE_ENV'] === 'production';
+
 /**
  * 404 路由兜底中间件 — 放在所有路由之后、全局错误处理之前
  */
@@ -43,11 +45,20 @@ export function globalErrorHandler(
     return;
   }
 
-  // 未知异常 → 500，不暴露内部细节
+  // 生成错误追踪 ID
+  const errorId = req.requestId ?? 'unknown';
   const message =
     err instanceof Error ? err.message : 'An unexpected error occurred';
-  const stack = err instanceof Error ? err.stack : undefined;
-  log.error({ err: message, stack }, 'Unhandled error');
+
+  if (isProduction) {
+    // 生产环境：只记录 errorId + message，不记录完整 stack
+    log.error({ errorId, err: message }, 'Unhandled error');
+  } else {
+    // 开发环境：debug 级别记录完整 stack
+    const stack = err instanceof Error ? err.stack : undefined;
+    log.error({ errorId, err: message }, 'Unhandled error');
+    log.debug({ errorId, stack }, 'Error stack trace');
+  }
 
   sendError(
     res,

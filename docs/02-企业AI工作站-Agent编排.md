@@ -1,6 +1,7 @@
 # 企业 AI 工作站 · Agent 编排设计
 
-> 版本：v2.2 · 2026-03-30 · 本文档定义所有 AI Agent 的职责、工具集、提示词结构和协作机制
+> 版本：v2.3 · 2026-03-30 · 本文档定义所有 AI Agent 的职责、工具集、提示词结构和协作机制
+> v2.3 变更：9人团队审查修复 — ACI规则冲突解决/回调死循环防护/情绪词枚举/工具错误处理框架/提示词注入增强/SSE去重乱序/上下文压缩审计保留/双引擎权限统一/退货场景补全
 > v2.2 变更：客服子系统升级为ACI客服中枢（创始人定义的决策中枢架构，ADR-025）；修复降级策略bug（Claude不可用时降级为百炼而非反过来）
 > v2.1 变更：CTO终审新增 — 第十五节Agent间标准消息格式(AgentMessage/AgentResponse)、第十六节事件驱动主动触发框架、第十七节SSE流式输出断线重连机制
 
@@ -409,16 +410,67 @@ ACI 客服中枢处理：
         ↓
       人工客服在工作站确认 → Phase 2+半自动执行
 
+同优先级规则冲突解决（rulePriorityMatrix）：
+  · 当多条规则同时触发且优先级相同时，取更严格结果（即更倾向升级人工/拒绝）
+  · P1级规则严格度排序：RULE_04(欺诈嫌疑) > RULE_05(金额>500)
+    理由：欺诈是安全问题，误放行后果远大于金额门槛误触
+  · 具体执行：
+    - 欺诈+金额同时触发 → 按欺诈处理（升级人工+标记欺诈嫌疑）
+    - 任何规则输出"升级人工"与另一规则输出"建议退货" → 取"升级人工"
+    - 规则评估顺序：RULE_01→02→03→04→05，一旦触发"升级人工"则短路
+
 风险闸门（Phase 1硬编码，不可被AI覆盖）：
   · 退款/补偿 → P0，必须人审
-  · 情绪激动 → 立即升级
+  · 情绪激动 → 立即升级（见下方情绪识别词表）
   · 欺诈嫌疑 → 立即升级
   · 不确定case → 直接转人工
 
 放权闸门（Phase 1→2升级条件）：
   · 陪练结果连续稳定2周
   · 关键指标不波动
+
+回调终止条件（防死循环）：
+  · 人工确认后状态更新携带标记 processedByHuman=true
+  · Webhook 收到带 processedByHuman=true 的状态更新事件时，不触发 CS Agent 重入
+  · 防护链：AI建议→人工确认→状态更新(processedByHuman=true)→webhook收到→检查标记→终止
+  · 额外保险：同一工单在10分钟内最多触发1次 CS Agent 评估（Redis 限流锁）
+  · 实现：webhook handler 入口处检查：
+    if (event.processedByHuman === true) return; // 不重入
+    if (await redis.get(`cs-lock:${ticketId}`)) return; // 限流
 ```
+
+### 情绪识别词表
+
+**中强度情绪词**（触发"情绪激动"风险闸门的关键词）：
+
+| 类别 | 词汇列表 |
+|------|---------|
+| 不满表达 | 不满意、差评、太慢了、不行、很差、失望、无语、受不了 |
+| 欺骗指控 | 骗人、坑人、骗子、虚假宣传、欺骗、忽悠 |
+| 贬损评价 | 垃圾、破烂、劣质、坑货、辣鸡、什么玩意 |
+| 投诉意向 | 投诉、举报、12315、消费者协会、工商、曝光、差评伺候 |
+| 威胁表达 | 退钱、赔偿、法律、律师、起诉、告你们 |
+
+**否定句排除规则**：
+- 当情绪词前出现否定词（不、没、不想、不会、不用、别）时，不计为情绪触发
+- 示例："不想投诉" → 不触发；"想投诉" → 触发
+- 实现：正则检测 `(不|没|不想|不会|不用|别)\s*{情绪词}` 时跳过
+
+**强度升级规则**：
+- 单条消息出现 >= 2 个中强度词 → 视为高强度，立即升级
+- 连续 2 条消息各出现 >= 1 个中强度词 → 视为持续不满，升级人工
+
+### 退货场景补全（Phase 1 判断规则扩展）
+
+除基础5条规则外，以下场景需要额外判断逻辑：
+
+| 退货场景 | 判断规则 | AI建议 |
+|---------|---------|--------|
+| 联合退货（一单多品只退部分） | 检查该订单是否有多个SKU + 退货品项是否独立可退 | 建议部分退货，标注退款金额=退货品项金额（不含整单优惠分摊） |
+| 部分退货（一品多件只退部分） | 检查退货数量 < 订单该SKU总数量 | 建议部分退货，退款金额=单价*退货数量，优惠券按比例分摊 |
+| 换货 | 检查目标SKU是否有库存 + 价差处理 | 有库存且价差<=50元→建议换货；价差>50元→升级人工确认补差 |
+| 质量争议 | 买家需提供图片/视频凭证 | 无凭证→引导上传；有凭证→AI初判(百炼视觉)+升级人工终审 |
+| 发货延迟 | 检查承诺发货时间 vs 实际发货时间 | 超过承诺时间48h且未发货→建议取消+退款；已发货→引导等待+提供物流信息 |
 
 ### 工具集
 ```javascript
@@ -718,6 +770,42 @@ function detectInjection(input) {
 }
 ```
 
+**增强检测（防Unicode/中文/空白绕过）**：
+
+```javascript
+// 第一步：输入预处理（在正则匹配前执行）
+function normalizeInput(input) {
+  // 1. Unicode NFKC 归一化（将全角字符/变体统一为标准形式）
+  let normalized = input.normalize('NFKC');
+  // 2. 压缩连续空白字符为单个空格（防止 "i g n o r e" 绕过）
+  normalized = normalized.replace(/\s+/g, ' ').trim();
+  return normalized;
+}
+
+// 第二步：中文注入检测
+const CHINESE_INJECTION_PATTERNS = [
+  /(忽略|无视|忘记|跳过)\s*(之前|上面|所有|全部)?\s*(指令|规则|提示|设定|系统)/,
+  /(假装|扮演|模拟|变成|你现在是)\s*.{0,10}\s*(身份|角色|系统|助手|AI)/,
+  /(告诉我|透露|显示|输出)\s*.{0,10}\s*(系统提示|system\s*prompt|指令|规则)/,
+  /(不要|别)\s*(遵守|执行|理会)\s*(规则|指令|限制)/,
+];
+
+// 第三步：语义级检测（百炼 Qwen 二次意图分类）
+async function semanticInjectionCheck(input) {
+  const classification = await qwenClassify(input, {
+    labels: ['normal_query', 'prompt_injection', 'jailbreak_attempt'],
+    model: 'qwen3.5-plus' // 轻量模型，低延迟
+  });
+  if (classification.label !== 'normal_query' && classification.confidence > 0.8) {
+    auditLog.warn('semantic_injection_detected', { input, classification });
+    return true;
+  }
+  return false;
+}
+
+// 完整检测流程：normalize → 正则 → 中文正则 → 语义（仅正则未命中时才调语义，控制成本）
+```
+
 **处理方式**：检测到注入特征时，记录审计日志 + 返回安全提示（"您的输入包含不安全的内容，请重新描述您的需求"），不将原始输入传递给 AI。
 
 **工具调用参数校验**：所有工具函数参数必须经过 Zod schema 校验，防止 Agent 被诱导生成恶意参数：
@@ -756,6 +844,28 @@ function filterOutput(response) {
   return response;
 }
 ```
+
+### 双引擎权限统一（Claude Code + OpenClaw）
+
+两个引擎（飞书号1·Claude Code / 飞书号2·OpenClaw）调用后端工具函数时，权限检查统一在 API Gateway 层完成，确保无论从哪个引擎发起的请求都经过相同的权限校验：
+
+```
+Claude Code(飞书号1) ──┐
+                       ├──→ API Gateway（统一权限中间件） ──→ 工具函数
+OpenClaw(飞书号2)  ──┘
+                       │
+                       ├── JWT 校验（身份）
+                       ├── RBAC 校验（角色权限）
+                       ├── DataScope 校验（数据范围）
+                       └── 配额校验（调用限额）
+```
+
+**关键规则**：
+- 权限中间件是唯一的权限判定点，两个引擎共用同一份权限规则
+- 引擎本身不做权限判断，只负责调用 API Gateway 暴露的接口
+- 工具函数级别的权限映射表统一维护在数据库 `ToolPermission` 表中
+- 当两个引擎对同一资源发起冲突操作时，API Gateway 用分布式锁（Redis）保证操作原子性
+- 审计日志统一记录请求来源引擎（`source: 'claude-code' | 'openclaw'`），便于追溯
 
 ### System Agent 硬性拦截
 
@@ -838,6 +948,43 @@ if (failed.length > 0) {
 2. 缓存模板答案兜底
 3. 提示用户稍后重试
 
+### 工具错误处理框架
+
+#### 单工具失败 — 指数退避重试
+```javascript
+async function callToolWithRetry(toolFn, params, context, maxRetries = 3) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await toolFn(params, context);
+    } catch (err) {
+      if (attempt === maxRetries - 1) throw err;
+      const delay = Math.pow(2, attempt) * 1000; // 1s → 2s → 4s
+      await sleep(delay);
+      auditLog.warn('tool_retry', { tool: toolFn.name, attempt, delay, error: err.message });
+    }
+  }
+}
+```
+
+#### 超时处理
+- 单工具超时阈值：**30 秒**
+- 超时后返回缓存数据（如果有），响应标记 `stale: true`
+- 无缓存时返回错误提示：`{ success: false, error: 'TOOL_TIMEOUT', stale: false }`
+- 超时工具调用记录写入 AgentCallLog，status = 'timeout'
+
+#### 链式调用失败（A → B → C）
+- A 失败时取消 B、C 的调用，返回错误说明
+- A 成功、B 失败时，返回 A 的结果 + B 失败说明，取消 C
+- 实现：每步检查前置步骤结果，前置失败则 `return { partial: true, completedSteps: [...], failedAt: 'B', error: '...' }`
+
+#### 降级策略矩阵
+| AI 工具状态 | 降级方案 | 用户感知 |
+|-----------|---------|---------|
+| AI 模型不可用 | 降级为规则引擎（预置查询模板直查数据库） | "AI 分析暂不可用，以下为基础数据" |
+| AI 模型超时 | 返回缓存结果 + stale 标记 | "数据更新时间：{缓存时间}，当前获取较慢" |
+| 外部 API 不可用（商城/ERP） | 返回最近一次成功缓存 + 标记 | "数据截至 {时间}，外部系统暂时不可用" |
+| 全部不可用 | 直接 ESCALATE 转人工处理 | "系统暂时无法处理，已转人工" |
+
 ---
 
 ## 十三、AI 成本控制
@@ -864,6 +1011,12 @@ const SIMPLE_QUERY_PATTERNS = [
 - 压缩方式：AI 生成前轮摘要，替换原始对话记录
 - 效果预期：压缩后上下文 token 控制在 2,000 以内
 - 压缩结果存入 `Conversation.contextSummary`
+
+**审计数据保留**：
+- 压缩只影响 AI 上下文窗口（即传给模型的 messages 数组），不影响原始数据
+- 原始完整对话归档到 `AuditLog` 表（字段 `type='conversation_archive'`），保留 **30 天**
+- 30 天后原始对话转入冷存储（阿里云 OSS），再保留 **90 天**后彻底删除
+- 工具调用记录（AgentCallLog）独立于上下文压缩，始终完整保留
 
 ---
 
@@ -1037,3 +1190,52 @@ data: {"messageId": "msg_abc123", "totalTokens": 856, "seq": 5}
 - 客户端断线重连时携带 `Last-Event-ID` header
 - 服务端检查缓存，从断点序列号续传后续事件
 - 微信小程序不支持原生 EventSource（见 PIT-003），使用 `wx.request({ enableChunked: true })` 模拟，断线重连逻辑在 Taro 封装层实现
+
+### 17.3 消息去重与乱序处理
+
+**消息去重**：
+- 客户端维护已收到的序列号 Set（内存中保存当前流的 `receivedSeqSet`）
+- 重连后收到的事件，检查 `seq` 是否在 Set 中，重复则静默丢弃
+- 流结束（收到 `event: done`）时清空 Set
+
+**乱序处理**：
+- 每条 SSE 事件携带递增的 `sequence number`（即 data 中的 `seq` 字段）
+- 客户端维护接收缓冲区，按 seq 排序后依次渲染
+- 如果收到 seq=5 但 seq=4 尚未到达，等待 500ms；超时后跳过缺失的 seq 继续渲染
+- 缺失的 seq 记录到客户端日志，便于排查
+
+**半接收恢复**：
+- 断线时客户端记录最后一个**完整接收**的序列号（`lastCompleteSeq`）
+- 不记录中断传输中的部分数据，避免拼接出不完整内容
+- 重连时携带 `Last-Event-ID: {lastCompleteSeq}`
+- 服务端从 `lastCompleteSeq + 1` 开始重传
+
+```javascript
+// 客户端 SSE 接收器伪代码
+class SSEReceiver {
+  receivedSeqSet = new Set();
+  lastCompleteSeq = 0;
+  buffer = new Map(); // seq -> event data
+
+  onEvent(event) {
+    const { seq } = event.data;
+    if (this.receivedSeqSet.has(seq)) return; // 去重
+    this.receivedSeqSet.add(seq);
+    this.buffer.set(seq, event.data);
+    this.flushBuffer();
+  }
+
+  flushBuffer() {
+    while (this.buffer.has(this.lastCompleteSeq + 1)) {
+      const data = this.buffer.get(this.lastCompleteSeq + 1);
+      this.render(data);
+      this.buffer.delete(this.lastCompleteSeq + 1);
+      this.lastCompleteSeq++;
+    }
+  }
+
+  getReconnectId() {
+    return this.lastCompleteSeq; // 断线重连时使用
+  }
+}
+```
