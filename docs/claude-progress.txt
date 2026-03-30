@@ -30,7 +30,24 @@ Mac 本地
     └── spawn claude CLI → Anthropic API (需非中国IP)
 ```
 
-### 下一步: Wave 5 — JWT RS256 + 微信登录 (2天)
+### Wave 5: US-P1b-001 — JWT RS256 + 微信登录 (2天) ← 进行中
+
+#### 已确认方案（方案先行，2026-03-30）
+
+**新建文件（4个）：**
+- services/auth/jwt-service.ts — RS256 sign/verify + refresh token rotation
+- services/auth/wechat-auth.ts — 微信code换openid + findOrCreateUser
+- routes/auth/index.ts — 4个端点: wechat-login/bind-phone/refresh/logout
+
+**修改文件（3个）：**
+- lib/env.ts — 新增 JWT_PRIVATE_KEY + JWT_PUBLIC_KEY（PEM），保留 JWT_SECRET 兼容
+- middleware/auth.ts — HS256→RS256，verify 用公钥
+- app.ts — 挂载 /api/v1/auth 公开路由（不走 requireAuth）
+
+**Day 1：** jwt-service.ts（RS256签发/验证）+ auth.ts升级 + env.ts + 测试
+**Day 2：** wechat-auth.ts + 4个路由端点 + 登录限流 + AuditLog + 测试
+
+**10个AC：** RS256签名/Access 15min+Refresh 7d/Rotation刷新/登出黑名单/微信登录/手机号绑定/中间件升级/统一401/登录限流5次分/session_key不下发+AuditLog
 
 ### P0 基础设施修复 ✅ (评估后立即修复)
 - CI/CD: .github/workflows/test.yml + build.yml (commit 893a949)
