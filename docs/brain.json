@@ -1,0 +1,1437 @@
+{
+  "projectName": "企业AI工作站",
+  "version": "2.1.0",
+  "lastUpdated": "2026-03-30",
+
+  "projectBrief": {
+    "_instruction": "新对话必读。读完这一段就能理解项目全貌，不需要打开其他文档。",
+    "identity": "创始人同时拥有三个品牌：时皙（生活品牌，主品牌）、AIBIAINI（生酮营养品）、卢司令（社群电商，2026年关停）。企业AI工作站以时皙为主题。",
+    "product": "企业级AI操作系统(SaaS)。员工不学后台，问一句话就干活；老板一句话管全公司。先内部跑通，再对外售卖。",
+    "coreValue": "核心价值不是替代金蝶或七鱼的单点功能深度，而是用AI把多个系统串起来——老板一句话完成原来需要打开5个系统才能干的事。Phase 1追求跨模块AI串联体验，不追求单模块功能深度。",
+    "coreMergerDecision": "创始人提出大胆想法：将原本独立的时皙Life商城项目（NestJS+MySQL，27张表/207条验收标准/22页面）与企业AI工作站合并为一套系统。9人团队全面评估后确认（ADR-022）。这不是'加个商城功能'，是两个完整产品的深度融合——同一个后端、同一个数据库、同一个Schema。合并的核心价值：AI和商城之间没有边界，AI能直接控制商城一切。",
+    "architecture": {
+      "brain": "企业AI工作站（大脑）— 内置所有核心业务能力，不是简单的AI对话壳子",
+      "brainCoreCapabilities": [
+        "财务系统（最核心）— 替代金蝶/用友，ERP数据进来后直接内部处理：凭证/记账/报表/成本/报税，不需要外部财务软件",
+        "客服系统（ACI客服中枢）— 对标七鱼/美洽，决策中枢定位，AI判断+人类授权+系统执行，90%AI+10%人工确认",
+        "运营分析 — 选品/定价/活动/异常检测",
+        "结算对账 — 供应商对账/结算",
+        "报表系统 — 早报/周报/异常告警"
+      ],
+      "hand": "时皙Life商城(app-mall) — 大脑的执行端，对标李佳琦小程序，AI直接控制一切（同库无边界）",
+      "data": "ERP数据源(聚水潭/旺店通) — 各平台数据喂进大脑。聚水潭合作申请中(2026-03-29)",
+      "tools": "工具Agent市场 — 可扩展能力层。每个工具=独立Agent=独立记忆=独立知识库。AIBI小酮是营养师工具(不是客服)"
+    },
+    "dataStrategy": {
+      "_description": "Phase 1的数据来源策略：API为主 + 用户上传为辅",
+      "primary": "MallAdapter（ztdy-open API）— 现有商城6个API端点，146万用户/95万订单/8466商品/1142供应商的真实数据，Phase 1直接用真实数据验证AI能力",
+      "secondary": "数据上传分析 — Excel/CSV上传，覆盖无API权限的租户或岗位。使用场景少但必须保留，是SaaS多租户的基础能力",
+      "future": "自建商城上线后（Phase 2-3），MallAdapter退役，切换为同库直查。适配器模式让过渡零痛感",
+      "writeOperations": "Phase 1所有API只读。写操作（上下架/改价/发货）规划让第三方系统配合开放写API，纳入Phase 2"
+    },
+    "aciHub": {
+      "_description": "ACI客服中枢 — 创始人亲自定义的客服系统架构",
+      "positioning": "决策中枢(Control Plane)，不是'更聪明的客服机器人'",
+      "principles": [
+        "人类授权为唯一决策源，AI负责判断与编排，系统负责执行",
+        "不做全场景，只做高频最小闭环",
+        "V1默认'人确认→再执行'",
+        "先规则后模型，AI逐步参与判断节点",
+        "ACI不背业务结果，只对'判断与合规执行链'负责"
+      ],
+      "phase1Scenario": "判断是否具备进入退货审核流程的前置条件。只输出'建议/不建议+理由'，不执行任何动作",
+      "judgmentRules": [
+        "规则1: 订单未收货(ProcessNode<3) → 不进退货审核，引导取消订单",
+        "规则2: 收货超过7天 → 不建议退货，但提示可申诉",
+        "规则3: 食品/生鲜类商品 → 加严（已拆封不可退）",
+        "规则4: 同一用户30天内退货≥3次 → 标记欺诈嫌疑，升级人工",
+        "规则5: 金额>500 → 无论如何升级人工"
+      ],
+      "riskGates": {
+        "退款/补偿": "P0，必须人审",
+        "情绪激动": "立即升级",
+        "欺诈嫌疑": "立即升级",
+        "不确定case": "直接转人工"
+      },
+      "evolution": "Phase 1(人在环+SOP跑通) → Phase 2(半自动，低风险可自动) → Phase 3(模板化复制更多场景)",
+      "promotionGate": "Phase 1→2必须满足：陪练结果连续稳定2周 + 关键指标不波动",
+      "integration": "第三方团队帮接入消息通道（类似七鱼/美恰模式），我们提供接口，可拿到消息、订单、工单等所有数据"
+    },
+    "dualEngines": {
+      "_description": "企业AI工作站的两条手臂。这是整个系统最核心的能力架构，缺一不可。",
+      "claudeCode": {
+        "role": "最强大脑 — 造产品+可以做一切",
+        "deployment": "阿里云服务器tmux保活，通过Bridge API从小程序/飞书/任何通道远程可达",
+        "capability": "读写代码、执行命令、Git操作、架构决策、查数据、管业务——什么都能干。能力远大于OpenClaw",
+        "model": "Claude Opus 4.6",
+        "users": "老板（驾驶舱）+ 9人研发团队",
+        "access": "不需要守电脑。创始人在手机上通过小程序/飞书就能给Claude Code下开发指令、查看任务进度、审查代码",
+        "cost": "Claude订阅额度，用在刀刃上（重要决策、开发迭代、复杂分析）",
+        "originalVision": "创始人最初的需求就是'不想一直守在电脑前'，Claude Code部署在云服务器+Bridge API+小程序壳=随时随地远程开发迭代"
+      },
+      "openClaw": {
+        "role": "日常大脑 — 跑产品，连接一切通讯渠道",
+        "deployment": "已在Qiyao项目跑通，连接了飞书。之后扩展到微信/Telegram",
+        "capability": "业务查询、AI对话、客服判断、报表、多渠道消息路由。是'对话即一切'的真正实现层",
+        "model": "百炼Qwen（Qwen3-Max/Qwen3.5-Plus），成本低",
+        "users": "所有员工+买家+客服",
+        "access": "飞书/微信/Telegram/小程序，任何通讯渠道都是系统入口",
+        "cost": "百炼按量付费，处理90%日常操作",
+        "source": "目前在Qiyao项目（不是ATLAS），Phase 2合并到工作站时是核心合并项"
+      },
+      "relationship": "Claude Code > OpenClaw（能力层面）。两个独立飞书号：飞书号1连Claude Code（开发/迭代/架构/分析/一切），飞书号2连OpenClaw（日常业务/查数据/客服/报表）。两者都从手机可达，创始人不需要守电脑。",
+      "aiModels": "百炼可用模型：Qwen3-Max(强)/Qwen3.5-Plus(快省)/Qwen-VL-Max(图片)/text-embedding-v3(RAG)"
+    },
+    "techStack": "Node.js 20+ / TypeScript strict / Express 4 / Prisma 6 / PostgreSQL 15+pgvector / Redis 7 / BullMQ / Zod / Taro 4+React 18+NutUI / Vitest / pnpm 10 / Docker Compose / 阿里云 / GitHub Actions",
+    "monorepo": "packages/backend(统一后端) + packages/app-workstation(员工端Taro) + packages/app-mall(买家端Taro,Phase2) + packages/shared(共享类型)",
+    "domain": "cebrenis.com(已备案) — api.cebrenis.com / app.cebrenis.com",
+    "keyRules": [
+      "所有数据库查询必须带tenantId",
+      "API统一格式 {success,data,error?,requestId}",
+      "每个会话只处理一个US，每个AC完成就git commit",
+      "方案先行——宁慢勿糙，不匆忙开工",
+      "01主文档是数据模型权威源，05全局架构是产品能力权威源",
+      "砍功能比加功能重要——Phase 1只做最小可对话系统"
+    ],
+    "mergerSources": {
+      "aibiXiaotong": "AIBI小酮(Python/FastAPI+百炼) → 营养师工具Agent(tools/health/aibi-ketogenic/)，Phase 2合并",
+      "qiyao": "Qiyao含两个核心资产：(1)OpenClaw引擎(已跑通飞书，核心合并项) (2)数据分析(7分析器+对账)。Phase 2合并。注意：供应商对账模块只有统计没有逻辑，必须重新设计；OpenClaw是系统核心能力，不是可选的",
+      "atlas": "ATLAS(WebSocket IM+SSE+文件流+监控) → 选择性合并到对话通道和驾驶舱，Phase 3。注意：OpenClaw不在ATLAS而在Qiyao",
+      "shishi": "时皙商城(27表/207验收/22页面) → 已决策合并(ADR-022)，技术栈迁移(NestJS→Express, MySQL→PostgreSQL, uni-app→Taro)，Phase 2-3"
+    },
+    "currentStatus": "Phase 1a 进行中。脚手架已完成(US-P1a-001 ✅)。v2.1更新：明确双引擎架构(Claude Code+OpenClaw)，Phase 1b用OpenClaw飞书替代Taro前端验证AI对话能力。下一步：Wave 2 三路并行(Schema精简版/健康检查/Docker)。"
+  },
+
+  "currentPhase": "Phase 1a",
+  "phaseGoal": "Phase 1a（第1-2周）：项目脚手架+精简Schema(AI/系统层)+健康检查API+Docker本地环境+MallAdapter接入ztdy-open真实数据；Phase 1b（第3-5周）：JWT认证+多租户+AI对话引擎(百炼Qwen+SSE+tool_call)+5个运营查询真实场景+ACI客服MVP(退货审核判断)+OpenClaw飞书接入(替代Taro前端验证)+限流+备份",
+  "phaseDeadline": "2026-05-02",
+  "phaseNote": "宁慢勿糙原则：Phase 1a目标4月11日，Phase 1b目标5月2日（从原4周延长至5周，新增AI对话+客服MVP）。方案先行——方案不清晰不开工，每次新对话对方案理解必须一致。",
+
+  "activeTasks": [
+    {
+      "id": "US-P1a-001",
+      "title": "项目脚手架初始化",
+      "status": "done",
+      "assignee": "BE Agent + FE Agent",
+      "story": "AS 开发团队 I WANT 完整的项目脚手架 SO THAT 所有Agent可以在统一的代码规范和目录结构中协作开发",
+      "ac": [
+        "AC-01: monorepo 根目录包含 backend/ 和 frontend/ 两个子项目",
+        "AC-02: backend 使用 TypeScript strict 模式，tsconfig.json 配置完整",
+        "AC-03: ESLint + Prettier 配置完成，lint 命令可执行且零错误",
+        "AC-04: pnpm workspace 配置完成，可从根目录统一安装依赖",
+        "AC-05: backend package.json 包含 express, prisma, @prisma/client, zod, redis, bullmq, jsonwebtoken 等核心依赖",
+        "AC-06: frontend 使用 Taro + React + TypeScript 初始化，NutUI 集成",
+        "AC-07: .env.example 文件包含所有必要环境变量模板",
+        "AC-08: .gitignore 正确排除 node_modules, dist, .env, prisma/migrations 等",
+        "AC-默认-01: 项目目录结构严格遵循主文档第十一节定义"
+      ],
+      "scope": {
+        "include": "目录结构、TypeScript配置、ESLint/Prettier、pnpm workspace、核心依赖安装、.env模板",
+        "exclude": "不写业务代码，不建数据库，不写测试"
+      },
+      "priority": "P0",
+      "blockedBy": [],
+      "blocks": ["US-P1a-002", "US-P1a-005", "US-P1a-006", "US-P1a-009"],
+      "wave": 1,
+      "phase": "1a",
+      "createdAt": "2026-03-29"
+    },
+    {
+      "id": "US-P1a-002",
+      "title": "Prisma Schema 精简版（AI/系统层优先）",
+      "status": "pending",
+      "assignee": "Data Agent",
+      "story": "AS 数据工程师 I WANT AI和系统核心数据模型定义为Prisma Schema SO THAT AI对话和客服判断有本地存储基础",
+      "ac": [
+        "AC-01: schema.prisma 包含基础层核心模型（Tenant, User, Role）",
+        "AC-02: schema.prisma 包含AI&系统层模型（Conversation, Message, AuditLog, Notification）",
+        "AC-03: schema.prisma 包含客服相关模型（CSSession, CSMessage, CSTicket）最小版",
+        "AC-04: 所有枚举类型定义完整（用到的部分）",
+        "AC-05: 所有 @@unique 和 @@index 约束严格遵循主文档定义",
+        "AC-06: prisma migrate dev 可成功执行，生成首次迁移脚本",
+        "AC-默认-01: 所有业务表包含 tenantId 字段",
+        "AC-默认-02: 所有核心表包含 deletedAt 软删除字段"
+      ],
+      "scope": {
+        "include": "Tenant/User/Role/Conversation/Message/AuditLog/Notification/CS*最小版、枚举、首次migration",
+        "exclude": "不建商品/订单/供应商等业务表（Phase 1从API读取不落库）、不写种子数据（Phase 1b）、不配置RLS"
+      },
+      "priority": "P0",
+      "blockedBy": ["US-P1a-001"],
+      "blocks": ["US-P1b-001", "US-P1b-002", "US-P1b-003"],
+      "wave": 2,
+      "phase": "1a",
+      "createdAt": "2026-03-29",
+      "updatedAt": "2026-03-30",
+      "updateNote": "v2.0方案重构：Schema从全量4层精简为AI/系统层优先，商品/订单数据Phase 1从ztdy API读取不落库，工作量减少60-70%"
+    },
+    {
+      "id": "US-P1a-005",
+      "title": "健康检查 API + 统一响应格式",
+      "status": "pending",
+      "assignee": "BE Agent",
+      "story": "AS 运维团队 I WANT 系统健康检查端点和统一的API响应格式 SO THAT 监控系统能检测服务状态且前端处理响应一致",
+      "ac": [
+        "AC-01: GET /health 返回 API 状态、PostgreSQL 连通性、Redis 连通性，响应时间 < 200ms",
+        "AC-02: GET /api/v1/health 返回详细版本信息（version, uptime, environment）",
+        "AC-03: 成功响应统一格式 { success: true, data, meta?, requestId }",
+        "AC-04: 错误响应统一格式 { success: false, error: { code, message }, requestId }",
+        "AC-05: requestId middleware 为每个请求生成唯一 ID（UUID v4）",
+        "AC-06: 全局错误处理中间件捕获未处理异常，返回 500 + 统一格式（不暴露内部细节）",
+        "AC-07: 404 路由兜底返回统一格式",
+        "AC-08: Zod 校验失败返回 400 + 字段级错误详情",
+        "AC-默认-01: API 响应时间 < 500ms",
+        "AC-默认-02: 错误响应遵循统一格式"
+      ],
+      "scope": {
+        "include": "健康检查端点、统一响应工具函数、requestId中间件、全局错误处理、Zod错误格式化",
+        "exclude": "不做 Prometheus 指标暴露（Phase 1b）"
+      },
+      "priority": "P0",
+      "blockedBy": ["US-P1a-001"],
+      "blocks": [],
+      "wave": 2,
+      "phase": "1a",
+      "createdAt": "2026-03-29"
+    },
+    {
+      "id": "US-P1a-006",
+      "title": "Docker Compose 本地开发环境",
+      "status": "pending",
+      "assignee": "DevOps Agent",
+      "story": "AS 开发团队 I WANT 一键启动的本地开发环境 SO THAT 任何Agent/开发者可以快速启动完整的开发环境",
+      "ac": [
+        "AC-01: docker-compose.yml 包含 backend, postgres, redis 三个服务",
+        "AC-02: docker-compose.dev.yml 覆盖文件支持热重载（volume mount + nodemon）",
+        "AC-03: PostgreSQL 数据持久化到 named volume",
+        "AC-04: Redis 数据持久化到 named volume",
+        "AC-05: 所有容器配置日志轮转（max-size: 50m, max-file: 3）",
+        "AC-06: pnpm run dev 或 docker compose up 即可启动完整环境",
+        "AC-07: backend 容器暴露 3000 端口，postgres 暴露 5432，redis 暴露 6379",
+        "AC-08: Makefile 或 package.json scripts 包含常用命令（dev, build, test, lint, db:migrate, db:seed）",
+        "AC-默认-01: 新开发者 clone 后 5 分钟内可启动环境"
+      ],
+      "scope": {
+        "include": "docker-compose.yml、docker-compose.dev.yml、Dockerfile（multi-stage）、Makefile",
+        "exclude": "不配 nginx（Phase 1b）、不配 prometheus/grafana（Phase 1b）、不配生产 compose"
+      },
+      "priority": "P0",
+      "blockedBy": ["US-P1a-001"],
+      "blocks": ["US-P1b-008"],
+      "wave": 2,
+      "phase": "1a",
+      "createdAt": "2026-03-29"
+    },
+    {
+      "id": "US-P1a-009",
+      "title": "MallAdapter — 接入ztdy-open商城API",
+      "status": "pending",
+      "assignee": "BE Agent",
+      "story": "AS AI系统 I WANT 通过统一适配器访问现有商城真实数据 SO THAT AI对话和客服判断基于真实业务数据",
+      "ac": [
+        "AC-01: MallAdapter类实现，封装ztdy-open 6个API端点为统一接口",
+        "AC-02: 所有API响应通过Zod schema校验，异常数据不进入系统",
+        "AC-03: getUsers(filters) — 用户查询（支持分页/关键字/等级筛选）",
+        "AC-04: getOrders(filters) — 订单查询（支持分页/日期范围/状态/供应商筛选）",
+        "AC-05: getItems(filters) — 商品查询（支持分页/上下架状态/关键字筛选）",
+        "AC-06: getSuppliers(filters) — 供应商查询",
+        "AC-07: getSupplierWithdraws(filters) — 供应商提现记录查询",
+        "AC-08: getUserWithdraws(filters) — 用户提现记录查询",
+        "AC-09: 统一错误处理：网络超时/API异常/数据格式异常，返回标准错误码",
+        "AC-10: 请求缓存（Redis，TTL可配置，默认5分钟），避免重复调用",
+        "AC-11: 聚合查询工具函数：getSalesStats(dateRange)、getTopSuppliers(metric)、getOrderStatusDistribution() 等",
+        "AC-默认-01: API密钥通过环境变量注入，不硬编码",
+        "AC-默认-02: 所有外部API调用记入AuditLog"
+      ],
+      "scope": {
+        "include": "MallAdapter类、Zod响应schema、Redis缓存、聚合工具函数、错误处理",
+        "exclude": "不做写操作（Phase 2第三方配合开放）、不做数据落库（Phase 1从API实时读）"
+      },
+      "priority": "P0",
+      "blockedBy": ["US-P1a-001"],
+      "blocks": ["US-P1b-003", "US-P1b-004", "US-P1b-005"],
+      "wave": 3,
+      "phase": "1a",
+      "createdAt": "2026-03-30"
+    },
+    {
+      "id": "US-P1b-001",
+      "title": "JWT 认证中间件 + 微信小程序登录流",
+      "status": "pending",
+      "assignee": "BE Agent",
+      "story": "AS 用户 I WANT 安全的登录认证系统 SO THAT 我的数据受到保护且登录体验流畅",
+      "ac": [
+        "AC-01: RS256 非对称签名，密钥对安全存储（环境变量或阿里云KMS）",
+        "AC-02: Access Token 有效期 15 分钟，Refresh Token 有效期 7 天",
+        "AC-03: Token 刷新端点 POST /api/v1/auth/refresh 实现 Refresh Token Rotation",
+        "AC-04: Redis Token 黑名单机制：登出/角色变更时 token 立即失效",
+        "AC-05: 微信小程序登录端点 POST /api/v1/auth/wechat-login 实现完整流程（code→openid→查库→签发JWT）",
+        "AC-06: 手机号绑定端点 POST /api/v1/auth/bindPhone（新用户首次登录）",
+        "AC-07: auth middleware 校验 JWT 签名+过期时间+黑名单，注入 req.user（tenantId, userId, role）",
+        "AC-08: 认证失败统一返回 401，格式遵循统一响应规范",
+        "AC-09: 登录接口 Rate Limiting 5次/分钟（IP级）",
+        "AC-默认-01: session_key 不下发前端",
+        "AC-默认-02: 所有认证相关操作写入 AuditLog"
+      ],
+      "scope": {
+        "include": "JWT签发/校验/刷新、微信登录流、Redis黑名单、auth中间件、登录限流",
+        "exclude": "不做权限中间件（Phase 2处理），不做企微登录（Phase 2）"
+      },
+      "priority": "P0",
+      "blockedBy": ["US-P1a-002"],
+      "blocks": ["US-P1b-002"],
+      "wave": 1,
+      "phase": "1b",
+      "createdAt": "2026-03-29",
+      "updatedAt": "2026-03-30",
+      "updateNote": "从Phase 1a移至Phase 1b wave 1，原ID US-P1a-003"
+    },
+    {
+      "id": "US-P1b-002",
+      "title": "多租户中间件 + 数据隔离基础",
+      "status": "pending",
+      "assignee": "BE Agent + Data Agent",
+      "story": "AS SaaS平台 I WANT 可靠的多租户数据隔离 SO THAT 不同企业的数据绝对不会互相泄露",
+      "ac": [
+        "AC-01: tenant middleware 从 JWT 提取 tenantId 并注入 req.tenantId",
+        "AC-02: 所有 Prisma 查询自动注入 tenantId 过滤条件（通过 Prisma middleware 或封装函数）",
+        "AC-03: PostgreSQL RLS 策略创建脚本（应用层 + 数据库层双重防线）",
+        "AC-04: 租户不存在或已停用时返回 403",
+        "AC-05: 隔离测试：创建2个租户，验证 A 租户无法访问 B 租户数据（至少3个表）",
+        "AC-06: X-Tenant-ID header 在登录阶段用于租户识别，登录后以 JWT 为唯一权威",
+        "AC-默认-01: 覆盖率 100%（多租户隔离层）"
+      ],
+      "scope": {
+        "include": "tenant中间件、Prisma查询注入、RLS策略脚本、隔离测试",
+        "exclude": "不做 dataScope 细粒度（dept/shop/own，Phase 2 权限中间件处理）"
+      },
+      "priority": "P0",
+      "blockedBy": ["US-P1a-002", "US-P1b-001"],
+      "blocks": ["US-P1b-003"],
+      "wave": 2,
+      "phase": "1b",
+      "createdAt": "2026-03-29",
+      "updatedAt": "2026-03-30",
+      "updateNote": "从Phase 1a移至Phase 1b wave 2，原ID US-P1a-004"
+    },
+    {
+      "id": "US-P1b-003",
+      "title": "AI 对话引擎（百炼Qwen + SSE + tool_call）",
+      "status": "pending",
+      "assignee": "BE Agent",
+      "story": "AS 用户 I WANT 对着AI说一句话就能查到真实业务数据 SO THAT 不需要登录多个系统手动查询",
+      "ac": [
+        "AC-01: ai-client.ts 封装百炼Qwen API调用（Qwen3.5-Plus为默认模型）",
+        "AC-02: SSE流式输出端点 POST /api/v1/ai/chat，支持流式返回",
+        "AC-03: tool_call机制：AI可调用MallAdapter的聚合工具函数查询真实数据",
+        "AC-04: Conversation和Message存储到本地PostgreSQL",
+        "AC-05: 会话上下文管理：最近10条消息作为上下文窗口",
+        "AC-06: System Prompt定义工作站AI助手角色和可用工具描述",
+        "AC-07: tool_call结果格式化为自然语言返回给用户",
+        "AC-08: AI调用失败降级为友好提示（不暴露内部错误）",
+        "AC-默认-01: 单次对话token上限10000",
+        "AC-默认-02: AI调用记入AuditLog（含token消耗量）"
+      ],
+      "scope": {
+        "include": "ai-client.ts、SSE端点、tool_call→MallAdapter、会话存储、上下文管理",
+        "exclude": "不做多Agent编排（Phase 2）、不做RAG知识库（Phase 2）、不做图片理解（Phase 2）"
+      },
+      "priority": "P0",
+      "blockedBy": ["US-P1a-009", "US-P1b-002"],
+      "blocks": ["US-P1b-004", "US-P1b-005"],
+      "wave": 3,
+      "phase": "1b",
+      "createdAt": "2026-03-30"
+    },
+    {
+      "id": "US-P1b-004",
+      "title": "5个运营查询场景验证（真实数据）",
+      "status": "pending",
+      "assignee": "BE Agent",
+      "story": "AS 老板 I WANT 对AI说一句话就能看到真实经营数据 SO THAT 随时掌握生意状况",
+      "ac": [
+        "AC-01: 场景1 '这个月销售额多少' → getOrders(日期过滤) → 聚合TotalAmount/Count → 自然语言返回",
+        "AC-02: 场景2 '哪个供应商出货最慢' → getOrders(待发货) → 按SupplierID聚合 → 排序返回",
+        "AC-03: 场景3 '最近新增了多少用户' → getUsers(日期过滤) → 按天聚合 → 趋势返回",
+        "AC-04: 场景4 '供应商XX提现了多少' → getSupplierWithdraws(过滤) → 汇总返回",
+        "AC-05: 场景5 '有哪些下架的商品' → getItems(IsShelf=false) → 列表返回",
+        "AC-06: 每个场景对应一个tool_call工具函数，硬编码实现（不追求通用性）",
+        "AC-07: 工具函数返回结构化数据，AI负责格式化为自然语言",
+        "AC-默认-01: 每个场景端到端测试通过",
+        "AC-默认-02: 查询响应时间 < 3秒（含API调用+AI生成）"
+      ],
+      "scope": {
+        "include": "5个硬编码工具函数、对应的tool定义、端到端测试",
+        "exclude": "不做通用查询框架（Phase 2）、不做自然语言→SQL转换"
+      },
+      "priority": "P0",
+      "blockedBy": ["US-P1b-003"],
+      "blocks": [],
+      "wave": 4,
+      "phase": "1b",
+      "createdAt": "2026-03-30"
+    },
+    {
+      "id": "US-P1b-005",
+      "title": "ACI 客服中枢 MVP — 退货审核判断",
+      "status": "pending",
+      "assignee": "BE Agent",
+      "story": "AS 客服团队 I WANT AI帮我判断退货申请是否合理 SO THAT 我可以更快速准确地处理客户诉求",
+      "ac": [
+        "AC-01: 客服消息接收端点 POST /api/v1/cs/message/incoming（第三方团队推送消息到此）",
+        "AC-02: AI读取消息+调MallAdapter查关联订单信息",
+        "AC-03: 常见问题知识库匹配（发货时间/物流/使用方法），硬编码FAQ列表Phase 1",
+        "AC-04: 90%常见问题 → AI生成回复草稿 → 存入CSMessage(status=draft)",
+        "AC-05: 退货相关 → 执行5条判断规则 → 输出'建议/不建议+理由'",
+        "AC-06: 判断结果附加提醒'仅供参考，最终以人工审核为准'",
+        "AC-07: 风险闸门：金额>500/情绪激动/欺诈嫌疑/不确定 → 自动升级标记",
+        "AC-08: 客服确认端点 POST /api/v1/cs/message/:id/confirm（人工确认后标记为approved）",
+        "AC-09: CSSession/CSMessage/CSTicket基础CRUD",
+        "AC-默认-01: 所有判断过程记入AuditLog（可审计决策链）",
+        "AC-默认-02: 不执行任何退款/补偿动作"
+      ],
+      "scope": {
+        "include": "消息接收、FAQ匹配、退货判断规则引擎、回复草稿、人工确认流程",
+        "exclude": "不做自动回复发送（Phase 2半自动）、不做退款执行、不做多渠道接入（Phase 2）"
+      },
+      "priority": "P0",
+      "blockedBy": ["US-P1b-003"],
+      "blocks": [],
+      "wave": 4,
+      "phase": "1b",
+      "createdAt": "2026-03-30"
+    },
+    {
+      "id": "US-P1b-006",
+      "title": "双飞书对接：Claude Code + OpenClaw（替代 Taro 前端）",
+      "status": "pending",
+      "assignee": "BE Agent",
+      "story": "AS 老板 I WANT 在飞书直接跟两个大脑对话 SO THAT 不需要守电脑、随时随地开发迭代+管理业务",
+      "ac": [
+        "AC-01: 飞书号1对接Claude Code — 阿里云服务器tmux部署+Bridge API，飞书消息→Claude Code→飞书回复",
+        "AC-02: 飞书号1功能验证：在飞书给Claude Code下开发指令、查看文件、审查代码、执行任务",
+        "AC-03: 飞书号2对接OpenClaw — 从Qiyao迁移OpenClaw飞书通道核心代码，连接工作站AI对话引擎",
+        "AC-04: 飞书号2功能验证：OpenClaw消息→路由到AI对话引擎(US-P1b-003)→tool_call查真实数据→飞书回复",
+        "AC-05: ACI客服判断结果也能在飞书号2查看和确认",
+        "AC-06: 两个飞书号的对话记录分别存入Conversation/Message表",
+        "AC-07: 基础错误处理：AI不可用时飞书返回友好提示",
+        "AC-默认-01: 飞书消息响应时间 < 5秒",
+        "AC-默认-02: 所有飞书操作记入AuditLog"
+      ],
+      "scope": {
+        "include": "Claude Code飞书Bridge API、OpenClaw飞书通道迁移、与AI对话引擎对接、会话存储",
+        "exclude": "不做Taro前端（推迟到Phase 2）、不做微信/Telegram通道（Phase 2扩展）"
+      },
+      "priority": "P0-最高",
+      "blockedBy": ["US-P1b-003"],
+      "blocks": [],
+      "wave": 4,
+      "phase": "1b",
+      "createdAt": "2026-03-30",
+      "updateNote": "Claude Code飞书对接是最高优先级（创始人核心需求：不守电脑），OpenClaw飞书同步或紧接第二步（流程已通，很快）。两个飞书号各自独立通道，一个连最强大脑，一个连日常大脑"
+    },
+    {
+      "id": "US-P1b-007",
+      "title": "Rate Limiting 中间件",
+      "status": "pending",
+      "assignee": "BE Agent",
+      "story": "AS 平台运维 I WANT API限流机制 SO THAT 单个租户或用户无法通过大量请求影响平台稳定性",
+      "ac": [
+        "AC-01: 基于 Redis 滑动窗口算法实现限流",
+        "AC-02: 租户级限流：100 req/min",
+        "AC-03: 用户级限流：30 req/min",
+        "AC-04: 超限返回 429 Too Many Requests + Retry-After header",
+        "AC-05: 限流配置可通过环境变量调整",
+        "AC-06: 限流中间件可按路由灵活配置（不同接口不同限制）",
+        "AC-07: AI对话接口（/api/v1/ai/*）专项限流：10 req/min（用户级），AI调用成本高，必须限流",
+        "AC-默认-01: API 响应时间 < 500ms（限流检查本身 < 5ms）"
+      ],
+      "scope": {
+        "include": "Redis滑动窗口限流、租户级+用户级限流、AI对话接口专项限流、429响应",
+        "exclude": "不做IP级限流（已在US-P1b-001登录接口实现）"
+      },
+      "priority": "P1",
+      "blockedBy": ["US-P1a-001"],
+      "blocks": [],
+      "wave": 5,
+      "phase": "1b",
+      "createdAt": "2026-03-29",
+      "updatedAt": "2026-03-30",
+      "updateNote": "从Phase 1a移至Phase 1b wave 5，原ID US-P1a-008"
+    },
+    {
+      "id": "US-P1b-008",
+      "title": "数据库备份自动化脚本",
+      "status": "pending",
+      "assignee": "DevOps Agent + Data Agent",
+      "story": "AS 系统管理员 I WANT 自动化数据库备份 SO THAT 数据丢失时可以恢复（RPO < 1小时）",
+      "ac": [
+        "AC-01: 备份脚本 scripts/backup.sh 实现 pg_dump 全量备份",
+        "AC-02: 备份文件自动上传到阿里云 OSS（使用 ossutil）",
+        "AC-03: OSS 目录结构：oss://bucket/backups/daily/{date}.dump + oss://bucket/backups/wal/",
+        "AC-04: crontab 配置：每天凌晨3点全量备份",
+        "AC-05: PostgreSQL WAL 归档配置（archive_mode=on）",
+        "AC-06: 备份文件保留策略：日备份30天，月备份1年",
+        "AC-07: 备份失败时发送告警（预留企微Webhook接口，Phase 2 接入）",
+        "AC-08: 恢复脚本 scripts/restore.sh 可从 OSS 拉取备份并恢复",
+        "AC-默认-01: 备份脚本可在 Docker 容器内执行"
+      ],
+      "scope": {
+        "include": "备份脚本、恢复脚本、crontab配置、WAL归档配置、OSS上传",
+        "exclude": "不做恢复演练自动化（手动执行），不做实时流复制（Phase 2+）"
+      },
+      "priority": "P1",
+      "blockedBy": ["US-P1a-006"],
+      "blocks": [],
+      "wave": 6,
+      "phase": "1b",
+      "createdAt": "2026-03-29",
+      "updatedAt": "2026-03-30",
+      "updateNote": "从Phase 1a移至Phase 1b wave 6（部署前完成即可），原ID US-P1a-007"
+    }
+  ],
+
+  "executionPlan": {
+    "description": "Phase 1 执行波次图（1a+1b合并视图）：同波次任务可并行，跨波次必须串行",
+    "waves": [
+      {
+        "wave": 1,
+        "tasks": ["US-P1a-001"],
+        "description": "地基：项目脚手架 ✅ 已完成",
+        "parallel": false,
+        "estimatedDays": 1,
+        "phase": "1a",
+        "status": "done"
+      },
+      {
+        "wave": 2,
+        "tasks": ["US-P1a-002", "US-P1a-005", "US-P1a-006"],
+        "description": "三路并行：Data Agent做Schema精简版 / BE Agent做健康检查 / DevOps Agent做Docker",
+        "parallel": true,
+        "estimatedDays": 2,
+        "phase": "1a"
+      },
+      {
+        "wave": 3,
+        "tasks": ["US-P1a-009"],
+        "description": "数据通道：MallAdapter接入ztdy-open 6个API，打通真实数据",
+        "parallel": false,
+        "estimatedDays": 2,
+        "phase": "1a"
+      },
+      {
+        "wave": "--- Phase 1b 分界线 ---",
+        "tasks": [],
+        "description": "以下任务进入Phase 1b，Phase 1a交付后开始"
+      },
+      {
+        "wave": 4,
+        "tasks": ["US-P1b-001"],
+        "description": "认证：JWT+微信登录，用户能进系统",
+        "parallel": false,
+        "estimatedDays": 2,
+        "phase": "1b"
+      },
+      {
+        "wave": 5,
+        "tasks": ["US-P1b-002", "US-P1b-003"],
+        "description": "并行：多租户隔离 + AI对话引擎（百炼Qwen+SSE+tool_call）",
+        "parallel": true,
+        "estimatedDays": 3,
+        "phase": "1b"
+      },
+      {
+        "wave": 6,
+        "tasks": ["US-P1b-004", "US-P1b-005", "US-P1b-006"],
+        "description": "三路并行：5个运营场景 / ACI客服MVP / OpenClaw飞书接入",
+        "parallel": true,
+        "estimatedDays": 3,
+        "phase": "1b"
+      },
+      {
+        "wave": 7,
+        "tasks": ["US-P1b-007", "US-P1b-008"],
+        "description": "收尾：限流中间件 + 数据库备份（部署前必须完成）",
+        "parallel": true,
+        "estimatedDays": 2,
+        "phase": "1b"
+      }
+    ],
+    "totalEstimatedDays": "15-18个工作日（含Critic双重审查时间）",
+    "criticalPath": "US-P1a-001 → US-P1a-002 → US-P1b-001 → US-P1b-002 → US-P1b-003 → US-P1b-004/005/006",
+    "phase1aDeliverable": "可运行的后端+Docker环境+6个ztdy API已接通+健康检查可访问",
+    "phase1bDeliverable": "老板在飞书说一句话→OpenClaw→AI查ztdy真实数据→飞书回复真实数字；客服消息→ACI判断退货→飞书确认"
+  },
+
+  "backlog": [
+    {
+      "id": "BL-001",
+      "title": "合并AIBI小酮营养师工具到工作站",
+      "description": "AIBI小酮重新定位为「生酮营养师工具Agent」（不是客服）。它是工具市场中的一个健康咨询类工具，提供1v1或群聊营养指导。现有Python/FastAPI+百炼+Redis系统合并为TypeScript工具Agent。涉及：营养师Bot→工具Agent（category=health）、生酮知识库→pgvector RAG、企微群聊/私聊渠道接入、会话管理迁移。注意：不与客服子系统混淆，小酮不处理售后订单",
+      "priority": "P1",
+      "targetPhase": "Phase 2",
+      "source": "AIBI小酮项目（/Users/weixuejian/claude-workspace/AIBI小酮/）",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "BL-002",
+      "title": "合并Qiyao数据分析引擎到工作站",
+      "description": "Qiyao有7个分析器(指标/异常/健康分/时间趋势/达人质量/利润/对账)+12项核心指标+8种异常检测。重写为TypeScript。⚠️关键约束：供应商对账模块只有统计展示，没有真正的对账逻辑（差异匹配/归因判定/退款分摊），合并时必须重新设计完整业务逻辑，不是搬代码。其他分析器可重写迁移",
+      "priority": "P1",
+      "targetPhase": "Phase 2",
+      "source": "qiyao-workstation（/Users/weixuejian/claude-workspace/qiyao-workstation/）",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "BL-003",
+      "title": "合并ATLAS文件分析流和IM通讯能力",
+      "description": "ATLAS的S3文件上传→分析→输出流程、WebSocket IM即时通讯、SSE流式输出(心跳+超时回滚)、OpenClaw Monitor监控面板。选择性合并到工作站AI对话通道和系统驾驶舱",
+      "priority": "P2",
+      "targetPhase": "Phase 3",
+      "source": "atlas项目（服务器8.131.109.208:/root/atlas-report）",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "BL-004",
+      "title": "统一AI人格系统设计",
+      "description": "参考OpenClaw的SOUL.md人格系统+行为准则+保密规则，为工作站各角色Agent设计统一的人格/语气/边界规范",
+      "priority": "P1",
+      "targetPhase": "Phase 2",
+      "source": "qiyao-workstation/SOUL.md + AGENTS.md",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "BL-005",
+      "title": "ACI客服中枢Phase 2：半自动+多渠道接入",
+      "description": "Phase 1验证判断能力后，Phase 2升级：(1)低风险场景自动回复（FAQ类无需人确认）(2)微信小程序客服消息正式接入（微信第三方平台资质）(3)抖店飞鸽客服接入（抖店服务商资质）(4)退货审核半自动执行（AI判断+自动提交，异常才人审）(5)客服数据分析面板。API资质模型：服务商/第三方平台一次申请，所有店铺通过OAuth授权接入。前提：Phase 1 ACI陪练结果连续稳定2周",
+      "priority": "P0",
+      "targetPhase": "Phase 2",
+      "source": "创始人ACI客服中枢规划 + ADR-021服务商资质模式",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "BL-009",
+      "title": "工具市场 MVP：工具注册/发现/实例化完整链路",
+      "description": "实现工具市场核心链路：ToolDefinition→ToolInstance→工具Agent自动发现→前端工具列表页→点击进入独立对话界面。包含：工具注册表(_registry.ts)自动扫描tools/目录、ToolDefinition/ToolInstance CRUD API、工具启用/停用、工具权限分配、AIChatBox组件传agent参数路由。至少内置2个示例工具（客服+运营）验证链路",
+      "priority": "P1",
+      "targetPhase": "Phase 2",
+      "source": "ADR-013 + ADR-014 工具=Agent架构",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "BL-011",
+      "title": "平台结算对账Agent（抖店/天猫/拼多多/京东）",
+      "description": "电商财务最高频痛点。每个平台有不同的结算报告格式、扣款类别（佣金/罚款/推广/物流补贴）、结算周期（T+1到T+15）。AI Agent自动：1.解析平台结算报告（PDF/Excel）2.与本地ERP订单数据逐条匹配 3.标记差异（少结/多扣/遗漏）4.生成调整凭证 5.输出可确认的对账报告。竞品分析：聚水潭/金蝶都没有AI自动对账能力，这是核心差异化功能",
+      "priority": "P1",
+      "targetPhase": "Phase 2",
+      "source": "CTO审查-市场对标-电商财务最大痛点",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "BL-012",
+      "title": "轻量审批流引擎",
+      "description": "企业级必备能力。场景：退款>500元需主管审批、供应商结算单需财务确认、价格调整需运营经理批准。不做重型BPM，用AI预填+自动路由实现轻量审批。数据模型：ApprovalFlow(流程定义)+ApprovalInstance(实例)+ApprovalStep(步骤)。AI优势：Agent预填审批内容、自动路由给正确审批人、跟踪审批状态、超时提醒",
+      "priority": "P1",
+      "targetPhase": "Phase 2",
+      "source": "CTO审查-对标钉钉/飞书/金蝶都有审批流",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "BL-013",
+      "title": "食品行业数据模型扩展（保质期+批次追溯）",
+      "description": "AIBIAINI是生酮食品品牌，食品电商有法规要求。扩展内容：1.Product增加shelfLifeDays字段 2.新建ProductBatch表（生产批次+生产日期+到期日期+入库数量）3.订单发货关联批次号实现正向追溯 4.售后/召回按批次反向追溯 5.AI Agent自动预警即将过期批次",
+      "priority": "P1",
+      "targetPhase": "Phase 2",
+      "source": "CTO审查-食品安全法追溯要求+品牌实际需求",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "BL-016",
+      "title": "自建小程序商城（基于时皙项目，迁移到工作站技术栈，AI全控）",
+      "description": "基于时皙(CEBRENIS)项目的完整PRD/数据模型/API设计（27张表+207条验收标准），迁移到工作站技术栈（Express+Prisma+PostgreSQL+Taro，原设计为NestJS+TypeORM+MySQL+uni-app）。共享同一个PostgreSQL数据库。核心业务能力：全品类社群电商（食品/百货/美妆/服装/小家电）+供应商自运营+会员分销体系(Lv0-3)+积分系统+多仓发货+AI选品评分。数据模型融合策略：工作站已有的表(Product/Order/User/Shop/Supplier)扩展字段兼容商城需求，商城独有的表(Cart/Distribution/Coupon/PointRecord/Shipment/MemberLevel/BonusPool等)新增到工作站Schema。商城管理后台用AI对话替代80%传统表单操作（见ADR-023 AI操作边界矩阵）。商城买家端用Taro（和工作站员工端同技术栈，一套代码两个入口）",
+      "priority": "P1",
+      "targetPhase": "Phase 2-3",
+      "source": "时皙项目（/Users/weixuejian/claude-workspace/shishi/project-docs/）+ 创始人产品闭环构想",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "BL-017",
+      "title": "商城管理：传统界面为主+AI助手抽屉为辅（ADR-023修正版）",
+      "description": "每个管理页面=预置传统界面+右上角[🤖AI助手]按钮。【传统界面（默认展示）】数据大盘=KPI卡片+折线图+预警看板；商品管理=商品列表+搜索筛选+上下架按钮+编辑；订单管理=状态Tab+订单表格+发货操作；分销管理=分销员列表+审批按钮。用户一进来就能看到核心数据，不需要问AI。【AI助手抽屉（点击展开）】右侧滑出上下文对话面板，AI自动感知当前页面上下文。两者互补不互斥",
+      "priority": "P1",
+      "targetPhase": "Phase 3",
+      "source": "BL-016技术实现层 + ADR-023 AI操作边界矩阵",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "BL-018",
+      "title": "ztdy-open写操作API开放（第三方配合）",
+      "description": "Phase 1 ztdy API全部只读。Phase 2需要第三方系统配合开放写操作API：(1)商品上下架 PUT/PATCH (2)商品改价 (3)订单发货操作 (4)退款审核提交。写操作通过MallAdapter统一封装，AI tool_call可调用。写操作必须经过ConfirmationCard确认（ADR-019），不允许AI直接执行",
+      "priority": "P1",
+      "targetPhase": "Phase 2",
+      "source": "CTO评估-Phase 1只读约束→Phase 2写操作规划",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "BL-019",
+      "title": "数据上传分析能力（Excel/CSV）",
+      "description": "覆盖无API权限的租户或岗位。用户上传Excel/CSV → 系统解析 → 存入临时分析表 → AI可查询分析。场景：新租户导入历史数据、财务上传银行流水对账、运营上传竞品数据分析。关键设计：上传文件→BullMQ异步解析→结构化存储→AI tool可查询。不替代API数据源，是补充渠道",
+      "priority": "P1",
+      "targetPhase": "Phase 2",
+      "source": "创始人要求-SaaS多租户必备，不是所有租户都有API权限",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "BL-008",
+      "title": "自建财务核算模块（自建为主，金蝶/用友/ERPNext做参考）",
+      "description": "聚水潭数据→AI自动生成凭证→自建记账+报表。核心模块：会计科目(电商定制版)、凭证自动生成+审核、总账/明细账、三大报表、银行对账、成本核算(按SKU/店铺/平台)、税务计算。自建TypeScript实现，不二开ERPNext。会计准则是国家标准不属于任何公司，我们用AI方式重新实现",
+      "priority": "P1",
+      "targetPhase": "Phase 3",
+      "source": "自建。参考：ERPNext设计思路 + 金蝶精斗云试用 + 金蝶云星空API文档 + 用友T+帮助文档",
+      "date": "2026-03-29",
+      "updatedAt": "2026-03-30",
+      "updateNote": "CTO建议从Phase 2延后到Phase 3，这是最重的模块，Phase 2先用AI读ERP数据生成简单报表"
+    },
+    {
+      "id": "BL-010",
+      "title": "远期：发票管理+报税对接金税+审计底稿",
+      "description": "财务完整流程的三个远期能力，当前阶段不做",
+      "priority": "P3",
+      "targetPhase": "远期",
+      "source": "财务完整流程补全",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "BL-015",
+      "title": "SaaS计费引擎设计",
+      "description": "Tenant.plan字段已设计但细则缺失。等有付费客户意向时再设计",
+      "priority": "P2",
+      "targetPhase": "Phase 3+",
+      "source": "CTO审查-SaaS商业模式必备",
+      "date": "2026-03-29",
+      "updatedAt": "2026-03-30",
+      "updateNote": "CTO建议延后，没用户的时候做计费是浪费"
+    }
+  ],
+
+  "backlogRemoved": {
+    "_description": "v2.0方案精简时移除的Backlog项，记录原因以便追溯",
+    "items": [
+      {
+        "id": "BL-006",
+        "title": "二开Dify RAG模块替换百炼托管知识库",
+        "removedReason": "百炼托管知识库够用到Phase 3，自建RAG投入产出比太低",
+        "removedDate": "2026-03-30"
+      },
+      {
+        "id": "BL-007",
+        "title": "接入Coze Bot API作为外部能力数据源",
+        "removedReason": "快递查询/汇率等通用能力用API直接调，不需要绕Coze",
+        "removedDate": "2026-03-30"
+      },
+      {
+        "id": "BL-014",
+        "title": "工具市场版本管理和灰度发布",
+        "removedReason": "过度设计，工具市场MVP都没上线",
+        "removedDate": "2026-03-30"
+      }
+    ]
+  },
+
+  "techStack": {
+    "runtime": "Node.js v20+",
+    "language": "TypeScript (strict mode)",
+    "framework": "Express 4.x",
+    "orm": "Prisma 6.x",
+    "packageManager": "pnpm 10.x",
+    "database": "PostgreSQL 15 + pgvector",
+    "cache": "Redis 7",
+    "queue": "BullMQ (基于Redis)",
+    "validation": "Zod",
+    "frontend": "Taro 4 + React 18 + NutUI + Zustand 5",
+    "engine_claudeCode": "飞书号1·Claude Code（最强大脑）— Claude Opus 4.6，阿里云服务器tmux+Bridge API，飞书/小程序可达",
+    "engine_openClaw": "飞书号2·OpenClaw（日常大脑）— 百炼Qwen，已在Qiyao跑通飞书，连接一切通讯渠道",
+    "ai_dashscope_models": "Qwen3-Max(强)/Qwen3.5-Plus(快省)/Qwen-VL-Max(图片)/text-embedding-v3(RAG)",
+    "testing": "Vitest 3 + Supertest (Phase 1b) + Playwright (Phase 2)",
+    "monitoring": "Prometheus + Grafana (Phase 1b)",
+    "deploy": "Docker Compose + 阿里云（ECS+RDS+Redis+OSS+ACR）",
+    "cicd": "GitHub Actions"
+  },
+
+  "architectureDecisions": [
+    {
+      "id": "ADR-001",
+      "title": "选用 Node.js + Express + Prisma",
+      "reason": "ERP SDK 生态最好，开发效率高",
+      "status": "accepted",
+      "date": "2026-03-28"
+    },
+    {
+      "id": "ADR-002",
+      "title": "多租户方案：共享数据库 + tenantId 隔离",
+      "reason": "中小规模 SaaS 最优方案，运维成本低",
+      "status": "accepted",
+      "date": "2026-03-28"
+    },
+    {
+      "id": "ADR-003",
+      "title": "ERP 适配器模式",
+      "reason": "上层业务不感知 ERP 差异，新增 ERP 零改动业务代码",
+      "status": "accepted",
+      "date": "2026-03-28"
+    },
+    {
+      "id": "ADR-004",
+      "title": "Multi-Agent 架构：Master + 子 Agent",
+      "reason": "专业 Agent 各司其职，可并行执行，上下文不超限",
+      "status": "accepted",
+      "date": "2026-03-28"
+    },
+    {
+      "id": "ADR-005",
+      "title": "前端用 Taro 跨端框架",
+      "reason": "一套代码同时出微信小程序和 H5，维护成本减半",
+      "status": "accepted",
+      "date": "2026-03-28"
+    },
+    {
+      "id": "ADR-006",
+      "title": "引入 BullMQ 消息队列",
+      "reason": "ERP同步、Webhook、通知推送需要可靠的异步任务队列，基于已有Redis，零额外基础设施成本",
+      "status": "accepted",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "ADR-007",
+      "title": "引入 TypeScript + Zod 请求校验",
+      "reason": "财务数据和报税场景要求类型安全，Zod在运行时校验API输入防止脏数据",
+      "status": "accepted",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "ADR-008",
+      "title": "JWT完整方案：RS256 + refresh token + Redis黑名单",
+      "reason": "支持token吊销和角色变更即时失效，RS256避免密钥泄露风险",
+      "status": "accepted",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "ADR-009",
+      "title": "PostgreSQL RLS + 应用层双重租户隔离",
+      "reason": "纵深防御，应用层bug不会导致租户数据泄露",
+      "status": "accepted",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "ADR-010",
+      "title": "日志方案：winston + 结构化JSON + requestId串联",
+      "reason": "链路追踪需要结构化日志和唯一请求ID",
+      "status": "accepted",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "ADR-011",
+      "title": "Agent编排：语义路由 + 动态工具注入",
+      "reason": "Master Agent根据意图路由到子Agent，子Agent动态加载工具，扩展性好",
+      "status": "accepted",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "ADR-012",
+      "title": "AI双引擎：Claude造产品 + 百炼跑产品",
+      "reason": "Claude能力强但贵，只给研发和老板用；百炼按量付费适合大量用户场景",
+      "status": "accepted",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "ADR-013",
+      "title": "工具=Agent架构：每个工具是独立Agent实例",
+      "reason": "工具之间完全隔离（记忆/知识库/配置），扩展新工具不改核心代码",
+      "status": "accepted",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "ADR-014",
+      "title": "工具市场：ToolDefinition(模板) → ToolInstance(实例)",
+      "reason": "同一个工具模板可被多个租户实例化使用，支持租户级个性化配置",
+      "status": "accepted",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "ADR-015",
+      "title": "AI能力先借力(百炼托管)后自建(RAG/Embedding)",
+      "reason": "Phase 1快速验证，Phase 2+掌握核心能力。百炼托管知识库够用到Phase 3",
+      "status": "accepted",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "ADR-016",
+      "title": "Agent会话协议（进度文件+init脚本+brain.json）",
+      "reason": "解决跨会话上下文丢失。来源：Anthropic Engineering长运行Agent最佳实践",
+      "status": "accepted",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "ADR-017",
+      "title": "Agent间标准化消息格式（AgentMessage/AgentResponse）",
+      "reason": "统一消息格式解决链路追踪、权限透传、错误溯源三个问题",
+      "status": "accepted",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "ADR-018",
+      "title": "事件驱动+主动Agent触发框架（BullMQ事件队列）",
+      "reason": "条件触发（库存预警/退款异常）和定时触发（每日早报）。安全约束：自动执行仅限只读，写操作生成草稿需用户确认",
+      "status": "accepted",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "ADR-019",
+      "title": "高风险操作使用结构化确认卡片（ConfirmationCard）",
+      "reason": "纯对话确认高风险操作不安全。AI生成结构化确认卡片，展示变更明细，按风险等级配色和倒计时",
+      "status": "accepted",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "ADR-020",
+      "title": "客服是独立子系统（ACI客服中枢），不是工具市场中的工具",
+      "reason": "客服是核心业务子系统，需要多渠道接入、人机协作、售后订单闭环、可审计决策链。创始人亲自定义为'决策中枢(Control Plane)'",
+      "status": "accepted",
+      "date": "2026-03-29",
+      "updatedAt": "2026-03-30",
+      "updateNote": "v2.0整合创始人ACI客服中枢规划，明确Phase 1只做退货审核判断验证"
+    },
+    {
+      "id": "ADR-021",
+      "title": "客服渠道采用服务商/第三方平台模式：一次申请API资质，OAuth授权服务所有租户所有店铺",
+      "reason": "微信第三方平台和抖店服务商都支持此模式，是SaaS多租户的核心壁垒",
+      "status": "accepted",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "ADR-022",
+      "title": "自建小程序商城与AI工作站共享数据库，商城是工作站的'手'",
+      "reason": "商城从零自建，共享PostgreSQL数据库，AI Agent通过管理API直接控制商城运营。自建的核心优势：API你说了算，AI能控制一切",
+      "status": "accepted",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "ADR-023",
+      "title": "商城管理：传统界面为主+AI助手抽屉为辅",
+      "reason": "纠正前版'80%纯对话'的激进设计。用户不总是知道该问什么，预置好的看板和列表是安全感。两者互补不互斥",
+      "status": "accepted",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "ADR-027",
+      "title": "双引擎架构：Claude Code(造产品+最强大脑) + OpenClaw(跑产品+日常大脑)",
+      "reason": "创始人最初需求：不想守电脑，随时随地管公司和迭代系统。Claude Code部署在云服务器(tmux)+Bridge API，从小程序/飞书远程可达，能力最强（开发/架构/分析/一切）。OpenClaw已在Qiyao跑通飞书，百炼驱动，成本低，处理90%日常操作。两者并列是系统最核心的能力架构。Phase 1b先接入OpenClaw飞书通道验证AI对话，Taro前端推迟到Phase 2",
+      "status": "accepted",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "ADR-024",
+      "title": "Phase 1数据策略：ztdy-open API为主数据源 + 用户上传为辅",
+      "reason": "现有商城(极速订货/ztdy-open)已有146万用户/95万订单/8466商品的真实数据且API已开通。Phase 1直接用真实数据验证AI能力，不造mock数据。MallAdapter封装6个API端点，套用ERP适配器模式（ADR-003）。同时保留数据上传（Excel/CSV）能力覆盖无API权限的租户。自建商城上线后（Phase 2-3）MallAdapter退役切换为同库直查",
+      "status": "accepted",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "ADR-025",
+      "title": "ACI客服中枢：决策中枢架构，分阶段放权",
+      "reason": "创始人亲自设计。定位为决策中枢(Control Plane)而非聊天机器人。核心：人类授权为唯一决策源→AI判断与编排→系统执行。Phase 1只验证判断能力（退货审核前置判断），5条硬规则+风险闸门，不执行任何动作。Phase 2半自动（低风险可自动），Phase 3模板化复制。放权闸门：陪练连续稳定2周+指标不波动。第三方团队帮接入消息通道",
+      "status": "accepted",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "ADR-026",
+      "title": "Phase 1方案重构：从'纯基础设施'调整为'最小可对话系统'",
+      "reason": "v1.0 Phase 1全是中间件（Schema/JWT/多租户/Docker/备份/限流），4月底交付一个完美的空壳——没有AI对话、没有业务数据、无法演示。v2.0调整：(1)Schema精简为AI/系统层（商品/订单从API读不落库）(2)新增MallAdapter接入真实数据(3)新增AI对话引擎+5个运营场景+ACI客服MVP+前端对话页(4)备份/限流降级到1b后段。Phase 1交付标准从'基础设施完备'变为'老板能对AI说话看到真实数据+客服能做退货判断'。同时坚持方案先行原则——方案不清晰不开工",
+      "status": "accepted",
+      "date": "2026-03-30"
+    }
+  ],
+
+  "interfaceContracts": {
+    "apiVersion": "v1",
+    "baseUrl": "/api/v1",
+    "auth": "Bearer JWT (RS256)",
+    "tenantHeader": "X-Tenant-ID（仅登录阶段租户识别，登录后以JWT为准）",
+    "responseFormat": {
+      "success": { "success": true, "data": "object", "meta": "object?", "requestId": "string" },
+      "error": { "success": false, "error": { "code": "string", "message": "string" }, "requestId": "string" }
+    },
+    "pagination": {
+      "defaultPageSize": 20,
+      "maxPageSize": 200,
+      "queryParams": "page=1&pageSize=20",
+      "responseFormat": "{ total, page, pageSize, totalPages }"
+    },
+    "timezone": "所有时间统一存储UTC，展示按租户时区转换（默认 Asia/Shanghai）。API日期参数使用ISO8601格式",
+    "cacheKeyVersion": "v1（数据模型升级时递增版本号，使旧缓存自动失效）",
+    "queryConventions": {
+      "sorting": "sortBy=fieldName&sortOrder=asc|desc（默认 createdAt desc）",
+      "filtering": "filter[status]=active&filter[platform]=douyin（字段级精确过滤）",
+      "searching": "search=keyword（模糊搜索，搜索范围由各端点定义）",
+      "dateRange": "startDate=2026-03-01&endDate=2026-03-31（ISO日期格式）",
+      "includes": "include=shop,supplier（关联数据预加载，逗号分隔）"
+    },
+    "phase1aEndpoints": [
+      { "method": "GET",  "path": "/health",                 "auth": false, "description": "系统健康检查（公开）", "us": "US-P1a-005" },
+      { "method": "GET",  "path": "/api/v1/health",          "auth": true,  "description": "详细健康状态（需认证）", "us": "US-P1a-005" }
+    ],
+    "phase1bEndpoints": [
+      { "method": "POST", "path": "/api/v1/auth/wechat-login", "auth": false, "description": "微信小程序登录", "us": "US-P1b-001" },
+      { "method": "POST", "path": "/api/v1/auth/bind-phone",   "auth": false, "description": "绑定手机号（新用户）", "us": "US-P1b-001" },
+      { "method": "POST", "path": "/api/v1/auth/refresh",      "auth": false, "description": "刷新Access Token", "us": "US-P1b-001" },
+      { "method": "POST", "path": "/api/v1/auth/logout",       "auth": true,  "description": "登出（token加入黑名单）", "us": "US-P1b-001" },
+      { "method": "POST", "path": "/api/v1/ai/chat",           "auth": true,  "description": "AI对话（SSE流式）", "us": "US-P1b-003" },
+      { "method": "GET",  "path": "/api/v1/ai/conversations",  "auth": true,  "description": "会话列表", "us": "US-P1b-003" },
+      { "method": "GET",  "path": "/api/v1/ai/conversations/:id/messages", "auth": true, "description": "会话消息历史", "us": "US-P1b-003" },
+      { "method": "POST", "path": "/api/v1/cs/message/incoming", "auth": false, "description": "客服消息接收（第三方推送）", "us": "US-P1b-005" },
+      { "method": "GET",  "path": "/api/v1/cs/sessions",        "auth": true,  "description": "客服会话列表", "us": "US-P1b-005" },
+      { "method": "GET",  "path": "/api/v1/cs/sessions/:id",    "auth": true,  "description": "客服会话详情+消息", "us": "US-P1b-005" },
+      { "method": "POST", "path": "/api/v1/cs/message/:id/confirm", "auth": true, "description": "人工确认AI回复", "us": "US-P1b-005" },
+      { "method": "GET",  "path": "/api/v1/cs/tickets",         "auth": true,  "description": "工单列表", "us": "US-P1b-005" }
+    ],
+    "mallAdapterEndpoints": {
+      "_description": "MallAdapter内部调用ztdy-open API的端点映射，不直接暴露给前端",
+      "baseUrl": "https://admin.ztdy.cc",
+      "auth": "Header api-key",
+      "endpoints": [
+        { "internal": "getUsers",             "external": "GET /api/Open/UserPageList" },
+        { "internal": "getOrders",            "external": "GET /api/Open/OrderPageList" },
+        { "internal": "getItems",             "external": "GET /api/Open/ItemPageList" },
+        { "internal": "getSuppliers",         "external": "GET /api/Open/SupplierPageList" },
+        { "internal": "getSupplierWithdraws", "external": "GET /api/Open/SupplierWithdrawPageList" },
+        { "internal": "getUserWithdraws",     "external": "GET /api/Open/UserWithdrawPageList" }
+      ]
+    }
+  },
+
+  "errorCodes": {
+    "_description": "所有 Agent 必须使用此注册表中的错误码，不可自行发明",
+    "auth": [
+      { "code": "AUTH_INVALID_TOKEN",     "httpStatus": 401, "message": "无效的访问令牌" },
+      { "code": "AUTH_TOKEN_EXPIRED",     "httpStatus": 401, "message": "访问令牌已过期" },
+      { "code": "AUTH_TOKEN_BLACKLISTED", "httpStatus": 401, "message": "令牌已被吊销" },
+      { "code": "AUTH_REFRESH_INVALID",   "httpStatus": 401, "message": "刷新令牌无效或已过期" },
+      { "code": "AUTH_WECHAT_CODE_INVALID", "httpStatus": 400, "message": "微信登录code无效" },
+      { "code": "AUTH_PHONE_REQUIRED",    "httpStatus": 400, "message": "需要绑定手机号" }
+    ],
+    "tenant": [
+      { "code": "TENANT_NOT_FOUND",       "httpStatus": 404, "message": "租户不存在" },
+      { "code": "TENANT_SUSPENDED",       "httpStatus": 403, "message": "租户已停用" },
+      { "code": "TENANT_QUOTA_EXCEEDED",  "httpStatus": 429, "message": "租户配额已用尽" }
+    ],
+    "permission": [
+      { "code": "PERMISSION_DENIED",      "httpStatus": 403, "message": "权限不足" },
+      { "code": "SCOPE_EXCEEDED",         "httpStatus": 403, "message": "超出数据访问范围" }
+    ],
+    "validation": [
+      { "code": "VALIDATION_ERROR",       "httpStatus": 400, "message": "请求参数校验失败（附带 details 字段）" },
+      { "code": "RESOURCE_NOT_FOUND",     "httpStatus": 404, "message": "请求的资源不存在" },
+      { "code": "RESOURCE_CONFLICT",      "httpStatus": 409, "message": "资源冲突（如重复创建）" }
+    ],
+    "rateLimit": [
+      { "code": "RATE_LIMITED",           "httpStatus": 429, "message": "请求过于频繁，请稍后再试" },
+      { "code": "AUTH_RATE_LIMITED",       "httpStatus": 429, "message": "登录尝试过于频繁" }
+    ],
+    "erp": [
+      { "code": "ERP_UNAUTHORIZED",       "httpStatus": 502, "message": "ERP认证失败" },
+      { "code": "ERP_RATE_LIMITED",        "httpStatus": 502, "message": "ERP接口限频" },
+      { "code": "ERP_TIMEOUT",            "httpStatus": 504, "message": "ERP接口超时" },
+      { "code": "ERP_SYNC_FAILED",        "httpStatus": 500, "message": "数据同步失败" }
+    ],
+    "mall": [
+      { "code": "MALL_API_UNAUTHORIZED",   "httpStatus": 502, "message": "商城API认证失败" },
+      { "code": "MALL_API_TIMEOUT",        "httpStatus": 504, "message": "商城API请求超时" },
+      { "code": "MALL_API_ERROR",          "httpStatus": 502, "message": "商城API返回异常" },
+      { "code": "MALL_DATA_INVALID",       "httpStatus": 502, "message": "商城API返回数据格式异常" }
+    ],
+    "ai": [
+      { "code": "AI_RATE_LIMITED",         "httpStatus": 429, "message": "AI调用频率超限" },
+      { "code": "AI_SERVICE_UNAVAILABLE",  "httpStatus": 503, "message": "AI服务暂不可用" },
+      { "code": "AI_CONTEXT_TOO_LONG",     "httpStatus": 400, "message": "对话上下文超出长度限制" }
+    ],
+    "cs": [
+      { "code": "CS_SESSION_NOT_FOUND",    "httpStatus": 404, "message": "客服会话不存在" },
+      { "code": "CS_MESSAGE_NOT_DRAFT",    "httpStatus": 400, "message": "只能确认草稿状态的消息" },
+      { "code": "CS_ESCALATED",            "httpStatus": 200, "message": "已升级到人工处理" }
+    ],
+    "system": [
+      { "code": "INTERNAL_ERROR",         "httpStatus": 500, "message": "服务器内部错误" },
+      { "code": "SERVICE_UNAVAILABLE",    "httpStatus": 503, "message": "服务暂不可用" }
+    ]
+  },
+
+  "definitionOfDone": {
+    "_description": "所有 US 通用的完成检查清单，在 AC 之外额外检查",
+    "code": [
+      "TypeScript strict 模式编译零错误",
+      "ESLint 零错误零警告",
+      "无 console.log / console.error（使用 logger 替代）",
+      "无硬编码的魔法字符串或数字（使用常量或枚举）",
+      "所有新增 API 输入通过 Zod schema 校验",
+      "所有数据库查询包含 tenantId 过滤",
+      "业务数据使用软删除（deletedAt），不物理删除",
+      "敏感操作写入 AuditLog"
+    ],
+    "test": [
+      "新增代码有对应单元测试",
+      "测试覆盖率达到对应层级标准（见QA Agent规格）",
+      "现有测试全部通过（无回归）",
+      "多租户隔离测试通过（如涉及数据操作）"
+    ],
+    "api": [
+      "响应格式遵循 interfaceContracts 定义",
+      "错误码使用 errorCodes 注册表中的已有码",
+      "API 响应时间 < 500ms（P95）",
+      "分页/排序/过滤参数遵循 queryConventions"
+    ],
+    "security": [
+      "无 SQL 注入、XSS、CSRF 风险",
+      "密钥/密码不出现在代码或日志中",
+      "权限校验在中间件和业务层双重执行"
+    ]
+  },
+
+  "criticReviews": [],
+
+  "pitfalls": [
+    {
+      "id": "PIT-001",
+      "title": "聚水潭API日调用限制2000次",
+      "solution": "Agent工具函数优先查询本地数据库，不直接打ERP API；本地数据由同步任务维护",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "PIT-002",
+      "title": "微信小程序tabBar最多5个",
+      "solution": "super_admin导航改为5个tab，将'工具'合并到'我的'",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "PIT-003",
+      "title": "小程序不支持原生SSE(EventSource)",
+      "solution": "使用wx.request的enableChunked参数实现流式输出，需要Taro条件编译",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "PIT-004",
+      "title": "Prisma upsert要求where必须命中唯一约束",
+      "solution": "所有需要upsert的表必须定义@@unique而非@@index",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "PIT-005",
+      "title": "AI多Agent并行调用成本高",
+      "solution": "简单查询直接查库返回不调AI；单次对话token上限10000；月度配额+告警",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "PIT-006",
+      "title": "Docker日志不设轮转会撑满磁盘",
+      "solution": "所有容器必须配置 log-driver: json-file, max-size: 50m, max-file: 3",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "PIT-007",
+      "title": "PostgreSQL RLS 与 Prisma 连接池兼容性风险",
+      "solution": "Prisma默认使用PgBouncer(transaction mode)，SET命令在transaction mode下不生效。方案A:每个事务开始时用$executeRaw('SET app.tenant_id = $1')；方案B:放弃数据库RLS只用应用层隔离；方案C:不用PgBouncer，Prisma直连PostgreSQL（小规模阶段可行）",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "PIT-008",
+      "title": "Redis缓存键必须带版本前缀",
+      "solution": "所有Redis缓存键使用 v1: 前缀，数据模型升级时递增版本号使旧缓存自动失效",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "PIT-009",
+      "title": "AfterSale同一订单同一SKU可能多次售后",
+      "solution": "唯一约束用平台售后单号@@unique([tenantId,platformAfterSaleId])，原orderId+skuCode降级为普通索引",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "PIT-010",
+      "title": "首次全量导入可能撞聚水潭API日限（2000次/天）",
+      "solution": "新租户首次接入时优先使用CSV批量导入，绕开API限制",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "PIT-011",
+      "title": "微信第三方平台和抖店服务商资质申请需要2-4周",
+      "solution": "Phase 1a编码阶段就启动资质申请（不等技术开发）",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "PIT-012",
+      "title": "时皙商城原设计NestJS+MySQL，合并到工作站需迁移到Express+Prisma+PostgreSQL",
+      "solution": "不是重写——PRD/API设计/业务逻辑/207条验收标准直接复用，只需翻译技术栈",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "PIT-013",
+      "title": "微信小程序主包体积限制2MB",
+      "solution": "NutUI按需引入、AI对话组件放分包、工具市场放分包、图片资源走CDN",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "PIT-014",
+      "title": "百炼API并发限制（QPS/TPM）",
+      "solution": "ai-client.ts中实现请求队列+退避重试。AI接口专项限流10 req/min用户级",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "PIT-015",
+      "title": "Prisma 6大版本破坏性变更",
+      "solution": "开发时以Prisma 6官方文档为准，不参考Prisma 5教程",
+      "date": "2026-03-29"
+    },
+    {
+      "id": "PIT-016",
+      "title": "ztdy-open API的TeamBonusPageList和ItemStockPageList端点未通",
+      "solution": "2026-03-30测试时这两个端点返回HTML而非JSON。可能路径不同或需额外参数。Phase 1先用已通的6个端点，这两个端点需联系第三方确认",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "PIT-017",
+      "title": "ztdy-open API无分页总量限制，大量数据聚合需分页遍历",
+      "solution": "95万订单不可能一次拉完。聚合查询（如月销售额）需要分页遍历或请求第三方提供聚合API。Phase 1的MallAdapter实现分页自动遍历+结果缓存（Redis TTL 5min）。长期方案：数据定期同步落库后本地聚合",
+      "date": "2026-03-30"
+    }
+  ],
+
+  "technicalDebt": [
+    {
+      "id": "DEBT-001",
+      "title": "OrderItem未独立建表",
+      "description": "当前Order.items用JSON存储，无法按SKU维度聚合分析",
+      "priority": "high",
+      "due": "Phase 2",
+      "reason": "Phase 1优先跑通流程，Phase 2前必须拆表"
+    },
+    {
+      "id": "DEBT-002",
+      "title": "监控告警体系缺失",
+      "description": "需要Prometheus+Grafana监控+企业微信告警",
+      "priority": "high",
+      "due": "Phase 1b",
+      "reason": "没有监控等于盲飞"
+    },
+    {
+      "id": "DEBT-003",
+      "title": "CI/CD需改为镜像构建推送模式",
+      "description": "当前git pull直接部署不支持可靠回滚",
+      "priority": "high",
+      "due": "Phase 1b",
+      "reason": "镜像tag是可靠回滚的前提"
+    },
+    {
+      "id": "DEBT-004",
+      "title": "AI Agent测试方案空白",
+      "description": "需要4层测试：确定性/半确定性/模糊回归/Mock策略",
+      "priority": "medium",
+      "due": "Phase 2",
+      "reason": "AI核心功能的测试是最大盲区"
+    },
+    {
+      "id": "DEBT-005",
+      "title": "数据库备份自动化",
+      "description": "需要WAL归档+每日全量+OSS异地存储",
+      "priority": "high",
+      "due": "Phase 1b",
+      "reason": "数据丢失不可恢复",
+      "resolvedBy": "US-P1b-008"
+    },
+    {
+      "id": "DEBT-006",
+      "title": "商品/订单数据未落库（Phase 1从API读）",
+      "description": "Phase 1商品/订单/供应商数据全部从ztdy API实时读取，不落本地库。聚合查询需要分页遍历API，性能受限。Phase 2自建商城后数据落库解决",
+      "priority": "medium",
+      "due": "Phase 2",
+      "reason": "Phase 1刻意选择的技术债——用API读取换取开发速度"
+    }
+  ],
+
+  "changeHistory": [
+    {
+      "version": "2.1.0",
+      "date": "2026-03-30",
+      "author": "CTO + 创始人",
+      "summary": "双引擎架构明确 + OpenClaw飞书替代Taro前端验证",
+      "changes": [
+        "ADR-027: 双引擎架构(Claude Code+OpenClaw)明确为系统最核心能力",
+        "projectBrief.aiEngines → projectBrief.dualEngines: 重新定义Claude Code(最强大脑,云服务器远程可达)和OpenClaw(日常大脑,已跑通飞书)",
+        "US-P1b-006: 从'Taro前端最小对话页'改为'OpenClaw飞书接入'，Phase 1用飞书验证AI对话",
+        "mergerSources.qiyao: 明确OpenClaw是核心合并项（不是可选的），目前在Qiyao不在ATLAS",
+        "清除扣子(Coze)所有产品依赖引用，只保留07-UI设计规范中的竞品对标参考",
+        "Taro前端对话页推迟到Phase 2"
+      ]
+    },
+    {
+      "version": "2.0.0",
+      "date": "2026-03-30",
+      "author": "CTO + 创始人",
+      "summary": "Phase 1方案重构：从'纯基础设施'到'最小可对话系统'",
+      "changes": [
+        "ADR-024: ztdy-open API作为Phase 1主数据源，MallAdapter封装6个端点",
+        "ADR-025: ACI客服中枢架构（创始人亲定），Phase 1只验证退货审核判断",
+        "ADR-026: Phase 1方案重构，交付标准从'基础设施完备'变为'能对话+能判断'",
+        "activeTasks重构：Phase 1a精简为5个US（脚手架✅+Schema精简+健康检查+Docker+MallAdapter），Phase 1b新增AI对话引擎+5个运营场景+ACI客服MVP+前端对话页",
+        "Schema精简：Phase 1只建AI/系统层表，商品/订单从API读不落库（DEBT-006）",
+        "JWT认证/多租户/限流/备份从Phase 1a移至Phase 1b",
+        "Backlog精简：BL-006(Dify RAG)/BL-007(Coze)/BL-014(工具版本管理)移除，BL-008(财务)延后到Phase 3，BL-015(计费)延后到Phase 3+",
+        "新增BL-018(写API第三方配合)/BL-019(数据上传分析)",
+        "新增errorCodes.mall和errorCodes.cs",
+        "新增PIT-016(ztdy未通端点)/PIT-017(大数据量聚合)",
+        "Deadline从4月25日调整为5月2日（新增AI+客服工作量）"
+      ]
+    }
+  ],
+
+  "sessionProtocol": {
+    "_description": "来源：Anthropic Engineering《Effective Harnesses for Long-running Agents》。解决Agent跨会话上下文丢失问题。",
+    "_reference": "ADR-016 + 04文档八.7节",
+    "sessionStart": [
+      "STEP-1: 运行 pwd 确认工作目录，cat scripts/init.sh 了解环境",
+      "STEP-2: 读取 docs/claude-progress.txt + git log --oneline -10 + brain.json activeTasks",
+      "STEP-3: 定位当前US和未完成AC，有遗留问题优先处理",
+      "STEP-4: 运行现有测试确认基线无回归（有失败先修复）",
+      "STEP-5: 开始工作，每个会话只处理一个US（RULE-14）"
+    ],
+    "sessionEnd": [
+      "STEP-1: git add 相关文件 + git commit 清晰消息",
+      "STEP-2: 更新 docs/claude-progress.txt（完成了什么/遗留什么/下一步建议）",
+      "STEP-3: 更新 brain.json 对应US的AC完成状态",
+      "STEP-4: 向CTO汇报本次会话成果和遗留"
+    ],
+    "progressFile": {
+      "path": "docs/claude-progress.txt",
+      "format": "Markdown（不用JSON，方便人类快速阅读）",
+      "updateMode": "覆盖式更新（不追加，保持简洁）",
+      "requiredSections": [
+        "最后更新（时间+Agent+任务）",
+        "当前状态（每个US的AC完成标记 ✅/🔄/⏳）",
+        "本次会话完成（具体做了什么）",
+        "遗留问题（未完成的、发现的bug）",
+        "下一个会话应该做（接力棒，最重要的部分）",
+        "已知风险"
+      ]
+    },
+    "initScript": {
+      "path": "scripts/init.sh",
+      "purpose": "Agent新会话第一步读取此脚本了解如何启动环境，避免每次会话浪费时间配环境",
+      "includes": "docker compose up → wait db → prisma migrate → pnpm dev"
+    },
+    "keyPrinciple": "每个会话只处理一个US，每完成一个AC就git commit。进度文件是接力棒，不是日志。"
+  },
+
+  "riskRegister": [
+    {
+      "id": "RISK-001",
+      "title": "百炼API不可用或大幅调价",
+      "probability": "low",
+      "impact": "high",
+      "mitigation": "ADR-015先借力后自建策略已预留替换路径；核心对话降级为缓存模板兜底；保持AI调用统一封装（ai-client.ts），切换模型只改配置",
+      "owner": "CTO Agent"
+    },
+    {
+      "id": "RISK-002",
+      "title": "聚水潭API接口变更或下线",
+      "probability": "medium",
+      "impact": "high",
+      "mitigation": "适配器模式隔离变更影响（ADR-003）；保留CSV手工导入作为终极兜底；监控sync失败率",
+      "owner": "BE Agent"
+    },
+    {
+      "id": "RISK-003",
+      "title": "微信小程序审核不通过",
+      "probability": "medium",
+      "impact": "medium",
+      "mitigation": "首版小程序不含AI对话（审核敏感），先上基础功能过审；AI功能通过Web端先上线验证",
+      "owner": "FE Agent"
+    },
+    {
+      "id": "RISK-004",
+      "title": "多租户数据泄露",
+      "probability": "low",
+      "impact": "critical",
+      "mitigation": "应用层tenantId+PostgreSQL RLS双重防线；多租户隔离测试覆盖率100%；Critic代码审查必检项",
+      "owner": "Data Agent + QA Agent"
+    },
+    {
+      "id": "RISK-005",
+      "title": "Phase 1延期",
+      "probability": "medium",
+      "impact": "medium",
+      "mitigation": "已按宁慢勿糙原则预留缓冲（deadline 5月2日）；新增AI/客服任务但Schema大幅精简抵消部分工作量；如延期优先保证AI对话链路，限流/备份可再顺延",
+      "owner": "CTO Agent"
+    },
+    {
+      "id": "RISK-006",
+      "title": "阿里云服务器/RDS故障",
+      "probability": "low",
+      "impact": "high",
+      "mitigation": "每日全量备份+WAL归档到OSS（US-P1b-008）；RTO < 4小时；Phase 2升级为多可用区部署",
+      "owner": "DevOps Agent"
+    },
+    {
+      "id": "RISK-007",
+      "title": "ztdy-open API不稳定或被关停",
+      "probability": "low",
+      "impact": "high",
+      "mitigation": "MallAdapter遵循适配器模式，切换数据源只改适配器实现。Redis缓存兜底（TTL 5min，API不可用时返回缓存数据+过期提示）。Phase 2自建商城后彻底不依赖外部API",
+      "owner": "BE Agent"
+    },
+    {
+      "id": "RISK-008",
+      "title": "ACI客服判断准确率不达标",
+      "probability": "medium",
+      "impact": "low",
+      "mitigation": "Phase 1 ACI只做判断不执行，风险兜底是人工。5条硬规则覆盖高频场景，AI只处理规则覆盖不到的边缘case。陪练2周不稳定就不升级Phase 2",
+      "owner": "BE Agent"
+    }
+  ],
+
+  "teamRules": [
+    "RULE-01: 先方案后执行，重大功能先出方案，Critic通过后才写代码",
+    "RULE-02: 最小改动原则，只改完成任务必需的内容",
+    "RULE-03: 双重Critic审查，方案审查+代码审查",
+    "RULE-04: 所有改动写入brain.json，部署后30分钟内",
+    "RULE-05: 结果可验证，每个功能必须有自动化测试",
+    "RULE-06: 每次变更可回滚，无回滚方案禁止部署",
+    "RULE-07: 目标守护，不在范围内的功能记入Backlog",
+    "RULE-08: 数据库变更独立审批，必须有Migration脚本",
+    "RULE-09: 权限边界不可越权",
+    "RULE-10: 每5个任务后CTO执行健康检查",
+    "RULE-11: Critic熔断机制：同一US被REJECT 3次自动升级CTO裁决，防死循环",
+    "RULE-12: 错误码必须使用errorCodes注册表，不可自行发明",
+    "RULE-13: 所有任务完成前必须通过definitionOfDone通用检查清单",
+    "RULE-14: 每个会话只处理一个US，不跨US工作（Anthropic最佳实践：Agent一次做太多会质量下降）",
+    "RULE-15: 每完成一个AC就git commit，commit message写清完成了哪个AC（Git是检查点和恢复机制）",
+    "RULE-16: 会话启动必须执行sessionProtocol.sessionStart，会话结束必须执行sessionProtocol.sessionEnd，不可跳过",
+    "RULE-17: 砍功能比加功能重要——不在当前Phase scope内的需求，记入Backlog而非临时加码"
+  ],
+
+  "healthScore": {
+    "lastChecked": "2026-03-30",
+    "score": 100,
+    "previousScore": 100,
+    "improvements": [
+      "Round 1 (65→92): 文档一致性修复、brain.json完整性、Phase 1a用户故事、环境部署文档、章节编号修正、时间线调整",
+      "Round 2 (92→98): 任务依赖图+5波执行顺序、API端点目录+查询规范、统一错误码注册表、通用DoD检查清单、风险登记簿6项、术语表15个核心概念、Critic熔断机制、RULE-11/12/13新增、Cursor Rules同步更新",
+      "Round 3 (98→100): 会话协议（ADR-016）、进度接力文件规范、init.sh环境脚本、RULE-14/15/16新增、UI设计规范v1.1、开发工具链全部安装就绪",
+      "Round 4 (CTO终审): 修复8个数据模型/接口BUG + 12项优化。新增Backlog BL-011~015(平台对账/审批流/食品追溯/工具版本/计费引擎)。新增PIT-007~010",
+      "Round 5 (架构纠偏): AIBI小酮从'客服'重新定位为'营养师工具Agent'。客服独立为核心子系统Customer Service Agent(ADR-020)。全6份文档联动更新",
+      "Round 6 (v2.0方案重构): Phase 1从'纯基础设施'调整为'最小可对话系统'。接入ztdy-open真实数据(ADR-024)。整合ACI客服中枢(ADR-025)。Schema精简60-70%。Backlog精简(删3/延2/新增2)。新增ADR-024/025/026、RISK-007/008、PIT-016/017、DEBT-006、errorCodes.mall/cs。changeHistory开始记录"
+    ],
+    "remainingIssues": [
+      "01主文档Schema缺商城融合字段(~18张新表)——Phase 2-3补充，不阻塞Phase 1",
+      "05全局架构的routes目录结构(按功能分)与01主文档(按身份分)不一致——以01为准，05待更新",
+      "ztdy-open的TeamBonusPageList和ItemStockPageList端点未通——需联系第三方确认"
+    ],
+    "note": "v2.0方案重构完成。创始人与CTO达成共识：方案先行、真实数据验证、砍功能比加功能重要。Phase 1交付标准：老板能对AI说话看到真实数据 + 客服能做退货审核判断。下一步：确认方案无歧义后启动编码。"
+  }
+}

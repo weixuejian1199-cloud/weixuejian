@@ -1,0 +1,38 @@
+{
+  "name": "app-workstation",
+  "version": "0.1.0",
+  "private": true,
+  "templateInfo": {
+    "name": "default",
+    "typescript": true,
+    "css": "sass"
+  },
+  "scripts": {
+    "dev:weapp": "taro build --type weapp --watch",
+    "build:weapp": "taro build --type weapp",
+    "dev:h5": "taro build --type h5 --watch",
+    "build:h5": "taro build --type h5"
+  },
+  "dependencies": {
+    "@tarojs/cli": "^4.1.0",
+    "@tarojs/components": "^4.1.0",
+    "@tarojs/helper": "^4.1.0",
+    "@tarojs/plugin-framework-react": "^4.1.0",
+    "@tarojs/plugin-platform-weapp": "^4.1.0",
+    "@tarojs/plugin-platform-h5": "^4.1.0",
+    "@tarojs/react": "^4.1.0",
+    "@tarojs/runtime": "^4.1.0",
+    "@tarojs/shared": "^4.1.0",
+    "@tarojs/taro": "^4.1.0",
+    "@nutui/nutui-react-taro": "^2.7.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@tarojs/webpack5-runner": "^4.1.0",
+    "@types/react": "^18.3.0",
+    "typescript": "~5.7.0",
+    "sass": "^1.83.0"
+  }
+}

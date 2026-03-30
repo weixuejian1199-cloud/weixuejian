@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+.taro/
+
+# Environment
+.env
+.env.local
+*.pem
+
+# Database
+prisma/migrations/
+
+# Test
+coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.cursor/
+*.swp
+*.swo
+
+# Logs
+*.log

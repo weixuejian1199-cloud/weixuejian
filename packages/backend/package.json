@@ -1,0 +1,41 @@
+{
+  "name": "backend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/app.ts",
+    "build": "tsc",
+    "start": "node dist/app.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "prisma db seed",
+    "prisma:generate": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.5.0",
+    "bullmq": "^5.71.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0",
+    "helmet": "^8.0.0",
+    "ioredis": "^5.10.0",
+    "jsonwebtoken": "^9.0.0",
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0",
+    "prisma": "^6.5.0",
+    "uuid": "^11.0.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.0",
+    "@types/express": "^5.0.0",
+    "@types/express-serve-static-core": "^5.1.1",
+    "@types/jsonwebtoken": "^9.0.0",
+    "@types/node": "^22.0.0",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "~5.7.0",
+    "vitest": "^3.1.0"
+  }
+}
