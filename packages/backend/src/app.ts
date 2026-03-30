@@ -121,7 +121,8 @@ async function start(): Promise<void> {
   try {
     await connectRedis();
   } catch (err) {
-    logger.warn({ err }, 'Redis connection failed, starting without Redis');
+    logger.error({ err }, 'Redis connection failed — refusing to start (fail-secure)');
+    process.exit(1);
   }
 
   const server = app.listen(env.PORT, () => {
@@ -166,6 +167,10 @@ async function start(): Promise<void> {
 
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
   process.on('SIGINT', () => void shutdown('SIGINT'));
+  process.on('unhandledRejection', (reason) => {
+    logger.error({ reason: String(reason) }, 'Unhandled rejection — exiting');
+    process.exit(1);
+  });
 }
 
 void start();

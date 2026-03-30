@@ -94,7 +94,9 @@ async function enqueueTask(chatId, fn) {
       lock.processing = false;
       if (lock.queue.length > 0) {
         const next = lock.queue.shift();
-        enqueueTask(chatId, next);
+        enqueueTask(chatId, next).catch((err) => {
+          log.error({ chatId, err: err.message }, 'Queued task failed');
+        });
       } else {
         chatLocks.delete(chatId); // 清理空锁
       }

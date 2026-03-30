@@ -83,30 +83,34 @@ async function checkComponents(requestId: string): Promise<{
 /**
  * GET /health — 轻量级健康检查
  */
-basicHealthRouter.get('/', async (req: Request, res: Response, _next: NextFunction) => {
-  const { components, allHealthy } = await checkComponents(req.requestId);
-  sendSuccess(res, { status: allHealthy ? 'healthy' : 'degraded', components });
+basicHealthRouter.get('/', (req: Request, res: Response, next: NextFunction) => {
+  void (async () => {
+    const { components, allHealthy } = await checkComponents(req.requestId);
+    sendSuccess(res, { status: allHealthy ? 'healthy' : 'degraded', components });
+  })().catch(next);
 });
 
 /**
  * GET /api/v1/health — 详细健康检查，含版本、运行时间、环境
  * 生产环境隐藏 version 和 environment 详情
  */
-detailHealthRouter.get('/', async (req: Request, res: Response, _next: NextFunction) => {
-  const { components, allHealthy } = await checkComponents(req.requestId);
+detailHealthRouter.get('/', (req: Request, res: Response, next: NextFunction) => {
+  void (async () => {
+    const { components, allHealthy } = await checkComponents(req.requestId);
 
-  const data: Record<string, unknown> = {
-    status: allHealthy ? 'healthy' : 'degraded',
-    components,
-  };
+    const data: Record<string, unknown> = {
+      status: allHealthy ? 'healthy' : 'degraded',
+      components,
+    };
 
-  if (!isProduction) {
-    data['version'] = appVersion;
-    data['uptime'] = process.uptime();
-    data['environment'] = process.env['NODE_ENV'] ?? 'development';
-  }
+    if (!isProduction) {
+      data['version'] = appVersion;
+      data['uptime'] = process.uptime();
+      data['environment'] = process.env['NODE_ENV'] ?? 'development';
+    }
 
-  sendSuccess(res, data);
+    sendSuccess(res, data);
+  })().catch(next);
 });
 
 export { basicHealthRouter, detailHealthRouter };
