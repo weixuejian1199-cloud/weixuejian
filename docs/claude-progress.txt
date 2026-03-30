@@ -1,60 +1,38 @@
 # 进度接力
 
 ## 最后更新
-- 时间：2026-03-30 17:25
-- Agent：CTO Agent（Wave 3 + 3.5）
-- 任务：US-P1a-009 + SPIKE-001 + SPIKE-002
-
-## 本次完成
-
-### US-P1a-009 MallAdapter（commit 1dcdfd0）
-- 6个ztdy-open API端点封装为统一接口
-- Zod校验 + Redis缓存(差异化TTL) + fail-secure降级
-- 3个聚合查询：销售统计/供应商排行/订单状态分布
-- 零新依赖（Node 20+原生fetch）
-- 91/91测试全绿
-
-### SPIKE-001 百炼tool_call验证（commit b9b9d9a）
-- qwen3.5-plus tool_call 5/5 全部通过
-- 格式完全兼容OpenAI标准
-- 日期填充/enum选择/多工具路由全部准确
-- 结论：Phase 1b AI对话引擎可直接使用tool_call
-
-### SPIKE-002 飞书Bridge API验证（commit 1045060）
-- 飞书SDK认证：tenant_access_token获取成功
-- Bot信息：名称「启钥Qiyao」，open_id已获取
-- 消息API：链路正常（ID无效=预期参数错误，非认证错误）
-- Webhook：需公网服务器，Phase 1b部署时测试
-- 结论：飞书SDK集成完全可行
-
-### 文档一致性审计（11项修正，含在US-P1a-009 commit）
-- brain.json: US-P1a-006状态修正/executionPlan补全/errorCodes双向对齐
-- error-codes.ts: 6处httpStatus/message与brain.json对齐
-- Phase 1b任务标注已有实现
-
-## 验证结果
-- TypeScript编译：0 errors
-- ESLint：0 errors, 0 warnings
-- Vitest：91/91 passed
-- SPIKE-001：5/5 通过
-- SPIKE-002：3/4 通过（Webhook需服务器）
-
-## 历史完成
-- US-P1a-001 ✅ 脚手架（commit 9b60167）
-- US-P1a-002 ✅ Schema精简版（commit d7c1000）
-- US-P1a-005 ✅ 健康检查API（commit 88d84ba）
-- US-P1a-006 ✅ Docker（commit 471a5ac）
-- US-P1a-010 ✅ 安全中间件套件（commit 280be5b）
-- US-P1a-011 ✅ 安全基线重构（commit e512f5f）
-- US-P1a-009 ✅ MallAdapter（commit 1dcdfd0）
-- SPIKE-001 ✅ 百炼tool_call验证（commit b9b9d9a）
-- SPIKE-002 ✅ 飞书Bridge验证（commit 1045060）
+- 时间：2026-03-30 18:10
+- Agent：CTO Agent
+- 任务：Phase 1a 完结 + 飞书Bridge部署
 
 ## Phase 1a 全部完成 ✅
 
+### 完成清单
+| US | 内容 | commit |
+|----|------|--------|
+| US-P1a-001 | 项目脚手架 | 9b60167 |
+| US-P1a-002 | Schema精简版(21表) | d7c1000 |
+| US-P1a-005 | 健康检查API+中间件 | 88d84ba |
+| US-P1a-006 | Docker Compose | 471a5ac |
+| US-P1a-010 | 安全中间件套件(35测试) | 280be5b |
+| US-P1a-011 | 安全基线重构(fail-secure) | e512f5f |
+| US-P1a-009 | MallAdapter 6个API | 1dcdfd0 |
+| SPIKE-001 | 百炼tool_call 5/5通过 | b9b9d9a |
+| SPIKE-002 | 飞书SDK验证通过 | 1045060 |
+
+### 额外完成
+- ADR-028 更新：Bridge从Agent SDK改为CLI spawn方案（commit d186e88）
+- 飞书Bridge原型：长连接+会话记忆+并发锁（commit 487cf02）
+- 文档一致性审计：11项修正
+- 测试：91/91全绿
+
+### 飞书Bridge运行状态
+- 位置：Mac本地 scripts/bridge/index.mjs
+- 启动：FEISHU_APP_ID=cli_a92d6574013a9cb5 FEISHU_APP_SECRET=*** node index.mjs
+- 会话记忆：发「新对话」重置
+- 限制：Mac关机则断开（服务器无法访问Anthropic）
+
 ## 下一步（Phase 1b）
-- Wave 4：US-P1b-006 双飞书对接（预计5天）
-  - 飞书号1 → Claude Code（Agent SDK + Bridge API）
-  - 飞书号2 → OpenClaw（从Qiyao迁移）
+- Wave 4：US-P1b-006 双飞书对接（正式版）
 - Wave 5：US-P1b-001 JWT RS256升级 + 微信登录流
 - Wave 6：US-P1b-002 多租户Prisma注入
