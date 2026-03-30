@@ -1,0 +1,8 @@
+{
+  "name": "feishu-claude-bridge",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.45.0"
+  }
+}
