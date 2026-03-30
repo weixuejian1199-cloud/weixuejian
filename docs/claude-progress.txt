@@ -1,81 +1,113 @@
 # 进度接力
 
 ## 最后更新
-- 时间：2026-03-30 22:00
+- 时间：2026-03-31 01:25
 - Agent：CTO Agent
-- 任务：Phase 1b Wave 4 收尾
+- 任务：Wave 7 AI对话引擎 + P1b-007 限流增强 + P1b-008 数据库备份 — 三路并行完成
 
 ## Phase 1b 进行中
 
-### Wave 4: US-P1b-006A — Bridge 生产化 ✅ 完成
+### Wave 7: AI对话引擎 (US-P1b-003) ✅ 核心完成
+- 新建 services/ai/types.ts — SSE事件+ChatMessage+工具类型定义
+- 新建 services/ai/ai-client.ts — 百炼Qwen API封装(流式+非流式, 原生fetch)
+- 新建 services/ai/tool-registry.ts — 6个工具定义+执行映射+幻觉防护(_dataSource标记)
+- 新建 services/ai/system-prompt.ts — 8条严格规则(幻觉防护+工具失败处理+日期推断)
+- 新建 services/ai/conversation-service.ts — 会话CRUD+10条上下文窗口+token计量(上限10000)
+- 新建 services/ai/chat-orchestrator.ts — SSE流式编排+tool_call循环+P0安全修复
+- 新建 routes/ai/index.ts — POST /chat (SSE流式) + GET /conversations
+- P0 Critic修复: 内部字段剥离/AiErrorCode类型收紧/SSE write保护/fail-secure参数解析
+- 新增 29 个测试 (ai-client 12 + tool-registry 8 + conversation 9 + routes 10 - 重叠)
+- 剩余: AuditLog记录(token消耗)待补充
 
-#### AC-01/02 完成
-- scripts/bridge/(259行原型) → packages/bridge/(300行生产版)
-- 新增: lib/config.mjs(环境变量校验) + lib/logger.mjs(pino结构化日志)
-- 改进: 按chatId隔离并发 + session TTL 4h过期 + 限流10条/分 + 发送重试3次
-- 部署: deploy/bridge/start.sh(tmux) + ecosystem.config.cjs(PM2)
-- Makefile: bridge-start/stop/restart/status/logs 命令
-- .env.example: 新增 FEISHU_APP_ID/SECRET/PROJECT_DIR 等6个变量
+### US-P1b-007: Rate Limiting 增强 ✅ 完成
+- 租户级限流 100req/min + 用户级 30req/min + AI专项 10req/min
+- Retry-After header + 环境变量可配置 + fail-secure(Redis不可用=503)
+- +13 测试
 
-#### 部署拓扑（最终方案）
-- **Mac本地部署**（非ECS）
-- 原因：Anthropic API 对中国IP返回403 forbidden，ECS无法访问
-- Bridge运行在Mac上，通过飞书WebSocket长连接接收消息
-- 旧原型进程已关闭，生产版运行中
+### US-P1b-008: 数据库备份自动化 ✅ 完成
+- backup.sh: pg_dump + OSS上传 + 保留策略(日30天/月1年) + 企微告警预留
+- restore.sh: 本地/OSS恢复 + 安全确认提示
+- pg-wal-archive.conf + crontab.example
 
-```
-Mac 本地
-└── packages/bridge/index.mjs (PM2/nohup)
-    ├── 飞书 WebSocket 长连接
-    └── spawn claude CLI → Anthropic API (需非中国IP)
-```
+### 验证结果
+- 175测试全绿 (17文件，从123增长到175，+52新测试)
+- ESLint零错误
+- TypeScript编译零错误
 
-### Wave 5: US-P1b-001 — JWT RS256 + 微信登录 (2天) ← 进行中
+### Wave 5+6: JWT RS256 + 微信登录 + 多租户 ✅ 完成
 
-#### 已确认方案（方案先行，2026-03-30）
+#### Day 1: JWT RS256签发/验证 + env升级 ✅
+- 新建 services/auth/jwt-service.ts (253行)
+  - RS256签发/验证（支持HS256降级兼容）
+  - Access Token 15min + Refresh Token 7d
+  - Refresh Token Rotation（一个token只能用一次）
+  - 登出黑名单（Redis TTL = token剩余有效期）
+  - parseExpiry()解析时间字符串
+  - TokenRotationError自定义错误类
+- 升级 middleware/auth.ts — 从直接jwt.verify改为调用jwt-service
+- 升级 lib/env.ts — 新增JWT_PRIVATE_KEY/JWT_PUBLIC_KEY（RS256 PEM）
+- 新增14个测试 (jwt-service.test.ts)
 
-**新建文件（4个）：**
-- services/auth/jwt-service.ts — RS256 sign/verify + refresh token rotation
-- services/auth/wechat-auth.ts — 微信code换openid + findOrCreateUser
-- routes/auth/index.ts — 4个端点: wechat-login/bind-phone/refresh/logout
+#### Day 2: 微信登录 + 4个auth端点 ✅
+- 新建 services/auth/wechat-auth.ts (178行)
+  - code2Session — 微信code换openid
+  - findOrCreateByWechat — 查找或创建用户
+  - bindPhone — 手机号绑定+账号合并
+  - WechatAuthError自定义错误类
+  - session_key不下发客户端（安全原则）
+- 新建 routes/auth/index.ts (201行) — 4个端点:
+  - POST /api/v1/auth/wechat-login — 微信登录（登录限流5次/分钟）
+  - POST /api/v1/auth/bind-phone — 绑定手机号（需认证）
+  - POST /api/v1/auth/refresh — 刷新Token（Rotation）
+  - POST /api/v1/auth/logout — 登出（黑名单）
+- 升级 app.ts — 挂载 /api/v1/auth 公开路由
+- AuditLog记录: 登录/注册/合并/绑定/登出
+- 新增11个测试 (auth.test.ts) + 安装supertest
 
-**修改文件（3个）：**
-- lib/env.ts — 新增 JWT_PRIVATE_KEY + JWT_PUBLIC_KEY（PEM），保留 JWT_SECRET 兼容
-- middleware/auth.ts — HS256→RS256，verify 用公钥
-- app.ts — 挂载 /api/v1/auth 公开路由（不走 requireAuth）
+#### Day 3: 多租户Prisma注入 ✅
+- 新建 lib/tenant-context.ts
+  - AsyncLocalStorage实现请求级tenantId传播
+  - getTenantId() / getUserId() — 服务层直接获取，无需手动传参
+  - getTenantPrisma() — 返回自动注入tenantId的Prisma客户端
+- 升级 middleware/tenant.ts
+  - requireTenant中间件改用tenantStorage.run()包装next()
+  - Prisma扩展新增updateMany/deleteMany/count/aggregate
+- 新增7个测试 (tenant-context.test.ts)
 
-**Day 1：** jwt-service.ts（RS256签发/验证）+ auth.ts升级 + env.ts + 测试
-**Day 2：** wechat-auth.ts + 4个路由端点 + 登录限流 + AuditLog + 测试
+#### 验证结果
+- 123测试全绿 (13文件，从91增长到123，+32新测试)
+- ESLint零错误
+- TypeScript编译零错误
 
-**10个AC：** RS256签名/Access 15min+Refresh 7d/Rotation刷新/登出黑名单/微信登录/手机号绑定/中间件升级/统一401/登录限流5次分/session_key不下发+AuditLog
+#### 文件变更清单
+| 操作 | 文件 | 行数 |
+|------|------|------|
+| 新建 | services/auth/jwt-service.ts | 253 |
+| 新建 | services/auth/wechat-auth.ts | 178 |
+| 新建 | routes/auth/index.ts | 201 |
+| 新建 | lib/tenant-context.ts | 55 |
+| 新建 | __tests__/services/auth/jwt-service.test.ts | 183 |
+| 新建 | __tests__/routes/auth.test.ts | 217 |
+| 新建 | __tests__/lib/tenant-context.test.ts | 68 |
+| 修改 | middleware/auth.ts | HS256→RS256(jwt-service) |
+| 修改 | middleware/tenant.ts | +AsyncLocalStorage |
+| 修改 | lib/env.ts | +JWT_PRIVATE/PUBLIC_KEY |
+| 修改 | app.ts | +authRouter挂载 |
+| 修改 | __tests__/middleware/auth.test.ts | mock改为jwt-service |
 
-### P0 基础设施修复 ✅ (评估后立即修复)
-- CI/CD: .github/workflows/test.yml + build.yml (commit 893a949)
-- 自动迁移: deploy/entrypoint.sh + Dockerfile ENTRYPOINT (commit 893a949)
-- PG连接验证: app.ts启动时SELECT 1, 失败exit(1) (commit 893a949)
-- Bridge优化: system prompt重构 + 禁用跨项目resume (commit 750b5a3)
+### 下一步: Wave 7.5 — 飞书号2接入AI对话引擎 (2天)
+- 飞书号2通道代码连接工作站AI对话引擎(US-P1b-003)
+- 飞书消息→路由到AI对话引擎→tool_call查真实数据→飞书回复
+- 依赖Wave 7 AI对话引擎(已完成)
 
 ## Phase 1a 全部完成 ✅
 
-### 完成清单
-| US | 内容 | commit |
-|----|------|--------|
-| US-P1a-001 | 项目脚手架 | 9b60167 |
-| US-P1a-002 | Schema精简版(21表) | d7c1000 |
-| US-P1a-005 | 健康检查API+中间件 | 88d84ba |
-| US-P1a-006 | Docker Compose | 471a5ac |
-| US-P1a-010 | 安全中间件套件(35测试) | 280be5b |
-| US-P1a-011 | 安全基线重构(fail-secure) | e512f5f |
-| US-P1a-009 | MallAdapter 6个API | 1dcdfd0 |
-| SPIKE-001 | 百炼tool_call 5/5通过 | b9b9d9a |
-| SPIKE-002 | 飞书SDK验证通过 | 1045060 |
-
-## Phase 1b 路线图 (21工作日)
-- Wave 4: P1b-006A Bridge生产化 ✅ 完成 (Mac本地部署)
-- Wave 5: P1b-001 JWT RS256+微信登录 (2d) ← 下一步
-- Wave 6: P1b-002 多租户Prisma注入 (1d)
-- Wave 6.5: Critic审查 (2d)
-- Wave 7: P1b-003 AI对话引擎 (6d) ← 关键路径
-- Wave 7.5: P1b-006B OpenClaw飞书接入 (2d)
+## Phase 1b 路线图 (21工作日 → 14工作日加速版)
+- Wave 4: P1b-006A Bridge生产化 ✅ 完成
+- Wave 5+6: JWT RS256+微信登录+多租户 ✅ 完成 (3天)
+- Wave 7: P1b-003 AI对话引擎 ✅ 核心完成 (含P0 Critic修复)
+- P1b-007: Rate Limiting增强 ✅ 完成
+- P1b-008: 数据库备份自动化 ✅ 完成
+- Wave 7.5: P1b-006B 飞书号2接入AI对话引擎 (2d) ← 下一步
 - Wave 8: P1b-004 5个运营查询 (2d)
 - Wave 9: P1b-005 ACI客服MVP (3d)
