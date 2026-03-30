@@ -1,6 +1,6 @@
 {
   "projectName": "企业AI工作站",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "lastUpdated": "2026-03-30",
 
   "projectBrief": {
@@ -144,13 +144,13 @@
       "atlas": "ATLAS(WebSocket IM+SSE+文件流+监控) → 选择性合并到对话通道和驾驶舱，Phase 3。注意：OpenClaw不在ATLAS而在Qiyao",
       "shishi": "时皙商城(27表/207验收/22页面) → 已决策合并(ADR-022)，技术栈迁移(NestJS→Express, MySQL→PostgreSQL, uni-app→Taro)，Phase 2-3"
     },
-    "currentStatus": "Phase 1a 进行中。脚手架已完成并提交(US-P1a-001 ✅ commit 9b60167)。v2.2更新：CTO全面审查完成(17个P0已修复方案)，排期修正为Option A(加时间不砍功能)，Bridge API选型完成(ADR-028 Agent SDK+自建Bridge)，ACI决策树完整设计。下一步：Wave 2 三路并行(Schema精简版/健康检查/Docker)。"
+    "currentStatus": "Phase 1a 进行中。脚手架已完成(US-P1a-001 ✅ commit 9b60167)。v2.3更新：9人团队全面审查完成 — 双飞书对接从Wave9提前到Wave4(验证通道先行)、多租户Phase1简化(节省1天)、供应商对账模块删除(BL-002/BL-011)、新增Phase1a技术Spike(百炼tool_call+Bridge API原型)、AiJudgmentRecord结构化判断记录、AI幻觉防护写入对话引擎、直达模式跳过Master Agent、E2E冒烟测试。下一步：Wave 2 三路并行(Schema精简版/健康检查/Docker)。"
   },
 
   "currentPhase": "Phase 1a",
   "phaseGoal": "Phase 1a（第1-3周）：项目脚手架+精简Schema(AI/系统层)+健康检查API+Docker本地环境+MallAdapter接入ztdy-open真实数据；Phase 1b（第4-9周）：JWT认证+多租户+AI对话引擎(百炼Qwen+SSE+tool_call)+5个运营查询真实场景+ACI客服MVP(退货审核判断)+双飞书对接(Agent SDK Bridge+OpenClaw)+限流+备份",
   "phaseDeadline": "2026-06-06",
-  "phaseNote": "v2.2排期修正(CTO审查结论)：Phase 1a目标4月20日，Phase 1b目标6月6日。原估15-18工作日→修正为30-35工作日（加入Critic审查时间+工作量重估+Wave并行性修正）。决策：加时间不砍功能。方案先行——方案不清晰不开工。",
+  "phaseNote": "v2.3排期（9人团队审查后）：Phase 1a目标4月20日（含2个技术Spike），Phase 1b目标6月6日。总工期30-35工作日。关键变化：双飞书从Wave9→Wave4(验证通道先行)，多租户简化节省1天，供应商对账删除。方案先行——方案不清晰不开工。",
 
   "activeTasks": [
     {
@@ -184,7 +184,7 @@
     {
       "id": "US-P1a-002",
       "title": "Prisma Schema 精简版（AI/系统层优先）",
-      "status": "pending",
+      "status": "done",
       "assignee": "Data Agent",
       "story": "AS 数据工程师 I WANT AI和系统核心数据模型定义为Prisma Schema SO THAT AI对话和客服判断有本地存储基础",
       "ac": [
@@ -213,7 +213,7 @@
     {
       "id": "US-P1a-005",
       "title": "健康检查 API + 统一响应格式",
-      "status": "pending",
+      "status": "done",
       "assignee": "BE Agent",
       "story": "AS 运维团队 I WANT 系统健康检查端点和统一的API响应格式 SO THAT 监控系统能检测服务状态且前端处理响应一致",
       "ac": [
@@ -349,17 +349,17 @@
         "AC-默认-01: 覆盖率 100%（多租户隔离层）"
       ],
       "scope": {
-        "include": "tenant中间件、Prisma查询注入、RLS策略脚本、隔离测试",
-        "exclude": "不做 dataScope 细粒度（dept/shop/own，Phase 2 权限中间件处理）"
+        "include": "tenant中间件（硬编码默认租户）、Prisma查询自动注入tenantId、基础隔离逻辑",
+        "exclude": "不做RLS策略脚本（Phase 2）、不做多租户隔离测试（Phase 2引入第二租户时）、不做 dataScope 细粒度（Phase 2）"
       },
       "priority": "P0",
       "blockedBy": ["US-P1a-002", "US-P1b-001"],
       "blocks": ["US-P1b-003"],
-      "wave": 2,
+      "wave": 6,
       "phase": "1b",
       "createdAt": "2026-03-29",
       "updatedAt": "2026-03-30",
-      "updateNote": "从Phase 1a移至Phase 1b wave 2，原ID US-P1a-004"
+      "updateNote": "v2.3简化：Phase 1只有一个租户（时皙），硬编码默认租户ID简化中间件，RLS和隔离测试推迟到Phase 2引入第二个测试租户时。节省1天工作量"
     },
     {
       "id": "US-P1b-003",
@@ -434,7 +434,9 @@
         "AC-07: 风险闸门：金额>500/情绪激动/欺诈嫌疑/不确定 → 自动升级标记",
         "AC-08: 客服确认端点 POST /api/v1/cs/message/:id/confirm（人工确认后标记为approved）",
         "AC-09: CSSession/CSMessage/CSTicket基础CRUD",
-        "AC-默认-01: 所有判断过程记入AuditLog（可审计决策链）",
+        "AC-10: AiJudgmentRecord表结构化存储每次AI判断（decision/confidence/triggeredRules/context），支持按confidence范围查询和规则触发频率统计",
+        "AC-11: 退货判断记录落库到AiJudgmentRecord，用于规则4(30天退货频次)本地统计，不依赖外部API",
+        "AC-默认-01: 所有判断过程记入AuditLog + AiJudgmentRecord（可审计决策链+可回放）",
         "AC-默认-02: 不执行任何退款/补偿动作"
       ],
       "scope": {
@@ -470,12 +472,13 @@
         "exclude": "不做Taro前端（推迟到Phase 2）、不做微信/Telegram通道（Phase 2扩展）"
       },
       "priority": "P0-最高",
-      "blockedBy": ["US-P1b-003"],
-      "blocks": [],
+      "blockedBy": ["US-P1a-001"],
+      "blocks": ["US-P1b-003", "US-P1b-004", "US-P1b-005"],
       "wave": 4,
       "phase": "1b",
       "createdAt": "2026-03-30",
-      "updateNote": "Claude Code飞书对接是最高优先级（创始人核心需求：不守电脑），OpenClaw飞书同步或紧接第二步（流程已通，很快）。两个飞书号各自独立通道，一个连最强大脑，一个连日常大脑"
+      "updatedAt": "2026-03-30",
+      "updateNote": "v2.3重排：从Wave 9提前到Wave 4（Phase 1b第一个任务）。飞书是验证所有后续功能的通道——AI对话、运营查询、ACI判断都通过飞书验证。blockedBy从P1b-003改为P1a-001（SPIKE-002已验证Bridge API可行性，不需要等AI对话引擎完成）。Claude Code飞书先行，OpenClaw飞书紧接"
     },
     {
       "id": "US-P1b-007",
@@ -553,10 +556,11 @@
       {
         "wave": 2,
         "tasks": ["US-P1a-002", "US-P1a-005", "US-P1a-006"],
-        "description": "三路并行：Data Agent做Schema精简版 / BE Agent做健康检查 / DevOps Agent做Docker。注意：005的Redis连通性测试需006的Docker先启动，可先写逻辑后联调",
+        "description": "三路并行：Data Agent做Schema精简版 / BE Agent做健康检查 / DevOps Agent做Docker ✅ 全部完成",
         "parallel": true,
         "estimatedDays": 3,
-        "phase": "1a"
+        "phase": "1a",
+        "status": "done"
       },
       {
         "wave": "2.5",
@@ -576,10 +580,11 @@
       },
       {
         "wave": "3.5",
-        "tasks": ["Critic审查Wave3"],
-        "description": "MallAdapter方案+代码审查",
+        "tasks": ["Critic审查Wave3", "SPIKE-001", "SPIKE-002"],
+        "description": "MallAdapter方案+代码审查。同期执行两个技术验证Spike（不阻塞审查）：百炼Qwen tool_call最小验证 + Bridge API最小原型（飞书→Claude Code→飞书）",
         "estimatedDays": 1,
-        "phase": "1a"
+        "phase": "1a",
+        "note": "v2.3新增：两个Spike并行验证，提前暴露技术风险，不等到Phase 1b"
       },
       {
         "wave": "--- Phase 1b 分界线 --- 目标交付：2026-06-06",
@@ -588,6 +593,15 @@
       },
       {
         "wave": 4,
+        "tasks": ["US-P1b-006"],
+        "description": "【提前】双飞书对接：飞书号1(Agent SDK Bridge→Claude Code) + 飞书号2(OpenClaw迁移)。这是验证所有后续功能的通道，必须先做。Bridge API约600-800行核心代码",
+        "parallel": false,
+        "estimatedDays": 5,
+        "phase": "1b",
+        "note": "v2.3重排：从Wave 9提前到Wave 4。创始人核心需求（不守电脑）+ 飞书是所有功能的验证入口。SPIKE-002已验证可行性"
+      },
+      {
+        "wave": 5,
         "tasks": ["US-P1b-001"],
         "description": "认证：JWT RS256 + 微信登录 + Redis黑名单。AC补充：JWT payload必须包含{tenantId,userId,role}",
         "parallel": false,
@@ -595,75 +609,70 @@
         "phase": "1b"
       },
       {
-        "wave": 5,
-        "tasks": ["US-P1b-002"],
-        "description": "多租户隔离：Prisma middleware自动注入tenantId + 禁止$executeRaw + 隔离测试",
-        "parallel": false,
-        "estimatedDays": 2,
-        "phase": "1b"
-      },
-      {
         "wave": 6,
-        "tasks": ["US-P1b-003"],
-        "description": "AI对话引擎：百炼Qwen + SSE + tool_call + System Prompt。v2.2修正：从3天改为6天，tool_call和Prompt设计需多轮迭代",
+        "tasks": ["US-P1b-002"],
+        "description": "多租户隔离：Phase 1硬编码默认租户简化实现，保留tenantId字段但Prisma middleware轻量化。Phase 2引入第二个租户时再完善RLS",
         "parallel": false,
-        "estimatedDays": 6,
+        "estimatedDays": 1,
         "phase": "1b",
-        "note": "关键路径上最重的任务"
+        "note": "v2.3简化：Phase 1只有一个租户，RLS和隔离测试推迟到Phase 2，节省1天"
       },
       {
         "wave": "6.5",
         "tasks": ["Critic审查Wave4-6"],
-        "description": "JWT+多租户+AI对话引擎 方案+代码审查",
+        "description": "飞书对接+JWT+多租户 方案+代码审查",
         "estimatedDays": 2,
         "phase": "1b"
       },
       {
         "wave": 7,
-        "tasks": ["US-P1b-004"],
-        "description": "5个运营查询真实场景验证",
+        "tasks": ["US-P1b-003"],
+        "description": "AI对话引擎：百炼Qwen + SSE + tool_call + System Prompt。SPIKE-001已验证tool_call可行。增加AI幻觉防护：工具函数返回的数字直接嵌入模板不让AI复述，涉及金额附加数据来源引用",
         "parallel": false,
-        "estimatedDays": 2,
-        "phase": "1b"
+        "estimatedDays": 6,
+        "phase": "1b",
+        "note": "关键路径上最重的任务。增加'直达模式'——用户可跳过Master Agent直选子Agent（零AI调用成本降级）"
       },
       {
         "wave": 8,
-        "tasks": ["US-P1b-005"],
-        "description": "ACI客服MVP：退货审核判断决策树(已完整设计) + 5条规则硬编码 + 风险闸门",
+        "tasks": ["US-P1b-004"],
+        "description": "5个运营查询场景验证。v2.3：场景由创始人提供真实日常问题替代假设场景（Phase 1b开始前收集）",
         "parallel": false,
-        "estimatedDays": 3,
-        "phase": "1b"
+        "estimatedDays": 2,
+        "phase": "1b",
+        "note": "v2.3: 开始前让创始人记录1天真实查询需求，用真实问题替代假设场景"
       },
       {
         "wave": 9,
-        "tasks": ["US-P1b-006"],
-        "description": "双飞书对接：飞书号1(Agent SDK Bridge→Claude Code) + 飞书号2(OpenClaw迁移)。Bridge API约600-800行核心代码",
+        "tasks": ["US-P1b-005"],
+        "description": "ACI客服MVP：退货审核判断决策树(已完整设计) + 5条规则硬编码 + 风险闸门 + AiJudgmentRecord结构化存储",
         "parallel": false,
-        "estimatedDays": 5,
+        "estimatedDays": 3,
         "phase": "1b",
-        "note": "创始人核心需求，Agent SDK + @larksuiteoapi/node-sdk + PM2进程守护"
+        "note": "v2.3: 新增AiJudgmentRecord表存储每次AI判断完整决策链，为晋升Phase 2提供数据基础。退货判断记录落库解决规则4(30天退货频次)数据源问题"
       },
       {
         "wave": "9.5",
         "tasks": ["Critic审查Wave7-9"],
-        "description": "运营场景+ACI+飞书 方案+代码审查",
+        "description": "AI对话引擎+运营场景+ACI 方案+代码审查",
         "estimatedDays": 2,
         "phase": "1b"
       },
       {
         "wave": 10,
-        "tasks": ["US-P1b-007", "US-P1b-008"],
-        "description": "收尾：限流中间件 + 数据库备份",
+        "tasks": ["US-P1b-007", "US-P1b-008", "E2E冒烟测试"],
+        "description": "收尾：限流中间件 + 数据库备份 + 3个端到端冒烟测试（飞书→查数据→回复/飞书→ACI退货判断/飞书→Claude Code执行命令）",
         "parallel": true,
         "estimatedDays": 2,
-        "phase": "1b"
+        "phase": "1b",
+        "note": "v2.3: 新增E2E冒烟测试验证完整链路"
       }
     ],
-    "totalEstimatedDays": "30-35个工作日（含Critic双重审查5天 + 工作量重估）",
-    "criticalPath": "001(done) → 002 → 009 → P1b-001 → P1b-002 → P1b-003(6天最重) → P1b-005 → P1b-006(5天) → P1b-007/008",
-    "phase1aDeliverable": "可运行的后端+Docker环境+6个ztdy API已接通+健康检查可访问（目标4月20日）",
-    "phase1bDeliverable": "飞书号1→Claude Code可对话；飞书号2→OpenClaw→AI查ztdy真实数据→飞书回复；ACI退货审核判断可工作（目标6月6日）",
-    "v22ChangeLog": "CTO审查修正：(1)MallAdapter 2天→5天 (2)AI对话引擎 3天→6天 (3)Wave6三路并行拆为串行Wave7/8/9 (4)插入Critic审查Wave (5)总工期15-18天→30-35天"
+    "totalEstimatedDays": "30-35个工作日（含Critic双重审查5天 + 工作量重估 + 多租户简化节省1天）",
+    "criticalPath": "001(done) → 002/005/006 → 009 → P1b-006(飞书,5天,提前) → P1b-001 → P1b-002(简化) → P1b-003(6天最重) → P1b-004 → P1b-005 → P1b-007/008",
+    "phase1aDeliverable": "可运行的后端+Docker环境+6个ztdy API已接通+健康检查可访问+百炼tool_call已验证+Bridge API原型已验证（目标4月20日）",
+    "phase1bDeliverable": "飞书号1→Claude Code可对话（最先交付）；飞书号2→OpenClaw→AI查ztdy真实数据→飞书回复；ACI退货审核判断可工作+判断记录可回放（目标6月6日）",
+    "v23ChangeLog": "9人团队全面审查v2.3：(1)双飞书Wave9→Wave4（验证通道先行）(2)多租户Phase1简化（硬编码默认租户，节省1天）(3)新增SPIKE-001/002在Phase1a验证技术风险(4)删除供应商对账(BL-002/BL-011)(5)新增AiJudgmentRecord表(6)AI幻觉防护写入AI对话引擎(7)直达模式跳过Master Agent(8)E2E冒烟测试(9)MallAdapter按数据类型差异化缓存TTL(10)ACI标注数据集30-50个case"
   },
 
   "backlog": [
@@ -678,12 +687,14 @@
     },
     {
       "id": "BL-002",
-      "title": "合并Qiyao数据分析引擎到工作站",
-      "description": "Qiyao有7个分析器(指标/异常/健康分/时间趋势/达人质量/利润/对账)+12项核心指标+8种异常检测。重写为TypeScript。⚠️关键约束：供应商对账模块只有统计展示，没有真正的对账逻辑（差异匹配/归因判定/退款分摊），合并时必须重新设计完整业务逻辑，不是搬代码。其他分析器可重写迁移",
+      "title": "合并Qiyao数据分析引擎到工作站（不含对账）",
+      "description": "Qiyao有6个分析器(指标/异常/健康分/时间趋势/达人质量/利润)+12项核心指标+8种异常检测。重写为TypeScript。⚠️供应商对账模块已删除——已接入ztdy-open API，对账只是一个工具不值得投入重新设计",
       "priority": "P1",
       "targetPhase": "Phase 2",
       "source": "qiyao-workstation（/Users/weixuejian/claude-workspace/qiyao-workstation/）",
-      "date": "2026-03-29"
+      "date": "2026-03-29",
+      "updatedAt": "2026-03-30",
+      "updateNote": "v2.3: 创始人决策删除供应商对账模块，已有ztdy API无需对账"
     },
     {
       "id": "BL-003",
@@ -719,15 +730,6 @@
       "priority": "P1",
       "targetPhase": "Phase 2",
       "source": "ADR-013 + ADR-014 工具=Agent架构",
-      "date": "2026-03-29"
-    },
-    {
-      "id": "BL-011",
-      "title": "平台结算对账Agent（抖店/天猫/拼多多/京东）",
-      "description": "电商财务最高频痛点。每个平台有不同的结算报告格式、扣款类别（佣金/罚款/推广/物流补贴）、结算周期（T+1到T+15）。AI Agent自动：1.解析平台结算报告（PDF/Excel）2.与本地ERP订单数据逐条匹配 3.标记差异（少结/多扣/遗漏）4.生成调整凭证 5.输出可确认的对账报告。竞品分析：聚水潭/金蝶都没有AI自动对账能力，这是核心差异化功能",
-      "priority": "P1",
-      "targetPhase": "Phase 2",
-      "source": "CTO审查-市场对标-电商财务最大痛点",
       "date": "2026-03-29"
     },
     {
@@ -805,6 +807,42 @@
       "date": "2026-03-29"
     },
     {
+      "id": "BL-020",
+      "title": "数据安全与PIPL合规策略",
+      "description": "SaaS平台处理企业财务数据和客户个人信息，必须合规。内容：(1)敏感字段清单（手机号/收货地址/消费记录/银行信息）(2)敏感字段加密策略（AES-256-GCM扩展到更多字段）(3)数据导出/删除权（PIPL用户权利）(4)AuditLog保留期策略(5)数据脱敏展示规则。不需要复杂，但底线必须有",
+      "priority": "P0",
+      "targetPhase": "Phase 2 启动前",
+      "source": "CTO团队审查v2.3-安全合规评分6/10需提升",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "BL-021",
+      "title": "AI幻觉防护增强（Phase 2）",
+      "description": "Phase 1b的AI对话引擎已内置基础防护（工具函数数字直接嵌入模板+金额附加数据来源引用）。Phase 2增强：(1)关键指标自动校验（AI回复中的数字 vs 工具函数返回的原始数字，不一致则标记警告）(2)AI回复中的数据声明来源标注(3)财务类回复强制附加'数据来源：xxx，查询时间：xxx'(4)数据冲突检测（不同工具返回数据矛盾时告警）",
+      "priority": "P1",
+      "targetPhase": "Phase 2",
+      "source": "CTO团队审查v2.3-AI安全层",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "BL-022",
+      "title": "AI成本监控与预算控制仪表盘",
+      "description": "SaaS卖给其他企业时的核心能力。内容：(1)实时用量仪表盘（当前消耗token/金额）(2)按Agent/按用户的token消耗明细(3)接近配额告警+自动降级到更便宜模型(4)百炼API日限额保护(5)月度AI成本报告。自用阶段可简化，SaaS化时必备",
+      "priority": "P1",
+      "targetPhase": "Phase 2",
+      "source": "CTO团队审查v2.3-成本控制",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "BL-023",
+      "title": "操作确认记录表(ConfirmationRecord)+AI决策回放",
+      "description": "ADR-019设计了ConfirmationCard但缺少存储表。新增ConfirmationRecord表存储：AI生成确认请求→用户确认/拒绝→记录决策。同时支持AI决策回放——老板问'上周那个退货判断为什么拒绝了'，系统能回放完整决策链（输入→触发规则→证据→最终决策）",
+      "priority": "P1",
+      "targetPhase": "Phase 2",
+      "source": "CTO团队审查v2.3-Architect Agent",
+      "date": "2026-03-30"
+    },
+    {
       "id": "BL-015",
       "title": "SaaS计费引擎设计",
       "description": "Tenant.plan字段已设计但细则缺失。等有付费客户意向时再设计",
@@ -836,6 +874,12 @@
         "id": "BL-014",
         "title": "工具市场版本管理和灰度发布",
         "removedReason": "过度设计，工具市场MVP都没上线",
+        "removedDate": "2026-03-30"
+      },
+      {
+        "id": "BL-011",
+        "title": "平台结算对账Agent（抖店/天猫/拼多多/京东）",
+        "removedReason": "创始人决策删除——已接入ztdy-open API，供应商对账只是工具不值得投入，不影响核心流程",
         "removedDate": "2026-03-30"
       }
     ]
@@ -1072,6 +1116,13 @@
       "id": "ADR-029",
       "title": "ACI退货审核决策树：完整规则优先级 + ProcessNode枚举 + 输出Schema + 晋升KPI",
       "reason": "CTO审查发现4个P0：规则无优先级/ProcessNode未定义/输出格式未定义/跨数据源风险。完整设计方案：(1)ProcessNode 0-5六级枚举(需用真实数据校验)；(2)优先级P0安全闸门>P1合规>P2业务>P3品类时效>P4默认APPROVE；(3)输出ACIReturnJudgment含decision/reason/riskLevel/triggeredRules/confidence/context；(4)风险闸门：情绪关键词检测+欺诈多信号+置信度<0.7自动转人工；(5)晋升KPI：14天>=100笔，准确率>=90%，漏升级<5%，闸门拦截100%，灰度放权",
+      "status": "accepted",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "ADR-030",
+      "title": "v2.3九人团队全面审查10项决策",
+      "reason": "9人团队（CTO/PM/Architect/Critic/BE/Data/QA/DevOps/FE）全面审查项目方案，创始人确认3条指示后执行10项调整：(1)双飞书Wave9→Wave4(验证通道先行) (2)多租户Phase1简化(硬编码默认租户) (3)供应商对账删除(BL-002精简/BL-011移除) (4)Phase1a新增2个技术Spike(百炼tool_call+Bridge API原型) (5)新增AiJudgmentRecord表(结构化AI判断记录) (6)AI幻觉防护写入AI对话引擎基线 (7)Master Agent增加'直达模式'降级 (8)MallAdapter按数据类型差异化缓存TTL (9)3个E2E冒烟测试加入Phase1b收尾 (10)新增4个Backlog(BL-020数据安全/BL-021幻觉增强/BL-022成本监控/BL-023确认记录+决策回放)",
       "status": "accepted",
       "date": "2026-03-30"
     }
@@ -1323,7 +1374,33 @@
     {
       "id": "PIT-017",
       "title": "ztdy-open API无分页总量限制，大量数据聚合需分页遍历",
-      "solution": "95万订单不可能一次拉完。聚合查询（如月销售额）需要分页遍历或请求第三方提供聚合API。Phase 1的MallAdapter实现分页自动遍历+结果缓存（Redis TTL 5min）。长期方案：数据定期同步落库后本地聚合",
+      "solution": "95万订单不可能一次拉完。聚合查询（如月销售额）需要分页遍历或请求第三方提供聚合API。Phase 1的MallAdapter实现分页自动遍历+结果缓存（按数据类型差异化TTL：商品30min/订单5min/用户60min）。长期方案：数据定期同步落库后本地聚合",
+      "date": "2026-03-30",
+      "updatedAt": "2026-03-30",
+      "updateNote": "v2.3: 缓存从统一5min改为按数据类型差异化TTL"
+    },
+    {
+      "id": "PIT-018",
+      "title": "ACI规则2(收货>7天)依赖签收时间，但ztdy订单可能无精确签收时间字段",
+      "solution": "Phase 1 MallAdapter开发时第一步验证OrderPageList返回字段是否包含签收时间。如果没有，规则2改为用'发货时间+N天'估算（N=默认3天物流时间，可配置）",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "PIT-019",
+      "title": "Agent编排文档用Claude Function Calling示例，但Phase 1实际用百炼Qwen",
+      "solution": "实现时统一用百炼Qwen的tool_call格式（OpenAI兼容格式），不照搬02文档中的Claude示例代码。文档作为概念参考",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "PIT-020",
+      "title": "Redis单实例承担6种职责（Session/Token黑名单/缓存/队列/限流/通用）",
+      "solution": "用不同Redis DB做逻辑分离：db0=session+token, db1=mall-cache, db2=bullmq-queue, db3=rate-limit。Phase 1单实例够用，为Phase 2物理分离留路",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "PIT-021",
+      "title": "Conversation.agentType枚举不完整",
+      "solution": "agentType应包含：master/finance/operation/settlement/report/customer_service/system/tool。Phase 1a Schema建模时补全",
       "date": "2026-03-30"
     }
   ],
@@ -1377,10 +1454,40 @@
       "priority": "medium",
       "due": "Phase 2",
       "reason": "Phase 1刻意选择的技术债——用API读取换取开发速度"
+    },
+    {
+      "id": "DEBT-007",
+      "title": "Phase 1多租户为硬编码简化版",
+      "description": "Phase 1只有一个租户（时皙），tenant middleware硬编码默认tenantId，未实现RLS和隔离测试。Phase 2引入第二个测试租户时必须完善",
+      "priority": "high",
+      "due": "Phase 2",
+      "reason": "v2.3决策——Phase 1无第二租户，简化实现节省时间"
     }
   ],
 
   "changeHistory": [
+    {
+      "version": "2.3.0",
+      "date": "2026-03-30",
+      "author": "CTO + 9人团队全面审查",
+      "summary": "9人团队全面审查：10项方案优化 + 供应商对账删除 + 4个新Backlog + 5个新Pitfall + 1个新TechDebt",
+      "changes": [
+        "ADR-030: 9人团队全面审查10项决策",
+        "executionPlan重排：US-P1b-006(双飞书)从Wave9→Wave4（验证通道先行，创始人核心需求）",
+        "US-P1b-002简化：Phase 1硬编码默认租户，RLS/隔离测试推迟Phase 2（节省1天→DEBT-007）",
+        "Phase 1a新增Wave 3.5两个技术Spike：SPIKE-001(百炼Qwen tool_call验证) + SPIKE-002(Bridge API最小原型)",
+        "创始人决策：删除供应商对账模块——BL-002精简(删除对账部分)、BL-011移至backlogRemoved",
+        "US-P1b-005新增AC-10/11：AiJudgmentRecord结构化AI判断记录表，解决规则4数据源问题",
+        "US-P1b-003增强：AI幻觉防护基线（数字直接嵌入不让AI复述+金额附加来源引用）+ Master Agent直达模式",
+        "MallAdapter缓存策略从统一5min改为按数据类型差异化TTL（商品30min/订单5min/用户60min）",
+        "Phase 1b收尾新增3个E2E冒烟测试（飞书查数据/ACI判断/Claude Code命令）",
+        "新增Backlog：BL-020(数据安全PIPL)、BL-021(AI幻觉增强Phase2)、BL-022(AI成本监控)、BL-023(确认记录+决策回放)",
+        "新增Pitfall：PIT-018(ACI规则2签收时间)、PIT-019(百炼vs Claude tool_call格式)、PIT-020(Redis 6职责DB分离)、PIT-021(agentType枚举)",
+        "新增TechDebt：DEBT-007(Phase 1多租户硬编码简化)",
+        "US-P1b-004：场景改为创始人提供真实日常问题（开始前收集1天）",
+        "安全合规评估：从6/10提升路径明确（BL-020 Phase 2前制定策略）"
+      ]
+    },
     {
       "version": "2.2.0",
       "date": "2026-03-30",
@@ -1567,13 +1674,16 @@
       "Round 3 (98→100): 会话协议（ADR-016）、进度接力文件规范、init.sh环境脚本、RULE-14/15/16新增、UI设计规范v1.1、开发工具链全部安装就绪",
       "Round 4 (CTO终审): 修复8个数据模型/接口BUG + 12项优化。新增Backlog BL-011~015(平台对账/审批流/食品追溯/工具版本/计费引擎)。新增PIT-007~010",
       "Round 5 (架构纠偏): AIBI小酮从'客服'重新定位为'营养师工具Agent'。客服独立为核心子系统Customer Service Agent(ADR-020)。全6份文档联动更新",
-      "Round 6 (v2.0方案重构): Phase 1从'纯基础设施'调整为'最小可对话系统'。接入ztdy-open真实数据(ADR-024)。整合ACI客服中枢(ADR-025)。Schema精简60-70%。Backlog精简(删3/延2/新增2)。新增ADR-024/025/026、RISK-007/008、PIT-016/017、DEBT-006、errorCodes.mall/cs。changeHistory开始记录"
+      "Round 6 (v2.0方案重构): Phase 1从'纯基础设施'调整为'最小可对话系统'。接入ztdy-open真实数据(ADR-024)。整合ACI客服中枢(ADR-025)。Schema精简60-70%。Backlog精简(删3/延2/新增2)。新增ADR-024/025/026、RISK-007/008、PIT-016/017、DEBT-006、errorCodes.mall/cs。changeHistory开始记录",
+      "Round 7 (v2.3九人团队审查): 9人团队（CTO/PM/Architect/Critic/BE/Data/QA/DevOps/FE）全面审查。创始人3条指示：(1)供应商对账删除 (2)阿里云按需升级 (3)其余按CTO建议执行。10项重大调整：双飞书提前/多租户简化/技术Spike/AiJudgmentRecord/AI幻觉防护/直达模式/差异化缓存/E2E测试/4个新BL/数据安全合规路径。方案理解从8/10调整到10/10。ADR-030记录"
     ],
     "remainingIssues": [
       "01主文档Schema缺商城融合字段(~18张新表)——Phase 2-3补充，不阻塞Phase 1",
       "05全局架构的routes目录结构(按功能分)与01主文档(按身份分)不一致——以01为准，05待更新",
-      "ztdy-open的TeamBonusPageList和ItemStockPageList端点未通——需联系第三方确认"
+      "ztdy-open的TeamBonusPageList和ItemStockPageList端点未通——需联系第三方确认",
+      "02文档Agent编排示例代码用Claude Function Calling格式，实现时用百炼Qwen OpenAI兼容格式（PIT-019）",
+      "Conversation.agentType枚举需补全customer_service/report/tool（PIT-021）"
     ],
-    "note": "v2.0方案重构完成。创始人与CTO达成共识：方案先行、真实数据验证、砍功能比加功能重要。Phase 1交付标准：老板能对AI说话看到真实数据 + 客服能做退货审核判断。下一步：确认方案无歧义后启动编码。"
+    "note": "v2.3九人团队全面审查完成。方案理解10/10。所有评分维度均有改善路径。下一步：Wave 2 三路并行（Schema精简版/健康检查/Docker）+ Wave 3.5两个技术Spike。Phase 1b第一个任务改为双飞书对接（验证通道先行）。"
   }
 }

@@ -1,0 +1,32 @@
+# 进度接力
+
+## 最后更新
+- 时间：2026-03-30 14:00
+- Agent：CTO Agent
+- 任务：Wave 2（US-P1a-002 + US-P1a-005）
+
+## 本次完成
+- US-P1a-002 ✅ Prisma Schema 精简版：12张表 + 8个枚举 + 首次migration成功
+  - 基础层：Tenant, User, Role, RefreshToken
+  - AI&系统层：Conversation, Message, AuditLog, Notification
+  - 客服MVP：CustomerServiceSession, CustomerServiceMessage, CustomerServiceTicket
+  - v2.3新增：AiJudgmentRecord（AI判断结构化记录）
+- US-P1a-005 ✅ 健康检查API + 统一响应格式
+  - GET /health（轻量）+ GET /api/v1/health（详细，含version/uptime）
+  - 统一响应 {success, data, error?, requestId}
+  - requestId中间件 + X-Request-ID响应头
+  - 404兜底 + 全局错误处理（ZodError→400 / 未知→500不暴露细节）
+  - pino结构化日志 + Prisma单例 + Redis客户端
+- US-P1a-006 ✅ 上一个会话已完成（commit 471a5ac）
+- brain.json v2.3 更新：9人团队审查10项优化落地
+
+## 端到端验证
+- docker compose up → prisma migrate dev → tsx src/app.ts → curl /health → 全部通过
+- PostgreSQL ok (20ms) + Redis ok (11ms) + 404统一格式 + X-Request-ID
+
+## Wave 2 全部完成 ✅
+
+## 下一步
+- Wave 2.5：Critic审查Wave 2三个US的Schema/API/Docker
+- Wave 3：US-P1a-009 MallAdapter接入ztdy-open 6个API（预计5天）
+- Wave 3.5：两个技术Spike（百炼tool_call验证 + Bridge API原型）

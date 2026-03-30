@@ -1,7 +1,7 @@
 # 企业 AI 工作站 · Claude Code 项目指引
 
 > 本文件是 Claude Code 每次新会话的自动入口。启动时先读这个文件，再按指引操作。
-> v2.0 · 2026-03-30
+> v2.3 · 2026-03-30
 
 ## 项目概述
 
@@ -11,6 +11,7 @@
 - 时皙Life商城与工作站深度合并（ADR-022），同一个后端、同一个数据库
 - Phase 1 数据来源：ztdy-open 商城 API（真实数据）为主 + 用户上传为辅（ADR-024）
 - ACI 客服中枢：决策中枢定位，Phase 1 只验证退货审核判断能力（ADR-025）
+- 9人团队全面审查10项优化（ADR-030）：双飞书提前/多租户简化/技术Spike/AI幻觉防护/供应商对账删除
 
 ## 新会话启动协议（必须执行）
 
@@ -75,7 +76,7 @@ Node.js 20+ / TypeScript strict / Express 4 / Prisma 6 / PostgreSQL 15 / Redis 7
 
 ```
 docs/
-├── brain.json                    # 项目大脑 v2.0（projectBrief/任务/ADR/错误码/会话协议）
+├── brain.json                    # 项目大脑 v2.3（projectBrief/任务/ADR/错误码/会话协议）
 ├── claude-progress.txt           # 进度接力（开发后才有）
 ├── 01-企业AI工作站-主文档.md      # 数据模型、权限、安全（数据模型权威源）
 ├── 02-企业AI工作站-Agent编排.md   # AI Agent 架构 + ACI客服中枢
