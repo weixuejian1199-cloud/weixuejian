@@ -1,0 +1,378 @@
+// ============================================================
+// Enterprise Workstation - Phase 1 Schema
+// Prisma 6.x / PostgreSQL
+// AI/System Layer + Customer Service MVP + Foundation
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ──────────────────────────────────────────
+// Enums
+// ──────────────────────────────────────────
+
+enum AgentType {
+  master
+  finance
+  operation
+  settlement
+  report
+  customer_service
+  system
+  tool
+}
+
+enum MessageRole {
+  user
+  assistant
+  tool
+  system
+}
+
+enum CSSessionStatus {
+  ai_handling
+  human_queue
+  human_handling
+  resolved
+  closed
+}
+
+enum CSMessageSender {
+  buyer
+  ai
+  human_agent
+}
+
+enum CSTicketType {
+  refund
+  exchange
+  return_goods
+  complaint
+  other
+}
+
+enum CSTicketStatus {
+  pending
+  approved
+  rejected
+  processing
+  completed
+}
+
+enum AciDecision {
+  APPROVE
+  REJECT
+  REJECT_WITH_APPEAL
+  ESCALATE
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// ──────────────────────────────────────────
+// Foundation Layer
+// ──────────────────────────────────────────
+
+model Tenant {
+  id              String    @id @default(uuid())
+  name            String
+  slug            String    @unique
+  plan            String    @default("free")
+  planExpiresAt   DateTime?
+  maxUsers        Int       @default(10)
+  maxShops        Int       @default(5)
+  aiQuotaMonthly  Int       @default(1000)
+  status          String    @default("active")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  users                    User[]
+  roles                    Role[]
+  refreshTokens            RefreshToken[]
+  conversations            Conversation[]
+  messages                 Message[]
+  auditLogs                AuditLog[]
+  notifications            Notification[]
+  customerServiceSessions  CustomerServiceSession[]
+  customerServiceMessages  CustomerServiceMessage[]
+  customerServiceTickets   CustomerServiceTicket[]
+  aiJudgmentRecords        AiJudgmentRecord[]
+
+  @@map("tenants")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  tenantId      String
+  phone         String
+  name          String
+  avatarUrl     String?
+  wechatOpenid  String?
+  wecomUserid   String?
+  roleId        String
+  departmentId  String?
+  status        String    @default("active")
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  role          Role      @relation(fields: [roleId], references: [id])
+
+  refreshTokens            RefreshToken[]
+  conversations            Conversation[]
+  messages                 Message[]
+  auditLogs                AuditLog[]
+  notifications            Notification[]
+  assignedSessions         CustomerServiceSession[] @relation("AssignedUser")
+  aiJudgmentRecords        AiJudgmentRecord[]
+
+  @@unique([tenantId, phone])
+  @@index([tenantId])
+  @@map("users")
+}
+
+model Role {
+  id         String    @id @default(uuid())
+  tenantId   String
+  code       String
+  name       String
+  permissions Json
+  dataScope  String    @default("own")
+  isSystem   Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  users      User[]
+
+  @@unique([tenantId, code])
+  @@map("roles")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  tenantId   String
+  userId     String
+  tokenHash  String
+  deviceId   String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  user       User      @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// ──────────────────────────────────────────
+// AI & System Layer
+// ──────────────────────────────────────────
+
+model Conversation {
+  id              String    @id @default(uuid())
+  tenantId        String
+  userId          String
+  agentType       AgentType
+  title           String?
+  contextSummary  String?
+  tokenUsed       Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  user            User      @relation(fields: [userId], references: [id])
+  messages        Message[]
+
+  @@index([tenantId, userId, createdAt])
+  @@map("conversations")
+}
+
+model Message {
+  id              String      @id @default(uuid())
+  tenantId        String
+  conversationId  String
+  userId          String
+  role            MessageRole
+  content         String      @db.Text
+  toolCalls       Json?
+  toolResults     Json?
+  createdAt       DateTime    @default(now())
+
+  tenant          Tenant       @relation(fields: [tenantId], references: [id])
+  conversation    Conversation @relation(fields: [conversationId], references: [id])
+  user            User         @relation(fields: [userId], references: [id])
+
+  @@index([conversationId, createdAt])
+  @@index([tenantId, userId])
+  @@map("messages")
+}
+
+model AuditLog {
+  id            BigInt    @id @default(autoincrement())
+  tenantId      String
+  userId        String
+  action        String
+  resourceType  String
+  resourceId    String?
+  beforeData    Json?
+  afterData     Json?
+  ipAddress     String?
+  createdAt     DateTime  @default(now())
+
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  user          User      @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, userId, action])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  tenantId  String
+  userId    String
+  type      String
+  channel   String
+  title     String
+  content   String
+  isRead    Boolean  @default(false)
+  sentAt    DateTime @default(now())
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, userId, isRead])
+  @@map("notifications")
+}
+
+// ──────────────────────────────────────────
+// Customer Service MVP
+// ──────────────────────────────────────────
+
+model CustomerServiceSession {
+  id              String          @id @default(uuid())
+  tenantId        String
+  channelType     String
+  channelId       String
+  externalUserId  String
+  buyerName       String?
+  orderId         String?
+  category        String          @default("general")
+  status          CSSessionStatus @default(ai_handling)
+  assignedUserId  String?
+  aiSummary       String?
+  satisfaction    Int?
+  resolvedAt      DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id])
+  assignedUser    User?           @relation("AssignedUser", fields: [assignedUserId], references: [id])
+
+  messages        CustomerServiceMessage[]
+  tickets         CustomerServiceTicket[]
+  aiJudgmentRecords AiJudgmentRecord[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, channelType, externalUserId])
+  @@index([tenantId, createdAt])
+  @@map("customer_service_sessions")
+}
+
+model CustomerServiceMessage {
+  id        String          @id @default(uuid())
+  tenantId  String
+  sessionId String
+  sender    CSMessageSender
+  content   String          @db.Text
+  msgType   String          @default("text")
+  metadata  Json?
+  createdAt DateTime        @default(now())
+
+  tenant    Tenant                 @relation(fields: [tenantId], references: [id])
+  session   CustomerServiceSession @relation(fields: [sessionId], references: [id])
+
+  @@index([sessionId, createdAt])
+  @@index([tenantId, createdAt])
+  @@map("customer_service_messages")
+}
+
+model CustomerServiceTicket {
+  id             String         @id @default(uuid())
+  tenantId       String
+  sessionId      String
+  orderId        String?
+  afterSaleId    String?
+  type           CSTicketType
+  aiDecision     Json
+  humanDecision  Json?
+  status         CSTicketStatus @default(pending)
+  processedBy    String?
+  processedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id])
+  session        CustomerServiceSession @relation(fields: [sessionId], references: [id])
+
+  aiJudgmentRecords AiJudgmentRecord[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, sessionId])
+  @@map("customer_service_tickets")
+}
+
+// ──────────────────────────────────────────
+// AI Judgment Record (v2.3)
+// ──────────────────────────────────────────
+
+model AiJudgmentRecord {
+  id                String      @id @default(uuid())
+  tenantId          String
+  sessionId         String?
+  ticketId          String?
+  orderId           String?
+  userId            String
+  judgmentType       String
+  decision          AciDecision
+  reason            String      @db.Text
+  reasonForCustomer String?
+  riskLevel         RiskLevel
+  confidence        Float
+  triggeredRules    Json
+  context           Json
+  executionAllowed  Boolean     @default(false)
+  processingTimeMs  Int?
+  modelUsed         String?
+  createdAt         DateTime    @default(now())
+
+  tenant            Tenant                  @relation(fields: [tenantId], references: [id])
+  session           CustomerServiceSession? @relation(fields: [sessionId], references: [id])
+  ticket            CustomerServiceTicket?  @relation(fields: [ticketId], references: [id])
+  user              User                    @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, judgmentType, createdAt])
+  @@index([tenantId, decision])
+  @@index([tenantId, orderId])
+  @@map("ai_judgment_records")
+}
