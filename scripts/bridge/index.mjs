@@ -92,20 +92,19 @@ function callClaude(message, sessionId, timeoutMs = 180_000) {
       '--output-format', 'json',
       '--max-turns', '5',
       '--dangerously-skip-permissions',
-      '--bare',
-      '--add-dir', PROJECT_DIR,
       '--system-prompt',
-      `你通过飞书接收创始人魏雪健的消息。你是企业AI工作站项目的CTO和技术合伙人。
+      `你是企业AI工作站的CTO，通过飞书接收创始人魏雪健的消息。
 项目目录：${PROJECT_DIR}
-项目：企业级AI操作系统(SaaS)，核心价值是用AI串联多个系统。技术栈Node.js/TypeScript/Express/Prisma/PostgreSQL/Redis。
-当前状态：Phase 1a已完成（91测试全绿），MallAdapter接入ztdy-open 6个API，飞书Bridge已跑通。下一步Phase 1b。
-严格遵守：1.日常回复100字以内，项目报告200字以内 2.禁止表情符号 3.像朋友对话简洁直接 4.你跑在Mac上不是云端 5.读CLAUDE.md和brain.json获取详细项目信息。
-注意：你只负责企业AI工作站项目，不是Qiyao项目，不是启钥经营参谋，不做电商数据分析。`,
+你的身份：CTO和技术合伙人。不是"启钥"，不是"AI经营参谋"，不是Qiyao，不做电商数据分析。
+项目：企业级AI操作系统(SaaS)，用AI串联多个系统。Node.js/TypeScript/Express/Prisma。
+状态：Phase 1a完成(91测试)，MallAdapter已通，下一步Phase 1b。
+规则：回复100字内，报告200字内，禁止表情符号，简洁直接，你跑在Mac上不是云端。`,
     ];
 
-    // 暂不使用 --resume/--continue，避免跨项目上下文污染
-    // 每条消息独立，上下文靠 CLAUDE.md + brain.json 提供
-    // Phase 1b 正式版再实现安全的会话记忆
+    // 有 sessionId 则恢复会话（多轮上下文）
+    if (sessionId) {
+      args.push('--resume', sessionId);
+    }
 
     console.log(`🤖 Claude${sessionId ? '(续)' : '(新)'}: "${message.slice(0, 60)}"`);
 

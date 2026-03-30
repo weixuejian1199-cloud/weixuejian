@@ -480,7 +480,7 @@
     {
       "id": "US-P1b-006",
       "title": "双飞书对接：Claude Code + OpenClaw（替代 Taro 前端）",
-      "status": "pending",
+      "status": "in-progress",
       "assignee": "BE Agent",
       "story": "AS 老板 I WANT 在飞书直接跟两个大脑对话 SO THAT 不需要守电脑、随时随地开发迭代+管理业务",
       "ac": [
@@ -505,7 +505,7 @@
       "phase": "1b",
       "createdAt": "2026-03-30",
       "updatedAt": "2026-03-30",
-      "updateNote": "v2.3重排：从Wave 9提前到Wave 4（Phase 1b第一个任务）。飞书是验证所有后续功能的通道——AI对话、运营查询、ACI判断都通过飞书验证。blockedBy从P1b-003改为P1a-001（SPIKE-002已验证Bridge API可行性，不需要等AI对话引擎完成）。Claude Code飞书先行，OpenClaw飞书紧接"
+      "updateNote": "v2.5拆分为Phase A/B：Phase A(Wave 4, AC-01/02)=Bridge部署到ECS，已完成代码迁移scripts/bridge→packages/bridge(300行+配置/日志/部署)。Phase B(Wave 7.5, AC-03~07)=OpenClaw飞书接入AI对话引擎，依赖P1b-003。改进：按chatId隔离并发、pino结构化日志、session TTL 4h过期、限流10条/分、发送重试3次"
     },
     {
       "id": "US-P1b-007",

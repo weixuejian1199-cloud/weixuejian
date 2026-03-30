@@ -40,6 +40,23 @@ db-seed: ## 运行数据库 seed
 db-studio: ## 打开 Prisma Studio (数据库可视化)
 	pnpm --filter backend exec prisma studio
 
+# --- Bridge ---
+
+bridge-start: ## 启动飞书 Bridge (tmux)
+	./deploy/bridge/start.sh start
+
+bridge-stop: ## 停止飞书 Bridge
+	./deploy/bridge/start.sh stop
+
+bridge-restart: ## 重启飞书 Bridge
+	./deploy/bridge/start.sh restart
+
+bridge-status: ## 查看 Bridge 状态
+	./deploy/bridge/start.sh status
+
+bridge-logs: ## 查看 Bridge 日志
+	./deploy/bridge/start.sh logs
+
 # --- 日志与状态 ---
 
 logs: ## 查看所有容器日志
