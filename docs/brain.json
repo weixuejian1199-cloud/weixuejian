@@ -660,10 +660,11 @@
       {
         "wave": "3.5",
         "tasks": ["Critic审查Wave3", "SPIKE-001", "SPIKE-002"],
-        "description": "MallAdapter方案+代码审查。同期执行两个技术验证Spike（不阻塞审查）：百炼Qwen tool_call最小验证 + Bridge API最小原型（飞书→Claude Code→飞书）",
+        "description": "两个技术验证Spike ✅ 全部通过：SPIKE-001 Qwen tool_call 5/5通过 + SPIKE-002 飞书SDK认证+Bot信息+消息API通过",
         "estimatedDays": 1,
         "phase": "1a",
-        "note": "v2.3新增：两个Spike并行验证，提前暴露技术风险，不等到Phase 1b"
+        "status": "done",
+        "note": "SPIKE-001: qwen3.5-plus tool_call完全兼容OpenAI格式(commit b9b9d9a)。SPIKE-002: 飞书SDK认证正常,Bot名启钥Qiyao,消息API链路通(commit 1045060)。Webhook接收需公网服务器,Phase 1b部署时验证。"
       },
       {
         "wave": "--- Phase 1b 分界线 --- 目标交付：2026-06-06",

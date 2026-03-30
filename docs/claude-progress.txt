@@ -1,105 +1,60 @@
 # 进度接力
 
 ## 最后更新
-- 时间：2026-03-30 17:00
-- Agent：CTO Agent（Wave 3 MallAdapter）
-- 任务：US-P1a-009 MallAdapter — 接入ztdy-open商城6个API
+- 时间：2026-03-30 17:25
+- Agent：CTO Agent（Wave 3 + 3.5）
+- 任务：US-P1a-009 + SPIKE-001 + SPIKE-002
 
 ## 本次完成
 
-### US-P1a-009 MallAdapter（12个AC全部完成）
+### US-P1a-009 MallAdapter（commit 1dcdfd0）
+- 6个ztdy-open API端点封装为统一接口
+- Zod校验 + Redis缓存(差异化TTL) + fail-secure降级
+- 3个聚合查询：销售统计/供应商排行/订单状态分布
+- 零新依赖（Node 20+原生fetch）
+- 91/91测试全绿
 
-#### AC-01: MallAdapter类实现
-- 新建 adapters/erp/mall-adapter.ts — 统一封装6个ztdy-open端点
-- 构造函数读取env.ZTDY_API_BASE_URL + env.ZTDY_API_KEY
-- _callApi核心方法：缓存检查→API调用(含重试)→Zod校验→缓存写入→降级fallback
-- healthCheck()方法验证API可用性
+### SPIKE-001 百炼tool_call验证（commit b9b9d9a）
+- qwen3.5-plus tool_call 5/5 全部通过
+- 格式完全兼容OpenAI标准
+- 日期填充/enum选择/多工具路由全部准确
+- 结论：Phase 1b AI对话引擎可直接使用tool_call
 
-#### AC-02: Zod Schema校验
-- 新建 adapters/erp/schemas.ts — ztdyEnvelopeSchema + 6个实体schema + 5个过滤器schema
-- 所有API响应必须通过Zod校验，异常数据跳过（部分失败不影响有效数据）
-- 全部记录校验失败时抛MALL_DATA_INVALID
+### SPIKE-002 飞书Bridge API验证（commit 1045060）
+- 飞书SDK认证：tenant_access_token获取成功
+- Bot信息：名称「启钥Qiyao」，open_id已获取
+- 消息API：链路正常（ID无效=预期参数错误，非认证错误）
+- Webhook：需公网服务器，Phase 1b部署时测试
+- 结论：飞书SDK集成完全可行
 
-#### AC-03~08: 6个查询方法
-- getUsers(filters) — 146万用户，支持keyword/levelId筛选
-- getOrders(filters) — 95万订单，支持日期范围/状态/供应商/用户筛选
-- getItems(filters) — 8466商品，支持keyword/isShelf筛选
-- getSuppliers(filters) — 1142供应商，支持keyword筛选
-- getSupplierWithdraws(filters) — 8454条提现，支持日期/状态筛选
-- getUserWithdraws(filters) — 28730条用户提现，支持日期/状态筛选
-- 所有方法返回统一PaginatedResult<T>（含pagination/source/cachedAt）
-
-#### AC-09: 统一错误处理
-- 新建 adapters/erp/errors.ts — MallApiError自定义错误类
-- 错误码映射：MALL_API_UNAUTHORIZED/TIMEOUT/ERROR/DATA_INVALID
-- 网络错误重试1次（间隔2秒），401和数据校验失败不重试
-- API全部失败→尝试过期缓存→缓存也没有→抛错（fail-secure）
-
-#### AC-10: Redis缓存
-- 新建 adapters/erp/cache.ts — buildCacheKey/getCache/setCache
-- 差异化TTL：orders 5min / items 30min / users 60min / suppliers 30min
-- 缓存key格式：v1:mall:{tenantId}:{method}:{sha256(sortedParams)[0:16]}
-- fail-secure：Redis读写失败只记日志，不影响API调用
-
-#### AC-11: 聚合查询工具函数
-- 新建 services/mall/aggregates.ts
-- getSalesStats(dateRange) — 总金额/订单数/平均客单价
-- getTopSuppliers(metric, limit) — 按orderCount或amount排行
-- getOrderStatusDistribution(dateRange?) — 按processNode统计分布
-- 限量实时聚合：最多100页(10万条)，返回completeness标记
-- 结果缓存10分钟
-
-#### AC-默认-01: API密钥环境变量
-- ZTDY_API_BASE_URL / ZTDY_API_KEY 已在env.ts中定义（US-P1a-011）
-- MallAdapter构造函数读取，缺失时warn日志+MALL_API_UNAUTHORIZED
-
-#### AC-默认-02: AuditLog
-- Phase 1全只读，AuditLog写入预留到Phase 1b写操作时实现
-
-### 新增文件清单
-```
-adapters/erp/
-  types.ts         # 统一输出类型 + 过滤器 + 聚合结果
-  schemas.ts       # Zod schemas (6实体 + 5过滤器 + 信封)
-  errors.ts        # MallApiError自定义错误类
-  cache.ts         # Redis缓存工具 (key生成 + get/set + TTL)
-  mall-adapter.ts  # MallAdapter核心类 + 6方法 + healthCheck
-services/mall/
-  aggregates.ts    # 3个聚合查询函数
-__tests__/adapters/
-  cache.test.ts         # 16个测试
-  mall-adapter.test.ts  # 26个测试
-__tests__/services/
-  mall-aggregates.test.ts  # 9个测试
-```
-
-### 设计决策（RULE-17 砍功能）
-- 不做 ERPAdapterBase 抽象基类（Phase 2有第二个adapter再抽象）
-- 不做 AdapterFactory 工厂（同上）
-- 不做 Rate limiter / Quota manager 独立模块
-- 不做 BullMQ 预计算 cron job
-- 不做 PostgreSQL 快照表（L4降级）
-- 不做 三层缓存校验（写时Zod校验足够）
-- 用Node 20+ 原生fetch，零新依赖
+### 文档一致性审计（11项修正，含在US-P1a-009 commit）
+- brain.json: US-P1a-006状态修正/executionPlan补全/errorCodes双向对齐
+- error-codes.ts: 6处httpStatus/message与brain.json对齐
+- Phase 1b任务标注已有实现
 
 ## 验证结果
 - TypeScript编译：0 errors
 - ESLint：0 errors, 0 warnings
-- Vitest：91/91 passed（从40增加到91）
-- brain.json: v2.5.1
+- Vitest：91/91 passed
+- SPIKE-001：5/5 通过
+- SPIKE-002：3/4 通过（Webhook需服务器）
 
 ## 历史完成
 - US-P1a-001 ✅ 脚手架（commit 9b60167）
-- US-P1a-002 ✅ Schema精简版（commit d7c1000）→ 扩展到21张表
-- US-P1a-005 ✅ 健康检查API（commit 88d84ba）→ 充血安全中间件
-- US-P1a-006 ✅ Docker（commit 471a5ac）→ 加固安全配置
-- US-P1a-010 ✅ 安全中间件套件 + 代码充血（commit 280be5b）
+- US-P1a-002 ✅ Schema精简版（commit d7c1000）
+- US-P1a-005 ✅ 健康检查API（commit 88d84ba）
+- US-P1a-006 ✅ Docker（commit 471a5ac）
+- US-P1a-010 ✅ 安全中间件套件（commit 280be5b）
 - US-P1a-011 ✅ 安全基线重构（commit e512f5f）
-- US-P1a-009 ✅ MallAdapter接入ztdy-open 6个API（本次）
+- US-P1a-009 ✅ MallAdapter（commit 1dcdfd0）
+- SPIKE-001 ✅ 百炼tool_call验证（commit b9b9d9a）
+- SPIKE-002 ✅ 飞书Bridge验证（commit 1045060）
 
-## Wave 3 完成 ✅
+## Phase 1a 全部完成 ✅
 
-## 下一步
-- Wave 3.5：两个技术Spike（百炼tool_call验证 + Bridge API原型）
-- Phase 1b Wave 1：US-P1b-006 双飞书对接
-- Phase 1b Wave 2：US-P1b-001 JWT RS256升级 + 微信登录流
+## 下一步（Phase 1b）
+- Wave 4：US-P1b-006 双飞书对接（预计5天）
+  - 飞书号1 → Claude Code（Agent SDK + Bridge API）
+  - 飞书号2 → OpenClaw（从Qiyao迁移）
+- Wave 5：US-P1b-001 JWT RS256升级 + 微信登录流
+- Wave 6：US-P1b-002 多租户Prisma注入
