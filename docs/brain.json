@@ -505,7 +505,7 @@
       "phase": "1b",
       "createdAt": "2026-03-30",
       "updatedAt": "2026-03-30",
-      "updateNote": "v2.5拆分为Phase A/B：Phase A(Wave 4, AC-01/02)=Bridge部署到ECS，已完成代码迁移scripts/bridge→packages/bridge(300行+配置/日志/部署)。Phase B(Wave 7.5, AC-03~07)=OpenClaw飞书接入AI对话引擎，依赖P1b-003。改进：按chatId隔离并发、pino结构化日志、session TTL 4h过期、限流10条/分、发送重试3次"
+      "updateNote": "v2.5拆分为Phase A/B：Phase A(Wave 4, AC-01/02)=Bridge生产化完成。关键变更：ECS部署因Anthropic API中国IP封锁(403)改为Mac本地部署。代码迁移scripts/bridge→packages/bridge(300行+配置/日志/部署)。改进：按chatId隔离并发、pino结构化日志、session TTL 4h过期、限流10条/分、发送重试3次。Phase B(Wave 7.5, AC-03~07)=OpenClaw飞书接入AI对话引擎，依赖P1b-003"
     },
     {
       "id": "US-P1b-007",
