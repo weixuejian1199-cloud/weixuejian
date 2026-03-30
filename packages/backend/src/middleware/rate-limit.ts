@@ -17,6 +17,8 @@ export interface RateLimitOptions {
 /**
  * 基于 Redis 滑动窗口的速率限制中间件工厂
  *
+ * fail-secure 原则：Redis 不可用时拒绝请求，不降级放行。
+ *
  * 使用 Redis Sorted Set 实现滑动窗口：
  * - 每个请求记录时间戳作为 score
  * - 移除窗口外的旧记录
@@ -53,13 +55,23 @@ export function createRateLimit(options: RateLimitOptions) {
       pipeline.pexpire(key, windowMs * 2);
 
       const results = await pipeline.exec();
-      if (!results) {
-        // Redis pipeline 返回 null，降级放行
-        next();
+
+      // fail-secure：pipeline 结果无效时拒绝请求
+      if (!results || results.length < 4) {
+        log.error('Rate limit pipeline returned invalid results, rejecting request');
+        sendError(res, 'SERVICE_UNAVAILABLE', '限流服务暂不可用', 503);
         return;
       }
 
-      const count = results[2]?.[1] as number;
+      // 验证 zcard 结果的类型安全
+      const zcardResult = results[2];
+      if (!zcardResult || zcardResult[0] !== null || typeof zcardResult[1] !== 'number') {
+        log.error({ zcardResult }, 'Rate limit zcard result type error, rejecting request');
+        sendError(res, 'SERVICE_UNAVAILABLE', '限流服务暂不可用', 503);
+        return;
+      }
+
+      const count = zcardResult[1];
       const remaining = Math.max(0, max - count);
       const resetTime = Math.ceil((now + windowMs) / 1000);
 
@@ -76,9 +88,9 @@ export function createRateLimit(options: RateLimitOptions) {
 
       next();
     } catch (err) {
-      // Redis 不可用时降级放行（可用性优先）
-      log.warn({ err }, 'Rate limit check failed, allowing request');
-      next();
+      // fail-secure：Redis 不可用时拒绝请求
+      log.error({ err }, 'Rate limit check failed, rejecting request (fail-secure)');
+      sendError(res, 'SERVICE_UNAVAILABLE', '限流服务暂不可用', 503);
     }
   };
 }

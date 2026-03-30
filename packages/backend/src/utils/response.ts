@@ -1,4 +1,5 @@
 import type { Response } from 'express';
+import type { ErrorCode } from '../lib/error-codes.js';
 
 /** 统一成功响应结构 */
 interface SuccessResponse<T> {
@@ -30,7 +31,7 @@ export function sendSuccess<T>(
   meta?: Record<string, unknown>,
   httpStatus = 200,
 ): void {
-  const requestId = (res.req as { requestId?: string }).requestId ?? 'unknown';
+  const requestId = res.req.requestId ?? 'unknown';
   const body: SuccessResponse<T> = {
     success: true,
     data,
@@ -44,15 +45,17 @@ export function sendSuccess<T>(
 
 /**
  * 发送错误响应
+ *
+ * code 参数使用 ErrorCode 类型，编译时校验错误码合法性。
  */
 export function sendError(
   res: Response,
-  code: string,
+  code: ErrorCode,
   message: string,
   httpStatus = 500,
   details?: unknown,
 ): void {
-  const requestId = (res.req as { requestId?: string }).requestId ?? 'unknown';
+  const requestId = res.req.requestId ?? 'unknown';
   const body: ErrorResponse = {
     success: false,
     error: { code, message },

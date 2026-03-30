@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import type { Response } from 'express';
 import { sendSuccess, sendError } from '../../utils/response.js';
 
 function createMockRes(requestId = 'test-req-id') {
@@ -7,7 +8,7 @@ function createMockRes(requestId = 'test-req-id') {
   const res = {
     status,
     req: { requestId },
-  } as unknown as import('express').Response;
+  } as unknown as Response;
   return { res, status, json };
 }
 
@@ -49,7 +50,7 @@ describe('sendSuccess', () => {
     const res = {
       status,
       req: {},
-    } as unknown as import('express').Response;
+    } as unknown as Response;
 
     sendSuccess(res, {});
     expect(json).toHaveBeenCalledWith(
@@ -61,12 +62,12 @@ describe('sendSuccess', () => {
 describe('sendError', () => {
   it('应该返回正确的错误响应格式', () => {
     const { res, status, json } = createMockRes();
-    sendError(res, 'NOT_FOUND', '资源不存在', 404);
+    sendError(res, 'RESOURCE_NOT_FOUND', '资源不存在', 404);
 
     expect(status).toHaveBeenCalledWith(404);
     expect(json).toHaveBeenCalledWith({
       success: false,
-      error: { code: 'NOT_FOUND', message: '资源不存在' },
+      error: { code: 'RESOURCE_NOT_FOUND', message: '资源不存在' },
       requestId: 'test-req-id',
     });
   });
@@ -96,7 +97,7 @@ describe('sendError', () => {
 
   it('应该正确处理401未授权', () => {
     const { res, status } = createMockRes();
-    sendError(res, 'AUTH_INVALID', '未授权', 401);
+    sendError(res, 'AUTH_INVALID_TOKEN', '未授权', 401);
 
     expect(status).toHaveBeenCalledWith(401);
   });

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Request, Response } from 'express';
 
-// Use vi.hoisted to create mocks that can be referenced in vi.mock factories
 const { mockRedisExists, mockVerify } = vi.hoisted(() => ({
   mockRedisExists: vi.fn(),
   mockVerify: vi.fn(),
@@ -46,8 +45,7 @@ vi.mock('../../utils/logger.js', () => ({
   }),
 }));
 
-// Import after mocks
-import { requireAuth } from '../../middleware/auth.js';
+import { requireAuth, optionalAuth } from '../../middleware/auth.js';
 import jwt from 'jsonwebtoken';
 
 function createMockContext(authHeader?: string, requestId = 'test-req-id') {
@@ -81,121 +79,147 @@ describe('requireAuth', () => {
 
   it('有效token应该注入req.user并调用next', async () => {
     mockVerify.mockReturnValue(validPayload);
-    mockRedisExists.mockResolvedValue(0); // not blacklisted
+    mockRedisExists.mockResolvedValue(0);
 
     const { req, res, next } = createMockContext('Bearer valid-token');
-    requireAuth(req, res, next);
+    await requireAuth(req, res, next);
 
-    await vi.waitFor(() => {
-      expect(next).toHaveBeenCalledTimes(1);
-    });
-
-    expect((req as unknown as Record<string, unknown>)['user']).toEqual({
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(req.user).toEqual({
       userId: 'user-1',
       tenantId: 'tenant-1',
       role: 'admin',
     });
   });
 
-  it('无Authorization header应该返回401', () => {
+  it('无Authorization header应该返回401', async () => {
     const { req, res, next, status, json } = createMockContext();
-    requireAuth(req, res, next);
+    await requireAuth(req, res, next);
 
     expect(status).toHaveBeenCalledWith(401);
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,
-        error: expect.objectContaining({
-          code: 'AUTH_INVALID_TOKEN',
-        }),
+        error: expect.objectContaining({ code: 'AUTH_INVALID_TOKEN' }),
       }),
     );
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('非Bearer格式应该返回401', () => {
+  it('非Bearer格式应该返回401', async () => {
     const { req, res, next, status } = createMockContext('Basic abc123');
-    requireAuth(req, res, next);
+    await requireAuth(req, res, next);
 
     expect(status).toHaveBeenCalledWith(401);
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('无效token应该返回401', () => {
+  it('无效token应该返回401', async () => {
     mockVerify.mockImplementation(() => {
       throw new Error('invalid signature');
     });
 
     const { req, res, next, status, json } = createMockContext('Bearer invalid-token');
-    requireAuth(req, res, next);
+    await requireAuth(req, res, next);
 
     expect(status).toHaveBeenCalledWith(401);
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,
-        error: expect.objectContaining({
-          code: 'AUTH_INVALID_TOKEN',
-        }),
+        error: expect.objectContaining({ code: 'AUTH_INVALID_TOKEN' }),
       }),
     );
   });
 
-  it('过期token应该返回401并使用特定错误码', () => {
+  it('过期token应该返回401并使用特定错误码', async () => {
     mockVerify.mockImplementation(() => {
       throw new jwt.TokenExpiredError('jwt expired', new Date());
     });
 
     const { req, res, next, status, json } = createMockContext('Bearer expired-token');
-    requireAuth(req, res, next);
+    await requireAuth(req, res, next);
 
     expect(status).toHaveBeenCalledWith(401);
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,
-        error: expect.objectContaining({
-          code: 'AUTH_TOKEN_EXPIRED',
-        }),
+        error: expect.objectContaining({ code: 'AUTH_TOKEN_EXPIRED' }),
       }),
     );
   });
 
   it('黑名单token应该返回401', async () => {
     mockVerify.mockReturnValue(validPayload);
-    mockRedisExists.mockResolvedValue(1); // blacklisted
+    mockRedisExists.mockResolvedValue(1);
 
     const { req, res, next, status, json } = createMockContext('Bearer blacklisted-token');
-    requireAuth(req, res, next);
+    await requireAuth(req, res, next);
 
-    await vi.waitFor(() => {
-      expect(status).toHaveBeenCalledWith(401);
-    });
-
+    expect(status).toHaveBeenCalledWith(401);
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,
-        error: expect.objectContaining({
-          code: 'AUTH_TOKEN_BLACKLISTED',
-        }),
+        error: expect.objectContaining({ code: 'AUTH_TOKEN_BLACKLISTED' }),
       }),
     );
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('Redis不可用时应该降级放行', async () => {
+  it('Redis不可用时应该返回503（fail-secure）', async () => {
     mockVerify.mockReturnValue(validPayload);
     mockRedisExists.mockRejectedValue(new Error('Redis down'));
 
+    const { req, res, next, status, json } = createMockContext('Bearer valid-token');
+    await requireAuth(req, res, next);
+
+    expect(status).toHaveBeenCalledWith(503);
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ code: 'SERVICE_UNAVAILABLE' }),
+      }),
+    );
+    expect(next).not.toHaveBeenCalled();
+  });
+});
+
+describe('optionalAuth', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('无token时应该直接放行', async () => {
+    const { req, res, next } = createMockContext();
+    await optionalAuth(req, res, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(req.user).toBeUndefined();
+  });
+
+  it('有有效token时应该注入req.user', async () => {
+    mockVerify.mockReturnValue(validPayload);
+    mockRedisExists.mockResolvedValue(0);
+
     const { req, res, next } = createMockContext('Bearer valid-token');
-    requireAuth(req, res, next);
+    await optionalAuth(req, res, next);
 
-    await vi.waitFor(() => {
-      expect(next).toHaveBeenCalledTimes(1);
-    });
-
-    expect((req as unknown as Record<string, unknown>)['user']).toEqual({
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(req.user).toEqual({
       userId: 'user-1',
       tenantId: 'tenant-1',
       role: 'admin',
     });
+  });
+
+  it('有无效token时应该返回401', async () => {
+    mockVerify.mockImplementation(() => {
+      throw new Error('invalid');
+    });
+
+    const { req, res, next, status } = createMockContext('Bearer bad-token');
+    await optionalAuth(req, res, next);
+
+    expect(status).toHaveBeenCalledWith(401);
+    expect(next).not.toHaveBeenCalled();
   });
 });

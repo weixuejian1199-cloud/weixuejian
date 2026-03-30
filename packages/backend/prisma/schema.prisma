@@ -36,11 +36,14 @@ enum MessageRole {
 }
 
 enum CSSessionStatus {
-  ai_handling
-  human_queue
-  human_handling
-  resolved
-  closed
+  ai_handling          // AI 初步对话处理
+  ai_judging           // AI 退货判断中
+  pending_human_review // 人工待确认 AI 建议
+  escalated            // 已升级（高优先级人工处理）
+  human_queue          // 等待人工客服接单
+  human_handling       // 人工处理中
+  resolved             // 已解决
+  closed               // 已关闭
 }
 
 enum CSMessageSender {
@@ -58,11 +61,13 @@ enum CSTicketType {
 }
 
 enum CSTicketStatus {
-  pending
-  approved
-  rejected
-  processing
-  completed
+  pending                    // 待处理
+  ai_judging                 // AI 判断中
+  awaiting_human_confirmation // 等待人工确认 AI 判断
+  approved                   // 已批准
+  rejected                   // 已拒绝
+  processing                 // 执行中
+  completed                  // 已完成
 }
 
 enum AciDecision {
@@ -326,27 +331,32 @@ model CustomerServiceMessage {
 }
 
 model CustomerServiceTicket {
-  id            String         @id @default(uuid())
-  tenantId      String
-  sessionId     String
-  orderId       String?
-  afterSaleId   String?
-  type          CSTicketType
-  aiDecision    Json
-  humanDecision Json?
-  status        CSTicketStatus @default(pending)
-  processedBy   String?
-  processedAt   DateTime?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id              String         @id @default(uuid())
+  tenantId        String
+  sessionId       String
+  orderId         String?
+  afterSaleId     String?
+  aiJudgmentId    String?
+  type            CSTicketType
+  aiDecision      Json
+  humanDecision   Json?
+  humanReviewedAt DateTime?
+  humanComments   String?        @db.Text
+  status          CSTicketStatus @default(pending)
+  processedBy     String?
+  processedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
-  tenant  Tenant                 @relation(fields: [tenantId], references: [id])
-  session CustomerServiceSession @relation(fields: [sessionId], references: [id])
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id])
+  session     CustomerServiceSession @relation(fields: [sessionId], references: [id])
+  aiJudgment  AiJudgmentRecord?      @relation("TicketJudgment", fields: [aiJudgmentId], references: [id])
 
-  aiJudgmentRecords AiJudgmentRecord[]
+  aiJudgmentRecords AiJudgmentRecord[] @relation("TicketJudgmentHistory")
 
   @@index([tenantId, status])
   @@index([tenantId, sessionId])
+  @@index([tenantId, aiJudgmentId])
   @@map("customer_service_tickets")
 }
 
@@ -370,21 +380,26 @@ model AiJudgmentRecord {
   triggeredRules    Json
   context           Json
   executionAllowed  Boolean     @default(false)
+  disclaimer        String?     @db.Text
   processingTimeMs  Int?
   modelUsed         String?
   createdAt         DateTime    @default(now())
 
   tenant  Tenant                  @relation(fields: [tenantId], references: [id])
   session CustomerServiceSession? @relation(fields: [sessionId], references: [id])
-  ticket  CustomerServiceTicket?  @relation(fields: [ticketId], references: [id])
+  ticket  CustomerServiceTicket?  @relation("TicketJudgmentHistory", fields: [ticketId], references: [id])
   user    User                    @relation(fields: [userId], references: [id])
 
-  afterSales AfterSale[]
+  primaryTicket CustomerServiceTicket[] @relation("TicketJudgment")
+  afterSales    AfterSale[]
 
   @@index([tenantId, createdAt])
   @@index([tenantId, judgmentType, createdAt])
   @@index([tenantId, decision])
   @@index([tenantId, orderId])
+  @@index([tenantId, sessionId])
+  @@index([tenantId, riskLevel, createdAt])
+  @@index([tenantId, confidence, createdAt])
   @@map("ai_judgment_records")
 }
 

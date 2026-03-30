@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import type { Request, Response } from 'express';
 import { requestIdMiddleware } from '../../middleware/request-id.js';
 
 // Mock uuid
@@ -16,8 +17,8 @@ function createMockReqRes() {
   };
   const next = vi.fn();
   return {
-    req: req as unknown as import('express').Request,
-    res: res as unknown as import('express').Response,
+    req: req as unknown as Request,
+    res: res as unknown as Response,
     next,
     headers,
   };

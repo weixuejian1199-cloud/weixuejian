@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import type { Request, Response } from 'express';
 import { ZodError, ZodIssueCode } from 'zod';
 import { globalErrorHandler, notFoundHandler } from '../../middleware/error-handler.js';
 
@@ -19,11 +20,11 @@ function createMockContext(requestId = 'test-req-id') {
     requestId,
     method: 'GET',
     path: '/test',
-  } as unknown as import('express').Request;
+  } as unknown as Request;
   const res = {
     status,
     req,
-  } as unknown as import('express').Response;
+  } as unknown as Response;
   const next = vi.fn();
   return { req, res, next, status, json };
 }

@@ -9,10 +9,11 @@ import { resolve, dirname } from 'node:path';
 
 const isProduction = process.env['NODE_ENV'] === 'production';
 
+/** 健康检查单项超时（毫秒） */
+const HEALTH_CHECK_TIMEOUT_MS = 2000;
+
 function loadPackageVersion(): string {
   try {
-    // Node16 module 下 __dirname 可用（CJS 输出）
-    // 如果未来切换到 ESM，改用 fileURLToPath(import.meta.url)
     const pkgPath = resolve(dirname(__filename), '../../package.json');
     const content = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string };
     return content.version;
@@ -34,6 +35,18 @@ interface ComponentStatus {
   error?: string;
 }
 
+/**
+ * 带超时的 Promise — 防止外部依赖无响应导致健康检查挂起
+ */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} health check timeout (${timeoutMs}ms)`)), timeoutMs),
+    ),
+  ]);
+}
+
 async function checkComponents(requestId: string): Promise<{
   components: Record<string, ComponentStatus>;
   allHealthy: boolean;
@@ -41,10 +54,10 @@ async function checkComponents(requestId: string): Promise<{
   const log = childLogger(requestId);
   const components: Record<string, ComponentStatus> = {};
 
-  // PostgreSQL 检查
+  // PostgreSQL 检查（带超时）
   const pgStart = Date.now();
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    await withTimeout(prisma.$queryRaw`SELECT 1`, HEALTH_CHECK_TIMEOUT_MS, 'PostgreSQL');
     components['postgresql'] = { status: 'ok', latencyMs: Date.now() - pgStart };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
@@ -52,10 +65,10 @@ async function checkComponents(requestId: string): Promise<{
     components['postgresql'] = { status: 'error', latencyMs: Date.now() - pgStart, error: message };
   }
 
-  // Redis 检查
+  // Redis 检查（带超时）
   const redisStart = Date.now();
   try {
-    await redis.ping();
+    await withTimeout(redis.ping(), HEALTH_CHECK_TIMEOUT_MS, 'Redis');
     components['redis'] = { status: 'ok', latencyMs: Date.now() - redisStart };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

@@ -569,7 +569,7 @@
     {
       "id": "US-P1a-010",
       "title": "安全中间件套件 + 代码充血",
-      "status": "in_progress",
+      "status": "done",
       "assignee": "BE Agent + DevOps Agent",
       "story": "AS 安全工程师 I WANT 完整的安全中间件套件 SO THAT 系统在Phase 1就具备企业级安全防护",
       "ac": [
@@ -588,6 +588,32 @@
       "wave": "2.5",
       "phase": "1a",
       "createdAt": "2026-03-30"
+    },
+    {
+      "id": "US-P1a-011",
+      "title": "安全基线重构（fail-secure + 类型安全 + Schema对齐）",
+      "status": "done",
+      "assignee": "CTO Agent",
+      "story": "AS CTO I WANT 项目初期安全基线达到10分标准 SO THAT Wave 3及后续开发在干净可靠的基础上进行",
+      "ac": [
+        "AC-01: 安全降级策略重构 — auth/rate-limit/tenant全部改为fail-secure（Redis不可用=拒绝请求）",
+        "AC-02: 中间件架构重构 — protectedRouter分层/路径精确匹配/优雅关闭补Prisma/健康检查超时保护",
+        "AC-03: 类型安全加固 — 错误码注册表(ErrorCode类型编译时校验)/ESLint 0 errors/消除类型强转",
+        "AC-04: 环境变量验证体系重建 — env.ts完整覆盖.env.example全部变量/按Phase分组",
+        "AC-05: Schema与brain.json对齐 — AiJudgmentRecord补disclaimer/CSTicket补aiJudgmentId外键/枚举补中间状态/补关键索引",
+        "AC-06: 文档同步更新 — brain.json/CLAUDE.md/progress.txt"
+      ],
+      "scope": {
+        "include": "安全降级策略重构、中间件架构重组、错误码注册表、env验证覆盖、Schema字段补齐、文档同步",
+        "exclude": "不做CSRF(Phase 1无前端)、不做Redis TLS(部署US)、不做CI/CD、不新增Phase 2预留表"
+      },
+      "priority": "P0",
+      "blockedBy": ["US-P1a-010"],
+      "blocks": ["US-P1a-009"],
+      "wave": "2.5b",
+      "phase": "1a",
+      "createdAt": "2026-03-30",
+      "updateNote": "项目初期不接受补丁，必须重构。CTO全面体检发现6个P0安全问题+8个P1问题，通过重构（非补丁）一次性解决。核心原则：fail-secure（外部依赖不可用=拒绝请求，不是放行）。HS256为Phase 1临时决策，Phase 1b(US-P1b-001)升级RS256。"
     }
   ],
 

@@ -1,24 +1,32 @@
 import type { Request, Response, NextFunction } from 'express';
 import { sendError } from '../utils/response.js';
-
-const DEFAULT_TENANT_ID = 'default';
+import { childLogger } from '../utils/logger.js';
 
 /**
  * 租户隔离中间件 — 从 req.user.tenantId 提取租户 ID 并注入 req.tenantId
- * 必须在 requireAuth 之后使用
- * Phase 1 简化：如果 tenantId 为空，使用默认租户 'default'
+ *
+ * fail-secure 原则：tenantId 缺失时拒绝请求，不使用默认值。
+ * 必须在 requireAuth 之后使用。
  */
 export function requireTenant(
   req: Request,
   res: Response,
   next: NextFunction,
 ): void {
+  const log = childLogger(req.requestId ?? 'unknown');
+
   if (!req.user) {
     sendError(res, 'AUTH_INVALID_TOKEN', '无效的访问令牌', 401);
     return;
   }
 
-  req.tenantId = req.user.tenantId || DEFAULT_TENANT_ID;
+  if (!req.user.tenantId) {
+    log.error({ userId: req.user.userId }, 'JWT payload missing tenantId, rejecting request');
+    sendError(res, 'TENANT_NOT_FOUND', '租户信息缺失', 403);
+    return;
+  }
+
+  req.tenantId = req.user.tenantId;
   next();
 }
 

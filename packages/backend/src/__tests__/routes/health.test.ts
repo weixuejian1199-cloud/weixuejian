@@ -35,9 +35,9 @@ vi.mock('node:fs', () => ({
 
 // Import after mocks
 import { basicHealthRouter, detailHealthRouter } from '../../routes/health.js';
-import express from 'express';
+import express, { type Router } from 'express';
 
-function createTestApp(router: import('express').Router, path = '/') {
+function createTestApp(router: Router, path = '/') {
   const app = express();
   app.use((req: Request, _res: Response, next: NextFunction) => {
     req.requestId = 'test-req-id';

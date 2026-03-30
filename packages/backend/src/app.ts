@@ -7,6 +7,7 @@ import helmet from 'helmet';
 
 import { logger } from './utils/logger.js';
 import { redis, connectRedis } from './lib/redis.js';
+import { prisma } from './lib/prisma.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { requireAuth } from './middleware/auth.js';
@@ -33,7 +34,7 @@ app.use(
       },
     },
     hsts: {
-      maxAge: 31536000, // 1 年
+      maxAge: 31536000,
       includeSubDomains: true,
       preload: true,
     },
@@ -47,7 +48,6 @@ const allowedOrigins = env.CORS_ORIGINS.split(',').map((o) => o.trim());
 app.use(
   cors({
     origin(origin, callback) {
-      // 允许无 origin 的请求（如服务端调用、curl）
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
@@ -57,7 +57,7 @@ app.use(
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
-    maxAge: 86400, // 预检缓存 24 小时
+    maxAge: 86400,
   }),
 );
 
@@ -65,51 +65,42 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ─── 请求 ID + 日志 ──────────────────────────────────────
+// ─── 请求 ID + 日志（全局） ──────────────────────────────
 app.use(requestIdMiddleware);
 app.use(requestLogger);
 
-// ─── 健康检查（不需要认证和限流） ─────────────────────────
+// ─── 公开路由（不需要认证和限流） ─────────────────────────
 app.use('/health', basicHealthRouter);
 app.use('/api/v1/health', detailHealthRouter);
 
-// ─── 全局速率限制 ─────────────────────────────────────────
+// ─── 全局速率限制（认证路由之前） ─────────────────────────
 app.use(
   '/api/',
   createRateLimit({
-    windowMs: 60 * 1000, // 1 分钟
+    windowMs: 60 * 1000,
     max: 100,
     keyGenerator: (req) => `global:${req.ip}`,
   }),
 );
 
-// ─── 认证路由（不需要 JWT） ──────────────────────────────
+// ─── 公开 API 路由（登录/注册等，不需要 JWT） ────────────
+// 使用独立 Router 隔离，不经过 requireAuth
 // app.use('/api/v1/auth', authRouter);
 
-// ─── JWT 认证中间件（/api/v1/* 除 auth 外都需要） ────────
-app.use('/api/v1', (req, res, next) => {
-  // 跳过 auth 路由和健康检查
-  if (req.path.startsWith('/auth') || req.path.startsWith('/health')) {
-    next();
-    return;
-  }
-  requireAuth(req, res, next);
-});
+// ─── 需认证的 API 路由 ───────────────────────────────────
+// 使用独立 Router，统一挂载 requireAuth + requireTenant
+const protectedRouter = express.Router();
+protectedRouter.use(requireAuth);
+protectedRouter.use(requireTenant);
 
-// ─── 租户隔离中间件 ──────────────────────────────────────
-app.use('/api/v1', (req, res, next) => {
-  // 跳过 auth 路由和健康检查
-  if (req.path.startsWith('/auth') || req.path.startsWith('/health')) {
-    next();
-    return;
-  }
-  requireTenant(req, res, next);
-});
+// 业务路由挂载点（后续 US 实现后启用）
+// protectedRouter.use('/employee', employeeRouter);
+// protectedRouter.use('/buyer', buyerRouter);
+// protectedRouter.use('/admin', adminRouter);
 
-// ─── 业务路由挂载点（后续 US 实现后启用） ─────────────────
-// app.use('/api/v1/employee', employeeRouter);
-// app.use('/api/v1/buyer', buyerRouter);
-// app.use('/api/v1/admin', adminRouter);
+app.use('/api/v1', protectedRouter);
+
+// ─── Webhook 路由（使用签名验证，不走 JWT） ──────────────
 // app.use('/webhook', webhookRouter);
 
 // ─── 404 兜底 + 全局错误处理（必须在所有路由之后） ────────
@@ -118,7 +109,6 @@ app.use(globalErrorHandler);
 
 // ─── 启动服务 ─────────────────────────────────────────────
 async function start(): Promise<void> {
-  // 显式连接 Redis
   try {
     await connectRedis();
   } catch (err) {
@@ -136,18 +126,29 @@ async function start(): Promise<void> {
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, 'Shutdown signal received');
 
+    // 1. 停止接收新连接
     server.close(() => {
       logger.info('HTTP server closed');
     });
 
-    try {
-      await redis.quit();
-      logger.info('Redis connection closed');
-    } catch {
-      // Redis 关闭失败不阻塞退出
+    // 2. 关闭所有依赖（并行，互不阻塞）
+    const results = await Promise.allSettled([
+      redis.quit().catch((err: unknown) => {
+        logger.error({ err }, 'Redis shutdown error');
+      }),
+      prisma.$disconnect().catch((err: unknown) => {
+        logger.error({ err }, 'Prisma shutdown error');
+      }),
+    ]);
+
+    const failed = results.filter((r) => r.status === 'rejected');
+    if (failed.length > 0) {
+      logger.warn({ failedCount: failed.length }, 'Some dependencies failed to shutdown');
+    } else {
+      logger.info('All dependencies shutdown complete');
     }
 
-    // 给进行中的请求 10 秒完成
+    // 3. 强制退出兜底（防僵尸进程）
     setTimeout(() => {
       logger.warn('Forcing shutdown after timeout');
       process.exit(1);
