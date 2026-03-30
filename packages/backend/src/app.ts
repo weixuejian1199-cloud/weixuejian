@@ -12,9 +12,11 @@ import { requestIdMiddleware } from './middleware/request-id.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { requireAuth } from './middleware/auth.js';
 import { requireTenant } from './middleware/tenant.js';
-import { createRateLimit } from './middleware/rate-limit.js';
+import { createRateLimit, createTenantRateLimit, createUserRateLimit, createAiRateLimit } from './middleware/rate-limit.js';
 import { notFoundHandler, globalErrorHandler } from './middleware/error-handler.js';
 import { basicHealthRouter, detailHealthRouter } from './routes/health.js';
+import { authRouter } from './routes/auth/index.js';
+import { aiRouter } from './routes/ai/index.js';
 
 const app = express();
 
@@ -85,13 +87,23 @@ app.use(
 
 // ─── 公开 API 路由（登录/注册等，不需要 JWT） ────────────
 // 使用独立 Router 隔离，不经过 requireAuth
-// app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/auth', authRouter);
 
 // ─── 需认证的 API 路由 ───────────────────────────────────
 // 使用独立 Router，统一挂载 requireAuth + requireTenant
 const protectedRouter = express.Router();
 protectedRouter.use(requireAuth);
 protectedRouter.use(requireTenant);
+
+// ─── 租户级 + 用户级限流（认证后才有 tenantId/userId） ────
+protectedRouter.use(createTenantRateLimit());
+protectedRouter.use(createUserRateLimit());
+
+// ─── AI 接口专项限流（10 req/min，用户级） ───────────────
+protectedRouter.use('/ai', createAiRateLimit());
+
+// ─── AI 对话引擎 ─────────────────────────────────────────
+protectedRouter.use('/ai', aiRouter);
 
 // 业务路由挂载点（后续 US 实现后启用）
 // protectedRouter.use('/employee', employeeRouter);

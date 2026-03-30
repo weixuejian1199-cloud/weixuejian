@@ -94,3 +94,73 @@ export function createRateLimit(options: RateLimitOptions) {
     }
   };
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 多维度限流预设（US-P1b-007）
+// ═══════════════════════════════════════════════════════════════
+
+/** 环境变量驱动的限流配置，带合理默认值 */
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/**
+ * 租户级限流：同一租户所有用户共享配额
+ * 默认 100 req/min，环境变量 RATE_LIMIT_TENANT_MAX 可调
+ */
+export function createTenantRateLimit() {
+  const max = envInt('RATE_LIMIT_TENANT_MAX', 100);
+  const windowMs = envInt('RATE_LIMIT_TENANT_WINDOW_MS', 60_000);
+
+  return createRateLimit({
+    windowMs,
+    max,
+    keyGenerator: (req: Request) => {
+      const tenantId = (req as unknown as Record<string, unknown>)['tenantId'];
+      // 没有 tenantId 时用 IP 兜底（未认证路由不会挂此中间件）
+      return `tenant:${tenantId ?? req.ip}`;
+    },
+    message: '租户请求配额已用尽，请稍后再试',
+  });
+}
+
+/**
+ * 用户级限流：单个用户独立配额
+ * 默认 30 req/min，环境变量 RATE_LIMIT_USER_MAX 可调
+ */
+export function createUserRateLimit() {
+  const max = envInt('RATE_LIMIT_USER_MAX', 30);
+  const windowMs = envInt('RATE_LIMIT_USER_WINDOW_MS', 60_000);
+
+  return createRateLimit({
+    windowMs,
+    max,
+    keyGenerator: (req: Request) => {
+      const userId = (req as unknown as Record<string, unknown>)['userId'];
+      return `user:${userId ?? req.ip}`;
+    },
+    message: '请求过于频繁，请稍后再试',
+  });
+}
+
+/**
+ * AI接口专项限流：/api/v1/ai/* 路径，用户级
+ * 默认 10 req/min，环境变量 RATE_LIMIT_AI_MAX 可调
+ */
+export function createAiRateLimit() {
+  const max = envInt('RATE_LIMIT_AI_MAX', 10);
+  const windowMs = envInt('RATE_LIMIT_AI_WINDOW_MS', 60_000);
+
+  return createRateLimit({
+    windowMs,
+    max,
+    keyGenerator: (req: Request) => {
+      const userId = (req as unknown as Record<string, unknown>)['userId'];
+      return `ai:${userId ?? req.ip}`;
+    },
+    message: 'AI调用频率限制，请稍后再试',
+  });
+}
