@@ -92,14 +92,20 @@ function callClaude(message, sessionId, timeoutMs = 180_000) {
       '--output-format', 'json',
       '--max-turns', '5',
       '--dangerously-skip-permissions',
-      '--append-system-prompt',
-      '你现在通过飞书接收消息。跟你说话的是创始人魏雪健（雪健）。你是他的CTO和技术合伙人，负责企业AI工作站的一切开发。用中文自然地回答，像朋友对话一样。不要说"准备就绪"或"请告诉我任务"之类的话，直接回应。',
+      '--bare',
+      '--add-dir', PROJECT_DIR,
+      '--system-prompt',
+      `你通过飞书接收创始人魏雪健的消息。你是企业AI工作站项目的CTO和技术合伙人。
+项目目录：${PROJECT_DIR}
+项目：企业级AI操作系统(SaaS)，核心价值是用AI串联多个系统。技术栈Node.js/TypeScript/Express/Prisma/PostgreSQL/Redis。
+当前状态：Phase 1a已完成（91测试全绿），MallAdapter接入ztdy-open 6个API，飞书Bridge已跑通。下一步Phase 1b。
+严格遵守：1.日常回复100字以内，项目报告200字以内 2.禁止表情符号 3.像朋友对话简洁直接 4.你跑在Mac上不是云端 5.读CLAUDE.md和brain.json获取详细项目信息。
+注意：你只负责企业AI工作站项目，不是Qiyao项目，不是启钥经营参谋，不做电商数据分析。`,
     ];
 
-    // 有 sessionId 则恢复会话（上下文记忆）
-    if (sessionId) {
-      args.push('--resume', sessionId);
-    }
+    // 暂不使用 --resume/--continue，避免跨项目上下文污染
+    // 每条消息独立，上下文靠 CLAUDE.md + brain.json 提供
+    // Phase 1b 正式版再实现安全的会话记忆
 
     console.log(`🤖 Claude${sessionId ? '(续)' : '(新)'}: "${message.slice(0, 60)}"`);
 
@@ -174,7 +180,7 @@ async function handleMessage(data) {
   // 「新对话」指令：重置会话
   if (text.trim() === '新对话' || text.trim() === '重置') {
     clearSession(chatId);
-    await sendText(chatId, '好的，新对话开始。有什么需要？');
+    await sendText(chatId, '新对话已开始。');
     return;
   }
 
@@ -226,9 +232,11 @@ async function sendText(chatId, text) {
 
 // ─── 启动 ────────────────────────────────────────────────
 
-console.log('🚀 飞书 ↔ Claude Code Bridge');
+// 启动时清空所有旧 session，避免 resume 到错误项目的上下文
+sessions.clear();
+console.log('飞书 Bridge 启动');
 console.log(`   项目: ${PROJECT_DIR}`);
-console.log(`   指令: 发「新对话」重置会话，发「重置」同效`);
+console.log(`   指令: 发「新对话」重置会话`);
 console.log('');
 
 const wsClient = new lark.WSClient({
