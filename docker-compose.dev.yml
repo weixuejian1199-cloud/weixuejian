@@ -1,0 +1,18 @@
+# ============================================================
+# 企业AI工作站 Docker Compose — 开发环境覆盖
+# 使用: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# 或直接: make dev
+# ============================================================
+
+services:
+  backend:
+    build:
+      target: development
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./packages/backend/src:/app/packages/backend/src
+      - ./packages/backend/prisma:/app/packages/backend/prisma
+      - ./packages/backend/tsconfig.json:/app/packages/backend/tsconfig.json
+      - ./packages/shared:/app/packages/shared
+      - ./tsconfig.base.json:/app/tsconfig.base.json

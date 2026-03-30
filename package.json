@@ -12,7 +12,9 @@
     "format:check": "prettier --check 'packages/**/*.{ts,tsx,json}'",
     "test": "pnpm --filter backend test",
     "db:migrate": "pnpm --filter backend prisma:migrate",
-    "db:seed": "pnpm --filter backend prisma:seed"
+    "db:seed": "pnpm --filter backend prisma:seed",
+    "docker:dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
+    "docker:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down"
   },
   "engines": {
     "node": ">=20",

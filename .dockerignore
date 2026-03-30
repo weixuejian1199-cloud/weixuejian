@@ -1,0 +1,12 @@
+node_modules
+dist
+.taro
+.env
+.env.local
+*.pem
+coverage
+.git
+.idea
+.cursor
+.DS_Store
+*.log
