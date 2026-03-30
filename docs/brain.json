@@ -1224,18 +1224,21 @@
     },
     {
       "id": "ADR-028",
-      "title": "Bridge API选型：Agent SDK直连 + 轻量自建Bridge + 飞书官方SDK",
-      "reason": "CTO审查确认Bridge API是飞书号1→Claude Code链路的核心缺失项。调研结论：(1)Claude Agent SDK(@anthropic-ai/claude-agent-sdk)是TypeScript原生，AsyncGenerator流式输出，与项目技术栈完全一致，能力等同Claude Code CLI但集成更优；(2)飞书官方SDK(@larksuiteoapi/node-sdk)内置验签+事件订阅+消息收发；(3)弃选cc-connect(有死锁bug+复杂度过高)和裸Anthropic API(无文件系统/Bash/Agent循环能力)；(4)异步方案：飞书Webhook→立即ack(200ms)→发'处理中'卡片→Agent SDK异步执行→流式更新卡片→最终推送结果；(5)进程守护PM2自动重启；(6)核心代码约600-800行，实施约1周",
+      "title": "Bridge API选型：Claude Code CLI + 飞书官方SDK（方案B）",
+      "reason": "创始人使用Claude Max订阅(非API)，无Anthropic API Key。SPIKE验证发现claude -p --output-format json返回结构化JSON（type/result/duration/cost），输出稳定性等同Agent SDK。方案B优势：(1)零额外成本，复用Max订阅；(2)CLI能力等同Agent SDK（文件系统/Bash/Agent循环）；(3)JSON输出格式稳定可解析；(4)未来切Agent SDK只需替换spawn→SDK调用，业务逻辑不变。限制：Max订阅同时只能跑一个会话（Phase 1只有创始人用，不影响）。",
       "techStack": {
-        "claudeCodeIntegration": "@anthropic-ai/claude-agent-sdk (query() AsyncGenerator)",
-        "feishuSDK": "@larksuiteoapi/node-sdk (EventDispatcher + im.message.create/patch)",
+        "claudeCodeIntegration": "claude -p --output-format json --dangerously-skip-permissions（CLI spawn子进程）",
+        "feishuSDK": "@larksuiteoapi/node-sdk (EventDispatcher + im.message.create/reply) — SPIKE-002已验证",
         "httpFramework": "Express 4 (项目已有)",
         "processManager": "PM2 (自动重启+日志+内存监控)",
         "taskQueue": "内存Map (Phase 1单机够用，Phase 2可升级Redis)",
-        "asyncFlow": "Webhook→ack→BullMQ/内存队列→Agent SDK→流式卡片更新→最终结果推送"
+        "asyncFlow": "飞书Webhook→立即ack→发'处理中'卡片→spawn claude CLI→解析JSON result→更新飞书卡片",
+        "upgradeToSDK": "Phase 2购买API Key后，spawn CLI改为Agent SDK调用，业务层零改动"
       },
       "status": "accepted",
-      "date": "2026-03-30"
+      "date": "2026-03-30",
+      "updatedAt": "2026-03-30",
+      "updateNote": "从Agent SDK方案改为CLI spawn方案。原因：创始人用Max订阅无API Key。SPIKE验证CLI --output-format json输出稳定。Phase 2可平滑切换到Agent SDK"
     },
     {
       "id": "ADR-029",
