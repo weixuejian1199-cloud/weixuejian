@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Request, Response } from 'express';
 
-const { mockRedisExists, mockVerify } = vi.hoisted(() => ({
-  mockRedisExists: vi.fn(),
-  mockVerify: vi.fn(),
+const { mockVerifyAccessToken, mockIsTokenBlacklisted } = vi.hoisted(() => ({
+  mockVerifyAccessToken: vi.fn(),
+  mockIsTokenBlacklisted: vi.fn(),
 }));
 
 vi.mock('jsonwebtoken', () => {
@@ -16,24 +16,14 @@ vi.mock('jsonwebtoken', () => {
     }
   };
   return {
-    default: {
-      verify: mockVerify,
-      TokenExpiredError,
-    },
+    default: { TokenExpiredError },
     TokenExpiredError,
   };
 });
 
-vi.mock('../../lib/redis.js', () => ({
-  redis: {
-    exists: mockRedisExists,
-  },
-}));
-
-vi.mock('../../lib/env.js', () => ({
-  env: {
-    JWT_SECRET: 'test-secret-that-is-at-least-32-chars-long',
-  },
+vi.mock('../../services/auth/jwt-service.js', () => ({
+  verifyAccessToken: mockVerifyAccessToken,
+  isTokenBlacklisted: mockIsTokenBlacklisted,
 }));
 
 vi.mock('../../utils/logger.js', () => ({
@@ -78,8 +68,8 @@ describe('requireAuth', () => {
   });
 
   it('有效token应该注入req.user并调用next', async () => {
-    mockVerify.mockReturnValue(validPayload);
-    mockRedisExists.mockResolvedValue(0);
+    mockVerifyAccessToken.mockReturnValue(validPayload);
+    mockIsTokenBlacklisted.mockResolvedValue(false);
 
     const { req, res, next } = createMockContext('Bearer valid-token');
     await requireAuth(req, res, next);
@@ -115,7 +105,7 @@ describe('requireAuth', () => {
   });
 
   it('无效token应该返回401', async () => {
-    mockVerify.mockImplementation(() => {
+    mockVerifyAccessToken.mockImplementation(() => {
       throw new Error('invalid signature');
     });
 
@@ -132,7 +122,7 @@ describe('requireAuth', () => {
   });
 
   it('过期token应该返回401并使用特定错误码', async () => {
-    mockVerify.mockImplementation(() => {
+    mockVerifyAccessToken.mockImplementation(() => {
       throw new jwt.TokenExpiredError('jwt expired', new Date());
     });
 
@@ -149,8 +139,8 @@ describe('requireAuth', () => {
   });
 
   it('黑名单token应该返回401', async () => {
-    mockVerify.mockReturnValue(validPayload);
-    mockRedisExists.mockResolvedValue(1);
+    mockVerifyAccessToken.mockReturnValue(validPayload);
+    mockIsTokenBlacklisted.mockResolvedValue(true);
 
     const { req, res, next, status, json } = createMockContext('Bearer blacklisted-token');
     await requireAuth(req, res, next);
@@ -166,8 +156,8 @@ describe('requireAuth', () => {
   });
 
   it('Redis不可用时应该返回503（fail-secure）', async () => {
-    mockVerify.mockReturnValue(validPayload);
-    mockRedisExists.mockRejectedValue(new Error('Redis down'));
+    mockVerifyAccessToken.mockReturnValue(validPayload);
+    mockIsTokenBlacklisted.mockRejectedValue(new Error('Redis down'));
 
     const { req, res, next, status, json } = createMockContext('Bearer valid-token');
     await requireAuth(req, res, next);
@@ -197,8 +187,8 @@ describe('optionalAuth', () => {
   });
 
   it('有有效token时应该注入req.user', async () => {
-    mockVerify.mockReturnValue(validPayload);
-    mockRedisExists.mockResolvedValue(0);
+    mockVerifyAccessToken.mockReturnValue(validPayload);
+    mockIsTokenBlacklisted.mockResolvedValue(false);
 
     const { req, res, next } = createMockContext('Bearer valid-token');
     await optionalAuth(req, res, next);
@@ -212,7 +202,7 @@ describe('optionalAuth', () => {
   });
 
   it('有无效token时应该返回401', async () => {
-    mockVerify.mockImplementation(() => {
+    mockVerifyAccessToken.mockImplementation(() => {
       throw new Error('invalid');
     });
 

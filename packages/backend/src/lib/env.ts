@@ -14,7 +14,10 @@ const envSchema = z.object({
   CORS_ORIGINS: z.string().min(1, 'CORS_ORIGINS is required (comma-separated)'),
 
   // ═══ JWT 配置 ═══════════════════════════════════════════
-  // Phase 1: HS256 + JWT_SECRET。Phase 1b(US-P1b-001): 升级 RS256 密钥对
+  // RS256模式：配置JWT_PRIVATE_KEY + JWT_PUBLIC_KEY (PEM格式)
+  // HS256降级：仅使用JWT_SECRET（开发环境兼容）
+  JWT_PRIVATE_KEY: z.string().optional(), // RS256 PEM私钥（生产必须）
+  JWT_PUBLIC_KEY: z.string().optional(),  // RS256 PEM公钥（生产必须）
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
