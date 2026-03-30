@@ -1,6 +1,6 @@
 {
   "projectName": "企业AI工作站",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "lastUpdated": "2026-03-30",
 
   "projectBrief": {
@@ -153,7 +153,7 @@
       "atlas": "ATLAS(WebSocket IM+SSE+文件流+监控) → 选择性合并到对话通道和驾驶舱，Phase 3。注意：OpenClaw不在ATLAS而在Qiyao",
       "shishi": "时皙商城(27表/207验收/22页面) → 已决策合并(ADR-022)，技术栈迁移(NestJS→Express, MySQL→PostgreSQL, uni-app→Taro)，Phase 2-3"
     },
-    "currentStatus": "Phase 1a 进行中。脚手架已完成(US-P1a-001 ✅ commit 9b60167)。v2.3更新：9人团队全面审查完成 — 双飞书对接从Wave9提前到Wave4(验证通道先行)、多租户Phase1简化(节省1天)、供应商对账模块删除(BL-002/BL-011)、新增Phase1a技术Spike(百炼tool_call+Bridge API原型)、AiJudgmentRecord结构化判断记录、AI幻觉防护写入对话引擎、直达模式跳过Master Agent、E2E冒烟测试。v2.4更新：全面审查补强 — ACI规则冲突修复、中强度词枚举、安全设计方案、前后端接口契约、工具错误处理框架、团队流程补强。下一步：Wave 2 三路并行(Schema精简版/健康检查/Docker)。"
+    "currentStatus": "Phase 1a 进行中。脚手架已完成(US-P1a-001 ✅ commit 9b60167)。v2.3更新：9人团队全面审查完成 — 双飞书对接从Wave9提前到Wave4(验证通道先行)、多租户Phase1简化(节省1天)、供应商对账模块删除(BL-002/BL-011)、新增Phase1a技术Spike(百炼tool_call+Bridge API原型)、AiJudgmentRecord结构化判断记录、AI幻觉防护写入对话引擎、直达模式跳过Master Agent、E2E冒烟测试。v2.4更新：全面审查补强 — ACI规则冲突修复、中强度词枚举、安全设计方案、前后端接口契约、工具错误处理框架、团队流程补强。v2.5更新：供应链策略确认(ADR-031) — 爱库存封闭不可行已删除，确认1+1策略(ztdy基本盘+1688增量)，Phase 1b加1688 Spike，Phase 2新增5个Backlog(BL-024~028)。下一步：Wave 3 MallAdapter。"
   },
 
   "securityDesign": {
@@ -893,6 +893,51 @@
       "date": "2026-03-30"
     },
     {
+      "id": "BL-024",
+      "title": "1688开放平台API可行性Spike（Phase 1b技术验证）",
+      "description": "在Phase 1b期间用1周验证1688开放平台的实际可用性。内容：(1)注册1688开发者账号+企业认证+申请诚信通(2)申请社交电商解决方案+采购接口权限(3)sandbox环境跑通商品查询API(4)跑通一件代发下单流程(5)评估数据格式与MallAdapter统一接口的映射难度(6)输出可行性报告。目标：Phase 2启动时不从零开始",
+      "priority": "P1",
+      "targetPhase": "Phase 1b",
+      "source": "ADR-031 供应链策略",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "BL-025",
+      "title": "1688 Adapter实现（Phase 2 Wave 1核心）",
+      "description": "基于ADR-003适配器模式，新增1688Adapter。职责：商品数据拉取(主图/详情/SKU/价格/库存)+订单自动流转(一件代发)+库存实时同步+物流信息回传。输出统一Product/Order/Inventory接口，上层业务代码不感知货源差异。缓存策略复用MallAdapter三层校验+预计算。依赖BL-024 Spike结果确认可行",
+      "priority": "P0",
+      "targetPhase": "Phase 2 Wave 1",
+      "source": "ADR-031 供应链策略",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "BL-026",
+      "title": "AI选品Agent（基于ztdy+1688双数据源）",
+      "description": "从ztdy(8485商品)+1688自动拉取候选商品→AI评分模型(热度/毛利率/品质/退货率/品牌力)→评分≥阈值进入候选池→人工终审或高分自动上架。万邦API辅助跨平台比价。长期目标：10%人工精选+90%AI自动",
+      "priority": "P1",
+      "targetPhase": "Phase 2 Wave 2",
+      "source": "ADR-031 + 时皙Life供应链指令",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "BL-027",
+      "title": "商品风格统一模块（多源商品品牌化处理）",
+      "description": "不同供应链的商品风格不一致。模块职责：主图AI处理(统一暖白背景/去水印/统一尺寸)+详情页模板化生成(统一品牌调性)+商品标题AI改写(统一话术)。调用通义万相或其他图片AI API",
+      "priority": "P1",
+      "targetPhase": "Phase 2 Wave 2",
+      "source": "ADR-031 + 时皙Life供应链指令",
+      "date": "2026-03-30"
+    },
+    {
+      "id": "BL-028",
+      "title": "订单路由引擎（多源智能分单）",
+      "description": "用户下单后根据商品货源自动路由到对应供应链：ztdy自有库存优先→1688一件代发。职责：路由决策+自动创建供应商订单+物流单号回传+异常处理(缺货/超时)。需新增OrderRouting表记录路由决策",
+      "priority": "P0",
+      "targetPhase": "Phase 2 Wave 2",
+      "source": "ADR-031 + 时皙Life供应链指令",
+      "date": "2026-03-30"
+    },
+    {
       "id": "BL-015",
       "title": "SaaS计费引擎设计",
       "description": "Tenant.plan字段已设计但细则缺失。等有付费客户意向时再设计",
@@ -1168,6 +1213,14 @@
       "reason": "CTO审查发现4个P0：规则无优先级/ProcessNode未定义/输出格式未定义/跨数据源风险。完整设计方案：(1)ProcessNode 0-5六级枚举(需用真实数据校验)；(2)优先级P0安全闸门>P1合规>P2业务>P3品类时效>P4默认APPROVE；(3)输出ACIReturnJudgment含decision/reason/riskLevel/triggeredRules/confidence/context；(4)风险闸门：情绪关键词检测+欺诈多信号+置信度<0.7自动转人工；(5)晋升KPI：14天>=100笔，准确率>=90%，漏升级<5%，闸门拦截100%，灰度放权",
       "status": "accepted",
       "date": "2026-03-30"
+    },
+    {
+      "id": "ADR-031",
+      "title": "供应链策略：ztdy基本盘 + 1688增量（1+1策略）",
+      "reason": "时皙Life项目市场调研后确认供应链方向。关键发现：(1)爱库存是封闭生态（品牌给它供货，它不对外供货API），不可行，从方案中删除；(2)1688开放平台有成熟的采购API+社交电商解决方案+一件代发，是唯一确定可行的外部供应链源；(3)京东宙斯门槛高需要体量，降为Phase 3候选；(4)万邦开放平台可做跨平台比价辅助。最终策略：ztdy-open(8485商品基本盘，60%首发)+1688(增量40%，API已验证可行)。Phase 1不变，Phase 1b加1688 API可行性Spike，Phase 2实现1688 Adapter+AI选品+订单路由。适配器模式(ADR-003)天然支持多源扩展，MallAdapter就是第一个实例",
+      "status": "accepted",
+      "date": "2026-03-30",
+      "source": "时皙Life项目市场调研 + CTO团队评估 + 创始人确认"
     },
     {
       "id": "ADR-030",
