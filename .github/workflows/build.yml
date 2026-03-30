@@ -1,0 +1,36 @@
+# ============================================================
+# CI: Docker Build
+# main 分支 push 时构建生产镜像，验证 Dockerfile 正确性
+# ============================================================
+
+name: Docker Build
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build production image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: production
+          push: false
+          tags: enterprise-workstation:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

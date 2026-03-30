@@ -109,6 +109,15 @@ app.use(globalErrorHandler);
 
 // ─── 启动服务 ─────────────────────────────────────────────
 async function start(): Promise<void> {
+  // ─── PostgreSQL 连接验证（fail-secure: 失败则拒绝启动）───
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    logger.info('PostgreSQL connected');
+  } catch (err) {
+    logger.error({ err }, 'PostgreSQL connection failed — refusing to start (fail-secure)');
+    process.exit(1);
+  }
+
   try {
     await connectRedis();
   } catch (err) {
