@@ -217,7 +217,6 @@ describe('ai-client', () => {
       });
 
       await expect(async () => {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for await (const _ of chatStream(sampleMessages)) {
           // consume
         }
