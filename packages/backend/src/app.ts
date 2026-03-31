@@ -22,6 +22,7 @@ import { notFoundHandler, globalErrorHandler } from './middleware/error-handler.
 import { basicHealthRouter, detailHealthRouter } from './routes/health.js';
 import { authRouter } from './routes/auth/index.js';
 import { aiRouter } from './routes/ai/index.js';
+import { csRouter } from './routes/cs/index.js';
 
 const app = express();
 
@@ -109,6 +110,9 @@ protectedRouter.use('/ai', createAiRateLimit());
 
 // ─── AI 对话引擎 ─────────────────────────────────────────
 protectedRouter.use('/ai', aiRouter);
+
+// ─── ACI 客服中枢 ────────────────────────────────────────
+protectedRouter.use('/cs', csRouter);
 
 app.use('/api/v1', protectedRouter);
 
