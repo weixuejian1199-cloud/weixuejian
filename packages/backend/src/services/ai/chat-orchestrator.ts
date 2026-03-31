@@ -17,6 +17,7 @@ import {
   MAX_CONVERSATION_TOKENS,
 } from './conversation-service.js';
 import { logger } from '../../utils/logger.js';
+import { recordAiRequest } from '../../routes/metrics.js';
 import type { ChatMessage, SSEEvent, ToolExecutionResult, TokenUsage } from './types.js';
 import type { AgentType } from '@prisma/client';
 
@@ -177,6 +178,7 @@ export async function* orchestrateChat(req: ChatRequest): AsyncGenerator<SSEEven
     await updateConversationMeta(conversationId, totalUsage.total_tokens, title);
 
     // 10. stream_end
+    recordAiRequest(true);
     yield {
       type: 'stream_end',
       conversationId,
@@ -185,6 +187,7 @@ export async function* orchestrateChat(req: ChatRequest): AsyncGenerator<SSEEven
       totalTokens: totalUsage.total_tokens,
     };
   } catch (err) {
+    recordAiRequest(false);
     if (err instanceof AiClientError) {
       yield {
         type: 'error',
@@ -244,7 +247,9 @@ async function handleToolCalls(
   for (const tc of toolCalls) {
     let parsedArgs: Record<string, unknown>;
     try {
-      parsedArgs = JSON.parse(tc.arguments) as Record<string, unknown>;
+      const parsed: unknown = JSON.parse(tc.arguments);
+      if (!isPlainObject(parsed)) throw new Error('not an object');
+      parsedArgs = parsed;
     } catch {
       // fail-secure: 参数解析失败，记录错误，跳过此工具
       const errorResult: ToolExecutionResult = {
@@ -361,11 +366,16 @@ function getErrorMessage(code: string): string {
 
 /** P0-1: 剥离内部标记字段，防止泄露给客户端 */
 function stripInternalFields(data: unknown): unknown {
-  if (data && typeof data === 'object' && !Array.isArray(data)) {
-    const copy = { ...(data as Record<string, unknown>) };
+  if (isPlainObject(data)) {
+    const copy = { ...data };
     delete copy['_dataSource'];
     delete copy['_queryTime'];
     return copy;
   }
   return data;
+}
+
+/** 类型守卫：判断是否为普通对象 */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }

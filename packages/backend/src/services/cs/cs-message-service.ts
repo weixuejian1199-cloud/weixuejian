@@ -13,6 +13,17 @@ interface DraftMetadata {
   [key: string]: unknown;
 }
 
+/** 类型守卫：从 Prisma JsonValue 中安全提取 DraftMetadata */
+function isDraftMetadata(value: unknown): DraftMetadata | null {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    if (obj['isDraft'] === true) {
+      return obj as DraftMetadata;
+    }
+  }
+  return null;
+}
+
 export async function createMessage(
   tenantId: string,
   sessionId: string,
@@ -75,8 +86,8 @@ export async function confirmDraft(
 
   if (!msg) throw new Error('CS_MESSAGE_NOT_FOUND');
 
-  const meta = msg.metadata as Record<string, unknown> | null;
-  if (!meta || meta['isDraft'] !== true) throw new Error('CS_MESSAGE_NOT_DRAFT');
+  const meta = isDraftMetadata(msg.metadata);
+  if (!meta) throw new Error('CS_MESSAGE_NOT_DRAFT');
 
   if (action === 'discard') {
     await prisma.customerServiceMessage.delete({
@@ -89,7 +100,7 @@ export async function confirmDraft(
     isDraft: false,
     confirmedAt: new Date().toISOString(),
     confirmedBy: userId,
-    source: (meta['source'] as string) ?? 'faq',
+    source: meta.source ?? 'faq',
   };
 
   await prisma.customerServiceMessage.update({

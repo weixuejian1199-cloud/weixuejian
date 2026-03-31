@@ -72,6 +72,10 @@ vi.mock('../../../utils/logger.js', () => ({
   logger: mocks.logger,
 }));
 
+vi.mock('../../../routes/metrics.js', () => ({
+  recordAiRequest: vi.fn(),
+}));
+
 import { orchestrateChat, type ChatRequest } from '../../../services/ai/chat-orchestrator.js';
 import type { SSEEvent } from '../../../services/ai/types.js';
 

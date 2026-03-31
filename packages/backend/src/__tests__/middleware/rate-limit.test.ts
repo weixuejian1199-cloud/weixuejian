@@ -43,6 +43,10 @@ vi.mock('../../lib/env.js', () => ({
   env: mockEnv,
 }));
 
+vi.mock('../../routes/metrics.js', () => ({
+  recordRateLimitRejection: vi.fn(),
+}));
+
 import {
   createRateLimit,
   createTenantRateLimit,

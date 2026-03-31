@@ -3,6 +3,7 @@ import { redis } from '../lib/redis.js';
 import { sendError } from '../utils/response.js';
 import { childLogger } from '../utils/logger.js';
 import { env } from '../lib/env.js';
+import { recordRateLimitRejection } from '../routes/metrics.js';
 
 export interface RateLimitOptions {
   /** 时间窗口（毫秒） */
@@ -78,6 +79,7 @@ export function createRateLimit(options: RateLimitOptions) {
       res.setHeader('X-RateLimit-Reset', resetTime);
 
       if (count > max) {
+        recordRateLimitRejection();
         res.setHeader('Retry-After', Math.ceil(windowMs / 1000));
         sendError(res, 'RATE_LIMITED', message, 429);
         return;
