@@ -173,7 +173,7 @@
       "externalIM": "技术参考：已验证的WebSocket IM+SSE流式输出+文件上传分析流程+系统监控面板。选择性合并到对话通道和驾驶舱，Phase 3",
       "shishi": "时皙商城(27表/207验收/22页面) → 已决策合并(ADR-022)，技术栈迁移(NestJS→Express, MySQL→PostgreSQL, uni-app→Taro)，Phase 2-3"
     },
-    "currentStatus": "Phase 1b 进行中。Phase 1a 全部完成。当前基线：250测试全绿/ESLint零错误/TypeScript零错误。Wave 8完成(5个运营查询工具)。下一步：Wave 9 ACI客服MVP(P1b-005)。"
+    "currentStatus": "Phase 1b 完成。Phase 1a 全部完成。当前基线：328测试全绿/ESLint零错误/TypeScript零错误。Wave 9完成(ACI客服MVP)。Phase 1b所有核心US已交付。"
   },
 
   "securityDesign": {
@@ -469,7 +469,7 @@
     {
       "id": "US-P1b-005",
       "title": "ACI 客服中枢 MVP — 退货审核判断",
-      "status": "pending",
+      "status": "done",
       "assignee": "BE Agent",
       "story": "AS 客服团队 I WANT AI帮我判断退货申请是否合理 SO THAT 我可以更快速准确地处理客户诉求",
       "ac": [

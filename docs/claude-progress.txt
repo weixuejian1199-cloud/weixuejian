@@ -1,9 +1,27 @@
 # 进度接力
 
 ## 最后更新
-- 时间：2026-03-31 12:00
+- 时间：2026-03-31 14:00
 - Agent：CTO Agent
-- 任务：v3.0 八路进阶审计 + P1全量修复
+- 任务：Wave 9 ACI客服MVP (US-P1b-005)
+
+## Wave 9: ACI客服MVP ✅ 完成
+- Phase 1b最后一个核心US，ACI客服中枢定位"决策中枢"
+- **Day 1**: types.ts + emotion-detector.ts + faq-matcher.ts + return-judgment-engine.ts
+  - 决策树引擎: P0→P4 9节点串行评估，executionAllowed硬编码false
+  - 情绪检测: 高/中强度关键词+否定词排除+退款意图检测
+  - FAQ匹配: 15条硬编码FAQ，关键词匹配，isReturnRelated触发判断
+  - +58测试(250→308)
+- **Day 2**: 4个CRUD服务 + cs-orchestrator.ts
+  - 编排: 消息持久化→情绪检测→FAQ匹配→订单查询→退货判断→草稿→工单
+  - 独立于chat-orchestrator（LLM流式），共享MallAdapter/Prisma
+  - +8测试(308→316)
+- **Day 3**: routes/cs/index.ts + app.ts注册
+  - 6个端点: incoming/confirm/sessions/session-detail/messages/tickets
+  - +12测试(316→328)
+- **附带修复**: v3.1审计遗留变更提交 + Prisma 7.x版本冲突修复
+- 基线: 328测试全绿 / TypeScript零错误 / ESLint零错误
+- 11个AC全部覆盖
 
 ## Wave 8: 5个运营查询工具 ✅ 完成
 - 新增3个工具: getSlowSuppliers/getUserGrowthTrend/getSupplierWithdraws
