@@ -70,10 +70,14 @@ const sampleOrder = {
   SupplierName: '供应商A',
   Status: 2,
   ProcessNode: 3,
+  ProcessNodeText: '待发货',
   PayDate: '2026-03-01',
+  ShipmentsDate: null,
   TotalAmount: 299.9,
+  ItemID: 3001,
   ItemName: '生酮巧克力',
-  Quantity: 2,
+  StockName: '默认规格',
+  Number: 2,
   CreateDate: '2026-03-01',
 };
 

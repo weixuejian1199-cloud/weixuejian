@@ -402,12 +402,16 @@ export class MallAdapter {
     UserID: number;
     SupplierID: number;
     SupplierName?: string | null;
-    Status: number;
+    Status?: number;
     ProcessNode: number;
+    ProcessNodeText?: string | null;
     PayDate?: string | null;
+    ShipmentsDate?: string | null;
     TotalAmount: number;
+    ItemID?: number;
     ItemName?: string | null;
-    Quantity?: number;
+    StockName?: string | null;
+    Number?: number;
     CreateDate?: string | null;
   }): MallOrder {
     return {
@@ -416,12 +420,12 @@ export class MallAdapter {
       userId: raw.UserID,
       supplierId: raw.SupplierID,
       supplierName: raw.SupplierName ?? null,
-      status: raw.Status,
+      status: raw.Status ?? 0,
       processNode: raw.ProcessNode,
       payDate: raw.PayDate ?? null,
       totalAmount: raw.TotalAmount,
       itemName: raw.ItemName ?? null,
-      quantity: raw.Quantity ?? 1,
+      quantity: raw.Number ?? 1,
       createDate: raw.CreateDate ?? null,
     };
   }
