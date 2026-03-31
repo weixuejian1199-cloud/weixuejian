@@ -85,6 +85,21 @@ vi.mock('../../../utils/logger.js', () => ({
 
 vi.mock('../../../routes/metrics.js', () => ({
   recordAiRequest: vi.fn(),
+  recordAiTokens: vi.fn(),
+  recordAiQuotaBlocked: vi.fn(),
+  recordAiModelDowngrade: vi.fn(),
+}));
+
+vi.mock('../../../services/ai/cost-service.js', () => ({
+  checkQuota: vi.fn().mockResolvedValue({ allowed: true, currentUsage: { tokensToday: 0, tokensMonth: 0, costMonthYuan: 0 } }),
+  recordUsage: vi.fn().mockResolvedValue(undefined),
+  calculateCost: vi.fn().mockReturnValue(0.001),
+}));
+
+vi.mock('../../../lib/env.js', () => ({
+  env: {
+    DASHSCOPE_MODEL: 'qwen-plus',
+  },
 }));
 
 import { orchestrateChat, type ChatRequest } from '../../../services/ai/chat-orchestrator.js';

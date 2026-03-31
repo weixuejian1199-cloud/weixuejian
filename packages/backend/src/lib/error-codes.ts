@@ -50,6 +50,10 @@ export const ERROR_CODES = {
   AI_RATE_LIMITED: { httpStatus: 429, message: 'AI调用频率超限' },
   AI_SERVICE_UNAVAILABLE: { httpStatus: 503, message: 'AI服务暂不可用' },
   AI_CONTEXT_TOO_LONG: { httpStatus: 400, message: '对话上下文超出长度限制' },
+  AI_QUOTA_EXCEEDED: { httpStatus: 429, message: 'AI月度token配额已用尽' },
+  AI_BUDGET_EXCEEDED: { httpStatus: 429, message: 'AI月度预算已用尽' },
+  AI_DAILY_LIMIT_EXCEEDED: { httpStatus: 429, message: 'AI日调用限额已达上限' },
+  AI_COST_CHECK_FAILED: { httpStatus: 503, message: 'AI成本检查服务不可用' },
 
   // === 客服 ===
   CS_SESSION_NOT_FOUND: { httpStatus: 404, message: '客服会话不存在' },

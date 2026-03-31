@@ -96,7 +96,11 @@ model Tenant {
   planExpiresAt  DateTime?
   maxUsers       Int       @default(10)
   maxShops       Int       @default(5)
-  aiQuotaMonthly Int       @default(1000)
+  aiQuotaMonthly      Int       @default(1000)
+  aiQuotaDaily        Int       @default(100000)
+  aiBudgetMonthly     Decimal   @default(100.00) @db.Decimal(10, 2)
+  aiAlertThreshold    Decimal   @default(0.80)   @db.Decimal(3, 2)
+  aiDowngradeThreshold Decimal  @default(0.90)   @db.Decimal(3, 2)
   status         String    @default("active")
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -123,6 +127,7 @@ model Tenant {
   toolInstances           ToolInstance[]
   toolDefinitions         ToolDefinition[]
   confirmationRecords     ConfirmationRecord[]
+  aiUsageRecords          AiUsageRecord[]
 
   @@map("tenants")
 }
@@ -223,6 +228,34 @@ model Conversation {
 
   @@index([tenantId, userId, createdAt])
   @@map("conversations")
+}
+
+// ──────────────────────────────────────────
+// AI Cost Monitoring (Phase 2, BL-022)
+// ──────────────────────────────────────────
+
+/// AI用量记录：每次AI API调用一条，用于成本监控仪表盘
+model AiUsageRecord {
+  id               String    @id @default(cuid())
+  tenantId         String
+  userId           String
+  conversationId   String?
+  agentType        AgentType
+  model            String
+  promptTokens     Int
+  completionTokens Int
+  totalTokens      Int
+  costYuan         Decimal   @db.Decimal(10, 6)
+  wasDowngraded    Boolean   @default(false)
+  originalModel    String?
+  createdAt        DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, userId, createdAt])
+  @@index([tenantId, agentType, createdAt])
+  @@map("ai_usage_records")
 }
 
 model Message {

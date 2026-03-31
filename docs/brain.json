@@ -1164,7 +1164,9 @@
       "priority": "P1",
       "targetPhase": "Phase 2",
       "source": "CTO团队审查v2.3-成本控制",
-      "date": "2026-03-30"
+      "date": "2026-03-30",
+      "status": "done",
+      "notes": "692→748测试: cost-service(28) + cost-routes(15) + monthly-report(9) + metrics(+4) = +56测试。新增AiUsageRecord表+Tenant 4预算字段+4错误码+3环境变量+4 Prometheus指标。orchestrator集成预飞检查+用量记录+自动模型降级"
     },
     {
       "id": "BL-023",
@@ -2442,5 +2444,5 @@
     ],
     "note": "v2.3九人团队全面审查完成。方案理解10/10。所有评分维度均有改善路径。下一步：Wave 2 三路并行（Schema精简版/健康检查/Docker）+ Wave 3.5两个技术Spike。Phase 1b第一个任务改为双飞书对接（验证通道先行）。"
   },
-  "testBaseline": 628
+  "testBaseline": 748
 }

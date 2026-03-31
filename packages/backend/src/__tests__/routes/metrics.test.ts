@@ -13,7 +13,7 @@ vi.mock('../../lib/redis.js', () => ({
   },
 }));
 
-import { recordHttpRequest, recordRateLimitRejection, recordAiRequest } from '../../routes/metrics.js';
+import { recordHttpRequest, recordRateLimitRejection, recordAiRequest, recordAiTokens, recordAiQuotaBlocked, recordAiModelDowngrade } from '../../routes/metrics.js';
 
 describe('metrics', () => {
   beforeEach(() => {
@@ -49,6 +49,32 @@ describe('metrics', () => {
 
     it('应该记录失败的AI请求', () => {
       expect(() => recordAiRequest(false)).not.toThrow();
+    });
+  });
+
+  // BL-022 成本指标
+  describe('recordAiTokens', () => {
+    it('应该记录token消耗和成本', () => {
+      expect(() => recordAiTokens(1500, 0.0018)).not.toThrow();
+    });
+
+    it('应该累积多次调用', () => {
+      expect(() => {
+        recordAiTokens(1000, 0.001);
+        recordAiTokens(2000, 0.002);
+      }).not.toThrow();
+    });
+  });
+
+  describe('recordAiQuotaBlocked', () => {
+    it('应该记录配额拦截', () => {
+      expect(() => recordAiQuotaBlocked()).not.toThrow();
+    });
+  });
+
+  describe('recordAiModelDowngrade', () => {
+    it('应该记录模型降级', () => {
+      expect(() => recordAiModelDowngrade()).not.toThrow();
     });
   });
 });

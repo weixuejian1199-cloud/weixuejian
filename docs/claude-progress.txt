@@ -1,9 +1,32 @@
 # 进度接力
 
 ## 最后更新
-- 时间：2026-03-31 22:00
+- 时间：2026-03-31 23:30
 - Agent：CTO Agent
-- 任务：BL-020提交 + BL-021 AI幻觉防护 + BL-023 确认记录+决策回放
+- 任务：BL-022 AI成本监控与预算控制仪表盘
+
+## BL-022 AI成本监控仪表盘 ✅ 完成 (692→748测试)
+- **Schema**: AiUsageRecord模型(每次AI调用一条) + Tenant新增4预算字段(日限额/月预算/告警阈值/降级阈值)
+- **核心服务**: cost-service.ts
+  - calculateCost: token→CNY定价(qwen-turbo/plus/max, 未知模型按最贵fail-secure)
+  - checkQuota: 预飞检查(日token/月token/月预算三重拦截 + 90%降级 + 80%告警 + DB异常=封锁)
+  - recordUsage: 每次AI调用写入AiUsageRecord
+  - getUsageSummary/getUsageBreakdown/getDailyTrend/getMonthlyReport: 仪表盘聚合查询
+- **Orchestrator集成**: chat-orchestrator.ts插入预飞检查+用量记录(~20行)
+  - 自动模型降级链: qwen-max→qwen-plus→qwen-turbo
+  - effectiveModel传递到chatStream/chatCompletion
+- **路由层**: 4个GET端点
+  - /api/v1/ai/cost/summary — 实时用量概览(day/month)
+  - /api/v1/ai/cost/breakdown — 按用户/Agent明细
+  - /api/v1/ai/cost/trend — 日趋势图数据
+  - /api/v1/ai/cost/report — 月度完整报告
+- **Prometheus**: 4新指标(ai_tokens_total/ai_cost_yuan_total/ai_quota_blocked_total/ai_model_downgrade_total)
+- **错误码**: +4个(AI_QUOTA_EXCEEDED/AI_BUDGET_EXCEEDED/AI_DAILY_LIMIT_EXCEEDED/AI_COST_CHECK_FAILED)
+- **环境变量**: +3个可选(AI_DAILY_TOKEN_LIMIT/AI_MONTHLY_BUDGET_YUAN/AI_DOWNGRADE_MODEL)
+- **月报任务**: monthly-cost-report.ts(结构化日志+站内通知)
+- **测试(+56)**: cost-service(28) + cost-routes(15) + monthly-report(9) + metrics(+4)
+- 基线: 748测试全绿(55文件) / TypeScript零错误
+- **下一步**: Wave 3其他(BL-005 ACI半自动/BL-002数据分析/BL-012审批流)
 
 ## BL-023 操作确认记录+AI决策回放 ✅ 完成 (670→692测试)
 - **Schema**: ConfirmationRecord模型 + ConfirmationStatus枚举 + 5个索引

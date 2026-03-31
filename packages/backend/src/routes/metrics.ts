@@ -19,6 +19,10 @@ let httpRequestCount = 0;
 let rateLimitRejectedTotal = 0;
 let aiRequestTotal = 0;
 let aiRequestErrorsTotal = 0;
+let aiTokensTotal = 0;
+let aiCostYuanTotal = 0;
+let aiQuotaBlockedTotal = 0;
+let aiModelDowngradeTotal = 0;
 
 /** 记录 HTTP 请求（由 request-logger 中间件调用） */
 export function recordHttpRequest(statusCode: number, durationMs: number): void {
@@ -37,6 +41,22 @@ export function recordRateLimitRejection(): void {
 export function recordAiRequest(success: boolean): void {
   aiRequestTotal++;
   if (!success) aiRequestErrorsTotal++;
+}
+
+/** 记录 AI token 消耗和成本 (BL-022) */
+export function recordAiTokens(tokens: number, costYuan: number): void {
+  aiTokensTotal += tokens;
+  aiCostYuanTotal += costYuan;
+}
+
+/** 记录配额拦截 */
+export function recordAiQuotaBlocked(): void {
+  aiQuotaBlockedTotal++;
+}
+
+/** 记录模型降级 */
+export function recordAiModelDowngrade(): void {
+  aiModelDowngradeTotal++;
 }
 
 // ─── Metrics 端点 ────────────────────────────────────────────
@@ -96,6 +116,23 @@ metricsRouter.get('/', async (_req, res) => {
     lines.push('# HELP ai_request_errors_total Total AI API call failures');
     lines.push('# TYPE ai_request_errors_total counter');
     lines.push(`ai_request_errors_total ${aiRequestErrorsTotal}`);
+
+    // AI cost metrics (BL-022)
+    lines.push('# HELP ai_tokens_total Total AI tokens consumed');
+    lines.push('# TYPE ai_tokens_total counter');
+    lines.push(`ai_tokens_total ${aiTokensTotal}`);
+
+    lines.push('# HELP ai_cost_yuan_total Total AI cost in CNY');
+    lines.push('# TYPE ai_cost_yuan_total counter');
+    lines.push(`ai_cost_yuan_total ${aiCostYuanTotal.toFixed(6)}`);
+
+    lines.push('# HELP ai_quota_blocked_total Total AI requests blocked by quota');
+    lines.push('# TYPE ai_quota_blocked_total counter');
+    lines.push(`ai_quota_blocked_total ${aiQuotaBlockedTotal}`);
+
+    lines.push('# HELP ai_model_downgrade_total Total AI model downgrades');
+    lines.push('# TYPE ai_model_downgrade_total counter');
+    lines.push(`ai_model_downgrade_total ${aiModelDowngradeTotal}`);
 
     // Dependency health (1 = healthy, 0 = unhealthy)
     lines.push('# HELP dependency_up Whether a dependency is reachable (1=up, 0=down)');

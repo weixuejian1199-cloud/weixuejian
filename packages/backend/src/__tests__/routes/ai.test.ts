@@ -28,6 +28,17 @@ vi.mock('../../lib/prisma.js', () => ({
   },
 }));
 
+vi.mock('../../lib/env.js', () => ({
+  env: {},
+}));
+
+vi.mock('../../services/ai/cost-service.js', () => ({
+  getUsageSummary: vi.fn(),
+  getUsageBreakdown: vi.fn(),
+  getDailyTrend: vi.fn(),
+  getMonthlyReport: vi.fn(),
+}));
+
 vi.mock('../../utils/logger.js', () => ({
   logger: {
     info: vi.fn(),

@@ -57,6 +57,11 @@ const envSchema = z.object({
   FEISHU_LINGXI_SERVICE_TENANT_ID: z.string().uuid().optional(),
   FEISHU_LINGXI_SERVICE_USER_ID: z.string().uuid().optional(),
 
+  // ═══ AI 成本控制（BL-022）═══════════════════════════
+  AI_DAILY_TOKEN_LIMIT: z.coerce.number().int().positive().optional(),
+  AI_MONTHLY_BUDGET_YUAN: z.coerce.number().positive().optional(),
+  AI_DOWNGRADE_MODEL: z.string().optional(),
+
   // ═══ 限流配置（US-P1b-007）═══════════════════════════
   RATE_LIMIT_TENANT_MAX: z.coerce.number().int().positive().optional(),
   RATE_LIMIT_TENANT_WINDOW_MS: z.coerce.number().int().positive().optional(),

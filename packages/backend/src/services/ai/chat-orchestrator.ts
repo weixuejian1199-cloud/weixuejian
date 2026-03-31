@@ -17,8 +17,10 @@ import {
   MAX_CONVERSATION_TOKENS,
 } from './conversation-service.js';
 import { logger } from '../../utils/logger.js';
-import { recordAiRequest } from '../../routes/metrics.js';
+import { recordAiRequest, recordAiTokens, recordAiQuotaBlocked, recordAiModelDowngrade } from '../../routes/metrics.js';
 import { validateResponse } from './hallucination-guard.js';
+import { checkQuota, recordUsage, calculateCost } from './cost-service.js';
+import { env } from '../../lib/env.js';
 import type { ChatMessage, SSEEvent, ToolDefinition, ToolExecutionResult, TokenUsage } from './types.js';
 import type { AgentType } from '@prisma/client';
 
@@ -60,6 +62,25 @@ export async function* orchestrateChat(req: ChatRequest): AsyncGenerator<SSEEven
     return;
   }
 
+  // 1b. 成本配额预飞检查 (BL-022)
+  const requestedModel = env.DASHSCOPE_MODEL ?? 'qwen-plus';
+  const quotaResult = await checkQuota(req.tenantId, requestedModel);
+  if (!quotaResult.allowed) {
+    recordAiQuotaBlocked();
+    yield {
+      type: 'error',
+      code: 'AI_QUOTA_EXCEEDED',
+      message: quotaResult.reason ?? 'AI配额已用尽',
+      recoverable: false,
+      messageId,
+    };
+    return;
+  }
+  const effectiveModel = quotaResult.downgradeTo ?? requestedModel;
+  if (quotaResult.downgradeTo) {
+    recordAiModelDowngrade();
+  }
+
   // 2. 保存用户消息
   await saveUserMessage(conversationId, req.tenantId, req.userId, req.message);
 
@@ -94,7 +115,7 @@ export async function* orchestrateChat(req: ChatRequest): AsyncGenerator<SSEEven
     const pendingToolCalls: Array<{ id: string; name: string; arguments: string }> = [];
     let streamContent = '';
 
-    for await (const chunk of chatStream(messages, { tools: activeTools })) {
+    for await (const chunk of chatStream(messages, { tools: activeTools, model: effectiveModel })) {
       if (chunk.type === 'content' && chunk.content) {
         streamContent += chunk.content;
         yield {
@@ -137,6 +158,7 @@ export async function* orchestrateChat(req: ChatRequest): AsyncGenerator<SSEEven
         req.tenantId,
         totalUsage,
         activeTools,
+        effectiveModel,
       );
 
       // yield tool events
@@ -201,7 +223,22 @@ export async function* orchestrateChat(req: ChatRequest): AsyncGenerator<SSEEven
     const title = !req.conversationId ? generateTitle(req.message) : undefined;
     await updateConversationMeta(conversationId, req.tenantId, totalUsage.total_tokens, title);
 
-    // 11. stream_end
+    // 11. 记录 AI 用量 (BL-022)
+    const costYuan = calculateCost(effectiveModel, totalUsage.prompt_tokens, totalUsage.completion_tokens);
+    await recordUsage({
+      tenantId: req.tenantId,
+      userId: req.userId,
+      conversationId,
+      agentType: req.agentType ?? 'master',
+      model: effectiveModel,
+      promptTokens: totalUsage.prompt_tokens,
+      completionTokens: totalUsage.completion_tokens,
+      wasDowngraded: effectiveModel !== requestedModel,
+      originalModel: effectiveModel !== requestedModel ? requestedModel : undefined,
+    });
+    recordAiTokens(totalUsage.total_tokens, costYuan);
+
+    // 12. stream_end
     recordAiRequest(true);
     yield {
       type: 'stream_end',
@@ -243,6 +280,7 @@ async function handleToolCalls(
   tenantId: string,
   _existingUsage: TokenUsage,
   activeTools: ToolDefinition[],
+  model?: string,
 ): Promise<{
   events: SSEEvent[];
   textEvents: SSEEvent[];
@@ -332,7 +370,7 @@ async function handleToolCalls(
   // AI 根据工具结果继续生成（非流式，因为 tool_call 后的回复通常不长）
   let finalContent = '';
   try {
-    const response = await chatCompletion(updatedMessages, { tools: activeTools });
+    const response = await chatCompletion(updatedMessages, { tools: activeTools, model });
     const choice = response.choices[0];
     if (choice?.message.content) {
       finalContent = choice.message.content;

@@ -13,8 +13,12 @@ import { sendSuccess, sendError } from '../../utils/response.js';
 import { logger } from '../../utils/logger.js';
 import { prisma } from '../../lib/prisma.js';
 import type { SSEEvent } from '../../services/ai/types.js';
+import { costRouter } from './cost.js';
 
 export const aiRouter = Router();
+
+// ─── 成本监控子路由 (BL-022) ─────────────────────────────
+aiRouter.use('/cost', costRouter);
 
 // ─── 请求校验 ────────────────────────────────────────────
 
