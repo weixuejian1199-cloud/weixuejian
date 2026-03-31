@@ -1,9 +1,30 @@
 # 进度接力
 
 ## 最后更新
-- 时间：2026-03-31 14:00
+- 时间：2026-03-31 14:50
 - Agent：CTO Agent
-- 任务：Wave 9 ACI客服MVP (US-P1b-005)
+- 任务：Wave 9.5 Critic审查 + Bug修复
+
+## Wave 9.5 Critic审查 ✅ 完成
+- **三维度审查**: 安全(P0×3 P1×5 P2×6) + 架构(P1×1 P2×2) + 文档(P0×1 P1×2)
+- **启动门禁Bug**: tsx未安装在根级→session-guard无法执行，已修复
+- **代码安全修复(5项)**:
+  - tool-registry: 9个工具全部添加Zod参数校验(日期/页码/枚举) + 10KB参数长度上限
+  - chat-orchestrator: stripInternalFields递归处理嵌套对象/数组 + error不泄露参数原文
+  - cs-message-service+routes: AppError类型化错误替代字符串匹配
+  - RULE-22修复: cs-message-service `as unknown as DraftMetadata`消除
+  - metrics.ts: async路由try/catch + recordRateLimitRejection/recordAiRequest接入
+- **文档同步**: brain.json CS错误码3→8个 / 否定词+2 / 退款关键词完整化
+- 基线: 408测试全绿(36文件) / TypeScript零错误
+- **遗留P2(Wave 10+)**: system-prompt硬编码营销数据 / CS限流增强 / 上下文字节限制
+- **下一步**: Wave 10 E2E冒烟测试(3个场景)
+
+## v3.2审计冲刺 ✅ 完成 (328→408测试)
+- **第一轮**: request-logger(+9) + cache-refresh(+7)测试 / conversation-service类型修复(StoredToolCall/StoredToolResult) / env.ts console.error→process.stderr.write / brain.json validationStatus→verified + Prisma settlement枚举清理
+- **第二轮**: error-codes(+9) + audit-cleanup(+5) + metrics(+6)测试 / cs-message-service isDraftMetadata类型守卫 / chat-orchestrator isPlainObject类型守卫+JSON.parse运行时校验 / tool-registry JSON.parse校验+attachDataSource泛型约束
+- 基线: 408测试全绿(36文件) / TypeScript零错误 / console.error零处 / as unknown as Record零处
+- **第三轮**: lingxi-bridge.ts飞书SDK类型安全化 — 定义FeishuEventMessage/FeishuEventSender/FeishuMessageEvent接口 + asFeishuEvent类型守卫，4处as Record全部消除，error handler也移除as Error
+- **src/非测试文件as Record残留**: 仅3处合理用法(prisma.ts官方模式/cs-message-service类型守卫内部/tool-registry运行时校验后赋值)，零违规
 
 ## Wave 9: ACI客服MVP ✅ 完成
 - Phase 1b最后一个核心US，ACI客服中枢定位"决策中枢"
