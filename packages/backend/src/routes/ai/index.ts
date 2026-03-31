@@ -22,7 +22,7 @@ const chatBodySchema = z.object({
   conversationId: z.string().uuid().optional(),
   message: z.string().min(1, '消息不能为空').max(2000, '消息不能超过2000字'),
   agentType: z
-    .enum(['master', 'operation', 'finance', 'customer_service', 'report', 'system'])
+    .enum(['master', 'operation', 'finance', 'settlement', 'customer_service', 'report', 'system', 'tool'])
     .default('master'),
 });
 

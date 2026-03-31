@@ -15,8 +15,13 @@ vi.mock('../../../services/tool-market/builtin-tools.js', () => ({
   BUILTIN_TOOL_HANDLERS: {
     getSalesStats: vi.fn(),
     getOrders: vi.fn(),
+    getSupplierWithdraws: vi.fn(),
   },
-  BUILTIN_PARAM_SCHEMAS: {},
+  TOOL_META_CATEGORIES: {
+    getSalesStats: 'analytics',
+    getOrders: 'operation',
+    getSupplierWithdraws: 'finance',
+  },
 }));
 
 vi.mock('../../../services/ai/tool-registry.js', () => ({
@@ -25,7 +30,23 @@ vi.mock('../../../services/ai/tool-registry.js', () => ({
       type: 'function',
       function: {
         name: 'getSalesStats',
-        description: 'Hardcoded fallback',
+        description: 'Hardcoded fallback - analytics',
+        parameters: { type: 'object', properties: {} },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'getOrders',
+        description: 'Hardcoded fallback - operation',
+        parameters: { type: 'object', properties: {} },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'getSupplierWithdraws',
+        description: 'Hardcoded fallback - finance',
         parameters: { type: 'object', properties: {} },
       },
     },
@@ -36,6 +57,8 @@ vi.mock('../../../services/ai/tool-registry.js', () => ({
 vi.mock('../../../utils/logger.js', () => ({
   logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
+
+// persona-registry: use real implementation (pure code, no side effects)
 
 import {
   getActiveToolDefinitions,
@@ -83,9 +106,8 @@ describe('getActiveToolDefinitions', () => {
 
     const tools = await getActiveToolDefinitions(TENANT);
 
-    expect(tools).toHaveLength(1);
+    expect(tools).toHaveLength(3);
     expect(tools[0]!.function.name).toBe('getSalesStats');
-    expect(tools[0]!.function.description).toBe('Hardcoded fallback');
   });
 
   it('should fallback to hardcoded TOOL_DEFINITIONS on DB error', async () => {
@@ -93,8 +115,7 @@ describe('getActiveToolDefinitions', () => {
 
     const tools = await getActiveToolDefinitions(TENANT);
 
-    expect(tools).toHaveLength(1);
-    expect(tools[0]!.function.description).toBe('Hardcoded fallback');
+    expect(tools).toHaveLength(3);
   });
 
   it('should handle definitions with null description', async () => {
@@ -108,6 +129,81 @@ describe('getActiveToolDefinitions', () => {
 
     expect(tools[0]!.function.description).toBe('');
     expect(tools[0]!.function.parameters).toEqual({ type: 'object', properties: {} });
+  });
+});
+
+describe('getActiveToolDefinitions — persona filtering', () => {
+  it('should return all tools for master agentType', async () => {
+    mockListActiveInstances.mockResolvedValue([]);
+
+    const tools = await getActiveToolDefinitions(TENANT, 'master');
+
+    expect(tools).toHaveLength(3);
+  });
+
+  it('should return all tools when agentType is undefined', async () => {
+    mockListActiveInstances.mockResolvedValue([]);
+
+    const tools = await getActiveToolDefinitions(TENANT);
+
+    expect(tools).toHaveLength(3);
+  });
+
+  it('should filter tools for finance persona (finance+analytics)', async () => {
+    mockListActiveInstances.mockResolvedValue([]);
+
+    const tools = await getActiveToolDefinitions(TENANT, 'finance');
+    const names = tools.map(t => t.function.name);
+
+    expect(names).toContain('getSalesStats');       // analytics ✓
+    expect(names).toContain('getSupplierWithdraws'); // finance ✓
+    expect(names).not.toContain('getOrders');         // operation ✗
+  });
+
+  it('should filter tools for report persona (analytics only)', async () => {
+    mockListActiveInstances.mockResolvedValue([]);
+
+    const tools = await getActiveToolDefinitions(TENANT, 'report');
+    const names = tools.map(t => t.function.name);
+
+    expect(names).toContain('getSalesStats');           // analytics ✓
+    expect(names).not.toContain('getOrders');            // operation ✗
+    expect(names).not.toContain('getSupplierWithdraws'); // finance ✗
+  });
+
+  it('should filter tools for customer_service persona (operation only)', async () => {
+    mockListActiveInstances.mockResolvedValue([]);
+
+    const tools = await getActiveToolDefinitions(TENANT, 'customer_service');
+    const names = tools.map(t => t.function.name);
+
+    expect(names).toContain('getOrders');               // operation ✓
+    expect(names).not.toContain('getSalesStats');        // analytics ✗
+    expect(names).not.toContain('getSupplierWithdraws'); // finance ✗
+  });
+
+  it('should return all tools for tool agentType (empty categories)', async () => {
+    mockListActiveInstances.mockResolvedValue([]);
+
+    const tools = await getActiveToolDefinitions(TENANT, 'tool');
+
+    expect(tools).toHaveLength(3);
+  });
+
+  it('should pass unknown tool names through (safe degradation)', async () => {
+    mockListActiveInstances.mockResolvedValue([{
+      ...DB_INSTANCE,
+      toolDefinition: {
+        ...DB_INSTANCE.toolDefinition,
+        name: 'customPlugin',
+      },
+    }]);
+
+    // finance persona but unknown tool name → should pass through
+    const tools = await getActiveToolDefinitions(TENANT, 'finance');
+
+    expect(tools).toHaveLength(1);
+    expect(tools[0]!.function.name).toBe('customPlugin');
   });
 });
 

@@ -67,6 +67,7 @@ export async function* orchestrateChat(req: ChatRequest): AsyncGenerator<SSEEven
     userName: req.userName,
     role: req.role,
     tenantName: req.tenantName,
+    agentType: req.agentType,
   };
   const systemPrompt = buildSystemPrompt(promptCtx);
   const contextMessages = await getContextMessages(conversationId, req.tenantId);
@@ -88,7 +89,7 @@ export async function* orchestrateChat(req: ChatRequest): AsyncGenerator<SSEEven
   let chunkIndex = 0;
 
   try {
-    const activeTools = await getActiveToolDefinitions(req.tenantId);
+    const activeTools = await getActiveToolDefinitions(req.tenantId, req.agentType);
     const pendingToolCalls: Array<{ id: string; name: string; arguments: string }> = [];
     let streamContent = '';
 

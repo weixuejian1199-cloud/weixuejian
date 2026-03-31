@@ -58,6 +58,12 @@ export const BUILTIN_TOOL_SEEDS: BuiltinToolSeed[] = TOOL_DEFINITIONS.map((def: 
   };
 });
 
+// ─── 工具名 → 类别映射（供 tool-resolver 人格过滤使用）──────
+
+export const TOOL_META_CATEGORIES: Record<string, ToolCategory> = Object.fromEntries(
+  Object.entries(TOOL_META).map(([name, meta]) => [name, meta.category]),
+);
+
 // ─── 重导出执行器映射（供 tool-resolver 使用）────────────────
 
 export { toolHandlers as BUILTIN_TOOL_HANDLERS };
