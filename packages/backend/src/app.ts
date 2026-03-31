@@ -25,6 +25,7 @@ import { authRouter } from './routes/auth/index.js';
 import { aiRouter } from './routes/ai/index.js';
 import { csRouter } from './routes/cs/index.js';
 import { toolsRouter } from './routes/tools/index.js';
+import { privacyRouter } from './routes/privacy/index.js';
 
 const app = express();
 
@@ -119,6 +120,9 @@ protectedRouter.use('/cs', csRouter);
 
 // ─── 工具市场 ────────────────────────────────────────────
 protectedRouter.use('/tools', toolsRouter);
+
+// ─── PIPL合规（数据导出/删除） ──────────────────────────
+protectedRouter.use('/privacy', privacyRouter);
 
 app.use('/api/v1', protectedRouter);
 

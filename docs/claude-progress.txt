@@ -1,9 +1,23 @@
 # 进度接力
 
 ## 最后更新
-- 时间：2026-03-31 19:00
+- 时间：2026-03-31 20:00
 - Agent：CTO Agent
-- 任务：v3.3 系统健康冲刺（10路审计+修复，目标98分）
+- 任务：Phase 2路线图规划 + BL-020 PIPL合规
+
+## Phase 2路线图 + BL-020 PIPL合规 ✅ 完成 (585→628测试)
+- **Phase 2路线图**: Wave 1-3规划写入brain.json(phase2Roadmap段落)
+- **供应链三线**: 1688诚信通已申请 / 爱库存商务对接中 / ztdy写API落实中
+- **BL-020 新增文件(4)**:
+  - lib/crypto.ts: AES-256-GCM加密/解密(scrypt KDF+随机salt+随机IV)
+  - lib/data-masking.ts: 7类敏感字段脱敏(手机/姓名/ID/IP/交易号)+递归自动脱敏
+  - services/privacy/privacy-service.ts: 数据导出(PIPL第45条)+数据删除(第47条)+保留策略
+  - routes/privacy/index.ts: 2个端点(GET /export + POST /deletion-request)
+- **改造文件(1)**: app.ts注册privacyRouter
+- **测试(+43)**: crypto(12) + data-masking(17) + privacy-service(14)
+- **brain.json同步**: testBaseline=628 / BL-020 status=done / phase2Roadmap段落 / currentStatus
+- 基线: 628测试全绿(50文件) / TypeScript零错误 / ESLint零错误
+- **下一步**: BL-021 AI幻觉防护增强 / 等供应链外部反馈
 
 ## v3.3 CTO全面审计冲刺 ✅ 完成 (569→585测试)
 - **审计**: 6路并行Agent（文档/代码/Schema/测试/安全/基础设施）
