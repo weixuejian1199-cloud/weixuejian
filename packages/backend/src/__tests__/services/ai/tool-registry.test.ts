@@ -117,7 +117,7 @@ describe('tool-registry', () => {
     it('无效 JSON 参数应该返回 error', async () => {
       const result = await executeTool('call_2', 'getSalesStats', 'not-json', 'tenant-1');
 
-      expect(result.error).toContain('Invalid tool arguments');
+      expect(result.error).toBe('参数格式无效');
     });
 
     it('executeTool 应该返回 duration 和 toolCallId', async () => {
@@ -147,16 +147,11 @@ describe('tool-registry', () => {
       expect(data['_queryTime']).toBeTruthy();
     });
 
-    it('getOrders 应该限制 pageSize 最大 50', async () => {
-      mockGetOrders.mockResolvedValueOnce({
-        items: [],
-        pagination: { pageIndex: 1, pageSize: 50, totalCount: 0, totalPages: 0 },
-        source: 'api',
-      });
+    it('getOrders 应该拒绝 pageSize 超过 50', async () => {
+      const result = await executeTool('call_5', 'getOrders', JSON.stringify({ pageSize: 200 }), 'tenant-1');
 
-      await executeTool('call_5', 'getOrders', JSON.stringify({ pageSize: 200 }), 'tenant-1');
-
-      expect(mockGetOrders).toHaveBeenCalledWith(expect.objectContaining({ pageSize: 50 }));
+      expect(result.error).toContain('参数校验失败');
+      expect(result.result).toBeNull();
     });
   });
 });

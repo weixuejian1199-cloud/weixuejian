@@ -252,13 +252,14 @@ async function handleToolCalls(
       parsedArgs = parsed;
     } catch {
       // fail-secure: 参数解析失败，记录错误，跳过此工具
+      logger.warn({ toolName: tc.name, argsLength: tc.arguments.length }, 'Tool args parse failed in orchestrator');
       const errorResult: ToolExecutionResult = {
         toolCallId: tc.id,
         toolName: tc.name,
         result: null,
         duration: 0,
         cached: false,
-        error: `参数解析失败: ${tc.arguments}`,
+        error: '参数解析失败',
       };
       results.push(errorResult);
       updatedMessages.push({
@@ -364,12 +365,17 @@ function getErrorMessage(code: string): string {
   }
 }
 
-/** P0-1: 剥离内部标记字段，防止泄露给客户端 */
+/** P0-1: 递归剥离内部标记字段，防止泄露给客户端 */
 function stripInternalFields(data: unknown): unknown {
+  if (Array.isArray(data)) {
+    return data.map(stripInternalFields);
+  }
   if (isPlainObject(data)) {
-    const copy = { ...data };
-    delete copy['_dataSource'];
-    delete copy['_queryTime'];
+    const copy: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (k.startsWith('_')) continue;
+      copy[k] = stripInternalFields(v);
+    }
     return copy;
   }
   return data;

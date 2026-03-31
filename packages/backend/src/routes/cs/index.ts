@@ -16,6 +16,7 @@ import * as messageService from '../../services/cs/cs-message-service.js';
 import * as ticketService from '../../services/cs/cs-ticket-service.js';
 import { sendSuccess, sendError } from '../../utils/response.js';
 import { logger } from '../../utils/logger.js';
+import { AppError } from '../../lib/error-codes.js';
 import type { CSSessionStatus, CSTicketStatus } from '@prisma/client';
 
 export const csRouter = Router();
@@ -107,11 +108,8 @@ csRouter.post('/message/:id/confirm', async (req, res) => {
     );
     sendSuccess(res, { messageId: req.params.id, ...result });
   } catch (err) {
-    const errMsg = err instanceof Error ? err.message : '';
-    if (errMsg === 'CS_MESSAGE_NOT_FOUND') {
-      sendError(res, 'CS_MESSAGE_NOT_FOUND');
-    } else if (errMsg === 'CS_MESSAGE_NOT_DRAFT') {
-      sendError(res, 'CS_MESSAGE_NOT_DRAFT');
+    if (err instanceof AppError) {
+      sendError(res, err.code);
     } else {
       logger.error({ err }, 'CS confirm draft failed');
       sendError(res, 'INTERNAL_ERROR');

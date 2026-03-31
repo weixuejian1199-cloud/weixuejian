@@ -5,6 +5,7 @@
 import { prisma } from '../../lib/prisma.js';
 import { Prisma } from '@prisma/client';
 import type { CSMessageSender } from '@prisma/client';
+import { AppError } from '../../lib/error-codes.js';
 
 interface DraftMetadata {
   isDraft: true;
@@ -84,10 +85,10 @@ export async function confirmDraft(
     select: { id: true, metadata: true },
   });
 
-  if (!msg) throw new Error('CS_MESSAGE_NOT_FOUND');
+  if (!msg) throw new AppError('CS_MESSAGE_NOT_FOUND');
 
   const meta = isDraftMetadata(msg.metadata);
-  if (!meta) throw new Error('CS_MESSAGE_NOT_DRAFT');
+  if (!meta) throw new AppError('CS_MESSAGE_NOT_DRAFT');
 
   if (action === 'discard') {
     await prisma.customerServiceMessage.delete({

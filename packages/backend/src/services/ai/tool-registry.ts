@@ -6,10 +6,55 @@
  *
  * 幻觉防护：工具结果附加数据来源和查询时间。
  */
+import { z } from 'zod';
 import { MallAdapter } from '../../adapters/erp/mall-adapter.js';
 import * as aggregates from '../mall/aggregates.js';
 import { logger } from '../../utils/logger.js';
 import type { ToolDefinition, ToolExecutionResult } from './types.js';
+
+// ─── 工具参数 Zod Schema（P0安全：AI输出不可信）────────────
+
+const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式必须为YYYY-MM-DD');
+const pageIndex = z.number().int().min(1).default(1);
+const pageSize = z.number().int().min(1).max(50).default(20);
+
+const toolParamSchemas: Record<string, z.ZodTypeAny> = {
+  getSalesStats: z.object({ startDate: dateStr, endDate: dateStr }),
+  getTopSuppliers: z.object({
+    metric: z.enum(['orderCount', 'amount']),
+    limit: z.number().int().min(1).max(50).default(10),
+  }),
+  getOrderStatusDistribution: z.object({
+    startDate: dateStr.optional(),
+    endDate: dateStr.optional(),
+  }),
+  getOrders: z.object({
+    pageIndex, pageSize,
+    startDate: dateStr.optional(), endDate: dateStr.optional(),
+    status: z.number().int().min(0).max(10).optional(),
+    processNode: z.number().int().min(0).max(10).optional(),
+    supplierId: z.number().int().positive().optional(),
+  }),
+  getUsers: z.object({
+    pageIndex, pageSize,
+    keyword: z.string().max(100).optional(),
+    levelId: z.number().int().nonnegative().optional(),
+  }),
+  getItems: z.object({
+    pageIndex, pageSize,
+    keyword: z.string().max(100).optional(),
+    isShelf: z.boolean().optional(),
+  }),
+  getSlowSuppliers: z.object({
+    limit: z.number().int().min(1).max(50).default(10),
+  }),
+  getUserGrowthTrend: z.object({ startDate: dateStr, endDate: dateStr }),
+  getSupplierWithdraws: z.object({
+    supplierId: z.number().int().positive().optional(),
+    startDate: dateStr.optional(), endDate: dateStr.optional(),
+    pageIndex, pageSize,
+  }),
+};
 
 // ─── 工具定义（发送给百炼 API）────────────────────────────
 
@@ -172,8 +217,8 @@ type ToolHandler = (
 const toolHandlers: Record<string, ToolHandler> = {
   async getSalesStats(adapter, tenantId, args) {
     const result = await aggregates.getSalesStats(adapter, tenantId, {
-      start: args['startDate'] as string,
-      end: args['endDate'] as string,
+      start: String(args['startDate']),
+      end: String(args['endDate']),
     });
     return attachDataSource(result, 'ztdy-open OrderPageList API (聚合)');
   },
@@ -183,14 +228,14 @@ const toolHandlers: Record<string, ToolHandler> = {
       adapter,
       tenantId,
       args['metric'] as 'orderCount' | 'amount',
-      (args['limit'] as number) ?? 10,
+      Number(args['limit'] ?? 10),
     );
     return attachDataSource(result, 'ztdy-open OrderPageList API (聚合)');
   },
 
   async getOrderStatusDistribution(adapter, tenantId, args) {
     const dateRange = args['startDate']
-      ? { start: args['startDate'] as string, end: args['endDate'] as string }
+      ? { start: String(args['startDate']), end: String(args['endDate']) }
       : undefined;
     const result = await aggregates.getOrderStatusDistribution(adapter, tenantId, dateRange);
     return attachDataSource(result, 'ztdy-open OrderPageList API (聚合)');
@@ -198,8 +243,8 @@ const toolHandlers: Record<string, ToolHandler> = {
 
   async getOrders(adapter, _tenantId, args) {
     const result = await adapter.getOrders({
-      pageIndex: (args['pageIndex'] as number) ?? 1,
-      pageSize: Math.min((args['pageSize'] as number) ?? 20, 50),
+      pageIndex: Number(args['pageIndex'] ?? 1),
+      pageSize: Number(args['pageSize'] ?? 20),
       startDate: args['startDate'] as string | undefined,
       endDate: args['endDate'] as string | undefined,
       status: args['status'] as number | undefined,
@@ -211,8 +256,8 @@ const toolHandlers: Record<string, ToolHandler> = {
 
   async getUsers(adapter, _tenantId, args) {
     const result = await adapter.getUsers({
-      pageIndex: (args['pageIndex'] as number) ?? 1,
-      pageSize: Math.min((args['pageSize'] as number) ?? 20, 50),
+      pageIndex: Number(args['pageIndex'] ?? 1),
+      pageSize: Number(args['pageSize'] ?? 20),
       keyword: args['keyword'] as string | undefined,
       levelId: args['levelId'] as number | undefined,
     });
@@ -221,8 +266,8 @@ const toolHandlers: Record<string, ToolHandler> = {
 
   async getItems(adapter, _tenantId, args) {
     const result = await adapter.getItems({
-      pageIndex: (args['pageIndex'] as number) ?? 1,
-      pageSize: Math.min((args['pageSize'] as number) ?? 20, 50),
+      pageIndex: Number(args['pageIndex'] ?? 1),
+      pageSize: Number(args['pageSize'] ?? 20),
       keyword: args['keyword'] as string | undefined,
       isShelf: args['isShelf'] as boolean | undefined,
     });
@@ -233,15 +278,15 @@ const toolHandlers: Record<string, ToolHandler> = {
     const result = await aggregates.getSlowSuppliers(
       adapter,
       tenantId,
-      (args['limit'] as number) ?? 10,
+      Number(args['limit'] ?? 10),
     );
     return attachDataSource(result, 'ztdy-open OrderPageList API (聚合)');
   },
 
   async getUserGrowthTrend(adapter, tenantId, args) {
     const result = await aggregates.getUserGrowthTrend(adapter, tenantId, {
-      start: args['startDate'] as string,
-      end: args['endDate'] as string,
+      start: String(args['startDate']),
+      end: String(args['endDate']),
     });
     return attachDataSource(result, 'ztdy-open UserPageList API (聚合)');
   },
@@ -249,8 +294,8 @@ const toolHandlers: Record<string, ToolHandler> = {
   async getSupplierWithdraws(adapter, _tenantId, args) {
     const filterSupplierId = args['supplierId'] as number | undefined;
     const result = await adapter.getSupplierWithdraws({
-      pageIndex: (args['pageIndex'] as number) ?? 1,
-      pageSize: Math.min((args['pageSize'] as number) ?? 20, 50),
+      pageIndex: Number(args['pageIndex'] ?? 1),
+      pageSize: Number(args['pageSize'] ?? 20),
       startDate: args['startDate'] as string | undefined,
       endDate: args['endDate'] as string | undefined,
     });
@@ -276,6 +321,9 @@ const toolHandlers: Record<string, ToolHandler> = {
   },
 };
 
+/** 工具参数最大长度（防DoS） */
+const MAX_TOOL_ARGS_LENGTH = 10_000;
+
 /**
  * 执行工具调用
  */
@@ -299,17 +347,45 @@ export async function executeTool(
     };
   }
 
-  let args: Record<string, unknown>;
-  try {
-    args = JSON.parse(argsJson) as Record<string, unknown>;
-  } catch {
+  // P0: 参数长度限制（防DoS）
+  if (argsJson.length > MAX_TOOL_ARGS_LENGTH) {
+    logger.warn({ toolName, argsLength: argsJson.length }, 'Tool arguments exceed size limit');
     return {
       toolCallId,
       toolName,
       result: null,
       duration: Date.now() - startTime,
       cached: false,
-      error: `Invalid tool arguments: ${argsJson}`,
+      error: `参数超出长度限制 (${argsJson.length}/${MAX_TOOL_ARGS_LENGTH})`,
+    };
+  }
+
+  let args: Record<string, unknown>;
+  try {
+    const parsed: unknown = JSON.parse(argsJson);
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('not an object');
+    }
+
+    // P0: Zod校验工具参数（AI输出不可信）
+    const schema = toolParamSchemas[toolName];
+    if (schema) {
+      args = schema.parse(parsed) as Record<string, unknown>;
+    } else {
+      args = parsed as Record<string, unknown>;
+    }
+  } catch (err) {
+    const message = err instanceof z.ZodError
+      ? `参数校验失败: ${err.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ')}`
+      : '参数格式无效';
+    logger.warn({ toolName, argsLength: argsJson.length }, 'Tool arguments validation failed');
+    return {
+      toolCallId,
+      toolName,
+      result: null,
+      duration: Date.now() - startTime,
+      cached: false,
+      error: message,
     };
   }
 
@@ -346,13 +422,13 @@ export async function executeTool(
 /**
  * 幻觉防护：附加数据来源和查询时间
  */
-function attachDataSource<T>(
+function attachDataSource<T extends object>(
   data: T,
   source: string,
 ): T & { _dataSource: string; _queryTime: string } {
   return {
-    ...(data as object),
+    ...data,
     _dataSource: source,
     _queryTime: new Date().toISOString(),
-  } as T & { _dataSource: string; _queryTime: string };
+  };
 }

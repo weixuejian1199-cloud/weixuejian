@@ -86,3 +86,11 @@ export const ERROR_CODES = {
 
 /** 注册表中的合法错误码类型 */
 export type ErrorCode = keyof typeof ERROR_CODES;
+
+/** 类型化业务错误 — 替代 throw new Error('CODE_STRING') + 字符串匹配 */
+export class AppError extends Error {
+  constructor(public readonly code: ErrorCode) {
+    super(code);
+    this.name = 'AppError';
+  }
+}

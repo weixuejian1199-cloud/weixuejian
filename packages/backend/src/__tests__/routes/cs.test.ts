@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { AppError } from '../../lib/error-codes.js';
 
 const {
   mockHandleIncomingMessage,
@@ -143,7 +144,7 @@ describe('POST /cs/message/:id/confirm', () => {
   });
 
   it('should return 404 for non-existent message', async () => {
-    mockConfirmDraft.mockRejectedValue(new Error('CS_MESSAGE_NOT_FOUND'));
+    mockConfirmDraft.mockRejectedValue(new AppError('CS_MESSAGE_NOT_FOUND'));
 
     const res = await request(createApp())
       .post('/cs/message/nonexistent/confirm')
@@ -153,7 +154,7 @@ describe('POST /cs/message/:id/confirm', () => {
   });
 
   it('should return 400 for non-draft message', async () => {
-    mockConfirmDraft.mockRejectedValue(new Error('CS_MESSAGE_NOT_DRAFT'));
+    mockConfirmDraft.mockRejectedValue(new AppError('CS_MESSAGE_NOT_DRAFT'));
 
     const res = await request(createApp())
       .post('/cs/message/msg-001/confirm')

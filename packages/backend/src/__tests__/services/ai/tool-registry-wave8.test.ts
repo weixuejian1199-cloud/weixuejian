@@ -296,7 +296,7 @@ describe('tool-registry Wave 8', () => {
         'tenant-1',
       );
 
-      expect(result.error).toContain('Invalid tool arguments');
+      expect(result.error).toBe('参数格式无效');
       expect(result.result).toBeNull();
     });
   });

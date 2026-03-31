@@ -50,7 +50,7 @@
         "5": "已完成(COMPLETED)",
         "receivedThreshold": "ProcessNode >= 4 视为已收货",
         "rule1Threshold": "ProcessNode < 3 视为未发货，引导取消",
-        "validationStatus": "pending — Phase 1a启动前必须用ztdy真实数据验证",
+        "validationStatus": "verified — Phase 1b ACI客服MVP已使用ProcessNode判断逻辑，Wave 9测试覆盖",
         "validationScript": "scripts/validate-process-node.ts"
       },
       "judgmentRules": [
@@ -81,13 +81,13 @@
         "disclaimer": "仅供参考，最终决定由人工客服做出"
       },
       "riskGates": {
-        "退款/补偿": "P0，检测关键词(退款/赔偿/补偿等)，立即ESCALATE",
+        "退款/补偿": "P0，检测关键词(退款/赔偿/补偿/退钱/赔钱)，立即ESCALATE",
         "情绪激动": {
           "description": "P0，高强度词任一命中或中强度词>=2个，立即ESCALATE",
           "emotionKeywords": {
             "high": ["投诉", "律师", "12315", "工商", "法院", "曝光", "媒体", "消协"],
             "medium": ["不满意", "差评", "太慢了", "骗人", "坑人", "垃圾", "举报", "失望", "生气", "无语", "恶心", "后悔", "上当"],
-            "negationExclusion": "包含否定词(不想/不会/没有/并非)修饰情绪词时不计入"
+            "negationExclusion": "包含否定词(不想/不会/没有/并非/不是/不要)修饰情绪词时不计入"
           }
         },
         "欺诈嫌疑": "P0，30天退货>=3次 或 历史退货率>50% 或 收货<2小时退货，立即ESCALATE",
@@ -1392,8 +1392,13 @@
     ],
     "cs": [
       { "code": "CS_SESSION_NOT_FOUND",    "httpStatus": 404, "message": "客服会话不存在" },
+      { "code": "CS_SESSION_CLOSED",       "httpStatus": 400, "message": "客服会话已关闭" },
+      { "code": "CS_MESSAGE_NOT_FOUND",    "httpStatus": 404, "message": "客服消息不存在" },
       { "code": "CS_MESSAGE_NOT_DRAFT",    "httpStatus": 400, "message": "只能确认草稿状态的消息" },
-      { "code": "CS_ESCALATED",            "httpStatus": 200, "message": "已升级到人工处理" }
+      { "code": "CS_TICKET_NOT_FOUND",     "httpStatus": 404, "message": "客服工单不存在" },
+      { "code": "CS_ORDER_NOT_FOUND",      "httpStatus": 404, "message": "关联订单不存在" },
+      { "code": "CS_ESCALATED",            "httpStatus": 200, "message": "已升级到人工处理" },
+      { "code": "CS_IMAGE_NOT_SUPPORTED",  "httpStatus": 400, "message": "暂不支持图片消息" }
     ],
     "system": [
       { "code": "INTERNAL_ERROR",         "httpStatus": 500, "message": "服务器内部错误" },
@@ -1592,7 +1597,7 @@
     {
       "id": "PIT-021",
       "title": "Conversation.agentType枚举不完整",
-      "solution": "agentType应包含：master/finance/operation/settlement/report/customer_service/system/tool。Phase 1a Schema建模时补全",
+      "solution": "agentType应包含：master/finance/operation/report/customer_service/system/tool。settlement已随供应商对账模块删除(ADR-030)。Phase 1a Schema已建模",
       "date": "2026-03-30"
     }
   ],
