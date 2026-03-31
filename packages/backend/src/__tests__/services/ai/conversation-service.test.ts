@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockFindFirst = vi.fn();
 const mockCreate = vi.fn();
 const mockFindMany = vi.fn();
-const mockUpdate = vi.fn();
+const mockUpdateMany = vi.fn();
 const mockCount = vi.fn();
 
 vi.mock('../../../lib/prisma.js', () => ({
@@ -13,7 +13,7 @@ vi.mock('../../../lib/prisma.js', () => ({
       findFirst: (...args: unknown[]) => mockFindFirst(...args),
       create: (...args: unknown[]) => mockCreate(...args),
       findMany: (...args: unknown[]) => mockFindMany(...args),
-      update: (...args: unknown[]) => mockUpdate(...args),
+      updateMany: (...args: unknown[]) => mockUpdateMany(...args),
       count: (...args: unknown[]) => mockCount(...args),
     },
     message: {
@@ -131,13 +131,14 @@ describe('conversation-service', () => {
   });
 
   describe('updateConversationMeta', () => {
-    it('应该增量更新 tokenUsed', async () => {
-      mockUpdate.mockResolvedValueOnce({});
+    it('应该增量更新 tokenUsed 并带 tenantId 隔离', async () => {
+      mockUpdateMany.mockResolvedValueOnce({ count: 1 });
 
-      await updateConversationMeta('conv-1', 100, '测试标题');
+      await updateConversationMeta('conv-1', 'tenant-1', 100, '测试标题');
 
-      expect(mockUpdate).toHaveBeenCalledWith(
+      expect(mockUpdateMany).toHaveBeenCalledWith(
         expect.objectContaining({
+          where: { id: 'conv-1', tenantId: 'tenant-1' },
           data: expect.objectContaining({
             tokenUsed: { increment: 100 },
             title: '测试标题',
@@ -147,11 +148,11 @@ describe('conversation-service', () => {
     });
 
     it('无标题时不更新 title', async () => {
-      mockUpdate.mockResolvedValueOnce({});
+      mockUpdateMany.mockResolvedValueOnce({ count: 1 });
 
-      await updateConversationMeta('conv-1', 50);
+      await updateConversationMeta('conv-1', 'tenant-1', 50);
 
-      const updateData = mockUpdate.mock.calls[0]![0].data;
+      const updateData = mockUpdateMany.mock.calls[0]![0].data;
       expect(updateData['title']).toBeUndefined();
     });
   });

@@ -35,16 +35,22 @@ vi.mock('../../../lib/redis.js', () => ({
   },
 }));
 
-vi.mock('../../../lib/prisma.js', () => ({
-  prisma: {
+vi.mock('../../../lib/prisma.js', () => {
+  const txProxy = {
     refreshToken: {
       create: mockPrismaCreate,
       findFirst: mockPrismaFindFirst,
       update: mockPrismaUpdate,
       updateMany: mockPrismaUpdateMany,
     },
-  },
-}));
+  };
+  return {
+    prisma: {
+      ...txProxy,
+      $transaction: vi.fn(async (fn: (tx: typeof txProxy) => Promise<unknown>) => fn(txProxy)),
+    },
+  };
+});
 
 vi.mock('../../../utils/logger.js', () => ({
   logger: {
@@ -213,7 +219,7 @@ describe('JWT Service', () => {
       mockRedisSetex.mockResolvedValue('OK');
       mockPrismaUpdateMany.mockResolvedValue({ count: 2 });
 
-      await revokeTokens(token, 'u1');
+      await revokeTokens(token, 'u1', 't1');
 
       // Redis黑名单
       expect(mockRedisSetex).toHaveBeenCalledWith(
@@ -222,9 +228,9 @@ describe('JWT Service', () => {
         '1',
       );
 
-      // 数据库吊销
+      // 数据库吊销 — 包含 tenantId 隔离
       expect(mockPrismaUpdateMany).toHaveBeenCalledWith({
-        where: { userId: 'u1', revokedAt: null },
+        where: { userId: 'u1', tenantId: 't1', revokedAt: null },
         data: { revokedAt: expect.any(Date) },
       });
     });

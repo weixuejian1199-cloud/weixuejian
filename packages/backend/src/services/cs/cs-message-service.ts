@@ -91,8 +91,8 @@ export async function confirmDraft(
   if (!meta) throw new AppError('CS_MESSAGE_NOT_DRAFT');
 
   if (action === 'discard') {
-    await prisma.customerServiceMessage.delete({
-      where: { id: messageId },
+    await prisma.customerServiceMessage.deleteMany({
+      where: { id: messageId, tenantId },
     });
     return { status: 'discarded' };
   }
@@ -104,8 +104,8 @@ export async function confirmDraft(
     source: meta.source ?? 'faq',
   };
 
-  await prisma.customerServiceMessage.update({
-    where: { id: messageId },
+  await prisma.customerServiceMessage.updateMany({
+    where: { id: messageId, tenantId },
     data: {
       content: action === 'edit_and_send' && editedContent ? editedContent : undefined,
       metadata: confirmedMeta,

@@ -46,8 +46,8 @@ export async function updateSessionStatus(
   tenantId: string,
   status: CSSessionStatus,
 ): Promise<void> {
-  await prisma.customerServiceSession.update({
-    where: { id: sessionId },
+  await prisma.customerServiceSession.updateMany({
+    where: { id: sessionId, tenantId },
     data: {
       status,
       ...(status === 'resolved' || status === 'closed' ? { resolvedAt: new Date() } : {}),

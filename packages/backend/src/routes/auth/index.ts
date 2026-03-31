@@ -256,7 +256,7 @@ authRouter.post(
     const authHeader = req.headers['authorization']!;
     const accessToken = authHeader.slice(7);
 
-    await revokeTokens(accessToken, userId);
+    await revokeTokens(accessToken, userId, tenantId);
 
     await prisma.auditLog.create({
       data: {

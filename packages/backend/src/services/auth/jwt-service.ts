@@ -138,42 +138,73 @@ export async function rotateTokenPair(
 ): Promise<TokenPair> {
   const tokenHash = hashRefreshToken(rawRefreshToken);
 
-  // 查找数据库中的refresh token
-  const stored = await prisma.refreshToken.findFirst({
-    where: {
-      tokenHash,
-      revokedAt: null,
-      expiresAt: { gt: new Date() },
-    },
-    include: {
-      user: {
-        select: { id: true, tenantId: true, roleId: true, status: true, role: true },
+  // 事务保护：防止并发请求同一refresh token签发多个新token
+  return prisma.$transaction(async (tx) => {
+    // 查找数据库中的refresh token
+    const stored = await tx.refreshToken.findFirst({
+      where: {
+        tokenHash,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
       },
-    },
-  });
+      include: {
+        user: {
+          select: { id: true, tenantId: true, roleId: true, status: true, role: true },
+        },
+      },
+    });
 
-  if (!stored) {
-    throw new TokenRotationError('INVALID_REFRESH_TOKEN');
-  }
+    if (!stored) {
+      throw new TokenRotationError('INVALID_REFRESH_TOKEN');
+    }
 
-  // 用户状态检查
-  if (stored.user.status !== 'active') {
-    // 吊销该用户所有refresh token
-    await prisma.refreshToken.updateMany({
-      where: { userId: stored.userId, revokedAt: null },
+    // 用户状态检查
+    if (stored.user.status !== 'active') {
+      // 吊销该用户所有refresh token
+      await tx.refreshToken.updateMany({
+        where: { userId: stored.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      throw new TokenRotationError('USER_INACTIVE');
+    }
+
+    // 作废旧的refresh token（Rotation核心）
+    await tx.refreshToken.update({
+      where: { id: stored.id },
       data: { revokedAt: new Date() },
     });
-    throw new TokenRotationError('USER_INACTIVE');
-  }
 
-  // 作废旧的refresh token（Rotation核心）
-  await prisma.refreshToken.update({
-    where: { id: stored.id },
-    data: { revokedAt: new Date() },
-  });
+    // 在同一事务中签发新的token pair
+    const jti = crypto.randomUUID();
+    const newRefreshToken = generateRefreshToken();
+    const newTokenHash = hashRefreshToken(newRefreshToken);
+    const refreshExpiresIn = parseExpiry(env.JWT_REFRESH_EXPIRES_IN);
+    const expiresAt = new Date(Date.now() + refreshExpiresIn * 1000);
 
-  // 签发新的token pair
-  return issueTokenPair(stored.userId, stored.tenantId, stored.user.role.name, deviceId);
+    await tx.refreshToken.create({
+      data: {
+        tenantId: stored.tenantId,
+        userId: stored.userId,
+        tokenHash: newTokenHash,
+        deviceId: deviceId ?? null,
+        expiresAt,
+      },
+    });
+
+    const accessToken = signAccessToken({
+      userId: stored.userId,
+      tenantId: stored.tenantId,
+      role: stored.user.role.name,
+      jti,
+    });
+    const accessExpiresIn = parseExpiry(env.JWT_ACCESS_EXPIRES_IN);
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+      expiresIn: accessExpiresIn,
+    };
+  }, { timeout: 10000 });
 }
 
 // ─── 登出（黑名单）─────────────────────────────────────────
@@ -182,7 +213,7 @@ export async function rotateTokenPair(
  * 将 Access Token 加入黑名单（Redis），TTL = token剩余有效期
  * 同时吊销对应用户的所有 Refresh Token
  */
-export async function revokeTokens(accessToken: string, userId: string): Promise<void> {
+export async function revokeTokens(accessToken: string, userId: string, tenantId: string): Promise<void> {
   // 1. 解码access token获取jti和exp（不验证签名，因为可能已过期）
   const decoded = jwt.decode(accessToken) as DecodedAccessToken | null;
   if (decoded?.jti && decoded?.exp) {
@@ -195,7 +226,7 @@ export async function revokeTokens(accessToken: string, userId: string): Promise
 
   // 2. 吊销该用户所有refresh token
   const result = await prisma.refreshToken.updateMany({
-    where: { userId, revokedAt: null },
+    where: { userId, tenantId, revokedAt: null },
     data: { revokedAt: new Date() },
   });
 

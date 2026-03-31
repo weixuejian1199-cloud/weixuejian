@@ -410,6 +410,7 @@ describe('chat-orchestrator', () => {
 
       expect(mocks.updateConversationMeta).toHaveBeenCalledWith(
         'conv-1',
+        'tenant-1',
         15,
         longMessage.slice(0, 30) + '...',
       );
@@ -426,7 +427,7 @@ describe('chat-orchestrator', () => {
 
       await collectEvents(orchestrateChat(baseRequest({ message: shortMessage })));
 
-      expect(mocks.updateConversationMeta).toHaveBeenCalledWith('conv-1', 15, shortMessage);
+      expect(mocks.updateConversationMeta).toHaveBeenCalledWith('conv-1', 'tenant-1', 15, shortMessage);
     });
   });
 
@@ -441,9 +442,9 @@ describe('chat-orchestrator', () => {
 
       await collectEvents(orchestrateChat(baseRequest({ conversationId: undefined })));
 
-      // updateConversationMeta 第三个参数应有 title
+      // updateConversationMeta 第四个参数应有 title (签名: conversationId, tenantId, tokens, title)
       const call = mocks.updateConversationMeta.mock.calls[0]!;
-      expect(call[2]).toBe('你好');
+      expect(call[3]).toBe('你好');
     });
 
     it('conversationId 有值时不生成标题', async () => {
@@ -462,9 +463,9 @@ describe('chat-orchestrator', () => {
 
       await collectEvents(orchestrateChat(baseRequest({ conversationId: 'conv-existing' })));
 
-      // updateConversationMeta 第三个参数应为 undefined
+      // updateConversationMeta 第四个参数应为 undefined (签名: conversationId, tenantId, tokens, title)
       const call = mocks.updateConversationMeta.mock.calls[0]!;
-      expect(call[2]).toBeUndefined();
+      expect(call[3]).toBeUndefined();
     });
   });
 

@@ -175,7 +175,7 @@ export async function* orchestrateChat(req: ChatRequest): AsyncGenerator<SSEEven
 
     // 9. 更新会话 meta
     const title = !req.conversationId ? generateTitle(req.message) : undefined;
-    await updateConversationMeta(conversationId, totalUsage.total_tokens, title);
+    await updateConversationMeta(conversationId, req.tenantId, totalUsage.total_tokens, title);
 
     // 10. stream_end
     recordAiRequest(true);

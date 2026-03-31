@@ -238,7 +238,7 @@ describe('Auth Routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(mockRevokeTokens).toHaveBeenCalledWith('test-access-token', 'u1');
+      expect(mockRevokeTokens).toHaveBeenCalledWith('test-access-token', 'u1', 't1');
     });
   });
 
