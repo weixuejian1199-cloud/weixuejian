@@ -2,7 +2,7 @@
  * MallAdapter 聚合查询服务
  *
  * Phase 1 策略：限量实时聚合 + completeness 标记。
- * 最多遍历 MAX_AGGREGATE_PAGES 页（避免耗尽 API 配额），
+ * 最多遍历 SAMPLE_PAGES 页（避免耗尽 API 配额），
  * 返回 completeness 让调用方知道数据完整度。
  */
 import type { MallAdapter } from '../../adapters/erp/mall-adapter.js';
@@ -15,13 +15,13 @@ import type {
   StatusDistribution,
 } from '../../adapters/erp/types.js';
 
-/** 聚合查询最多遍历的页数 */
-const MAX_AGGREGATE_PAGES = 300;
+/** 快速采样页数（控制在 5 秒内返回） */
+const SAMPLE_PAGES = 20;
 
 /** 每页大小（ztdy API 实际上限 200） */
 const AGGREGATE_PAGE_SIZE = 200;
 
-/** 并发请求数（加速分页遍历） */
+/** 并发请求数 */
 const CONCURRENCY = 5;
 
 /**
@@ -38,21 +38,19 @@ export async function getSalesStats(
   const cached = await getCache<AggregateResult<SalesStats>>(cacheKey);
   if (cached) return cached.data;
 
-  let totalAmount = 0;
-  let orderCount = 0;
+  // ztdy API 不支持服务端日期过滤，数据按时间倒序返回。
+  // 策略：采样前 N 页 → 统计命中率 → 用 TotalCount 估算全量。
+  const startMs = new Date(dateRange.start).getTime();
+  const endMs = new Date(dateRange.end + ' 23:59:59').getTime();
+
+  let sampleAmount = 0;
+  let sampleHits = 0;
   let scannedRecords = 0;
   let totalRecords = 0;
   let hitOlderData = false;
 
-  // ztdy API 不支持日期过滤，数据按时间倒序返回
-  // 策略：并发拉取，客户端按 PayDate 过滤，遇到旧数据停止
-  const startMs = new Date(dateRange.start).getTime();
-  const endMs = new Date(dateRange.end + ' 23:59:59').getTime();
-
-  for (let batch = 0; batch < MAX_AGGREGATE_PAGES / CONCURRENCY && !hitOlderData; batch++) {
-    const pages = Array.from({ length: CONCURRENCY }, (_, i) => batch * CONCURRENCY + i + 1)
-      .filter((p) => p <= MAX_AGGREGATE_PAGES);
-
+  for (let batch = 0; batch < SAMPLE_PAGES / CONCURRENCY && !hitOlderData; batch++) {
+    const pages = Array.from({ length: CONCURRENCY }, (_, i) => batch * CONCURRENCY + i + 1);
     const results = await Promise.all(
       pages.map((page) =>
         adapter.getOrders({ pageIndex: page, pageSize: AGGREGATE_PAGE_SIZE }),
@@ -61,23 +59,38 @@ export async function getSalesStats(
 
     for (const result of results) {
       if (totalRecords === 0) totalRecords = result.pagination.totalCount;
-
       for (const order of result.items) {
         scannedRecords++;
         if (!order.payDate) continue;
         const payMs = new Date(order.payDate).getTime();
         if (payMs >= startMs && payMs <= endMs) {
-          totalAmount += order.totalAmount;
-          orderCount++;
+          sampleAmount += order.totalAmount;
+          sampleHits++;
         } else if (payMs < startMs) {
           hitOlderData = true;
         }
       }
-
-      if (results[0] && batch * CONCURRENCY + 1 >= results[0].pagination.totalPages) {
-        hitOlderData = true;
-      }
     }
+  }
+
+  // 如果采样全部命中（说明还没扫到日期范围外），用采样均值 × 估算总量
+  const sampleSize = scannedRecords;
+  const hitRate = sampleSize > 0 ? sampleHits / sampleSize : 0;
+  const avgAmountPerOrder = sampleHits > 0 ? sampleAmount / sampleHits : 0;
+
+  let totalAmount: number;
+  let orderCount: number;
+
+  if (hitOlderData || hitRate < 0.95) {
+    // 采样已覆盖到日期边界外，直接用采样的精确值
+    totalAmount = sampleAmount;
+    orderCount = sampleHits;
+  } else {
+    // 采样全命中，说明数据量超过采样范围，用比例估算
+    // 估算月订单数 = sampleHits / hitRate （近似）
+    const estimatedOrders = Math.round(sampleHits / hitRate * (totalRecords / sampleSize > 1 ? Math.min(totalRecords / sampleSize, totalRecords / AGGREGATE_PAGE_SIZE / SAMPLE_PAGES) : 1));
+    totalAmount = Math.round(avgAmountPerOrder * estimatedOrders * 100) / 100;
+    orderCount = estimatedOrders;
   }
 
   const data: AggregateResult<SalesStats> = {
@@ -118,7 +131,7 @@ export async function getTopSuppliers(
   let scannedRecords = 0;
   let totalRecords = 0;
 
-  for (let page = 1; page <= MAX_AGGREGATE_PAGES; page++) {
+  for (let page = 1; page <= SAMPLE_PAGES; page++) {
     const result = await adapter.getOrders({
       pageIndex: page,
       pageSize: AGGREGATE_PAGE_SIZE,
@@ -187,7 +200,7 @@ export async function getOrderStatusDistribution(
   let scannedRecords = 0;
   let totalRecords = 0;
 
-  for (let page = 1; page <= MAX_AGGREGATE_PAGES; page++) {
+  for (let page = 1; page <= SAMPLE_PAGES; page++) {
     const result = await adapter.getOrders({
       pageIndex: page,
       pageSize: AGGREGATE_PAGE_SIZE,
