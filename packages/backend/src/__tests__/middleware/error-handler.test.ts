@@ -1,7 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Request, Response } from 'express';
 import { ZodError, ZodIssueCode } from 'zod';
-import { globalErrorHandler, notFoundHandler } from '../../middleware/error-handler.js';
+
+vi.mock('../../lib/env.js', () => ({
+  env: { NODE_ENV: 'test' },
+}));
 
 // Mock logger
 vi.mock('../../utils/logger.js', () => ({
@@ -12,6 +15,8 @@ vi.mock('../../utils/logger.js', () => ({
     info: vi.fn(),
   }),
 }));
+
+import { globalErrorHandler, notFoundHandler } from '../../middleware/error-handler.js';
 
 function createMockContext(requestId = 'test-req-id') {
   const json = vi.fn();

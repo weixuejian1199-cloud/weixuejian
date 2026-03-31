@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Request, Response } from 'express';
 
+vi.mock('../../lib/env.js', () => ({
+  env: { NODE_ENV: 'test' },
+}));
+
 vi.mock('../../utils/logger.js', () => ({
   childLogger: () => ({
     warn: vi.fn(),

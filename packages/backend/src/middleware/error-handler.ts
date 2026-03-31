@@ -2,8 +2,9 @@ import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { sendError } from '../utils/response.js';
 import { childLogger } from '../utils/logger.js';
+import { env } from '../lib/env.js';
 
-const isProduction = process.env['NODE_ENV'] === 'production';
+const isProduction = env.NODE_ENV === 'production';
 
 /**
  * 404 路由兜底中间件 — 放在所有路由之后、全局错误处理之前

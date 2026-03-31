@@ -1,14 +1,8 @@
 import Redis from 'ioredis';
+import { env } from './env.js';
 import { logger } from '../utils/logger.js';
 
-// 延迟导入 env 避免循环依赖：redis 模块在 env 验证之后才被使用
-// 但模块加载时 env.ts 已经执行完毕
-const getRedisUrl = (): string => {
-  // 从已验证的环境变量读取（支持密码，如 redis://:password@host:port/db）
-  return process.env['REDIS_URL'] ?? 'redis://localhost:6379';
-};
-
-export const redis = new Redis(getRedisUrl(), {
+export const redis = new Redis(env.REDIS_URL, {
   maxRetriesPerRequest: 3,
   lazyConnect: true,
   retryStrategy(times: number) {

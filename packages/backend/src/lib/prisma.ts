@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
+import { env } from './env.js';
 
-const isProduction = process.env['NODE_ENV'] === 'production';
+const isProduction = env.NODE_ENV === 'production';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;

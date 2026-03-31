@@ -4,10 +4,11 @@ import { prisma } from '../lib/prisma.js';
 import { redis } from '../lib/redis.js';
 import { sendSuccess } from '../utils/response.js';
 import { childLogger } from '../utils/logger.js';
+import { env } from '../lib/env.js';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 
-const isProduction = process.env['NODE_ENV'] === 'production';
+const isProduction = env.NODE_ENV === 'production';
 
 /** 健康检查单项超时（毫秒） */
 const HEALTH_CHECK_TIMEOUT_MS = 2000;
@@ -118,7 +119,7 @@ detailHealthRouter.get(
     if (!isProduction) {
       data['version'] = appVersion;
       data['uptime'] = process.uptime();
-      data['environment'] = process.env['NODE_ENV'] ?? 'development';
+      data['environment'] = env.NODE_ENV;
     }
 
     sendSuccess(res, data);

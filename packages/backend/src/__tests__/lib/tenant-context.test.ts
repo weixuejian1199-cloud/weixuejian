@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 
+vi.mock('../../lib/env.js', () => ({
+  env: { NODE_ENV: 'test' },
+}));
+
 vi.mock('../../lib/prisma.js', () => ({
   prisma: {
     $extends: vi.fn().mockReturnValue({ _extended: true }),

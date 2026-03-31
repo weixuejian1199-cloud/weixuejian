@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
 
+vi.mock('../../lib/env.js', () => ({
+  env: { NODE_ENV: 'test' },
+}));
+
 // Use vi.hoisted to create mocks that can be referenced in vi.mock factories
 const { mockQueryRaw, mockPing } = vi.hoisted(() => ({
   mockQueryRaw: vi.fn(),
