@@ -12,6 +12,37 @@ import { prisma } from '../../lib/prisma.js';
 import { logger } from '../../utils/logger.js';
 import { orchestrateChat } from '../ai/chat-orchestrator.js';
 
+// ─── 飞书事件消息结构 ───────────────────────────────────────
+
+/** 飞书 im.message.receive_v1 事件中的 message 字段 */
+interface FeishuEventMessage {
+  message_id?: string;
+  chat_id?: string;
+  message_type?: string;
+  content?: string;
+}
+
+/** 飞书 im.message.receive_v1 事件中的 sender 字段 */
+interface FeishuEventSender {
+  sender_id?: {
+    open_id?: string;
+  };
+}
+
+/** 飞书 im.message.receive_v1 事件 payload */
+interface FeishuMessageEvent {
+  message?: FeishuEventMessage;
+  sender?: FeishuEventSender;
+}
+
+/** 安全地将 unknown 转为飞书事件结构 */
+function asFeishuEvent(data: unknown): FeishuMessageEvent {
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    return data as FeishuMessageEvent;
+  }
+  return {};
+}
+
 // ─── 配置常量 ────────────────────────────────────────────
 
 const SESSION_TTL_MS = 4 * 60 * 60 * 1000; // 4小时
@@ -213,28 +244,28 @@ async function sendText(chatId: string, text: string, retries = 2): Promise<bool
 
 // ─── 消息处理 ────────────────────────────────────────────
 
-async function handleMessage(data: Record<string, unknown>): Promise<void> {
-  const message = data['message'] as Record<string, unknown> | undefined;
-  const sender = data['sender'] as Record<string, unknown> | undefined;
+async function handleMessage(event: FeishuMessageEvent): Promise<void> {
+  const message = event.message;
+  const sender = event.sender;
 
-  if (!message?.['message_id']) return;
-  const messageId = String(message['message_id']);
+  if (!message?.message_id) return;
+  const messageId = String(message.message_id);
   if (isDuplicate(messageId)) return;
 
-  const chatId = String(message['chat_id']);
-  const senderId =
-    (sender?.['sender_id'] as Record<string, unknown> | undefined)?.['open_id'] ?? 'unknown';
+  const chatId = String(message.chat_id);
+  const senderId = sender?.sender_id?.open_id ?? 'unknown';
 
-  if (message['message_type'] !== 'text') {
+  if (message.message_type !== 'text') {
     await sendText(chatId, '目前只支持文本消息。');
     return;
   }
 
   let text: string;
   try {
-    const content = JSON.parse(String(message['content'])) as { text?: string };
+    const content = JSON.parse(String(message.content)) as { text?: string };
     text = content.text ?? '';
   } catch {
+    logger.warn({ content: message.content, chatId }, '[lingxi] Failed to parse message content JSON');
     return;
   }
 
@@ -366,9 +397,9 @@ export async function startLingxiBridge(): Promise<void> {
     eventDispatcher: new lark.EventDispatcher({}).register({
       'im.message.receive_v1': async (data: unknown) => {
         try {
-          await handleMessage(data as Record<string, unknown>);
+          await handleMessage(asFeishuEvent(data));
         } catch (err) {
-          logger.error({ err: (err as Error).message }, '[lingxi] Unhandled error in handler');
+          logger.error({ err: err instanceof Error ? err.message : String(err) }, '[lingxi] Unhandled error in handler');
         }
         return {};
       },
