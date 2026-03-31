@@ -53,8 +53,13 @@ export const ERROR_CODES = {
 
   // === 客服 ===
   CS_SESSION_NOT_FOUND: { httpStatus: 404, message: '客服会话不存在' },
+  CS_SESSION_CLOSED: { httpStatus: 400, message: '客服会话已关闭' },
+  CS_MESSAGE_NOT_FOUND: { httpStatus: 404, message: '客服消息不存在' },
   CS_MESSAGE_NOT_DRAFT: { httpStatus: 400, message: '只能确认草稿状态的消息' },
+  CS_TICKET_NOT_FOUND: { httpStatus: 404, message: '客服工单不存在' },
+  CS_ORDER_NOT_FOUND: { httpStatus: 404, message: '关联订单不存在' },
   CS_ESCALATED: { httpStatus: 200, message: '已升级到人工处理' },
+  CS_IMAGE_NOT_SUPPORTED: { httpStatus: 400, message: '暂不支持图片消息' },
 
   // === 系统 ===
   INTERNAL_ERROR: { httpStatus: 500, message: '服务器内部错误' },
