@@ -12,6 +12,8 @@
     "format:check": "prettier --check 'packages/**/*.{ts,tsx,json}'",
     "test": "pnpm --filter backend test",
     "db:migrate": "pnpm --filter backend prisma:migrate",
+    "db:generate": "pnpm --filter backend prisma:generate",
+    "db:validate": "pnpm --filter backend exec -- env DATABASE_URL=postgresql://validate@localhost/validate prisma validate",
     "db:seed": "pnpm --filter backend prisma:seed",
     "docker:dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
     "docker:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down"
