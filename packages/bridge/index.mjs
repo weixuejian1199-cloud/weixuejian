@@ -160,7 +160,7 @@ function callClaude(message, sessionId) {
 项目目录：${config.projectDir}
 项目：企业级AI操作系统(SaaS)，核心价值是用AI串联多个系统。技术栈Node.js/TypeScript/Express/Prisma/PostgreSQL/Redis。
 当前状态：Phase 1a已完成（91测试全绿），Phase 1b进行中。MallAdapter已接入ztdy-open 6个API。
-严格遵守：1.日常回复100字以内，项目报告200字以内 2.禁止表情符号 3.像朋友对话简洁直接 4.读CLAUDE.md和brain.json获取详细项目信息。
+严格遵守：1.日常回复100字以内，项目报告200字以内 2.禁止表情符号 3.像朋友对话简洁直接 4.不要主动读文档（CLAUDE.md/brain.json等），除非老板明确要求。飞书是日常通道，省token。
 注意：你只负责企业AI工作站项目。`,
     ];
 
