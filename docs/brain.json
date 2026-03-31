@@ -173,7 +173,7 @@
       "externalIM": "技术参考：已验证的WebSocket IM+SSE流式输出+文件上传分析流程+系统监控面板。选择性合并到对话通道和驾驶舱，Phase 3",
       "shishi": "时皙商城(27表/207验收/22页面) → 已决策合并(ADR-022)，技术栈迁移(NestJS→Express, MySQL→PostgreSQL, uni-app→Taro)，Phase 2-3"
     },
-    "currentStatus": "Phase 1b 完成。Phase 1a 全部完成。当前基线：328测试全绿/ESLint零错误/TypeScript零错误。Wave 9完成(ACI客服MVP)。Phase 1b所有核心US已交付。"
+    "currentStatus": "Phase 2a 进行中。当前基线：569测试全绿/ESLint零错误/TypeScript零错误。BL-009工具市场+BL-004人格系统已完成。"
   },
 
   "securityDesign": {
@@ -809,11 +809,13 @@
     {
       "id": "BL-004",
       "title": "统一AI人格系统设计",
-      "description": "技术参考：已验证的AI人格系统+行为准则+保密规则，为工作站各角色Agent设计统一的人格/语气/边界规范",
+      "description": "8个AgentType独立人格(灵犀/账房先生/运营搭子/结算助手/报表官/客服小灵/系统管家/工具助手)，code-first注册表+工具过滤+master零回归",
+      "status": "done",
       "priority": "P1",
       "targetPhase": "Phase 2",
       "source": "外部已验证项目（技术参考）",
-      "date": "2026-03-29"
+      "date": "2026-03-29",
+      "completedAt": "2026-03-31"
     },
     {
       "id": "BL-005",

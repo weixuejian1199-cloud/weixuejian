@@ -1,9 +1,26 @@
 # 进度接力
 
 ## 最后更新
-- 时间：2026-03-31 17:00
+- 时间：2026-03-31 18:00
 - Agent：CTO Agent
-- 任务：Phase 2a Wave 10 — BL-009 工具市场 MVP
+- 任务：Phase 2a — BL-004 AI人格系统
+
+## Phase 2a: BL-004 AI人格系统 ✅ 完成 (488→569测试)
+- **架构**: Code-first人格注册表，8个AgentType独立人格
+- **新增文件(3)**:
+  - persona-registry.ts: 8个人格定义(灵犀/账房先生/运营搭子/结算助手/报表官/客服小灵/系统管家/工具助手)
+  - persona-registry.test.ts: 49测试
+  - system-prompt.test.ts: 25测试
+- **改造文件(6)**:
+  - system-prompt.ts: 按agentType构建不同提示词，master零回归
+  - chat-orchestrator.ts: 传agentType到prompt+tools(2行)
+  - tool-resolver.ts: 按人格toolCategories过滤工具 + 7新测试
+  - builtin-tools.ts: 导出TOOL_META_CATEGORIES(3行)
+  - routes/ai: agentType枚举+settlement/tool
+  - eslint.config.mjs: varsIgnorePattern修复
+- **人格工具过滤**: finance→finance+analytics / operation→operation+analytics / report→analytics / customer_service→operation / master+tool→全部
+- 基线: 569测试全绿(45文件) / TypeScript零错误 / ESLint零错误
+- **下一步**: ECS部署验证 / ACI观察期数据收集 / Phase 2a其他BL
 
 ## Phase 2a: BL-009 工具市场 MVP ✅ 完成 (454→488测试)
 - **架构**: DB驱动的工具发现 + 执行委托 + 硬编码降级
