@@ -43,6 +43,10 @@ const paginationSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
 });
 
+const idParamSchema = z.object({
+  id: z.string().uuid('无效的资源ID格式'),
+});
+
 const sessionListSchema = paginationSchema.extend({
   status: z.string().optional(),
 });
@@ -85,6 +89,12 @@ csRouter.post('/message/incoming', async (req, res) => {
 // ─── POST /message/:id/confirm — 人工确认草稿 ───────────
 
 csRouter.post('/message/:id/confirm', async (req, res) => {
+  const paramsParsed = idParamSchema.safeParse(req.params);
+  if (!paramsParsed.success) {
+    sendError(res, 'VALIDATION_ERROR', paramsParsed.error.issues[0]?.message ?? '无效的ID', 400);
+    return;
+  }
+
   const parsed = confirmSchema.safeParse(req.body);
   if (!parsed.success) {
     sendError(res, 'VALIDATION_ERROR', '请求参数校验失败', 400, parsed.error.issues);
@@ -100,13 +110,13 @@ csRouter.post('/message/:id/confirm', async (req, res) => {
 
   try {
     const result = await messageService.confirmDraft(
-      req.params.id,
+      paramsParsed.data.id,
       tenantId,
       userId,
       parsed.data.action,
       parsed.data.editedContent,
     );
-    sendSuccess(res, { messageId: req.params.id, ...result });
+    sendSuccess(res, { messageId: paramsParsed.data.id, ...result });
   } catch (err) {
     if (err instanceof AppError) {
       sendError(res, err.code);
@@ -153,6 +163,12 @@ csRouter.get('/sessions', async (req, res) => {
 // ─── GET /sessions/:id — 会话详情 ──────────────────────
 
 csRouter.get('/sessions/:id', async (req, res) => {
+  const paramsParsed = idParamSchema.safeParse(req.params);
+  if (!paramsParsed.success) {
+    sendError(res, 'VALIDATION_ERROR', paramsParsed.error.issues[0]?.message ?? '无效的ID', 400);
+    return;
+  }
+
   const tenantId = req.tenantId;
   if (!tenantId) {
     sendError(res, 'AUTH_INVALID_TOKEN', '认证信息不完整', 401);
@@ -160,7 +176,7 @@ csRouter.get('/sessions/:id', async (req, res) => {
   }
 
   try {
-    const session = await sessionService.getSessionById(req.params.id, tenantId);
+    const session = await sessionService.getSessionById(paramsParsed.data.id, tenantId);
     if (!session) {
       sendError(res, 'CS_SESSION_NOT_FOUND');
       return;
@@ -175,6 +191,12 @@ csRouter.get('/sessions/:id', async (req, res) => {
 // ─── GET /sessions/:id/messages — 会话消息列表 ─────────
 
 csRouter.get('/sessions/:id/messages', async (req, res) => {
+  const paramsParsed = idParamSchema.safeParse(req.params);
+  if (!paramsParsed.success) {
+    sendError(res, 'VALIDATION_ERROR', paramsParsed.error.issues[0]?.message ?? '无效的ID', 400);
+    return;
+  }
+
   const parsed = paginationSchema.safeParse(req.query);
   if (!parsed.success) {
     sendError(res, 'VALIDATION_ERROR', '请求参数校验失败', 400, parsed.error.issues);
@@ -189,7 +211,7 @@ csRouter.get('/sessions/:id/messages', async (req, res) => {
 
   try {
     const result = await messageService.listMessagesBySession(
-      req.params.id,
+      paramsParsed.data.id,
       tenantId,
       parsed.data.page,
       parsed.data.pageSize,

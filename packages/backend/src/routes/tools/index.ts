@@ -45,6 +45,10 @@ const activateBodySchema = z.object({
   config: z.record(z.unknown()).optional(),
 });
 
+const idParamSchema = z.object({
+  id: z.string().min(1, '无效的工具ID'),
+});
+
 // ─── GET / — 工具目录 ───────────────────────────────────
 
 toolsRouter.get(
@@ -76,7 +80,9 @@ toolsRouter.get(
 toolsRouter.get(
   '/instances/:id',
   asyncHandler(async (req, res) => {
-    const instance = await getInstanceById(String(req.params['id']), req.tenantId!);
+    const pp = idParamSchema.safeParse(req.params);
+    if (!pp.success) { sendError(res, 'VALIDATION_ERROR', pp.error.issues[0]?.message ?? '无效的ID', 400); return; }
+    const instance = await getInstanceById(pp.data.id, req.tenantId!);
     if (!instance) {
       sendError(res, 'TOOL_INSTANCE_NOT_FOUND', undefined, 404);
       return;
@@ -90,7 +96,9 @@ toolsRouter.get(
 toolsRouter.get(
   '/:id',
   asyncHandler(async (req, res) => {
-    const def = await getToolDefinitionById(String(req.params['id']), req.tenantId!);
+    const pp = idParamSchema.safeParse(req.params);
+    if (!pp.success) { sendError(res, 'VALIDATION_ERROR', pp.error.issues[0]?.message ?? '无效的ID', 400); return; }
+    const def = await getToolDefinitionById(pp.data.id, req.tenantId!);
     if (!def) {
       sendError(res, 'TOOL_NOT_FOUND', undefined, 404);
       return;
@@ -110,9 +118,11 @@ toolsRouter.post(
       return;
     }
 
+    const pp2 = idParamSchema.safeParse(req.params);
+    if (!pp2.success) { sendError(res, 'VALIDATION_ERROR', pp2.error.issues[0]?.message ?? '无效的ID', 400); return; }
     const instance = await activateTool(
       req.tenantId!,
-      String(req.params['id']),
+      pp2.data.id,
       parsed.data.config as never,
     );
 
@@ -130,7 +140,9 @@ toolsRouter.post(
 toolsRouter.post(
   '/:id/deactivate',
   asyncHandler(async (req, res) => {
-    await deactivateTool(req.tenantId!, String(req.params['id']));
+    const pp3 = idParamSchema.safeParse(req.params);
+    if (!pp3.success) { sendError(res, 'VALIDATION_ERROR', pp3.error.issues[0]?.message ?? '无效的ID', 400); return; }
+    await deactivateTool(req.tenantId!, pp3.data.id);
     sendSuccess(res, { message: '工具已停用' });
   }),
 );

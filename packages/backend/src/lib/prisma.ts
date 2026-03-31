@@ -38,7 +38,6 @@ const tenantGuardExtension = Prisma.defineExtension({
   },
 });
 
-// eslint-disable-next-line no-var -- Prisma singleton pattern for HMR
 declare global { var __prisma: PrismaClient | undefined; }
 
 const basePrisma =

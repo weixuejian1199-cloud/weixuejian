@@ -132,11 +132,11 @@ authRouter.post(
     } catch (err) {
       if (err instanceof WechatAuthError) {
         if (err.code === 'CODE_INVALID') {
-          sendError(res, 'AUTH_WECHAT_CODE_INVALID', err.message, 400);
+          sendError(res, 'AUTH_WECHAT_CODE_INVALID');
           return;
         }
         log.error({ code: err.code, message: err.message }, 'WeChat auth error');
-        sendError(res, 'SERVICE_UNAVAILABLE', err.message, 503);
+        sendError(res, 'SERVICE_UNAVAILABLE');
         return;
       }
       throw err;
@@ -236,7 +236,7 @@ authRouter.post(
       sendSuccess(res, tokenPair);
     } catch (err) {
       if (err instanceof TokenRotationError) {
-        sendError(res, 'AUTH_REFRESH_INVALID', err.message, 401);
+        sendError(res, 'AUTH_REFRESH_INVALID');
         return;
       }
       throw err;

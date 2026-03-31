@@ -1,8 +1,7 @@
 {
   "projectName": "企业AI工作站",
-  "version": "2.7.0",
+  "version": "3.3.0",
   "lastUpdated": "2026-03-31",
-
   "projectBrief": {
     "_instruction": "新对话必读。读完这一段就能理解项目全貌，不需要打开其他文档。",
     "identity": "创始人同时拥有三个品牌：时皙（生活品牌，主品牌）、AIBIAINI（生酮营养品）、卢司令（社群电商，2026年关停）。企业AI工作站以时皙为主题。",
@@ -62,10 +61,23 @@
       ],
       "rulePriorityMatrix": {
         "_instruction": "多规则同时触发时按优先级执行，高优先级命中即决策，所有触发规则均记录在triggeredRules中",
-        "P0_安全闸门": ["GATE_EMOTION(情绪激动)", "GATE_FRAUD(欺诈嫌疑)", "GATE_REFUND_REQUEST(退款意图)", "GATE_LOW_CONFIDENCE(AI置信度<0.7)"],
-        "P1_合规拦截": ["RULE_04(30天退货>=3,P1a)", "RULE_05(金额>500,P1b)"],
-        "P2_业务规则": ["RULE_01(未收货ProcessNode<3)"],
-        "P3_品类时效": ["RULE_03(食品已拆封)", "RULE_02(收货>7天)"],
+        "P0_安全闸门": [
+          "GATE_EMOTION(情绪激动)",
+          "GATE_FRAUD(欺诈嫌疑)",
+          "GATE_REFUND_REQUEST(退款意图)",
+          "GATE_LOW_CONFIDENCE(AI置信度<0.7)"
+        ],
+        "P1_合规拦截": [
+          "RULE_04(30天退货>=3,P1a)",
+          "RULE_05(金额>500,P1b)"
+        ],
+        "P2_业务规则": [
+          "RULE_01(未收货ProcessNode<3)"
+        ],
+        "P3_品类时效": [
+          "RULE_03(食品已拆封)",
+          "RULE_02(收货>7天)"
+        ],
         "P4_默认": "无规则触发 → APPROVE",
         "conflictResolution": "同优先级取更严格结果（如P3中RULE_03无申诉通道 > RULE_02可申诉）。同优先级内按子优先级排序，安全类(欺诈) > 业务类(金额)，即P1a > P1b"
       },
@@ -85,8 +97,31 @@
         "情绪激动": {
           "description": "P0，高强度词任一命中或中强度词>=2个，立即ESCALATE",
           "emotionKeywords": {
-            "high": ["投诉", "律师", "12315", "工商", "法院", "曝光", "媒体", "消协"],
-            "medium": ["不满意", "差评", "太慢了", "骗人", "坑人", "垃圾", "举报", "失望", "生气", "无语", "恶心", "后悔", "上当"],
+            "high": [
+              "投诉",
+              "律师",
+              "12315",
+              "工商",
+              "法院",
+              "曝光",
+              "媒体",
+              "消协"
+            ],
+            "medium": [
+              "不满意",
+              "差评",
+              "太慢了",
+              "骗人",
+              "坑人",
+              "垃圾",
+              "举报",
+              "失望",
+              "生气",
+              "无语",
+              "恶心",
+              "后悔",
+              "上当"
+            ],
             "negationExclusion": "包含否定词(不想/不会/没有/并非/不是/不要)修饰情绪词时不计入"
           }
         },
@@ -175,7 +210,6 @@
     },
     "currentStatus": "Phase 2a 进行中。当前基线：569测试全绿/ESLint零错误/TypeScript零错误。BL-009工具市场+BL-004人格系统已完成。"
   },
-
   "securityDesign": {
     "authentication": "JWT HS256(Phase 1临时) → RS256(Phase 1b US-P1b-001升级), access 15min, refresh 7d, Redis黑名单(fail-secure: Redis不可用=拒绝请求503)",
     "authorization": "RBAC + tenantId隔离, 权限检查在API Gateway统一执行",
@@ -186,7 +220,6 @@
     "csrf": "SameSite=Strict + X-Requested-With header验证",
     "audit": "所有敏感操作写AuditLog, 保留365天"
   },
-
   "missingRoles": {
     "_note": "v2.6审计后更新的缺失岗位。DocSync已在v2.6审计中实际运作，建议Phase 1b正式化",
     "docSyncAgent": "文档一致性守护Agent — 每次提交自动检查brain.json任务状态/错误码/部署描述与代码的一致性（v2.6审计发现文档严重滞后，5个任务状态+16个错误码+部署描述全部过时）",
@@ -194,12 +227,10 @@
     "sreAgent": "SRE Agent — 监控告警/容量规划/性能优化/CI-CD（v2.6审计发现无GitHub Actions pipeline）",
     "customerSuccessAgent": "客户成功Agent — SLA追踪/用户反馈/续约"
   },
-
-  "currentPhase": "Phase 1b",
+  "currentPhase": "Phase 2a",
   "phaseGoal": "Phase 1a（第1-3周）：项目脚手架+精简Schema(AI/系统层)+健康检查API+Docker本地环境+MallAdapter接入ztdy-open真实数据；Phase 1b（第4-9周）：JWT认证+多租户+AI对话引擎(通义千问+SSE+tool_call)+5个运营查询真实场景+ACI客服MVP(退货审核判断)+双飞书对接(Bridge+AI对话引擎)+限流+备份",
   "phaseDeadline": "2026-06-06",
   "phaseNote": "v2.3排期（9人团队审查后）：Phase 1a目标4月20日（含2个技术Spike），Phase 1b目标6月6日。总工期30-35工作日。关键变化：双飞书从Wave9→Wave4(验证通道先行)，多租户简化节省1天，供应商对账删除。方案先行——方案不清晰不开工。",
-
   "activeTasks": [
     {
       "id": "US-P1a-001",
@@ -224,7 +255,12 @@
       },
       "priority": "P0",
       "blockedBy": [],
-      "blocks": ["US-P1a-002", "US-P1a-005", "US-P1a-006", "US-P1a-009"],
+      "blocks": [
+        "US-P1a-002",
+        "US-P1a-005",
+        "US-P1a-006",
+        "US-P1a-009"
+      ],
       "wave": 1,
       "phase": "1a",
       "createdAt": "2026-03-29"
@@ -250,8 +286,14 @@
         "exclude": "不建商品/订单/供应商等业务表（Phase 1从API读取不落库）、不写种子数据（Phase 1b）、不配置RLS"
       },
       "priority": "P0",
-      "blockedBy": ["US-P1a-001"],
-      "blocks": ["US-P1b-001", "US-P1b-002", "US-P1b-003"],
+      "blockedBy": [
+        "US-P1a-001"
+      ],
+      "blocks": [
+        "US-P1b-001",
+        "US-P1b-002",
+        "US-P1b-003"
+      ],
       "wave": 2,
       "phase": "1a",
       "createdAt": "2026-03-29",
@@ -281,7 +323,9 @@
         "exclude": "不做 Prometheus 指标暴露（Phase 1b）"
       },
       "priority": "P0",
-      "blockedBy": ["US-P1a-001"],
+      "blockedBy": [
+        "US-P1a-001"
+      ],
       "blocks": [],
       "wave": 2,
       "phase": "1a",
@@ -309,8 +353,12 @@
         "exclude": "不配 nginx（Phase 1b）、不配 prometheus/grafana（Phase 1b）、不配生产 compose"
       },
       "priority": "P0",
-      "blockedBy": ["US-P1a-001"],
-      "blocks": ["US-P1b-008"],
+      "blockedBy": [
+        "US-P1a-001"
+      ],
+      "blocks": [
+        "US-P1b-008"
+      ],
       "wave": 2,
       "phase": "1a",
       "createdAt": "2026-03-29"
@@ -341,8 +389,15 @@
         "exclude": "不做写操作（Phase 2第三方配合开放）、不做数据落库（Phase 1从API实时读）"
       },
       "priority": "P0",
-      "blockedBy": ["US-P1a-001", "US-P1a-002"],
-      "blocks": ["US-P1b-003", "US-P1b-004", "US-P1b-005"],
+      "blockedBy": [
+        "US-P1a-001",
+        "US-P1a-002"
+      ],
+      "blocks": [
+        "US-P1b-003",
+        "US-P1b-004",
+        "US-P1b-005"
+      ],
       "wave": 3,
       "phase": "1a",
       "createdAt": "2026-03-30",
@@ -373,8 +428,12 @@
         "exclude": "不做权限中间件（Phase 2处理），不做企微登录（Phase 2）"
       },
       "priority": "P0",
-      "blockedBy": ["US-P1a-002"],
-      "blocks": ["US-P1b-002"],
+      "blockedBy": [
+        "US-P1a-002"
+      ],
+      "blocks": [
+        "US-P1b-002"
+      ],
       "wave": 1,
       "phase": "1b",
       "createdAt": "2026-03-29",
@@ -401,8 +460,13 @@
         "exclude": "不做RLS策略脚本（Phase 2）、不做多租户隔离测试（Phase 2引入第二租户时）、不做 dataScope 细粒度（Phase 2）"
       },
       "priority": "P0",
-      "blockedBy": ["US-P1a-002", "US-P1b-001"],
-      "blocks": ["US-P1b-003"],
+      "blockedBy": [
+        "US-P1a-002",
+        "US-P1b-001"
+      ],
+      "blocks": [
+        "US-P1b-003"
+      ],
       "wave": 6,
       "phase": "1b",
       "createdAt": "2026-03-29",
@@ -432,8 +496,14 @@
         "exclude": "不做多Agent编排（Phase 2）、不做RAG知识库（Phase 2）、不做图片理解（Phase 2）"
       },
       "priority": "P0",
-      "blockedBy": ["US-P1a-009", "US-P1b-002"],
-      "blocks": ["US-P1b-004", "US-P1b-005"],
+      "blockedBy": [
+        "US-P1a-009",
+        "US-P1b-002"
+      ],
+      "blocks": [
+        "US-P1b-004",
+        "US-P1b-005"
+      ],
       "wave": 3,
       "phase": "1b",
       "createdAt": "2026-03-30"
@@ -460,7 +530,9 @@
         "exclude": "不做通用查询框架（Phase 2）、不做自然语言→SQL转换"
       },
       "priority": "P0",
-      "blockedBy": ["US-P1b-003"],
+      "blockedBy": [
+        "US-P1b-003"
+      ],
       "blocks": [],
       "wave": 4,
       "phase": "1b",
@@ -492,7 +564,9 @@
         "exclude": "不做自动回复发送（Phase 2半自动）、不做退款执行、不做多渠道接入（Phase 2）"
       },
       "priority": "P0",
-      "blockedBy": ["US-P1b-003"],
+      "blockedBy": [
+        "US-P1b-003"
+      ],
       "blocks": [],
       "wave": 4,
       "phase": "1b",
@@ -520,8 +594,14 @@
         "exclude": "不做Taro前端（推迟到Phase 2）、不做微信/Telegram通道（Phase 2扩展）"
       },
       "priority": "P0-最高",
-      "blockedBy": ["US-P1a-001"],
-      "blocks": ["US-P1b-003", "US-P1b-004", "US-P1b-005"],
+      "blockedBy": [
+        "US-P1a-001"
+      ],
+      "blocks": [
+        "US-P1b-003",
+        "US-P1b-004",
+        "US-P1b-005"
+      ],
       "wave": 4,
       "phase": "1b",
       "createdAt": "2026-03-30",
@@ -549,7 +629,9 @@
         "exclude": "不做IP级限流（已在US-P1b-001登录接口实现）"
       },
       "priority": "P1",
-      "blockedBy": ["US-P1a-001"],
+      "blockedBy": [
+        "US-P1a-001"
+      ],
       "blocks": [],
       "wave": 5,
       "phase": "1b",
@@ -579,7 +661,9 @@
         "exclude": "不做恢复演练自动化（手动执行），不做实时流复制（Phase 2+）"
       },
       "priority": "P1",
-      "blockedBy": ["US-P1a-006"],
+      "blockedBy": [
+        "US-P1a-006"
+      ],
       "blocks": [],
       "wave": 6,
       "phase": "1b",
@@ -604,8 +688,12 @@
         "AC-08: 基础测试套件(middleware+routes+utils至少15个测试)"
       ],
       "priority": "P0",
-      "blockedBy": ["US-P1a-001"],
-      "blocks": ["US-P1b-001"],
+      "blockedBy": [
+        "US-P1a-001"
+      ],
+      "blocks": [
+        "US-P1b-001"
+      ],
       "wave": "2.5",
       "phase": "1a",
       "createdAt": "2026-03-30"
@@ -629,21 +717,26 @@
         "exclude": "不做CSRF(Phase 1无前端)、不做Redis TLS(部署US)、不做CI/CD、不新增Phase 2预留表"
       },
       "priority": "P0",
-      "blockedBy": ["US-P1a-010"],
-      "blocks": ["US-P1a-009"],
+      "blockedBy": [
+        "US-P1a-010"
+      ],
+      "blocks": [
+        "US-P1a-009"
+      ],
       "wave": "2.5b",
       "phase": "1a",
       "createdAt": "2026-03-30",
       "updateNote": "项目初期不接受补丁，必须重构。CTO全面体检发现6个P0安全问题+8个P1问题，通过重构（非补丁）一次性解决。核心原则：fail-secure（外部依赖不可用=拒绝请求，不是放行）。HS256为Phase 1临时决策，Phase 1b(US-P1b-001)升级RS256。"
     }
   ],
-
   "executionPlan": {
     "description": "Phase 1 执行波次图（v2.2 CTO审查后修正版）：含Critic审查时间、工作量重估、并行性修正",
     "waves": [
       {
         "wave": 1,
-        "tasks": ["US-P1a-001"],
+        "tasks": [
+          "US-P1a-001"
+        ],
         "description": "地基：项目脚手架 ✅ 已完成并提交(commit 9b60167)",
         "parallel": false,
         "estimatedDays": 1,
@@ -652,7 +745,11 @@
       },
       {
         "wave": 2,
-        "tasks": ["US-P1a-002", "US-P1a-005", "US-P1a-006"],
+        "tasks": [
+          "US-P1a-002",
+          "US-P1a-005",
+          "US-P1a-006"
+        ],
         "description": "三路并行：Data Agent做Schema精简版 / BE Agent做健康检查 / DevOps Agent做Docker ✅ 全部完成",
         "parallel": true,
         "estimatedDays": 3,
@@ -661,7 +758,11 @@
       },
       {
         "wave": "2.5",
-        "tasks": ["Critic审查Wave2", "US-P1a-010", "US-P1a-011"],
+        "tasks": [
+          "Critic审查Wave2",
+          "US-P1a-010",
+          "US-P1a-011"
+        ],
         "description": "方案审查+代码审查 + 安全中间件套件(US-P1a-010) + 安全基线重构(US-P1a-011, fail-secure+类型安全+Schema对齐) ✅ 全部完成",
         "estimatedDays": 2,
         "phase": "1a",
@@ -670,7 +771,9 @@
       },
       {
         "wave": 3,
-        "tasks": ["US-P1a-009"],
+        "tasks": [
+          "US-P1a-009"
+        ],
         "description": "数据通道：MallAdapter接入ztdy-open 6个API + Redis缓存 + 聚合工具函数 ✅ 完成",
         "parallel": false,
         "estimatedDays": 5,
@@ -680,7 +783,11 @@
       },
       {
         "wave": "3.5",
-        "tasks": ["Critic审查Wave3", "SPIKE-001", "SPIKE-002"],
+        "tasks": [
+          "Critic审查Wave3",
+          "SPIKE-001",
+          "SPIKE-002"
+        ],
         "description": "两个技术验证Spike ✅ 全部通过：SPIKE-001 Qwen tool_call 5/5通过 + SPIKE-002 飞书SDK认证+Bot信息+消息API通过",
         "estimatedDays": 1,
         "phase": "1a",
@@ -694,7 +801,9 @@
       },
       {
         "wave": 4,
-        "tasks": ["US-P1b-006"],
+        "tasks": [
+          "US-P1b-006"
+        ],
         "description": "【提前】双飞书对接：飞书号1(Bridge→Claude Code) + 飞书号2(AI对话引擎)。这是验证所有后续功能的通道，必须先做。Bridge API约600-800行核心代码",
         "parallel": false,
         "estimatedDays": 5,
@@ -703,7 +812,9 @@
       },
       {
         "wave": 5,
-        "tasks": ["US-P1b-001"],
+        "tasks": [
+          "US-P1b-001"
+        ],
         "description": "认证：JWT RS256 + 微信登录 + Redis黑名单。AC补充：JWT payload必须包含{tenantId,userId,role}",
         "parallel": false,
         "estimatedDays": 2,
@@ -711,7 +822,9 @@
       },
       {
         "wave": 6,
-        "tasks": ["US-P1b-002"],
+        "tasks": [
+          "US-P1b-002"
+        ],
         "description": "多租户隔离：Phase 1硬编码默认租户简化实现，保留tenantId字段但Prisma middleware轻量化。Phase 2引入第二个租户时再完善RLS",
         "parallel": false,
         "estimatedDays": 1,
@@ -720,14 +833,18 @@
       },
       {
         "wave": "6.5",
-        "tasks": ["Critic审查Wave4-6"],
+        "tasks": [
+          "Critic审查Wave4-6"
+        ],
         "description": "飞书对接+JWT+多租户 方案+代码审查",
         "estimatedDays": 2,
         "phase": "1b"
       },
       {
         "wave": 7,
-        "tasks": ["US-P1b-003"],
+        "tasks": [
+          "US-P1b-003"
+        ],
         "description": "AI对话引擎：百炼Qwen + SSE + tool_call + System Prompt。SPIKE-001已验证tool_call可行。增加AI幻觉防护：工具函数返回的数字直接嵌入模板不让AI复述，涉及金额附加数据来源引用",
         "parallel": false,
         "estimatedDays": 6,
@@ -736,7 +853,9 @@
       },
       {
         "wave": 8,
-        "tasks": ["US-P1b-004"],
+        "tasks": [
+          "US-P1b-004"
+        ],
         "description": "5个运营查询场景验证。v2.3：场景由创始人提供真实日常问题替代假设场景（Phase 1b开始前收集）",
         "parallel": false,
         "estimatedDays": 2,
@@ -745,7 +864,9 @@
       },
       {
         "wave": 9,
-        "tasks": ["US-P1b-005"],
+        "tasks": [
+          "US-P1b-005"
+        ],
         "description": "ACI客服MVP：退货审核判断决策树(已完整设计) + 5条规则硬编码 + 风险闸门 + AiJudgmentRecord结构化存储",
         "parallel": false,
         "estimatedDays": 3,
@@ -754,14 +875,20 @@
       },
       {
         "wave": "9.5",
-        "tasks": ["Critic审查Wave7-9"],
+        "tasks": [
+          "Critic审查Wave7-9"
+        ],
         "description": "AI对话引擎+运营场景+ACI 方案+代码审查",
         "estimatedDays": 2,
         "phase": "1b"
       },
       {
         "wave": 10,
-        "tasks": ["US-P1b-007", "US-P1b-008", "E2E冒烟测试"],
+        "tasks": [
+          "US-P1b-007",
+          "US-P1b-008",
+          "E2E冒烟测试"
+        ],
         "description": "收尾：限流中间件 + 数据库备份 + 3个端到端冒烟测试（飞书→查数据→回复/飞书→ACI退货判断/飞书→Claude Code执行命令）",
         "parallel": true,
         "estimatedDays": 2,
@@ -775,7 +902,6 @@
     "phase1bDeliverable": "飞书号1→Claude Code可对话（最先交付）；飞书号2→AI对话引擎→查ztdy真实数据→飞书回复；ACI退货审核判断可工作+判断记录可回放（目标6月6日）",
     "v23ChangeLog": "9人团队全面审查v2.3：(1)双飞书Wave9→Wave4（验证通道先行）(2)多租户Phase1简化（硬编码默认租户，节省1天）(3)新增SPIKE-001/002在Phase1a验证技术风险(4)删除供应商对账(BL-002/BL-011)(5)新增AiJudgmentRecord表(6)AI幻觉防护写入AI对话引擎(7)直达模式跳过Master Agent(8)E2E冒烟测试(9)MallAdapter按数据类型差异化缓存TTL(10)ACI标注数据集30-50个case"
   },
-
   "backlog": [
     {
       "id": "BL-001",
@@ -1002,7 +1128,6 @@
       "updateNote": "CTO建议延后，没用户的时候做计费是浪费"
     }
   ],
-
   "backlogRemoved": {
     "_description": "v2.0方案精简时移除的Backlog项，记录原因以便追溯",
     "items": [
@@ -1032,7 +1157,6 @@
       }
     ]
   },
-
   "techStack": {
     "runtime": "Node.js v20+",
     "language": "TypeScript (strict mode)",
@@ -1052,7 +1176,6 @@
     "deploy": "Docker Compose + 阿里云（ECS+RDS+Redis+OSS+ACR）",
     "cicd": "GitHub Actions"
   },
-
   "architectureDecisions": [
     {
       "id": "ADR-001",
@@ -1286,15 +1409,26 @@
       "date": "2026-03-30"
     }
   ],
-
   "interfaceContracts": {
     "apiVersion": "v1",
     "baseUrl": "/api/v1",
     "auth": "Bearer JWT (RS256)",
     "tenantHeader": "X-Tenant-ID（仅登录阶段租户识别，登录后以JWT为准）",
     "responseFormat": {
-      "success": { "success": true, "data": "object", "meta": "object?", "requestId": "string" },
-      "error": { "success": false, "error": { "code": "string", "message": "string" }, "requestId": "string" }
+      "success": {
+        "success": true,
+        "data": "object",
+        "meta": "object?",
+        "requestId": "string"
+      },
+      "error": {
+        "success": false,
+        "error": {
+          "code": "string",
+          "message": "string"
+        },
+        "requestId": "string"
+      }
     },
     "pagination": {
       "defaultPageSize": 20,
@@ -1312,121 +1446,428 @@
       "includes": "include=shop,supplier（关联数据预加载，逗号分隔）"
     },
     "phase1aEndpoints": [
-      { "method": "GET",  "path": "/health",                 "auth": false, "description": "系统健康检查（公开）", "us": "US-P1a-005" },
-      { "method": "GET",  "path": "/api/v1/health",          "auth": true,  "description": "详细健康状态（需认证）", "us": "US-P1a-005" }
+      {
+        "method": "GET",
+        "path": "/health",
+        "auth": false,
+        "description": "系统健康检查（公开）",
+        "us": "US-P1a-005"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/health",
+        "auth": true,
+        "description": "详细健康状态（需认证）",
+        "us": "US-P1a-005"
+      }
     ],
     "phase1bEndpoints": [
-      { "method": "POST", "path": "/api/v1/auth/wechat-login", "auth": false, "description": "微信小程序登录", "us": "US-P1b-001" },
-      { "method": "POST", "path": "/api/v1/auth/bind-phone",   "auth": false, "description": "绑定手机号（新用户）", "us": "US-P1b-001" },
-      { "method": "POST", "path": "/api/v1/auth/refresh",      "auth": false, "description": "刷新Access Token", "us": "US-P1b-001" },
-      { "method": "POST", "path": "/api/v1/auth/logout",       "auth": true,  "description": "登出（token加入黑名单）", "us": "US-P1b-001" },
-      { "method": "POST", "path": "/api/v1/ai/chat",           "auth": true,  "description": "AI对话（SSE流式）", "us": "US-P1b-003" },
-      { "method": "GET",  "path": "/api/v1/ai/conversations",  "auth": true,  "description": "会话列表", "us": "US-P1b-003" },
-      { "method": "GET",  "path": "/api/v1/ai/conversations/:id/messages", "auth": true, "description": "会话消息历史", "us": "US-P1b-003" },
-      { "method": "POST", "path": "/api/v1/cs/message/incoming", "auth": false, "description": "客服消息接收（第三方推送）", "us": "US-P1b-005" },
-      { "method": "GET",  "path": "/api/v1/cs/sessions",        "auth": true,  "description": "客服会话列表", "us": "US-P1b-005" },
-      { "method": "GET",  "path": "/api/v1/cs/sessions/:id",    "auth": true,  "description": "客服会话详情+消息", "us": "US-P1b-005" },
-      { "method": "POST", "path": "/api/v1/cs/message/:id/confirm", "auth": true, "description": "人工确认AI回复", "us": "US-P1b-005" },
-      { "method": "GET",  "path": "/api/v1/cs/tickets",         "auth": true,  "description": "工单列表", "us": "US-P1b-005" }
+      {
+        "method": "POST",
+        "path": "/api/v1/auth/wechat-login",
+        "auth": false,
+        "description": "微信小程序登录",
+        "us": "US-P1b-001"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/auth/bind-phone",
+        "auth": false,
+        "description": "绑定手机号（新用户）",
+        "us": "US-P1b-001"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/auth/refresh",
+        "auth": false,
+        "description": "刷新Access Token",
+        "us": "US-P1b-001"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/auth/logout",
+        "auth": true,
+        "description": "登出（token加入黑名单）",
+        "us": "US-P1b-001"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ai/chat",
+        "auth": true,
+        "description": "AI对话（SSE流式）",
+        "us": "US-P1b-003"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ai/conversations",
+        "auth": true,
+        "description": "会话列表",
+        "us": "US-P1b-003"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ai/conversations/:id/messages",
+        "auth": true,
+        "description": "会话消息历史",
+        "us": "US-P1b-003"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/cs/message/incoming",
+        "auth": false,
+        "description": "客服消息接收（第三方推送）",
+        "us": "US-P1b-005"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/cs/sessions",
+        "auth": true,
+        "description": "客服会话列表",
+        "us": "US-P1b-005"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/cs/sessions/:id",
+        "auth": true,
+        "description": "客服会话详情+消息",
+        "us": "US-P1b-005"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/cs/message/:id/confirm",
+        "auth": true,
+        "description": "人工确认AI回复",
+        "us": "US-P1b-005"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/cs/tickets",
+        "auth": true,
+        "description": "工单列表",
+        "us": "US-P1b-005"
+      }
     ],
     "mallAdapterEndpoints": {
       "_description": "MallAdapter内部调用ztdy-open API的端点映射，不直接暴露给前端",
       "baseUrl": "https://admin.ztdy.cc",
       "auth": "Header api-key",
       "endpoints": [
-        { "internal": "getUsers",             "external": "GET /api/Open/UserPageList" },
-        { "internal": "getOrders",            "external": "GET /api/Open/OrderPageList" },
-        { "internal": "getItems",             "external": "GET /api/Open/ItemPageList" },
-        { "internal": "getSuppliers",         "external": "GET /api/Open/SupplierPageList" },
-        { "internal": "getSupplierWithdraws", "external": "GET /api/Open/SupplierWithdrawPageList" },
-        { "internal": "getUserWithdraws",     "external": "GET /api/Open/UserWithdrawPageList" }
+        {
+          "internal": "getUsers",
+          "external": "GET /api/Open/UserPageList"
+        },
+        {
+          "internal": "getOrders",
+          "external": "GET /api/Open/OrderPageList"
+        },
+        {
+          "internal": "getItems",
+          "external": "GET /api/Open/ItemPageList"
+        },
+        {
+          "internal": "getSuppliers",
+          "external": "GET /api/Open/SupplierPageList"
+        },
+        {
+          "internal": "getSupplierWithdraws",
+          "external": "GET /api/Open/SupplierWithdrawPageList"
+        },
+        {
+          "internal": "getUserWithdraws",
+          "external": "GET /api/Open/UserWithdrawPageList"
+        }
       ]
     }
   },
-
   "errorCodes": {
     "_description": "所有 Agent 必须使用此注册表中的错误码，不可自行发明",
     "auth": [
-      { "code": "AUTH_INVALID_TOKEN",     "httpStatus": 401, "message": "无效的访问令牌" },
-      { "code": "AUTH_TOKEN_EXPIRED",     "httpStatus": 401, "message": "访问令牌已过期" },
-      { "code": "AUTH_TOKEN_BLACKLISTED", "httpStatus": 401, "message": "令牌已被吊销" },
-      { "code": "AUTH_REFRESH_INVALID",   "httpStatus": 401, "message": "刷新令牌无效或已过期" },
-      { "code": "AUTH_WECHAT_CODE_INVALID", "httpStatus": 400, "message": "微信登录code无效" },
-      { "code": "AUTH_PHONE_REQUIRED",    "httpStatus": 400, "message": "需要绑定手机号" },
-      { "code": "AUTH_PHONE_ALREADY_BOUND", "httpStatus": 409, "message": "手机号已被其他账号绑定" },
-      { "code": "AUTH_SMS_CODE_INVALID",  "httpStatus": 400, "message": "短信验证码无效或已过期" }
+      {
+        "code": "AUTH_INVALID_TOKEN",
+        "httpStatus": 401,
+        "message": "无效的访问令牌"
+      },
+      {
+        "code": "AUTH_TOKEN_EXPIRED",
+        "httpStatus": 401,
+        "message": "访问令牌已过期"
+      },
+      {
+        "code": "AUTH_TOKEN_BLACKLISTED",
+        "httpStatus": 401,
+        "message": "令牌已被吊销"
+      },
+      {
+        "code": "AUTH_REFRESH_INVALID",
+        "httpStatus": 401,
+        "message": "刷新令牌无效或已过期"
+      },
+      {
+        "code": "AUTH_WECHAT_CODE_INVALID",
+        "httpStatus": 400,
+        "message": "微信登录code无效"
+      },
+      {
+        "code": "AUTH_PHONE_REQUIRED",
+        "httpStatus": 400,
+        "message": "需要绑定手机号"
+      },
+      {
+        "code": "AUTH_PHONE_ALREADY_BOUND",
+        "httpStatus": 409,
+        "message": "手机号已被其他账号绑定"
+      },
+      {
+        "code": "AUTH_SMS_CODE_INVALID",
+        "httpStatus": 400,
+        "message": "短信验证码无效或已过期"
+      }
     ],
     "tenant": [
-      { "code": "TENANT_NOT_FOUND",       "httpStatus": 403, "message": "租户不存在或已停用" },
-      { "code": "TENANT_SUSPENDED",       "httpStatus": 403, "message": "租户已停用" },
-      { "code": "TENANT_QUOTA_EXCEEDED",  "httpStatus": 429, "message": "租户配额已用尽" },
-      { "code": "TENANT_MISMATCH",        "httpStatus": 403, "message": "租户ID不匹配" }
+      {
+        "code": "TENANT_NOT_FOUND",
+        "httpStatus": 403,
+        "message": "租户不存在或已停用"
+      },
+      {
+        "code": "TENANT_SUSPENDED",
+        "httpStatus": 403,
+        "message": "租户已停用"
+      },
+      {
+        "code": "TENANT_QUOTA_EXCEEDED",
+        "httpStatus": 429,
+        "message": "租户配额已用尽"
+      },
+      {
+        "code": "TENANT_MISMATCH",
+        "httpStatus": 403,
+        "message": "租户ID不匹配"
+      }
     ],
     "permission": [
-      { "code": "PERMISSION_DENIED",      "httpStatus": 403, "message": "权限不足" },
-      { "code": "SCOPE_EXCEEDED",         "httpStatus": 403, "message": "超出数据访问范围" }
+      {
+        "code": "PERMISSION_DENIED",
+        "httpStatus": 403,
+        "message": "权限不足"
+      },
+      {
+        "code": "SCOPE_EXCEEDED",
+        "httpStatus": 403,
+        "message": "超出数据访问范围"
+      }
     ],
     "validation": [
-      { "code": "VALIDATION_ERROR",       "httpStatus": 400, "message": "请求参数校验失败（附带 details 字段）" },
-      { "code": "RESOURCE_NOT_FOUND",     "httpStatus": 404, "message": "请求的资源不存在" },
-      { "code": "RESOURCE_CONFLICT",      "httpStatus": 409, "message": "资源冲突（如重复创建）" }
+      {
+        "code": "VALIDATION_ERROR",
+        "httpStatus": 400,
+        "message": "请求参数校验失败（附带 details 字段）"
+      },
+      {
+        "code": "RESOURCE_NOT_FOUND",
+        "httpStatus": 404,
+        "message": "请求的资源不存在"
+      },
+      {
+        "code": "RESOURCE_CONFLICT",
+        "httpStatus": 409,
+        "message": "资源冲突（如重复创建）"
+      }
     ],
     "rateLimit": [
-      { "code": "RATE_LIMITED",           "httpStatus": 429, "message": "请求过于频繁，请稍后再试" },
-      { "code": "AUTH_RATE_LIMITED",       "httpStatus": 429, "message": "登录尝试过于频繁" }
+      {
+        "code": "RATE_LIMITED",
+        "httpStatus": 429,
+        "message": "请求过于频繁，请稍后再试"
+      },
+      {
+        "code": "AUTH_RATE_LIMITED",
+        "httpStatus": 429,
+        "message": "登录尝试过于频繁"
+      }
     ],
     "erp": [
-      { "code": "ERP_UNAUTHORIZED",       "httpStatus": 502, "message": "ERP认证失败" },
-      { "code": "ERP_RATE_LIMITED",        "httpStatus": 502, "message": "ERP接口限频" },
-      { "code": "ERP_TIMEOUT",            "httpStatus": 504, "message": "ERP接口超时" },
-      { "code": "ERP_SYNC_FAILED",        "httpStatus": 502, "message": "ERP数据同步失败" }
+      {
+        "code": "ERP_UNAUTHORIZED",
+        "httpStatus": 502,
+        "message": "ERP认证失败"
+      },
+      {
+        "code": "ERP_RATE_LIMITED",
+        "httpStatus": 502,
+        "message": "ERP接口限频"
+      },
+      {
+        "code": "ERP_TIMEOUT",
+        "httpStatus": 504,
+        "message": "ERP接口超时"
+      },
+      {
+        "code": "ERP_SYNC_FAILED",
+        "httpStatus": 502,
+        "message": "ERP数据同步失败"
+      }
     ],
     "mall": [
-      { "code": "MALL_API_UNAUTHORIZED",   "httpStatus": 502, "message": "商城API认证失败" },
-      { "code": "MALL_API_TIMEOUT",        "httpStatus": 504, "message": "商城API请求超时" },
-      { "code": "MALL_API_ERROR",          "httpStatus": 502, "message": "商城API返回异常" },
-      { "code": "MALL_DATA_INVALID",       "httpStatus": 502, "message": "商城API返回数据格式异常" }
+      {
+        "code": "MALL_API_UNAUTHORIZED",
+        "httpStatus": 502,
+        "message": "商城API认证失败"
+      },
+      {
+        "code": "MALL_API_TIMEOUT",
+        "httpStatus": 504,
+        "message": "商城API请求超时"
+      },
+      {
+        "code": "MALL_API_ERROR",
+        "httpStatus": 502,
+        "message": "商城API返回异常"
+      },
+      {
+        "code": "MALL_DATA_INVALID",
+        "httpStatus": 502,
+        "message": "商城API返回数据格式异常"
+      }
     ],
     "ai": [
-      { "code": "AI_RATE_LIMITED",         "httpStatus": 429, "message": "AI调用频率超限" },
-      { "code": "AI_SERVICE_UNAVAILABLE",  "httpStatus": 503, "message": "AI服务暂不可用" },
-      { "code": "AI_CONTEXT_TOO_LONG",     "httpStatus": 400, "message": "对话上下文超出长度限制" }
+      {
+        "code": "AI_RATE_LIMITED",
+        "httpStatus": 429,
+        "message": "AI调用频率超限"
+      },
+      {
+        "code": "AI_SERVICE_UNAVAILABLE",
+        "httpStatus": 503,
+        "message": "AI服务暂不可用"
+      },
+      {
+        "code": "AI_CONTEXT_TOO_LONG",
+        "httpStatus": 400,
+        "message": "对话上下文超出长度限制"
+      }
     ],
     "cs": [
-      { "code": "CS_SESSION_NOT_FOUND",    "httpStatus": 404, "message": "客服会话不存在" },
-      { "code": "CS_SESSION_CLOSED",       "httpStatus": 400, "message": "客服会话已关闭" },
-      { "code": "CS_MESSAGE_NOT_FOUND",    "httpStatus": 404, "message": "客服消息不存在" },
-      { "code": "CS_MESSAGE_NOT_DRAFT",    "httpStatus": 400, "message": "只能确认草稿状态的消息" },
-      { "code": "CS_TICKET_NOT_FOUND",     "httpStatus": 404, "message": "客服工单不存在" },
-      { "code": "CS_ORDER_NOT_FOUND",      "httpStatus": 404, "message": "关联订单不存在" },
-      { "code": "CS_ESCALATED",            "httpStatus": 200, "message": "已升级到人工处理" },
-      { "code": "CS_IMAGE_NOT_SUPPORTED",  "httpStatus": 400, "message": "暂不支持图片消息" }
+      {
+        "code": "CS_SESSION_NOT_FOUND",
+        "httpStatus": 404,
+        "message": "客服会话不存在"
+      },
+      {
+        "code": "CS_SESSION_CLOSED",
+        "httpStatus": 400,
+        "message": "客服会话已关闭"
+      },
+      {
+        "code": "CS_MESSAGE_NOT_FOUND",
+        "httpStatus": 404,
+        "message": "客服消息不存在"
+      },
+      {
+        "code": "CS_MESSAGE_NOT_DRAFT",
+        "httpStatus": 400,
+        "message": "只能确认草稿状态的消息"
+      },
+      {
+        "code": "CS_TICKET_NOT_FOUND",
+        "httpStatus": 404,
+        "message": "客服工单不存在"
+      },
+      {
+        "code": "CS_ORDER_NOT_FOUND",
+        "httpStatus": 404,
+        "message": "关联订单不存在"
+      },
+      {
+        "code": "CS_ESCALATED",
+        "httpStatus": 200,
+        "message": "已升级到人工处理"
+      },
+      {
+        "code": "CS_IMAGE_NOT_SUPPORTED",
+        "httpStatus": 400,
+        "message": "暂不支持图片消息"
+      }
     ],
     "system": [
-      { "code": "INTERNAL_ERROR",         "httpStatus": 500, "message": "服务器内部错误" },
-      { "code": "SERVICE_UNAVAILABLE",    "httpStatus": 503, "message": "服务暂不可用" }
+      {
+        "code": "INTERNAL_ERROR",
+        "httpStatus": 500,
+        "message": "服务器内部错误"
+      },
+      {
+        "code": "SERVICE_UNAVAILABLE",
+        "httpStatus": 503,
+        "message": "服务暂不可用"
+      }
     ],
     "tool": [
-      { "code": "TOOL_TIMEOUT",           "httpStatus": 504, "message": "工具调用超时" },
-      { "code": "TOOL_DEGRADED",          "httpStatus": 200, "message": "工具降级返回缓存数据" },
-      { "code": "TOOL_CHAIN_PARTIAL",     "httpStatus": 207, "message": "链式调用部分失败" }
+      {
+        "code": "TOOL_TIMEOUT",
+        "httpStatus": 504,
+        "message": "工具调用超时"
+      },
+      {
+        "code": "TOOL_DEGRADED",
+        "httpStatus": 200,
+        "message": "工具降级返回缓存数据"
+      },
+      {
+        "code": "TOOL_CHAIN_PARTIAL",
+        "httpStatus": 207,
+        "message": "链式调用部分失败"
+      },
+      {
+        "code": "TOOL_NOT_FOUND",
+        "httpStatus": 404,
+        "message": "工具定义不存在"
+      },
+      {
+        "code": "TOOL_ALREADY_ACTIVE",
+        "httpStatus": 200,
+        "message": "工具已激活"
+      },
+      {
+        "code": "TOOL_INSTANCE_NOT_FOUND",
+        "httpStatus": 404,
+        "message": "工具实例不存在"
+      }
     ],
     "aci": [
-      { "code": "ACI_RULE_CONFLICT",      "httpStatus": 500, "message": "ACI规则冲突" },
-      { "code": "ACI_DATA_INCOMPLETE",    "httpStatus": 422, "message": "ACI判断数据不完整" }
+      {
+        "code": "ACI_RULE_CONFLICT",
+        "httpStatus": 500,
+        "message": "ACI规则冲突"
+      },
+      {
+        "code": "ACI_DATA_INCOMPLETE",
+        "httpStatus": 422,
+        "message": "ACI判断数据不完整"
+      }
     ],
     "cache": [
-      { "code": "CACHE_STALE",            "httpStatus": 200, "message": "缓存数据过期" }
+      {
+        "code": "CACHE_STALE",
+        "httpStatus": 200,
+        "message": "缓存数据过期"
+      }
     ],
     "quota": [
-      { "code": "API_QUOTA_EXCEEDED",     "httpStatus": 429, "message": "API配额超限" }
+      {
+        "code": "API_QUOTA_EXCEEDED",
+        "httpStatus": 429,
+        "message": "API配额超限"
+      }
     ],
     "_multiTenantMerged": "TENANT_MISMATCH已合并到tenant分组",
     "sse": [
-      { "code": "SSE_RECONNECT",          "httpStatus": 200, "message": "SSE重连中" }
+      {
+        "code": "SSE_RECONNECT",
+        "httpStatus": 200,
+        "message": "SSE重连中"
+      }
     ]
   },
-
   "definitionOfDone": {
     "_description": "所有 US 通用的完成检查清单，在 AC 之外额外检查",
     "code": [
@@ -1470,9 +1911,7 @@
       "session-guard.ts commit 检查通过"
     ]
   },
-
   "criticReviews": [],
-
   "pitfalls": [
     {
       "id": "PIT-001",
@@ -1603,7 +2042,6 @@
       "date": "2026-03-30"
     }
   ],
-
   "technicalDebt": [
     {
       "id": "DEBT-001",
@@ -1663,7 +2101,6 @@
       "reason": "v2.3决策——Phase 1无第二租户，简化实现节省时间"
     }
   ],
-
   "changeHistory": [
     {
       "version": "2.4.0",
@@ -1754,7 +2191,6 @@
       ]
     }
   ],
-
   "sessionProtocol": {
     "_description": "来源：Anthropic Engineering《Effective Harnesses for Long-running Agents》。解决Agent跨会话上下文丢失问题。",
     "_reference": "ADR-016 + 04文档八.7节",
@@ -1791,7 +2227,6 @@
     },
     "keyPrinciple": "每个会话只处理一个US，每完成一个AC就git commit。进度文件是接力棒，不是日志。"
   },
-
   "riskRegister": [
     {
       "id": "RISK-001",
@@ -1858,7 +2293,6 @@
       "owner": "BE Agent"
     }
   ],
-
   "teamRules": [
     "RULE-01: 先方案后执行，重大功能先出方案，Critic通过后才写代码",
     "RULE-02: 最小改动原则，只改完成任务必需的内容",
@@ -1878,7 +2312,6 @@
     "RULE-16: 会话启动必须执行sessionProtocol.sessionStart，会话结束必须执行sessionProtocol.sessionEnd，不可跳过",
     "RULE-17: 砍功能比加功能重要——不在当前Phase scope内的需求，记入Backlog而非临时加码"
   ],
-
   "healthScore": {
     "lastChecked": "2026-03-30",
     "score": 100,
@@ -1900,5 +2333,6 @@
       "Conversation.agentType枚举需补全customer_service/report/tool（PIT-021）"
     ],
     "note": "v2.3九人团队全面审查完成。方案理解10/10。所有评分维度均有改善路径。下一步：Wave 2 三路并行（Schema精简版/健康检查/Docker）+ Wave 3.5两个技术Spike。Phase 1b第一个任务改为双飞书对接（验证通道先行）。"
-  }
+  },
+  "testBaseline": 585
 }

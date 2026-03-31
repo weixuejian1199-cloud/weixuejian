@@ -53,6 +53,9 @@ function createApp() {
   return app;
 }
 
+const FAKE_UUID = '00000000-0000-4000-8000-000000000001';
+const FAKE_UUID_2 = '00000000-0000-4000-8000-000000000002';
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -62,8 +65,8 @@ beforeEach(() => {
 describe('POST /cs/message/incoming', () => {
   it('should accept valid incoming message', async () => {
     mockHandleIncomingMessage.mockResolvedValue({
-      sessionId: 'session-001',
-      messageId: 'msg-001',
+      sessionId: FAKE_UUID_2,
+      messageId: FAKE_UUID,
       processing: { faqMatched: false, isReturnRelated: false, judgmentTriggered: false },
     });
 
@@ -78,7 +81,7 @@ describe('POST /cs/message/incoming', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.data.sessionId).toBe('session-001');
+    expect(res.body.data.sessionId).toBe(FAKE_UUID_2);
   });
 
   it('should reject empty content', async () => {
@@ -125,7 +128,7 @@ describe('POST /cs/message/:id/confirm', () => {
     mockConfirmDraft.mockResolvedValue({ status: 'confirmed' });
 
     const res = await request(createApp())
-      .post('/cs/message/msg-001/confirm')
+      .post(`/cs/message/${FAKE_UUID}/confirm`)
       .send({ action: 'send' });
 
     expect(res.status).toBe(200);
@@ -136,7 +139,7 @@ describe('POST /cs/message/:id/confirm', () => {
     mockConfirmDraft.mockResolvedValue({ status: 'discarded' });
 
     const res = await request(createApp())
-      .post('/cs/message/msg-001/confirm')
+      .post(`/cs/message/${FAKE_UUID}/confirm`)
       .send({ action: 'discard' });
 
     expect(res.status).toBe(200);
@@ -147,7 +150,7 @@ describe('POST /cs/message/:id/confirm', () => {
     mockConfirmDraft.mockRejectedValue(new AppError('CS_MESSAGE_NOT_FOUND'));
 
     const res = await request(createApp())
-      .post('/cs/message/nonexistent/confirm')
+      .post(`/cs/message/${FAKE_UUID}/confirm`)
       .send({ action: 'send' });
 
     expect(res.status).toBe(404);
@@ -157,7 +160,7 @@ describe('POST /cs/message/:id/confirm', () => {
     mockConfirmDraft.mockRejectedValue(new AppError('CS_MESSAGE_NOT_DRAFT'));
 
     const res = await request(createApp())
-      .post('/cs/message/msg-001/confirm')
+      .post(`/cs/message/${FAKE_UUID}/confirm`)
       .send({ action: 'send' });
 
     expect(res.status).toBe(400);
@@ -169,7 +172,7 @@ describe('POST /cs/message/:id/confirm', () => {
 describe('GET /cs/sessions', () => {
   it('should list sessions with pagination', async () => {
     mockListSessions.mockResolvedValue({
-      items: [{ id: 'session-001', status: 'ai_handling', channelType: 'feishu' }],
+      items: [{ id: FAKE_UUID_2, status: 'ai_handling', channelType: 'feishu' }],
       total: 1,
     });
 
@@ -188,24 +191,24 @@ describe('GET /cs/sessions', () => {
 describe('GET /cs/sessions/:id', () => {
   it('should return session detail', async () => {
     mockGetSessionById.mockResolvedValue({
-      id: 'session-001',
+      id: FAKE_UUID_2,
       status: 'ai_handling',
       messages: [],
       tickets: [],
     });
 
     const res = await request(createApp())
-      .get('/cs/sessions/session-001');
+      .get(`/cs/sessions/${FAKE_UUID_2}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.data.id).toBe('session-001');
+    expect(res.body.data.id).toBe(FAKE_UUID_2);
   });
 
   it('should return 404 for non-existent session', async () => {
     mockGetSessionById.mockResolvedValue(null);
 
     const res = await request(createApp())
-      .get('/cs/sessions/nonexistent');
+      .get(`/cs/sessions/${FAKE_UUID_2}`);
 
     expect(res.status).toBe(404);
   });
