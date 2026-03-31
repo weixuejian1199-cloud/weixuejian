@@ -87,11 +87,16 @@ describe('Aggregate queries', () => {
   describe('getSalesStats', () => {
     it('should aggregate total amount and order count', async () => {
       const orders = [
-        makeOrder({ totalAmount: 100 }),
-        makeOrder({ totalAmount: 250.5 }),
-        makeOrder({ totalAmount: 49.5 }),
+        makeOrder({ totalAmount: 100, payDate: '2026-03-15 10:00:00' }),
+        makeOrder({ totalAmount: 250.5, payDate: '2026-03-20 10:00:00' }),
+        makeOrder({ totalAmount: 49.5, payDate: '2026-03-25 10:00:00' }),
       ];
-      vi.spyOn(adapter, 'getOrders').mockResolvedValue(makePageResult(orders));
+      // 第一页返回数据，后续页返回空（模拟只有1页）
+      const spy = vi.spyOn(adapter, 'getOrders');
+      spy.mockImplementation(async (filter) => {
+        if (filter?.pageIndex === 1) return makePageResult(orders);
+        return makePageResult([]);
+      });
 
       const result = await getSalesStats(adapter, 'tenant-1', {
         start: '2026-03-01',

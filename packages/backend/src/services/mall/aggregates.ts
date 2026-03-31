@@ -15,11 +15,14 @@ import type {
   StatusDistribution,
 } from '../../adapters/erp/types.js';
 
-/** 聚合查询最多遍历的页数（避免耗尽 API 配额）*/
-const MAX_AGGREGATE_PAGES = 100;
+/** 聚合查询最多遍历的页数 */
+const MAX_AGGREGATE_PAGES = 300;
 
-/** 每页大小（最大化每次请求数据量）*/
-const AGGREGATE_PAGE_SIZE = 1000;
+/** 每页大小（ztdy API 实际上限 200） */
+const AGGREGATE_PAGE_SIZE = 200;
+
+/** 并发请求数（加速分页遍历） */
+const CONCURRENCY = 5;
 
 /**
  * AC-11: 销售统计
@@ -39,25 +42,42 @@ export async function getSalesStats(
   let orderCount = 0;
   let scannedRecords = 0;
   let totalRecords = 0;
+  let hitOlderData = false;
 
-  for (let page = 1; page <= MAX_AGGREGATE_PAGES; page++) {
-    const result = await adapter.getOrders({
-      pageIndex: page,
-      pageSize: AGGREGATE_PAGE_SIZE,
-      startDate: dateRange.start,
-      endDate: dateRange.end,
-    });
+  // ztdy API 不支持日期过滤，数据按时间倒序返回
+  // 策略：并发拉取，客户端按 PayDate 过滤，遇到旧数据停止
+  const startMs = new Date(dateRange.start).getTime();
+  const endMs = new Date(dateRange.end + ' 23:59:59').getTime();
 
-    totalRecords = result.pagination.totalCount;
+  for (let batch = 0; batch < MAX_AGGREGATE_PAGES / CONCURRENCY && !hitOlderData; batch++) {
+    const pages = Array.from({ length: CONCURRENCY }, (_, i) => batch * CONCURRENCY + i + 1)
+      .filter((p) => p <= MAX_AGGREGATE_PAGES);
 
-    for (const order of result.items) {
-      totalAmount += order.totalAmount;
-      orderCount++;
+    const results = await Promise.all(
+      pages.map((page) =>
+        adapter.getOrders({ pageIndex: page, pageSize: AGGREGATE_PAGE_SIZE }),
+      ),
+    );
+
+    for (const result of results) {
+      if (totalRecords === 0) totalRecords = result.pagination.totalCount;
+
+      for (const order of result.items) {
+        scannedRecords++;
+        if (!order.payDate) continue;
+        const payMs = new Date(order.payDate).getTime();
+        if (payMs >= startMs && payMs <= endMs) {
+          totalAmount += order.totalAmount;
+          orderCount++;
+        } else if (payMs < startMs) {
+          hitOlderData = true;
+        }
+      }
+
+      if (results[0] && batch * CONCURRENCY + 1 >= results[0].pagination.totalPages) {
+        hitOlderData = true;
+      }
     }
-    scannedRecords += result.items.length;
-
-    // 数据已遍历完
-    if (page >= result.pagination.totalPages) break;
   }
 
   const data: AggregateResult<SalesStats> = {
