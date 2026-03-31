@@ -13,6 +13,8 @@ import type {
   SalesStats,
   SupplierRank,
   StatusDistribution,
+  SlowSupplierInfo,
+  UserGrowthTrend,
 } from '../../adapters/erp/types.js';
 
 /** 快速采样页数（控制在 5 秒内返回） */
@@ -228,5 +230,171 @@ export async function getOrderStatusDistribution(
   };
 
   await setAggregateCache(cacheKey, data);
+  return data;
+}
+
+/**
+ * Wave 8: 出货最慢的供应商
+ *
+ * 查询 processNode=2（待发货）的订单，按 supplierId 分组，
+ * 按最早待发货日期升序排序（越早 = 越慢）。
+ */
+export async function getSlowSuppliers(
+  adapter: MallAdapter,
+  tenantId: string,
+  limit = 10,
+): Promise<AggregateResult<SlowSupplierInfo[]>> {
+  const cacheKey = buildAggregateCacheKey(tenantId, 'slowSuppliers', { limit });
+  const cached = await getCache<AggregateResult<SlowSupplierInfo[]>>(cacheKey);
+  if (cached) return cached.data;
+
+  const supplierMap = new Map<
+    number,
+    { name: string | null; pendingCount: number; oldestOrderDate: string | null }
+  >();
+  let scannedRecords = 0;
+  let totalRecords = 0;
+
+  let done = false;
+  for (let batch = 0; batch < SAMPLE_PAGES / CONCURRENCY && !done; batch++) {
+    const pages = Array.from({ length: CONCURRENCY }, (_, i) => batch * CONCURRENCY + i + 1);
+    const results = await Promise.all(
+      pages.map((page) =>
+        adapter.getOrders({ pageIndex: page, pageSize: AGGREGATE_PAGE_SIZE }),
+      ),
+    );
+
+    for (const result of results) {
+      if (totalRecords === 0) totalRecords = result.pagination.totalCount;
+
+      for (const order of result.items) {
+        scannedRecords++;
+        if (order.processNode !== 2) continue;
+
+        const existing = supplierMap.get(order.supplierId);
+        if (existing) {
+          existing.pendingCount++;
+          if (!existing.name && order.supplierName) {
+            existing.name = order.supplierName;
+          }
+          if (order.createDate && (!existing.oldestOrderDate || order.createDate < existing.oldestOrderDate)) {
+            existing.oldestOrderDate = order.createDate;
+          }
+        } else {
+          supplierMap.set(order.supplierId, {
+            name: order.supplierName,
+            pendingCount: 1,
+            oldestOrderDate: order.createDate,
+          });
+        }
+      }
+
+      if (result.pagination.pageIndex >= result.pagination.totalPages) {
+        done = true;
+        break;
+      }
+    }
+  }
+
+  const ranked = Array.from(supplierMap.entries())
+    .map(([supplierId, stats]) => ({
+      supplierId,
+      supplierName: stats.name,
+      pendingCount: stats.pendingCount,
+      oldestOrderDate: stats.oldestOrderDate,
+    }))
+    .sort((a, b) => {
+      if (!a.oldestOrderDate && !b.oldestOrderDate) return 0;
+      if (!a.oldestOrderDate) return 1;
+      if (!b.oldestOrderDate) return -1;
+      return a.oldestOrderDate.localeCompare(b.oldestOrderDate);
+    })
+    .slice(0, limit);
+
+  const data: AggregateResult<SlowSupplierInfo[]> = {
+    data: ranked,
+    computedAt: new Date().toISOString(),
+    completeness: totalRecords > 0 ? Math.min(scannedRecords / totalRecords, 1) : 1,
+    totalRecords,
+    scannedRecords,
+  };
+
+  await setAggregateCache(cacheKey, data);
+  logger.debug({ tenantId, limit, supplierCount: ranked.length }, 'Slow suppliers computed');
+  return data;
+}
+
+/**
+ * Wave 8: 用户增长趋势
+ *
+ * 查询指定日期范围的用户，按天分组统计新增数。
+ * ztdy API 用户数据按时间倒序，碰到日期范围外即可停止扫描。
+ */
+export async function getUserGrowthTrend(
+  adapter: MallAdapter,
+  tenantId: string,
+  dateRange: { start: string; end: string },
+): Promise<AggregateResult<UserGrowthTrend>> {
+  const cacheKey = buildAggregateCacheKey(tenantId, 'userGrowth', dateRange);
+  const cached = await getCache<AggregateResult<UserGrowthTrend>>(cacheKey);
+  if (cached) return cached.data;
+
+  const startDate = dateRange.start;
+  const endDate = dateRange.end;
+
+  const dailyMap = new Map<string, number>();
+  let scannedRecords = 0;
+  let totalRecords = 0;
+  let hitOlderData = false;
+
+  for (let batch = 0; batch < SAMPLE_PAGES / CONCURRENCY && !hitOlderData; batch++) {
+    const pages = Array.from({ length: CONCURRENCY }, (_, i) => batch * CONCURRENCY + i + 1);
+    const results = await Promise.all(
+      pages.map((page) =>
+        adapter.getUsers({ pageIndex: page, pageSize: AGGREGATE_PAGE_SIZE }),
+      ),
+    );
+
+    for (const result of results) {
+      if (totalRecords === 0) totalRecords = result.pagination.totalCount;
+
+      for (const user of result.items) {
+        scannedRecords++;
+        if (!user.createDate) continue;
+
+        const dateStr = user.createDate.slice(0, 10);
+        if (dateStr < startDate) {
+          hitOlderData = true;
+          break;
+        }
+        if (dateStr > endDate) continue;
+
+        dailyMap.set(dateStr, (dailyMap.get(dateStr) ?? 0) + 1);
+      }
+
+      if (hitOlderData) break;
+      if (result.pagination.pageIndex >= result.pagination.totalPages) {
+        hitOlderData = true;
+        break;
+      }
+    }
+  }
+
+  const dailyBreakdown = Array.from(dailyMap.entries())
+    .map(([date, count]) => ({ date, count }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const totalNew = dailyBreakdown.reduce((sum, d) => sum + d.count, 0);
+
+  const data: AggregateResult<UserGrowthTrend> = {
+    data: { totalNew, dailyBreakdown },
+    computedAt: new Date().toISOString(),
+    completeness: totalRecords > 0 ? Math.min(scannedRecords / totalRecords, 1) : 1,
+    totalRecords,
+    scannedRecords,
+  };
+
+  await setAggregateCache(cacheKey, data);
+  logger.debug({ tenantId, dateRange, totalNew, days: dailyBreakdown.length }, 'User growth trend computed');
   return data;
 }

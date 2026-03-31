@@ -77,8 +77,8 @@ describe('tool-registry', () => {
   });
 
   describe('TOOL_DEFINITIONS', () => {
-    it('应该包含 6 个工具定义', () => {
-      expect(TOOL_DEFINITIONS).toHaveLength(6);
+    it('应该包含 9 个工具定义', () => {
+      expect(TOOL_DEFINITIONS).toHaveLength(9);
     });
 
     it('每个工具应该有 name 和 description', () => {
@@ -99,6 +99,9 @@ describe('tool-registry', () => {
         'getOrders',
         'getUsers',
         'getItems',
+        'getSlowSuppliers',
+        'getUserGrowthTrend',
+        'getSupplierWithdraws',
       ]);
     });
   });

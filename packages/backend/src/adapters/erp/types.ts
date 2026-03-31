@@ -157,3 +157,20 @@ export interface SupplierRank {
 export interface StatusDistribution {
   [status: string]: number;
 }
+
+export interface UserGrowthPoint {
+  date: string; // YYYY-MM-DD
+  count: number;
+}
+
+export interface UserGrowthTrend {
+  totalNew: number;
+  dailyBreakdown: UserGrowthPoint[];
+}
+
+export interface SlowSupplierInfo {
+  supplierId: number;
+  supplierName: string | null;
+  pendingCount: number;
+  oldestOrderDate: string | null;
+}

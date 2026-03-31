@@ -114,6 +114,51 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'getSlowSuppliers',
+      description: '查询出货最慢的供应商（待发货订单最多或等待时间最长）',
+      parameters: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number', description: '返回数量，默认10' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'getUserGrowthTrend',
+      description: '查询指定日期范围的用户增长趋势，按天统计新增用户数。必须提供日期范围。',
+      parameters: {
+        type: 'object',
+        properties: {
+          startDate: { type: 'string', description: '开始日期 YYYY-MM-DD' },
+          endDate: { type: 'string', description: '结束日期 YYYY-MM-DD' },
+        },
+        required: ['startDate', 'endDate'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'getSupplierWithdraws',
+      description: '查询供应商提现记录，支持按供应商ID和日期范围筛选，返回提现列表和总金额。',
+      parameters: {
+        type: 'object',
+        properties: {
+          supplierId: { type: 'number', description: '供应商ID（可选，不传则查全部）' },
+          startDate: { type: 'string', description: '开始日期 YYYY-MM-DD' },
+          endDate: { type: 'string', description: '结束日期 YYYY-MM-DD' },
+          pageIndex: { type: 'number', description: '页码，默认1' },
+          pageSize: { type: 'number', description: '每页数量，默认20' },
+        },
+      },
+    },
+  },
 ];
 
 // ─── 工具执行器 ──────────────────────────────────────────
@@ -182,6 +227,52 @@ const toolHandlers: Record<string, ToolHandler> = {
       isShelf: args['isShelf'] as boolean | undefined,
     });
     return attachDataSource(result, 'ztdy-open ItemPageList API');
+  },
+
+  async getSlowSuppliers(adapter, tenantId, args) {
+    const result = await aggregates.getSlowSuppliers(
+      adapter,
+      tenantId,
+      (args['limit'] as number) ?? 10,
+    );
+    return attachDataSource(result, 'ztdy-open OrderPageList API (聚合)');
+  },
+
+  async getUserGrowthTrend(adapter, tenantId, args) {
+    const result = await aggregates.getUserGrowthTrend(adapter, tenantId, {
+      start: args['startDate'] as string,
+      end: args['endDate'] as string,
+    });
+    return attachDataSource(result, 'ztdy-open UserPageList API (聚合)');
+  },
+
+  async getSupplierWithdraws(adapter, _tenantId, args) {
+    const filterSupplierId = args['supplierId'] as number | undefined;
+    const result = await adapter.getSupplierWithdraws({
+      pageIndex: (args['pageIndex'] as number) ?? 1,
+      pageSize: Math.min((args['pageSize'] as number) ?? 20, 50),
+      startDate: args['startDate'] as string | undefined,
+      endDate: args['endDate'] as string | undefined,
+    });
+
+    // 客户端按 supplierId 过滤（WithdrawFilter 不支持 supplierId）
+    const filteredItems = filterSupplierId
+      ? result.items.filter((w) => w.supplierId === filterSupplierId)
+      : result.items;
+
+    const totalAmount = Math.round(
+      filteredItems.reduce((sum, w) => sum + w.tranAmount, 0) * 100,
+    ) / 100;
+
+    return attachDataSource(
+      {
+        items: filteredItems,
+        pagination: result.pagination,
+        source: result.source,
+        totalAmount,
+      },
+      'ztdy-open SupplierWithdrawPageList API',
+    );
   },
 };
 
