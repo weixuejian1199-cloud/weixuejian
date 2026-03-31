@@ -87,6 +87,7 @@ export type SSEEvent =
   | SSETextComplete
   | SSEToolCallStart
   | SSEToolCallResult
+  | SSEDataValidation
   | SSEError
   | SSEStreamEnd;
 
@@ -126,6 +127,29 @@ export interface SSEToolCallResult {
   duration: number;
   cached: boolean;
   messageId: string;
+}
+
+export interface SSEDataValidation {
+  type: 'data_validation';
+  messageId: string;
+  /** 是否通过校验 */
+  passed: boolean;
+  /** 数字不一致警告 */
+  numberMismatches: Array<{
+    aiNumber: number;
+    aiText: string;
+    closestToolNumber?: number;
+    deviationPercent?: number;
+  }>;
+  /** 数据冲突警告 */
+  dataConflicts: Array<{
+    field: string;
+    toolA: { name: string; value: number };
+    toolB: { name: string; value: number };
+    deviationPercent: number;
+  }>;
+  /** 数据来源标注 */
+  sourceAttribution: string | null;
 }
 
 export interface SSEError {

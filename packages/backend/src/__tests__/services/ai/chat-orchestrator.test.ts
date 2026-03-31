@@ -23,6 +23,13 @@ const mocks = vi.hoisted(() => {
     ],
     executeTool: vi.fn(),
     buildSystemPrompt: vi.fn().mockReturnValue('mock-system-prompt'),
+    validateResponse: vi.fn().mockReturnValue({
+      passed: true,
+      numberMismatches: [],
+      sourceAttribution: null,
+      financeAuditTrail: null,
+      dataConflicts: [],
+    }),
     getOrCreateConversation: vi.fn(),
     getContextMessages: vi.fn().mockResolvedValue([]),
     saveUserMessage: vi.fn().mockResolvedValue('msg-id'),
@@ -57,6 +64,10 @@ vi.mock('../../../services/tool-market/tool-resolver.js', () => ({
 
 vi.mock('../../../services/ai/system-prompt.js', () => ({
   buildSystemPrompt: mocks.buildSystemPrompt,
+}));
+
+vi.mock('../../../services/ai/hallucination-guard.js', () => ({
+  validateResponse: mocks.validateResponse,
 }));
 
 vi.mock('../../../services/ai/conversation-service.js', () => ({
@@ -541,6 +552,208 @@ describe('chat-orchestrator', () => {
         undefined,
         undefined,
       );
+    });
+  });
+
+  describe('BL-021 幻觉防护集成', () => {
+    it('有 tool_call 时应调用 validateResponse 并 yield data_validation 事件', async () => {
+      mocks.chatStream.mockReturnValue(
+        mockStream([
+          {
+            type: 'tool_calls',
+            toolCalls: [
+              {
+                index: 0,
+                id: 'call-v1',
+                function: {
+                  name: 'getSalesStats',
+                  arguments: '{"startDate":"2026-03-01","endDate":"2026-03-31"}',
+                },
+              },
+            ],
+          },
+          { type: 'done', usage: { prompt_tokens: 50, completion_tokens: 20, total_tokens: 70 } },
+        ]),
+      );
+
+      mocks.executeTool.mockResolvedValue({
+        toolCallId: 'call-v1',
+        toolName: 'getSalesStats',
+        result: { totalAmount: 100000 },
+        duration: 200,
+        cached: false,
+      });
+
+      mocks.chatCompletion.mockResolvedValue({
+        choices: [
+          {
+            message: { role: 'assistant', content: '本月销售额¥100,000' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 80, completion_tokens: 30, total_tokens: 110 },
+      });
+
+      mocks.validateResponse.mockReturnValue({
+        passed: true,
+        numberMismatches: [],
+        sourceAttribution: '数据来源：ztdy-open API',
+        financeAuditTrail: null,
+        dataConflicts: [],
+      });
+
+      const events = await collectEvents(orchestrateChat(baseRequest()));
+      const types = events.map(e => e.type);
+
+      expect(types).toContain('data_validation');
+      expect(mocks.validateResponse).toHaveBeenCalled();
+
+      const validationEvent = events.find(e => e.type === 'data_validation');
+      expect(validationEvent).toMatchObject({
+        type: 'data_validation',
+        passed: true,
+        numberMismatches: [],
+        dataConflicts: [],
+        sourceAttribution: '数据来源：ztdy-open API',
+      });
+    });
+
+    it('finance 人格有审计尾注时应附加到 fullContent', async () => {
+      mocks.chatStream.mockReturnValue(
+        mockStream([
+          {
+            type: 'tool_calls',
+            toolCalls: [
+              {
+                index: 0,
+                id: 'call-fin',
+                function: {
+                  name: 'getSalesStats',
+                  arguments: '{"startDate":"2026-03-01","endDate":"2026-03-31"}',
+                },
+              },
+            ],
+          },
+          { type: 'done', usage: { prompt_tokens: 50, completion_tokens: 20, total_tokens: 70 } },
+        ]),
+      );
+
+      mocks.executeTool.mockResolvedValue({
+        toolCallId: 'call-fin',
+        toolName: 'getSalesStats',
+        result: { totalAmount: 100000 },
+        duration: 200,
+        cached: false,
+      });
+
+      const auditTrail = '\n---\n数据来源：ztdy-open API｜查询时间：2026/3/31 18:00:00\n⚠️ 以上数据由系统自动生成，财务决策请以原始单据为准';
+
+      mocks.chatCompletion.mockResolvedValue({
+        choices: [
+          {
+            message: { role: 'assistant', content: '销售额10万' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 80, completion_tokens: 30, total_tokens: 110 },
+      });
+
+      mocks.validateResponse.mockReturnValue({
+        passed: true,
+        numberMismatches: [],
+        sourceAttribution: '数据来源：ztdy-open API',
+        financeAuditTrail: auditTrail,
+        dataConflicts: [],
+      });
+
+      const events = await collectEvents(orchestrateChat(baseRequest({ agentType: 'finance' })));
+
+      // text_complete 应包含审计尾注
+      const textComplete = events.find(e => e.type === 'text_complete');
+      expect(textComplete).toBeDefined();
+      expect((textComplete as { content: string }).content).toContain('财务决策请以原始单据为准');
+
+      // saveAssistantMessage 应保存含尾注的完整内容
+      const savedContent = mocks.saveAssistantMessage.mock.calls[0]![3] as string;
+      expect(savedContent).toContain(auditTrail);
+    });
+
+    it('无 tool_call 时不调用 validateResponse', async () => {
+      mocks.chatStream.mockReturnValue(
+        mockStream([
+          { type: 'content', content: '你好' },
+          { type: 'done', usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } },
+        ]),
+      );
+
+      const events = await collectEvents(orchestrateChat(baseRequest()));
+      const types = events.map(e => e.type);
+
+      expect(types).not.toContain('data_validation');
+      expect(mocks.validateResponse).not.toHaveBeenCalled();
+    });
+
+    it('数字不一致时 data_validation 事件 passed=false', async () => {
+      mocks.chatStream.mockReturnValue(
+        mockStream([
+          {
+            type: 'tool_calls',
+            toolCalls: [
+              {
+                index: 0,
+                id: 'call-bad',
+                function: {
+                  name: 'getSalesStats',
+                  arguments: '{"startDate":"2026-03-01","endDate":"2026-03-31"}',
+                },
+              },
+            ],
+          },
+          { type: 'done', usage: { prompt_tokens: 50, completion_tokens: 20, total_tokens: 70 } },
+        ]),
+      );
+
+      mocks.executeTool.mockResolvedValue({
+        toolCallId: 'call-bad',
+        toolName: 'getSalesStats',
+        result: { totalAmount: 100000 },
+        duration: 200,
+        cached: false,
+      });
+
+      mocks.chatCompletion.mockResolvedValue({
+        choices: [
+          {
+            message: { role: 'assistant', content: '本月销售额¥200,000' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 80, completion_tokens: 30, total_tokens: 110 },
+      });
+
+      mocks.validateResponse.mockReturnValue({
+        passed: false,
+        numberMismatches: [{
+          aiNumber: 200000,
+          aiText: '¥200,000',
+          closestToolNumber: 100000,
+          deviationPercent: 100,
+        }],
+        sourceAttribution: null,
+        financeAuditTrail: null,
+        dataConflicts: [],
+      });
+
+      const events = await collectEvents(orchestrateChat(baseRequest()));
+      const validationEvent = events.find(e => e.type === 'data_validation');
+
+      expect(validationEvent).toMatchObject({
+        passed: false,
+        numberMismatches: [{
+          aiNumber: 200000,
+          closestToolNumber: 100000,
+        }],
+      });
     });
   });
 });

@@ -1,9 +1,26 @@
 # 进度接力
 
 ## 最后更新
-- 时间：2026-03-31 20:00
+- 时间：2026-03-31 21:00
 - Agent：CTO Agent
-- 任务：Phase 2路线图规划 + BL-020 PIPL合规
+- 任务：BL-020提交 + BL-021 AI幻觉防护增强
+
+## BL-021 AI幻觉防护增强 ✅ 完成 (628→670测试)
+- **新增文件(1)**:
+  - services/ai/hallucination-guard.ts: 4大防护能力
+    - (1) 关键指标自动校验: AI回复数字 vs 工具返回数字，偏差>1%标记警告
+    - (2) 数据来源标注: 从_dataSource/_queryTime提取，构建来源说明
+    - (3) 财务审计尾注: finance/settlement人格强制附加来源+时间+免责声明
+    - (4) 数据冲突检测: 不同工具同名字段偏差>5%触发冲突告警
+- **改造文件(2)**:
+  - types.ts: 新增SSEDataValidation事件类型
+  - chat-orchestrator.ts: tool_call完成后调用validateResponse，yield data_validation事件
+- **测试(+42)**:
+  - hallucination-guard.test.ts(38): 数字提取/校验/来源标注/财务尾注/冲突检测/集成
+  - chat-orchestrator.test.ts(+4): BL-021集成测试(调用验证/审计尾注/无工具跳过/不一致检测)
+- **brain.json同步**: testBaseline=670 / BL-021 status=done
+- 基线: 670测试全绿(51文件) / TypeScript零错误
+- **下一步**: Wave 1剩余(BL-025 1688Adapter等供应链) / 等外部反馈
 
 ## Phase 2路线图 + BL-020 PIPL合规 ✅ 完成 (585→628测试)
 - **Phase 2路线图**: Wave 1-3规划写入brain.json(phase2Roadmap段落)

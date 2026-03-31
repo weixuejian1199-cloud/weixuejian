@@ -40,13 +40,13 @@
       ],
       "phase1Scenario": "判断是否具备进入退货审核流程的前置条件。只输出'建议/不建议+理由'，不执行任何动作。executionAllowed硬编码false",
       "processNodeEnum": {
-        "_instruction": "Phase 1启动前必须用ztdy OrderPageList真实数据校验此映射",
         "0": "待付款(PENDING_PAYMENT)",
         "1": "已付款/待审核(PAID)",
         "2": "待发货(PENDING_SHIPMENT) — ztdy已确认",
         "3": "已发货/运输中(SHIPPED)",
         "4": "已收货/已签收(RECEIVED)",
         "5": "已完成(COMPLETED)",
+        "_instruction": "Phase 1启动前必须用ztdy OrderPageList真实数据校验此映射",
         "receivedThreshold": "ProcessNode >= 4 视为已收货",
         "rule1Threshold": "ProcessNode < 3 视为未发货，引导取消",
         "validationStatus": "verified — Phase 1b ACI客服MVP已使用ProcessNode判断逻辑，Wave 9测试覆盖",
@@ -236,30 +236,90 @@
       "title": "供应链基础+安全合规",
       "duration": "~3周",
       "tasks": [
-        {"id": "BL-020", "title": "数据安全与PIPL合规策略", "priority": "P0", "dependency": "无"},
-        {"id": "BL-025", "title": "1688 Adapter实现", "priority": "P0", "dependency": "BL-024 Spike"},
-        {"id": "BL-018", "title": "ztdy-open写操作API开放", "priority": "P1", "dependency": "第三方配合"},
-        {"id": "BL-021", "title": "AI幻觉防护增强", "priority": "P1", "dependency": "无"}
+        {
+          "id": "BL-020",
+          "title": "数据安全与PIPL合规策略",
+          "priority": "P0",
+          "dependency": "无"
+        },
+        {
+          "id": "BL-025",
+          "title": "1688 Adapter实现",
+          "priority": "P0",
+          "dependency": "BL-024 Spike"
+        },
+        {
+          "id": "BL-018",
+          "title": "ztdy-open写操作API开放",
+          "priority": "P1",
+          "dependency": "第三方配合"
+        },
+        {
+          "id": "BL-021",
+          "title": "AI幻觉防护增强",
+          "priority": "P1",
+          "dependency": "无"
+        }
       ]
     },
     "wave2": {
       "title": "AI选品+订单路由",
       "duration": "~3周",
       "tasks": [
-        {"id": "BL-028", "title": "订单路由引擎（多源智能分单）", "priority": "P0", "dependency": "BL-025"},
-        {"id": "BL-026", "title": "AI选品Agent", "priority": "P0", "dependency": "BL-025"},
-        {"id": "BL-027", "title": "商品风格统一模块", "priority": "P1", "dependency": "BL-026"},
-        {"id": "BL-023", "title": "操作确认记录+AI决策回放", "priority": "P1", "dependency": "无"}
+        {
+          "id": "BL-028",
+          "title": "订单路由引擎（多源智能分单）",
+          "priority": "P0",
+          "dependency": "BL-025"
+        },
+        {
+          "id": "BL-026",
+          "title": "AI选品Agent",
+          "priority": "P0",
+          "dependency": "BL-025"
+        },
+        {
+          "id": "BL-027",
+          "title": "商品风格统一模块",
+          "priority": "P1",
+          "dependency": "BL-026"
+        },
+        {
+          "id": "BL-023",
+          "title": "操作确认记录+AI决策回放",
+          "priority": "P1",
+          "dependency": "无"
+        }
       ]
     },
     "wave3": {
       "title": "ACI升级+数据分析",
       "duration": "~3周",
       "tasks": [
-        {"id": "BL-005", "title": "ACI客服Phase 2半自动", "priority": "P0", "dependency": "Phase 1 ACI陪练数据"},
-        {"id": "BL-002", "title": "电商数据分析引擎", "priority": "P1", "dependency": "无"},
-        {"id": "BL-022", "title": "AI成本监控仪表盘", "priority": "P1", "dependency": "无"},
-        {"id": "BL-012", "title": "轻量审批流引擎", "priority": "P2", "dependency": "无"}
+        {
+          "id": "BL-005",
+          "title": "ACI客服Phase 2半自动",
+          "priority": "P0",
+          "dependency": "Phase 1 ACI陪练数据"
+        },
+        {
+          "id": "BL-002",
+          "title": "电商数据分析引擎",
+          "priority": "P1",
+          "dependency": "无"
+        },
+        {
+          "id": "BL-022",
+          "title": "AI成本监控仪表盘",
+          "priority": "P1",
+          "dependency": "无"
+        },
+        {
+          "id": "BL-012",
+          "title": "轻量审批流引擎",
+          "priority": "P2",
+          "dependency": "无"
+        }
       ]
     },
     "supplyChainStatus": {
@@ -1091,7 +1151,11 @@
       "priority": "P1",
       "targetPhase": "Phase 2",
       "source": "CTO团队审查v2.3-AI安全层",
-      "date": "2026-03-30"
+      "date": "2026-03-30",
+      "status": "done",
+      "completionDate": "2026-03-31",
+      "testCount": 42,
+      "notes": "628→670测试: hallucination-guard(38) + orchestrator集成(4)"
     },
     {
       "id": "BL-022",

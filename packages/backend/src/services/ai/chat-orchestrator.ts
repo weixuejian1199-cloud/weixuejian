@@ -18,6 +18,7 @@ import {
 } from './conversation-service.js';
 import { logger } from '../../utils/logger.js';
 import { recordAiRequest } from '../../routes/metrics.js';
+import { validateResponse } from './hallucination-guard.js';
 import type { ChatMessage, SSEEvent, ToolDefinition, ToolExecutionResult, TokenUsage } from './types.js';
 import type { AgentType } from '@prisma/client';
 
@@ -156,7 +157,27 @@ export async function* orchestrateChat(req: ChatRequest): AsyncGenerator<SSEEven
       totalUsage = addUsage(totalUsage, toolCallResults.usage);
     }
 
-    // 7. text_complete
+    // 7. 幻觉防护校验（BL-021）
+    if (allToolResults.length > 0 && fullContent) {
+      const validation = validateResponse(fullContent, allToolResults, req.agentType);
+
+      // 财务审计尾注：强制附加到回复内容
+      if (validation.financeAuditTrail) {
+        fullContent += validation.financeAuditTrail;
+      }
+
+      // 发送校验结果事件
+      yield {
+        type: 'data_validation',
+        messageId,
+        passed: validation.passed,
+        numberMismatches: validation.numberMismatches,
+        dataConflicts: validation.dataConflicts,
+        sourceAttribution: validation.sourceAttribution,
+      };
+    }
+
+    // 8. text_complete
     if (fullContent) {
       yield {
         type: 'text_complete',
@@ -166,7 +187,7 @@ export async function* orchestrateChat(req: ChatRequest): AsyncGenerator<SSEEven
       };
     }
 
-    // 8. 保存 AI 回复
+    // 9. 保存 AI 回复
     await saveAssistantMessage(
       conversationId,
       req.tenantId,
@@ -176,11 +197,11 @@ export async function* orchestrateChat(req: ChatRequest): AsyncGenerator<SSEEven
       allToolResults.length > 0 ? allToolResults : undefined,
     );
 
-    // 9. 更新会话 meta
+    // 10. 更新会话 meta
     const title = !req.conversationId ? generateTitle(req.message) : undefined;
     await updateConversationMeta(conversationId, req.tenantId, totalUsage.total_tokens, title);
 
-    // 10. stream_end
+    // 11. stream_end
     recordAiRequest(true);
     yield {
       type: 'stream_end',
