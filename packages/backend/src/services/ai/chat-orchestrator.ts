@@ -6,7 +6,7 @@
  */
 import { randomUUID } from 'crypto';
 import { chatStream, chatCompletion, AiClientError } from './ai-client.js';
-import { TOOL_DEFINITIONS, executeTool } from './tool-registry.js';
+import { getActiveToolDefinitions, resolveAndExecuteTool } from '../tool-market/tool-resolver.js';
 import { buildSystemPrompt, type PromptContext } from './system-prompt.js';
 import {
   getOrCreateConversation,
@@ -18,7 +18,7 @@ import {
 } from './conversation-service.js';
 import { logger } from '../../utils/logger.js';
 import { recordAiRequest } from '../../routes/metrics.js';
-import type { ChatMessage, SSEEvent, ToolExecutionResult, TokenUsage } from './types.js';
+import type { ChatMessage, SSEEvent, ToolDefinition, ToolExecutionResult, TokenUsage } from './types.js';
 import type { AgentType } from '@prisma/client';
 
 export interface ChatRequest {
@@ -88,10 +88,11 @@ export async function* orchestrateChat(req: ChatRequest): AsyncGenerator<SSEEven
   let chunkIndex = 0;
 
   try {
+    const activeTools = await getActiveToolDefinitions(req.tenantId);
     const pendingToolCalls: Array<{ id: string; name: string; arguments: string }> = [];
     let streamContent = '';
 
-    for await (const chunk of chatStream(messages, { tools: TOOL_DEFINITIONS })) {
+    for await (const chunk of chatStream(messages, { tools: activeTools })) {
       if (chunk.type === 'content' && chunk.content) {
         streamContent += chunk.content;
         yield {
@@ -133,6 +134,7 @@ export async function* orchestrateChat(req: ChatRequest): AsyncGenerator<SSEEven
         messageId,
         req.tenantId,
         totalUsage,
+        activeTools,
       );
 
       // yield tool events
@@ -218,6 +220,7 @@ async function handleToolCalls(
   messageId: string,
   tenantId: string,
   _existingUsage: TokenUsage,
+  activeTools: ToolDefinition[],
 ): Promise<{
   events: SSEEvent[];
   textEvents: SSEEvent[];
@@ -279,7 +282,7 @@ async function handleToolCalls(
       messageId,
     });
 
-    const result = await executeTool(tc.id, tc.name, tc.arguments, tenantId);
+    const result = await resolveAndExecuteTool(tc.id, tc.name, tc.arguments, tenantId);
     results.push(result);
 
     // P0-1: 剥离内部字段后再发送给客户端
@@ -307,7 +310,7 @@ async function handleToolCalls(
   // AI 根据工具结果继续生成（非流式，因为 tool_call 后的回复通常不长）
   let finalContent = '';
   try {
-    const response = await chatCompletion(updatedMessages, { tools: TOOL_DEFINITIONS });
+    const response = await chatCompletion(updatedMessages, { tools: activeTools });
     const choice = response.choices[0];
     if (choice?.message.content) {
       finalContent = choice.message.content;

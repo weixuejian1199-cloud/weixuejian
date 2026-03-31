@@ -24,6 +24,7 @@ import { metricsRouter } from './routes/metrics.js';
 import { authRouter } from './routes/auth/index.js';
 import { aiRouter } from './routes/ai/index.js';
 import { csRouter } from './routes/cs/index.js';
+import { toolsRouter } from './routes/tools/index.js';
 
 const app = express();
 
@@ -115,6 +116,9 @@ protectedRouter.use('/ai', aiRouter);
 
 // ─── ACI 客服中枢 ────────────────────────────────────────
 protectedRouter.use('/cs', csRouter);
+
+// ─── 工具市场 ────────────────────────────────────────────
+protectedRouter.use('/tools', toolsRouter);
 
 app.use('/api/v1', protectedRouter);
 

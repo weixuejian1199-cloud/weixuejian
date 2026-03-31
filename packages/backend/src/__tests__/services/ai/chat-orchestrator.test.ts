@@ -50,9 +50,9 @@ vi.mock('../../../services/ai/ai-client.js', () => ({
   AiClientError: mocks.AiClientError,
 }));
 
-vi.mock('../../../services/ai/tool-registry.js', () => ({
-  TOOL_DEFINITIONS: mocks.TOOL_DEFINITIONS,
-  executeTool: mocks.executeTool,
+vi.mock('../../../services/tool-market/tool-resolver.js', () => ({
+  getActiveToolDefinitions: vi.fn().mockResolvedValue(mocks.TOOL_DEFINITIONS),
+  resolveAndExecuteTool: mocks.executeTool,
 }));
 
 vi.mock('../../../services/ai/system-prompt.js', () => ({
