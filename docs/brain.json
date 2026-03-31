@@ -173,7 +173,7 @@
       "externalIM": "技术参考：已验证的WebSocket IM+SSE流式输出+文件上传分析流程+系统监控面板。选择性合并到对话通道和驾驶舱，Phase 3",
       "shishi": "时皙商城(27表/207验收/22页面) → 已决策合并(ADR-022)，技术栈迁移(NestJS→Express, MySQL→PostgreSQL, uni-app→Taro)，Phase 2-3"
     },
-    "currentStatus": "Phase 1a 进行中。脚手架已完成(US-P1a-001 ✅ commit 9b60167)。v2.3更新：9人团队全面审查完成 — 双飞书对接从Wave9提前到Wave4(验证通道先行)、多租户Phase1简化(节省1天)、供应商对账模块删除(BL-002/BL-011)、新增Phase1a技术Spike(百炼tool_call+Bridge API原型)、AiJudgmentRecord结构化判断记录、AI幻觉防护写入对话引擎、直达模式跳过Master Agent、E2E冒烟测试。v2.4更新：全面审查补强 — ACI规则冲突修复、中强度词枚举、安全设计方案、前后端接口契约、工具错误处理框架、团队流程补强。v2.5更新：供应链策略确认(ADR-031) — 爱库存封闭不可行已删除，确认1+1策略(ztdy基本盘+1688增量)，Phase 1b加1688 Spike，Phase 2新增5个Backlog(BL-024~028)。下一步：Wave 3 MallAdapter。"
+    "currentStatus": "Phase 1b 进行中。Phase 1a 全部完成。当前基线：250测试全绿/ESLint零错误/TypeScript零错误。Wave 8完成(5个运营查询工具)。下一步：Wave 9 ACI客服MVP(P1b-005)。"
   },
 
   "securityDesign": {
@@ -1350,7 +1350,9 @@
       { "code": "AUTH_TOKEN_BLACKLISTED", "httpStatus": 401, "message": "令牌已被吊销" },
       { "code": "AUTH_REFRESH_INVALID",   "httpStatus": 401, "message": "刷新令牌无效或已过期" },
       { "code": "AUTH_WECHAT_CODE_INVALID", "httpStatus": 400, "message": "微信登录code无效" },
-      { "code": "AUTH_PHONE_REQUIRED",    "httpStatus": 400, "message": "需要绑定手机号" }
+      { "code": "AUTH_PHONE_REQUIRED",    "httpStatus": 400, "message": "需要绑定手机号" },
+      { "code": "AUTH_PHONE_ALREADY_BOUND", "httpStatus": 409, "message": "手机号已被其他账号绑定" },
+      { "code": "AUTH_SMS_CODE_INVALID",  "httpStatus": 400, "message": "短信验证码无效或已过期" }
     ],
     "tenant": [
       { "code": "TENANT_NOT_FOUND",       "httpStatus": 403, "message": "租户不存在或已停用" },

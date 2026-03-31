@@ -89,10 +89,11 @@ function callClaude(message, sessionId, timeoutMs = 180_000) {
   return new Promise((resolve, reject) => {
     const args = [
       '-p',
+      '--bare',
       '--output-format', 'json',
       '--max-turns', '5',
       '--dangerously-skip-permissions',
-      '--append-system-prompt',
+      '--system-prompt',
       `身份确认：
 1. 你是Claude Opus 4，Anthropic的模型。
 2. 你的角色是CTO和技术合伙人，飞书Bot名「启元」。

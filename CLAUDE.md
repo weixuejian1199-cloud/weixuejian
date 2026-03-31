@@ -112,7 +112,7 @@ Node.js 20+ / TypeScript strict / Express 4 / Prisma 6 / PostgreSQL 15 / Redis 7
 
 ```
 docs/
-├── brain.json                    # 项目大脑 v2.6（projectBrief/任务/ADR/错误码/会话协议）
+├── brain.json                    # 项目大脑 v2.7（projectBrief/任务/ADR/错误码/会话协议）
 ├── claude-progress.txt           # 进度接力（开发后才有）
 ├── 01-企业AI工作站-主文档.md      # 数据模型、权限、安全（数据模型权威源）
 ├── 02-企业AI工作站-Agent编排.md   # AI Agent 架构 + ACI客服中枢
@@ -121,5 +121,5 @@ docs/
 ├── 05-全局能力架构.md             # 全局蓝图、产品能力（能力权威源）
 ├── 06-环境与部署规划.md           # 阿里云资源、Docker、CI/CD
 ├── 07-UI设计规范.md              # 视觉语言、组件、页面设计
-└── 08-前后端接口契约.md          # 12种AI消息类型 + 17个API端点 + 41错误码
+└── 08-前后端接口契约.md          # 12种AI消息类型 + 18个API端点 + 43错误码
 ```

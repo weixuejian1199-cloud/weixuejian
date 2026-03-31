@@ -152,6 +152,7 @@ function callClaude(message, sessionId) {
   return new Promise((resolve, reject) => {
     const args = [
       '-p',
+      '--bare',
       '--output-format', 'json',
       '--max-turns', String(maxTurns),
       '--dangerously-skip-permissions',

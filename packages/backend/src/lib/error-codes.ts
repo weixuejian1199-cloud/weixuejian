@@ -12,6 +12,8 @@ export const ERROR_CODES = {
   AUTH_REFRESH_INVALID: { httpStatus: 401, message: '刷新令牌无效或已过期' },
   AUTH_WECHAT_CODE_INVALID: { httpStatus: 400, message: '微信登录code无效' },
   AUTH_PHONE_REQUIRED: { httpStatus: 400, message: '需要绑定手机号' },
+  AUTH_PHONE_ALREADY_BOUND: { httpStatus: 409, message: '手机号已被其他账号绑定' },
+  AUTH_SMS_CODE_INVALID: { httpStatus: 400, message: '短信验证码无效或已过期' },
 
   // === 租户 ===
   TENANT_NOT_FOUND: { httpStatus: 403, message: '租户不存在或已停用' },
