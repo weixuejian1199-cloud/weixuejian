@@ -38,18 +38,22 @@ const tenantGuardExtension = Prisma.defineExtension({
   },
 });
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
+// eslint-disable-next-line no-var -- Prisma singleton pattern for HMR
+declare global { var __prisma: PrismaClient | undefined; }
 
 const basePrisma =
-  globalForPrisma.prisma ??
+  globalThis.__prisma ??
   new PrismaClient({
     log: isProduction ? ['error', 'warn'] : ['query', 'info', 'warn', 'error'],
   });
 
-export const prisma = isProduction ? basePrisma : basePrisma.$extends(tenantGuardExtension) as unknown as PrismaClient;
+// Prisma $extends() returns a branded type incompatible with PrismaClient.
+// We export the extended client typed as the base—acceptable because the
+// extension only adds a query middleware and exposes no new surface.
+export const prisma: PrismaClient = isProduction
+  ? basePrisma
+  : (basePrisma.$extends(tenantGuardExtension) as PrismaClient);
 
 if (!isProduction) {
-  globalForPrisma.prisma = basePrisma;
+  globalThis.__prisma = basePrisma;
 }
