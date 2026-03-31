@@ -153,6 +153,15 @@ if ! pg_restore \
     exit 1
 fi
 
+# 验证恢复数据完整性
+echo "[RESTORE] 验证恢复数据..."
+TENANT_COUNT=$(PGPASSWORD="${DB_PASSWORD}" psql -U "${DB_USER}" -d "${DB_NAME}" -h "${DB_HOST}" -t -c "SELECT COUNT(*) FROM tenants;" 2>/dev/null | tr -d ' ')
+if [ -z "$TENANT_COUNT" ] || [ "$TENANT_COUNT" -eq 0 ]; then
+  echo "[ERROR] 恢复后数据验证失败: tenants表为空"
+  exit 1
+fi
+echo "[RESTORE] 数据验证通过 (tenants: ${TENANT_COUNT})"
+
 echo "[RESTORE] 恢复完成 ✓"
 echo "[RESTORE] 时间: $(date '+%Y-%m-%d %H:%M:%S')"
 

@@ -95,8 +95,12 @@ describe('conversation-service', () => {
         {
           role: 'assistant',
           content: '查询结果',
-          toolCalls: [{ id: 'tc_1', type: 'function', function: { name: 'getSalesStats', arguments: '{}' } }],
-          toolResults: [{ toolCallId: 'tc_1', toolName: 'getSalesStats', result: { totalAmount: 100 } }],
+          toolCalls: [
+            { id: 'tc_1', type: 'function', function: { name: 'getSalesStats', arguments: '{}' } },
+          ],
+          toolResults: [
+            { toolCallId: 'tc_1', toolName: 'getSalesStats', result: { totalAmount: 100 } },
+          ],
         },
       ]);
 

@@ -11,11 +11,7 @@ import { tenantStorage } from '../lib/tenant-context.js';
  * fail-secure 原则：tenantId 缺失时拒绝请求，不使用默认值。
  * 必须在 requireAuth 之后使用。
  */
-export function requireTenant(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): void {
+export function requireTenant(req: Request, res: Response, next: NextFunction): void {
   const log = childLogger(req.requestId ?? 'unknown');
 
   if (!req.user) {
@@ -32,10 +28,7 @@ export function requireTenant(
   req.tenantId = req.user.tenantId;
 
   // 设置 AsyncLocalStorage 上下文 — 后续服务层可通过 getTenantId() 获取
-  tenantStorage.run(
-    { tenantId: req.user.tenantId, userId: req.user.userId },
-    () => next(),
-  );
+  tenantStorage.run({ tenantId: req.user.tenantId, userId: req.user.userId }, () => next());
 }
 
 /**
@@ -53,44 +46,104 @@ export function createTenantPrismaExtension(tenantId: string) {
     name: 'tenant-isolation',
     query: {
       $allModels: {
-        async findMany({ args, query }: { args: Record<string, unknown>; query: (args: Record<string, unknown>) => Promise<unknown> }) {
-          args['where'] = { ...(args['where'] as object ?? {}), tenantId };
+        async findMany({
+          args,
+          query,
+        }: {
+          args: Record<string, unknown>;
+          query: (args: Record<string, unknown>) => Promise<unknown>;
+        }) {
+          args['where'] = { ...((args['where'] as object) ?? {}), tenantId };
           return query(args);
         },
-        async findFirst({ args, query }: { args: Record<string, unknown>; query: (args: Record<string, unknown>) => Promise<unknown> }) {
-          args['where'] = { ...(args['where'] as object ?? {}), tenantId };
+        async findFirst({
+          args,
+          query,
+        }: {
+          args: Record<string, unknown>;
+          query: (args: Record<string, unknown>) => Promise<unknown>;
+        }) {
+          args['where'] = { ...((args['where'] as object) ?? {}), tenantId };
           return query(args);
         },
-        async findUnique({ args, query }: { args: Record<string, unknown>; query: (args: Record<string, unknown>) => Promise<unknown> }) {
-          args['where'] = { ...(args['where'] as object ?? {}), tenantId };
+        async findUnique({
+          args,
+          query,
+        }: {
+          args: Record<string, unknown>;
+          query: (args: Record<string, unknown>) => Promise<unknown>;
+        }) {
+          args['where'] = { ...((args['where'] as object) ?? {}), tenantId };
           return query(args);
         },
-        async create({ args, query }: { args: Record<string, unknown>; query: (args: Record<string, unknown>) => Promise<unknown> }) {
-          args['data'] = { ...(args['data'] as object ?? {}), tenantId };
+        async create({
+          args,
+          query,
+        }: {
+          args: Record<string, unknown>;
+          query: (args: Record<string, unknown>) => Promise<unknown>;
+        }) {
+          args['data'] = { ...((args['data'] as object) ?? {}), tenantId };
           return query(args);
         },
-        async update({ args, query }: { args: Record<string, unknown>; query: (args: Record<string, unknown>) => Promise<unknown> }) {
-          args['where'] = { ...(args['where'] as object ?? {}), tenantId };
+        async update({
+          args,
+          query,
+        }: {
+          args: Record<string, unknown>;
+          query: (args: Record<string, unknown>) => Promise<unknown>;
+        }) {
+          args['where'] = { ...((args['where'] as object) ?? {}), tenantId };
           return query(args);
         },
-        async updateMany({ args, query }: { args: Record<string, unknown>; query: (args: Record<string, unknown>) => Promise<unknown> }) {
-          args['where'] = { ...(args['where'] as object ?? {}), tenantId };
+        async updateMany({
+          args,
+          query,
+        }: {
+          args: Record<string, unknown>;
+          query: (args: Record<string, unknown>) => Promise<unknown>;
+        }) {
+          args['where'] = { ...((args['where'] as object) ?? {}), tenantId };
           return query(args);
         },
-        async delete({ args, query }: { args: Record<string, unknown>; query: (args: Record<string, unknown>) => Promise<unknown> }) {
-          args['where'] = { ...(args['where'] as object ?? {}), tenantId };
+        async delete({
+          args,
+          query,
+        }: {
+          args: Record<string, unknown>;
+          query: (args: Record<string, unknown>) => Promise<unknown>;
+        }) {
+          args['where'] = { ...((args['where'] as object) ?? {}), tenantId };
           return query(args);
         },
-        async deleteMany({ args, query }: { args: Record<string, unknown>; query: (args: Record<string, unknown>) => Promise<unknown> }) {
-          args['where'] = { ...(args['where'] as object ?? {}), tenantId };
+        async deleteMany({
+          args,
+          query,
+        }: {
+          args: Record<string, unknown>;
+          query: (args: Record<string, unknown>) => Promise<unknown>;
+        }) {
+          args['where'] = { ...((args['where'] as object) ?? {}), tenantId };
           return query(args);
         },
-        async count({ args, query }: { args: Record<string, unknown>; query: (args: Record<string, unknown>) => Promise<unknown> }) {
-          args['where'] = { ...(args['where'] as object ?? {}), tenantId };
+        async count({
+          args,
+          query,
+        }: {
+          args: Record<string, unknown>;
+          query: (args: Record<string, unknown>) => Promise<unknown>;
+        }) {
+          args['where'] = { ...((args['where'] as object) ?? {}), tenantId };
           return query(args);
         },
-        async aggregate({ args, query }: { args: Record<string, unknown>; query: (args: Record<string, unknown>) => Promise<unknown> }) {
-          args['where'] = { ...(args['where'] as object ?? {}), tenantId };
+        async aggregate({
+          args,
+          query,
+        }: {
+          args: Record<string, unknown>;
+          query: (args: Record<string, unknown>) => Promise<unknown>;
+        }) {
+          args['where'] = { ...((args['where'] as object) ?? {}), tenantId };
           return query(args);
         },
       },

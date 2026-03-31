@@ -31,7 +31,11 @@ vi.mock('../../lib/env.js', () => ({
   },
 }));
 
-import { getSalesStats, getTopSuppliers, getOrderStatusDistribution } from '../../services/mall/aggregates.js';
+import {
+  getSalesStats,
+  getTopSuppliers,
+  getOrderStatusDistribution,
+} from '../../services/mall/aggregates.js';
 import { MallAdapter } from '../../adapters/erp/mall-adapter.js';
 import type { PaginatedResult, MallOrder } from '../../adapters/erp/types.js';
 

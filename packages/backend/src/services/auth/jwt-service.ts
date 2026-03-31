@@ -173,12 +173,7 @@ export async function rotateTokenPair(
   });
 
   // 签发新的token pair
-  return issueTokenPair(
-    stored.userId,
-    stored.tenantId,
-    stored.user.role.name,
-    deviceId,
-  );
+  return issueTokenPair(stored.userId, stored.tenantId, stored.user.role.name, deviceId);
 }
 
 // ─── 登出（黑名单）─────────────────────────────────────────
@@ -187,10 +182,7 @@ export async function rotateTokenPair(
  * 将 Access Token 加入黑名单（Redis），TTL = token剩余有效期
  * 同时吊销对应用户的所有 Refresh Token
  */
-export async function revokeTokens(
-  accessToken: string,
-  userId: string,
-): Promise<void> {
+export async function revokeTokens(accessToken: string, userId: string): Promise<void> {
   // 1. 解码access token获取jti和exp（不验证签名，因为可能已过期）
   const decoded = jwt.decode(accessToken) as DecodedAccessToken | null;
   if (decoded?.jti && decoded?.exp) {
@@ -230,11 +222,16 @@ function parseExpiry(expiry: string): number {
   const unit = match[2]!;
 
   switch (unit) {
-    case 's': return value;
-    case 'm': return value * 60;
-    case 'h': return value * 3600;
-    case 'd': return value * 86400;
-    default: return 900;
+    case 's':
+      return value;
+    case 'm':
+      return value * 60;
+    case 'h':
+      return value * 3600;
+    case 'd':
+      return value * 86400;
+    default:
+      return 900;
   }
 }
 
@@ -243,9 +240,7 @@ export class TokenRotationError extends Error {
   code: 'INVALID_REFRESH_TOKEN' | 'USER_INACTIVE';
 
   constructor(code: 'INVALID_REFRESH_TOKEN' | 'USER_INACTIVE') {
-    super(code === 'INVALID_REFRESH_TOKEN'
-      ? '刷新令牌无效或已过期'
-      : '用户账号已停用');
+    super(code === 'INVALID_REFRESH_TOKEN' ? '刷新令牌无效或已过期' : '用户账号已停用');
     this.code = code;
     this.name = 'TokenRotationError';
   }

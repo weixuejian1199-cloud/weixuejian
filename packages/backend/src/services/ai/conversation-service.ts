@@ -83,19 +83,28 @@ export async function getContextMessages(
       result.push({ role: msg.role, content: msg.content });
     } else if (msg.role === 'assistant') {
       const chatMsg: ChatMessage = { role: 'assistant', content: msg.content };
-      if (msg.toolCalls) {
-        chatMsg.tool_calls = msg.toolCalls as unknown as ChatMessage['tool_calls'];
+      if (msg.toolCalls && Array.isArray(msg.toolCalls)) {
+        chatMsg.tool_calls = (msg.toolCalls as Array<Record<string, unknown>>).map((tc) => ({
+          id: String(tc['id'] ?? ''),
+          type: 'function' as const,
+          function: {
+            name: String((tc['function'] as Record<string, unknown> | undefined)?.['name'] ?? ''),
+            arguments: String(
+              (tc['function'] as Record<string, unknown> | undefined)?.['arguments'] ?? '',
+            ),
+          },
+        }));
       }
       result.push(chatMsg);
 
       // 如果 assistant 消息有 tool_calls，对应的 tool results 也要加入
       if (msg.toolResults && Array.isArray(msg.toolResults)) {
-        for (const tr of msg.toolResults as Array<{ toolCallId: string; toolName: string; result: unknown }>) {
+        for (const tr of msg.toolResults as Array<Record<string, unknown>>) {
           result.push({
             role: 'tool',
-            content: JSON.stringify(tr.result),
-            tool_call_id: tr.toolCallId,
-            name: tr.toolName,
+            content: JSON.stringify(tr['result']),
+            tool_call_id: String(tr['toolCallId'] ?? ''),
+            name: String(tr['toolName'] ?? ''),
           });
         }
       }

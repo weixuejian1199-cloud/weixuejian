@@ -5,11 +5,7 @@
  * 实现完整的对话流程：SSE 流式输出 + tool_call 循环。
  */
 import { randomUUID } from 'crypto';
-import {
-  chatStream,
-  chatCompletion,
-  AiClientError,
-} from './ai-client.js';
+import { chatStream, chatCompletion, AiClientError } from './ai-client.js';
 import { TOOL_DEFINITIONS, executeTool } from './tool-registry.js';
 import { buildSystemPrompt, type PromptContext } from './system-prompt.js';
 import {
@@ -354,9 +350,12 @@ function generateTitle(message: string): string {
 
 function getErrorMessage(code: string): string {
   switch (code) {
-    case 'AI_RATE_LIMITED': return 'AI 调用频率限制，请稍后再试。';
-    case 'AI_CONTEXT_TOO_LONG': return '对话上下文已超出限制，请开始新会话。';
-    default: return 'AI 服务暂时不可用，请稍后重试。';
+    case 'AI_RATE_LIMITED':
+      return 'AI 调用频率限制，请稍后再试。';
+    case 'AI_CONTEXT_TOO_LONG':
+      return '对话上下文已超出限制，请开始新会话。';
+    default:
+      return 'AI 服务暂时不可用，请稍后重试。';
   }
 }
 
@@ -370,4 +369,3 @@ function stripInternalFields(data: unknown): unknown {
   }
   return data;
 }
-

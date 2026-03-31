@@ -2,7 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ─── Mocks ──────────────────────────────────────────────
 
-const { mockRedisExists, mockRedisSetex, mockPrismaCreate, mockPrismaFindFirst, mockPrismaUpdate, mockPrismaUpdateMany } = vi.hoisted(() => ({
+const {
+  mockRedisExists,
+  mockRedisSetex,
+  mockPrismaCreate,
+  mockPrismaFindFirst,
+  mockPrismaUpdate,
+  mockPrismaUpdateMany,
+} = vi.hoisted(() => ({
   mockRedisExists: vi.fn(),
   mockRedisSetex: vi.fn(),
   mockPrismaCreate: vi.fn(),
@@ -14,7 +21,7 @@ const { mockRedisExists, mockRedisSetex, mockPrismaCreate, mockPrismaFindFirst, 
 vi.mock('../../../lib/env.js', () => ({
   env: {
     JWT_SECRET: 'test-secret-that-is-at-least-32-chars-long',
-    JWT_PRIVATE_KEY: undefined,   // HS256 mode for tests
+    JWT_PRIVATE_KEY: undefined, // HS256 mode for tests
     JWT_PUBLIC_KEY: undefined,
     JWT_ACCESS_EXPIRES_IN: '15m',
     JWT_REFRESH_EXPIRES_IN: '7d',
@@ -166,8 +173,7 @@ describe('JWT Service', () => {
     it('无效refresh token应该抛出TokenRotationError', async () => {
       mockPrismaFindFirst.mockResolvedValue(null);
 
-      await expect(rotateTokenPair('invalid-token'))
-        .rejects.toThrow(TokenRotationError);
+      await expect(rotateTokenPair('invalid-token')).rejects.toThrow(TokenRotationError);
     });
 
     it('停用用户应该吊销所有token并抛出错误', async () => {
@@ -175,12 +181,17 @@ describe('JWT Service', () => {
         id: 'rt-1',
         userId: 'u1',
         tenantId: 't1',
-        user: { id: 'u1', tenantId: 't1', roleId: 'r1', status: 'suspended', role: { name: 'admin' } },
+        user: {
+          id: 'u1',
+          tenantId: 't1',
+          roleId: 'r1',
+          status: 'suspended',
+          role: { name: 'admin' },
+        },
       });
       mockPrismaUpdateMany.mockResolvedValue({ count: 3 });
 
-      await expect(rotateTokenPair('token-for-suspended-user'))
-        .rejects.toThrow(TokenRotationError);
+      await expect(rotateTokenPair('token-for-suspended-user')).rejects.toThrow(TokenRotationError);
 
       // 应该吊销该用户所有refresh token
       expect(mockPrismaUpdateMany).toHaveBeenCalledWith({
@@ -193,7 +204,12 @@ describe('JWT Service', () => {
   describe('revokeTokens', () => {
     it('应该将access token加入黑名单并吊销所有refresh token', async () => {
       // 签发一个token用于测试
-      const token = signAccessToken({ userId: 'u1', tenantId: 't1', role: 'admin', jti: 'jti-revoke' });
+      const token = signAccessToken({
+        userId: 'u1',
+        tenantId: 't1',
+        role: 'admin',
+        jti: 'jti-revoke',
+      });
       mockRedisSetex.mockResolvedValue('OK');
       mockPrismaUpdateMany.mockResolvedValue({ count: 2 });
 

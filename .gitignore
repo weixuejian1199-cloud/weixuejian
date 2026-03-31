@@ -32,3 +32,6 @@ logs/
 
 # Keys
 keys/
+
+# Lock files (pnpm-lock.yaml is the canonical lock — ignore npm lock in sub-packages)
+packages/**/package-lock.json

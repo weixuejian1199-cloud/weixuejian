@@ -91,6 +91,15 @@ fi
 BACKUP_SIZE=$(du -h "${BACKUP_FILE}" | cut -f1)
 echo "[BACKUP] 备份完成: ${BACKUP_FILE} (${BACKUP_SIZE})"
 
+# 验证备份文件有效性
+if command -v pg_restore &> /dev/null; then
+  if ! pg_restore -l "${BACKUP_FILE}" > /dev/null 2>&1; then
+    echo "[ERROR] 备份文件损坏或无效: ${BACKUP_FILE}"
+    exit 1
+  fi
+  echo "[BACKUP] 备份文件验证通过"
+fi
+
 # --------------------------------------------------
 # 5. 月备份：每月1号额外复制一份到 monthly/
 # --------------------------------------------------
@@ -139,7 +148,9 @@ upload_to_oss() {
     fi
 }
 
-upload_to_oss || true  # OSS 上传失败不阻塞本地备份流程
+if ! upload_to_oss; then
+  echo "[WARN] OSS上传失败，本地备份已保存: ${BACKUP_FILE}"
+fi
 
 # --------------------------------------------------
 # 7. 本地备份清理（保留策略）

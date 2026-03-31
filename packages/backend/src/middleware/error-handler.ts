@@ -8,17 +8,8 @@ const isProduction = process.env['NODE_ENV'] === 'production';
 /**
  * 404 路由兜底中间件 — 放在所有路由之后、全局错误处理之前
  */
-export function notFoundHandler(
-  req: Request,
-  res: Response,
-  _next: NextFunction,
-): void {
-  sendError(
-    res,
-    'RESOURCE_NOT_FOUND',
-    `Route ${req.method} ${req.path} not found`,
-    404,
-  );
+export function notFoundHandler(req: Request, res: Response, _next: NextFunction): void {
+  sendError(res, 'RESOURCE_NOT_FOUND', `Route ${req.method} ${req.path} not found`, 404);
 }
 
 /**
@@ -47,8 +38,7 @@ export function globalErrorHandler(
 
   // 生成错误追踪 ID
   const errorId = req.requestId ?? 'unknown';
-  const message =
-    err instanceof Error ? err.message : 'An unexpected error occurred';
+  const message = err instanceof Error ? err.message : 'An unexpected error occurred';
 
   if (isProduction) {
     // 生产环境：只记录 errorId + message，不记录完整 stack
@@ -60,10 +50,5 @@ export function globalErrorHandler(
     log.debug({ errorId, stack }, 'Error stack trace');
   }
 
-  sendError(
-    res,
-    'INTERNAL_ERROR',
-    'An internal server error occurred',
-    500,
-  );
+  sendError(res, 'INTERNAL_ERROR', 'An internal server error occurred', 500);
 }

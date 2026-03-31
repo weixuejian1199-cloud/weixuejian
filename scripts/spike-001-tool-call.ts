@@ -356,7 +356,7 @@ async function main() {
     console.log('   → Phase 1b 需要增加 tool_call 结果校验和重试逻辑');
   } else {
     console.log('❌ 结论: Qwen tool_call 不可靠');
-    console.log('   → Phase 1b 需要改用 prompt-based 工具路由（类似Qiyao方案）');
+    console.log('   → Phase 1b 需要改用 prompt-based 工具路由');
   }
 
   console.log('');

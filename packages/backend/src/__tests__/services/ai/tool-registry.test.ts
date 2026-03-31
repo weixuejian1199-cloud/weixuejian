@@ -151,16 +151,9 @@ describe('tool-registry', () => {
         source: 'api',
       });
 
-      await executeTool(
-        'call_5',
-        'getOrders',
-        JSON.stringify({ pageSize: 200 }),
-        'tenant-1',
-      );
+      await executeTool('call_5', 'getOrders', JSON.stringify({ pageSize: 200 }), 'tenant-1');
 
-      expect(mockGetOrders).toHaveBeenCalledWith(
-        expect.objectContaining({ pageSize: 50 }),
-      );
+      expect(mockGetOrders).toHaveBeenCalledWith(expect.objectContaining({ pageSize: 50 }));
     });
   });
 });

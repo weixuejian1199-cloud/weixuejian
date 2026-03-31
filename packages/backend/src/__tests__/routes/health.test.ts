@@ -78,7 +78,9 @@ async function makeRequest(
     } as unknown as Response;
 
     const next = vi.fn();
-    (app as unknown as { handle: (req: Request, res: Response, next: NextFunction) => void }).handle(req, res, next);
+    (
+      app as unknown as { handle: (req: Request, res: Response, next: NextFunction) => void }
+    ).handle(req, res, next);
   });
 }
 

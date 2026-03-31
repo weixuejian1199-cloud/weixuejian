@@ -98,36 +98,21 @@ describe('cache utilities', () => {
       mockRedis.set.mockResolvedValue('OK');
 
       await setCache('test-key', { items: [] }, 'orders');
-      expect(mockRedis.set).toHaveBeenCalledWith(
-        'test-key',
-        expect.any(String),
-        'EX',
-        300,
-      );
+      expect(mockRedis.set).toHaveBeenCalledWith('test-key', expect.any(String), 'EX', 300);
     });
 
     it('should write with correct TTL for users (60 min)', async () => {
       mockRedis.set.mockResolvedValue('OK');
 
       await setCache('test-key', { items: [] }, 'users');
-      expect(mockRedis.set).toHaveBeenCalledWith(
-        'test-key',
-        expect.any(String),
-        'EX',
-        3600,
-      );
+      expect(mockRedis.set).toHaveBeenCalledWith('test-key', expect.any(String), 'EX', 3600);
     });
 
     it('should write with correct TTL for items (30 min)', async () => {
       mockRedis.set.mockResolvedValue('OK');
 
       await setCache('test-key', { items: [] }, 'items');
-      expect(mockRedis.set).toHaveBeenCalledWith(
-        'test-key',
-        expect.any(String),
-        'EX',
-        1800,
-      );
+      expect(mockRedis.set).toHaveBeenCalledWith('test-key', expect.any(String), 'EX', 1800);
     });
 
     it('should not throw on Redis error (fail-secure)', async () => {

@@ -12,7 +12,12 @@ import { requestIdMiddleware } from './middleware/request-id.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { requireAuth } from './middleware/auth.js';
 import { requireTenant } from './middleware/tenant.js';
-import { createRateLimit, createTenantRateLimit, createUserRateLimit, createAiRateLimit } from './middleware/rate-limit.js';
+import {
+  createRateLimit,
+  createTenantRateLimit,
+  createUserRateLimit,
+  createAiRateLimit,
+} from './middleware/rate-limit.js';
 import { notFoundHandler, globalErrorHandler } from './middleware/error-handler.js';
 import { basicHealthRouter, detailHealthRouter } from './routes/health.js';
 import { authRouter } from './routes/auth/index.js';
@@ -64,8 +69,8 @@ app.use(
 );
 
 // ─── 请求解析 ─────────────────────────────────────────────
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // ─── 请求 ID + 日志（全局） ──────────────────────────────
 app.use(requestIdMiddleware);
@@ -105,15 +110,7 @@ protectedRouter.use('/ai', createAiRateLimit());
 // ─── AI 对话引擎 ─────────────────────────────────────────
 protectedRouter.use('/ai', aiRouter);
 
-// 业务路由挂载点（后续 US 实现后启用）
-// protectedRouter.use('/employee', employeeRouter);
-// protectedRouter.use('/buyer', buyerRouter);
-// protectedRouter.use('/admin', adminRouter);
-
 app.use('/api/v1', protectedRouter);
-
-// ─── Webhook 路由（使用签名验证，不走 JWT） ──────────────
-// app.use('/webhook', webhookRouter);
 
 // ─── 404 兜底 + 全局错误处理（必须在所有路由之后） ────────
 app.use(notFoundHandler);
@@ -138,11 +135,18 @@ async function start(): Promise<void> {
   }
 
   const server = app.listen(env.PORT, () => {
-    logger.info(
-      { port: env.PORT, env: env.NODE_ENV },
-      'Server running',
-    );
+    logger.info({ port: env.PORT, env: env.NODE_ENV }, 'Server running');
   });
+
+  // ─── 飞书灵犀 Bridge（可选，功能开关）────────────────
+  if (env.FEISHU_LINGXI_APP_ID) {
+    try {
+      const { startLingxiBridge } = await import('./services/feishu-bridge/lingxi-bridge.js');
+      await startLingxiBridge();
+    } catch (err) {
+      logger.error({ err }, 'Feishu Lingxi bridge failed to start');
+    }
+  }
 
   // ─── 优雅关闭 ────────────────────────────────────────
   const shutdown = async (signal: string): Promise<void> => {
@@ -153,7 +157,17 @@ async function start(): Promise<void> {
       logger.info('HTTP server closed');
     });
 
-    // 2. 关闭所有依赖（并行，互不阻塞）
+    // 2. 停止灵犀 Bridge（如果启动了）
+    if (env.FEISHU_LINGXI_APP_ID) {
+      try {
+        const { stopLingxiBridge } = await import('./services/feishu-bridge/lingxi-bridge.js');
+        stopLingxiBridge();
+      } catch {
+        // Bridge 可能未成功启动，忽略
+      }
+    }
+
+    // 3. 关闭所有依赖（并行，互不阻塞）
     const results = await Promise.allSettled([
       redis.quit().catch((err: unknown) => {
         logger.error({ err }, 'Redis shutdown error');

@@ -21,6 +21,20 @@ jobs:
     timeout-minutes: 10
 
     services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
       redis:
         image: redis:7-alpine
         options: >-
@@ -54,5 +68,29 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: TypeScript compile check
+        run: cd packages/backend && npx tsc --noEmit
+
       - name: Run tests
         run: pnpm test
+
+      - name: Validate Prisma schema
+        run: DATABASE_URL="postgresql://postgres:postgres@localhost:5432/enterprise_workstation_test" pnpm --filter backend exec prisma validate
+
+      - name: Session Guard — commit check
+        run: |
+          # RULE-21: 禁止删除测试文件
+          DELETED_TESTS=$(git diff --name-status HEAD~1 HEAD 2>/dev/null | grep "^D.*\.test\." || true)
+          if [ -n "$DELETED_TESTS" ]; then
+            echo "❌ RULE-21 违规：禁止删除测试文件"
+            echo "$DELETED_TESTS"
+            exit 1
+          fi
+          # RULE-22: 禁止 as unknown as Record 类型绕过（新增代码）
+          UNSAFE=$(git diff HEAD~1 HEAD -- '*.ts' 2>/dev/null | grep "^+" | grep "as unknown as Record" | grep -v "^+++" || true)
+          if [ -n "$UNSAFE" ]; then
+            echo "❌ RULE-22 违规：新增代码包含 as unknown as Record"
+            echo "$UNSAFE"
+            exit 1
+          fi
+          echo "✅ Session Guard checks passed"

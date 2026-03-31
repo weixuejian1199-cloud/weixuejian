@@ -1,0 +1,42 @@
+# ============================================================
+# CD: Deploy to ECS
+# Docker Build 成功后自动部署到生产 ECS
+# ============================================================
+
+name: Deploy to ECS
+
+on:
+  workflow_run:
+    workflows: ["Docker Build"]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to ECS via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ secrets.ECS_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          script: |
+            cd /opt/enterprise-workstation
+            docker compose pull backend
+            docker compose up -d --no-deps backend
+            sleep 5
+            curl -sf http://localhost:3000/health || (docker compose logs --tail=50 backend && exit 1)
+            echo "Deploy successful"
+
+      - name: Notify on failure
+        if: failure()
+        run: echo "::error::Deployment failed - check ECS logs"

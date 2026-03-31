@@ -24,7 +24,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # ---- 每天凌晨 3:00 执行全量备份 ----
 # 分 时 日 月 周  命令
 # Docker 方式（推荐）：在 postgres 容器内执行 pg_dump
-0 3 * * * docker exec enterprise-workstation-postgres-1 bash -c 'DB_PASSWORD="${POSTGRES_PASSWORD}" DB_HOST=localhost BACKUP_DIR=/data/backups /scripts/backup.sh' >> /data/backups/logs/backup.log 2>&1
+0 3 * * * cd /opt/enterprise-workstation && docker compose exec -T postgres bash -c 'DB_PASSWORD="${POSTGRES_PASSWORD}" DB_HOST=localhost BACKUP_DIR=/data/backups /scripts/backup.sh' >> /data/backups/logs/backup.log 2>&1
 
 # 宿主机方式（如果 pg_dump 安装在宿主机）：
 # 0 3 * * * cd /opt/enterprise-workstation && source .env && bash scripts/backup.sh >> /data/backups/logs/backup.log 2>&1

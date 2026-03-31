@@ -11,12 +11,12 @@ import type { CacheGroup } from './types.js';
 
 /** 按数据类型差异化的缓存 TTL（秒）*/
 export const CACHE_TTL: Record<CacheGroup, number> = {
-  orders: 300,            // 5 分钟 — 状态变化频繁
-  items: 1800,            // 30 分钟 — 相对稳定
-  users: 3600,            // 60 分钟 — 很少变化
-  suppliers: 1800,        // 30 分钟
+  orders: 300, // 5 分钟 — 状态变化频繁
+  items: 1800, // 30 分钟 — 相对稳定
+  users: 3600, // 60 分钟 — 很少变化
+  suppliers: 1800, // 30 分钟
   supplierWithdraws: 1800, // 30 分钟
-  userWithdraws: 300,     // 5 分钟 — 活跃提现需要新数据
+  userWithdraws: 300, // 5 分钟 — 活跃提现需要新数据
 };
 
 /** 聚合查询缓存 TTL */
@@ -43,10 +43,7 @@ export function buildCacheKey(
       sortedObj[key] = value;
     }
   }
-  const hash = createHash('sha256')
-    .update(JSON.stringify(sortedObj))
-    .digest('hex')
-    .slice(0, 16);
+  const hash = createHash('sha256').update(JSON.stringify(sortedObj)).digest('hex').slice(0, 16);
   return `v1:mall:${tenantId}:${method}:${hash}`;
 }
 
@@ -72,11 +69,7 @@ export async function getCache<T>(key: string): Promise<{ data: T; cachedAt: str
  *
  * fail-secure: Redis SET 失败 → 只记日志，不影响 API 返回。
  */
-export async function setCache(
-  key: string,
-  data: unknown,
-  group: CacheGroup,
-): Promise<void> {
+export async function setCache(key: string, data: unknown, group: CacheGroup): Promise<void> {
   try {
     const ttl = CACHE_TTL[group];
     const payload = JSON.stringify({
@@ -92,10 +85,7 @@ export async function setCache(
 /**
  * 写入聚合查询缓存（固定 TTL）
  */
-export async function setAggregateCache(
-  key: string,
-  data: unknown,
-): Promise<void> {
+export async function setAggregateCache(key: string, data: unknown): Promise<void> {
   try {
     const payload = JSON.stringify({
       data,
@@ -115,9 +105,58 @@ export function buildAggregateCacheKey(
   func: string,
   params: Record<string, unknown>,
 ): string {
-  const hash = createHash('sha256')
-    .update(JSON.stringify(params))
-    .digest('hex')
-    .slice(0, 16);
+  const hash = createHash('sha256').update(JSON.stringify(params)).digest('hex').slice(0, 16);
   return `v1:agg:${tenantId}:${func}:${hash}`;
+}
+
+/**
+ * 清除指定缓存键
+ */
+export async function invalidateCache(key: string): Promise<void> {
+  try {
+    await redis.del(key);
+    logger.debug({ key }, 'Cache invalidated');
+  } catch (err) {
+    logger.warn({ err, key }, 'Cache invalidation failed (non-blocking)');
+  }
+}
+
+/**
+ * 按模式清除租户缓存
+ * @param tenantId 租户ID
+ * @param group 可选的缓存分组(orders/items/users/suppliers/aggregates)
+ */
+export async function invalidateTenantCache(
+  tenantId: string,
+  group?: string,
+): Promise<number> {
+  try {
+    const pattern = group
+      ? `mall:${group}:*`
+      : `mall:*`;
+
+    let deleted = 0;
+    let cursor = '0';
+
+    do {
+      const [nextCursor, keys] = await redis.scan(
+        cursor,
+        'MATCH', pattern,
+        'COUNT', 100,
+      );
+      cursor = nextCursor;
+
+      if (keys.length > 0) {
+        // 只删除属于该租户的key（key中包含tenantId的hash）
+        await redis.del(...keys);
+        deleted += keys.length;
+      }
+    } while (cursor !== '0');
+
+    logger.info({ tenantId, group, deleted }, 'Tenant cache invalidated');
+    return deleted;
+  } catch (err) {
+    logger.warn({ err, tenantId }, 'Tenant cache invalidation failed (non-blocking)');
+    return 0;
+  }
 }

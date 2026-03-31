@@ -15,6 +15,9 @@ import * as lark from '@larksuiteoapi/node-sdk';
 import { spawn } from 'node:child_process';
 import { config } from './lib/config.mjs';
 import { log } from './lib/logger.mjs';
+import { initFeishuCard } from './lib/feishu-card.mjs';
+import { initDecisionEngine, drainPendingItems } from './lib/decision-engine.mjs';
+import { startInspector, getLatestReport, stopInspector } from './agents/inspector.mjs';
 
 // ─── 飞书客户端 ──────────────────────────────────────────
 
@@ -67,11 +70,24 @@ setInterval(() => {
 
 const processedMessages = new Map();
 
+const DEDUP_WINDOW_MS = 300_000; // 5分钟去重窗口（防飞书webhook重试）
+const MAX_INPUT_LENGTH = 10_000; // 输入最大10KB，防OOM
+
+// ─── UTF-8 输入有效性检查 ────────────────────────────────
+
+function isValidUtf8Text(str) {
+  // 检查是否只包含可打印字符和常见中文/标点
+  // 拒绝控制字符（除了换行\n/回车\r/制表\t）
+  return typeof str === 'string' && !/[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(str);
+}
+
 function isDuplicate(messageId) {
   if (processedMessages.has(messageId)) return true;
   processedMessages.set(messageId, Date.now());
+  // 清理过期条目
+  const now = Date.now();
   for (const [id, time] of processedMessages) {
-    if (Date.now() - time > 60_000) processedMessages.delete(id);
+    if (now - time > DEDUP_WINDOW_MS) processedMessages.delete(id);
   }
   return false;
 }
@@ -182,9 +198,18 @@ function callClaude(message, sessionId) {
         return;
       }
       try {
-        resolve(JSON.parse(stdout));
-      } catch {
-        resolve({ type: 'result', result: stdout.slice(0, 2000) || stderr.slice(0, 500) });
+        const parsed = JSON.parse(stdout);
+        resolve(parsed);
+      } catch (parseErr) {
+        // 非零退出码 + JSON解析失败 = 真正的错误，不应静默降级
+        if (code !== 0) {
+          log.error({ code, stderr: stderr.slice(0, 300), stdout: stdout.slice(0, 300) }, 'Claude exited with error');
+          reject(new Error(stderr.slice(0, 200) || stdout.slice(0, 200) || `进程异常退出 code ${code}`));
+          return;
+        }
+        // 零退出码但非JSON = CLI输出了纯文本（兼容旧版本）
+        log.warn({ parseErr: parseErr.message, stdoutLen: stdout.length }, 'Non-JSON stdout from Claude, wrapping as result');
+        resolve({ type: 'result', result: stdout.slice(0, 2000) || '(无输出内容)' });
       }
     });
 
@@ -222,6 +247,19 @@ async function handleMessage(data) {
 
   if (!text || text.trim() === '') return;
 
+  // UTF-8 有效性校验（拒绝包含控制字符的恶意输入）
+  if (!isValidUtf8Text(text)) {
+    log.warn({ senderId, chatId }, 'Invalid message content rejected');
+    await sendText(chatId, '消息包含无效字符，请重新输入');
+    return;
+  }
+
+  // 输入长度校验（防止超大消息打爆内存）
+  if (text.length > MAX_INPUT_LENGTH) {
+    await sendText(chatId, `消息太长了（${text.length}字），最多支持${MAX_INPUT_LENGTH}字。请精简后重发。`);
+    return;
+  }
+
   log.info({ senderId, chatId, text: text.slice(0, 100) }, 'Message received');
 
   // 限流检查
@@ -239,14 +277,26 @@ async function handleMessage(data) {
 
   if (text.trim() === '状态') {
     const sessionId = getSessionId(chatId);
+    const latest = getLatestReport();
+    const inspectorStatus = latest
+      ? `Inspector: ${latest.overallStatus} (${latest.timestamp.slice(11, 19)})`
+      : 'Inspector: not yet run';
     const info = [
       `Sessions: ${sessions.size}`,
       `Current: ${sessionId ? sessionId.slice(0, 8) : 'none'}`,
       `Uptime: ${(process.uptime() / 3600).toFixed(1)}h`,
       `Memory: ${(process.memoryUsage.rss() / 1024 / 1024).toFixed(0)}MB`,
+      inspectorStatus,
     ].join('\n');
     await sendText(chatId, info);
     return;
+  }
+
+  // 主动汇报待处理事项（老板发消息时）
+  const pendingItems = drainPendingItems();
+  if (pendingItems.length > 0) {
+    const summary = pendingItems.map(p => `- [${p.source}] ${p.summary}`).join('\n');
+    await sendText(chatId, `[启元提醒] 有${pendingItems.length}条待处理:\n${summary}\n\n现在处理你的消息...`);
   }
 
   // 入队处理
@@ -293,16 +343,17 @@ async function sendText(chatId, text, retries = 2) {
           content: JSON.stringify({ text }),
         },
       });
-      return;
+      return true;
     } catch (err) {
       if (attempt === retries) {
         log.error({ chatId, err: err.message, attempts: attempt + 1 }, 'Send failed (all retries exhausted)');
-      } else {
-        log.warn({ chatId, err: err.message, attempt: attempt + 1 }, 'Send failed, retrying...');
-        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        return false;
       }
+      log.warn({ chatId, err: err.message, attempt: attempt + 1 }, 'Send failed, retrying...');
+      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
     }
   }
+  return false;
 }
 
 // ─── 启动 ────────────────────────────────────────────────
@@ -314,6 +365,12 @@ log.info({
   maxTurns: config.bridge.maxTurns,
   rateLimitPerMin: config.bridge.rateLimitPerMin,
 }, 'Bridge starting');
+
+// 初始化 Agent 系统
+initFeishuCard(client);
+initDecisionEngine({ bossChatId: config.agents.bossChatId });
+startInspector();
+log.info('Agent system initialized (inspector active)');
 
 const wsClient = new lark.WSClient({
   appId: config.feishu.appId,
@@ -340,6 +397,7 @@ log.info('Waiting for Feishu messages...');
 // 优雅关闭
 function shutdown(signal) {
   log.info({ signal }, 'Shutdown signal received');
+  stopInspector();
   process.exit(0);
 }
 

@@ -343,12 +343,13 @@ describe('MallAdapter', () => {
       fetchSpy.mockResolvedValue({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({
-          Data: { PageIndex: 1, PageSize: 20, TotalCount: 0, PageData: [] },
-          Status: 0,
-          Message: 'API key expired',
-          Code: 403,
-        }),
+        json: () =>
+          Promise.resolve({
+            Data: { PageIndex: 1, PageSize: 20, TotalCount: 0, PageData: [] },
+            Status: 0,
+            Message: 'API key expired',
+            Code: 403,
+          }),
       });
 
       await expect(adapter.getUsers()).rejects.toMatchObject({
@@ -385,7 +386,17 @@ describe('MallAdapter', () => {
     it('should return cached data on cache hit', async () => {
       const cachedResult = {
         data: {
-          items: [{ userId: 1001, loginId: 'u1', userName: 'cached', avatar: null, levelId: 1, createDate: null, phone: null }],
+          items: [
+            {
+              userId: 1001,
+              loginId: 'u1',
+              userName: 'cached',
+              avatar: null,
+              levelId: 1,
+              createDate: null,
+              phone: null,
+            },
+          ],
           pagination: { pageIndex: 1, pageSize: 20, totalCount: 1, totalPages: 1 },
           source: 'api' as const,
         },
@@ -412,10 +423,21 @@ describe('MallAdapter', () => {
       // First call succeeds and caches
       mockRedis.get
         .mockResolvedValueOnce(null) // miss on first _callApi cache check
-        .mockResolvedValueOnce(     // hit on stale cache fallback
+        .mockResolvedValueOnce(
+          // hit on stale cache fallback
           JSON.stringify({
             data: {
-              items: [{ userId: 1001, loginId: null, userName: 'stale', avatar: null, levelId: null, createDate: null, phone: null }],
+              items: [
+                {
+                  userId: 1001,
+                  loginId: null,
+                  userName: 'stale',
+                  avatar: null,
+                  levelId: null,
+                  createDate: null,
+                  phone: null,
+                },
+              ],
               pagination: { pageIndex: 1, pageSize: 20, totalCount: 1, totalPages: 1 },
               source: 'api' as const,
             },
@@ -492,9 +514,7 @@ describe('MallAdapter', () => {
       await adapter.getUsers();
 
       const calledOptions = fetchSpy.mock.calls[0]?.[1] as RequestInit;
-      expect(calledOptions.headers).toEqual(
-        expect.objectContaining({ 'api-key': 'test-api-key' }),
-      );
+      expect(calledOptions.headers).toEqual(expect.objectContaining({ 'api-key': 'test-api-key' }));
     });
   });
 });

@@ -12,11 +12,7 @@ import { childLogger } from '../utils/logger.js';
  *
  * Phase 1b 升级：支持RS256(生产) + HS256(开发兼容)
  */
-export async function requireAuth(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
+export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const log = childLogger(req.requestId ?? 'unknown');
   const authHeader = req.headers['authorization'];
 
@@ -67,11 +63,7 @@ export async function requireAuth(
 /**
  * 可选认证中间件 — 有 token 则验证并注入 req.user，无 token 则放行
  */
-export async function optionalAuth(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
+export async function optionalAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers['authorization'];
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

@@ -49,6 +49,7 @@ COPY --from=build /app/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --filter backend --prod
 
 COPY deploy/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 3000
 USER node

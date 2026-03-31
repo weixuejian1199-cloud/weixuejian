@@ -53,9 +53,9 @@ export const rawItemSchema = z.object({
   ItemID: z.number(),
   ItemName: z.string(),
   Keywords: z.string().nullable().optional(),
-  IsShelf: z.union([z.boolean(), z.number()]).transform((v) =>
-    typeof v === 'number' ? v === 1 : v,
-  ),
+  IsShelf: z
+    .union([z.boolean(), z.number()])
+    .transform((v) => (typeof v === 'number' ? v === 1 : v)),
   CreateDate: z.string().nullable().optional(),
   SortID: z.number().nullable().optional(),
   Price: z.number().nullable().optional(),

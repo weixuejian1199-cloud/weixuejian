@@ -21,7 +21,7 @@ export const ERROR_CODES = {
 
   // === 权限 ===
   PERMISSION_DENIED: { httpStatus: 403, message: '权限不足' },
-  SCOPE_EXCEEDED: { httpStatus: 403, message: '超出数据权限范围' },
+  SCOPE_EXCEEDED: { httpStatus: 403, message: '超出数据访问范围' },
 
   // === 校验 ===
   VALIDATION_ERROR: { httpStatus: 400, message: '请求参数校验失败' },
@@ -39,28 +39,28 @@ export const ERROR_CODES = {
   ERP_SYNC_FAILED: { httpStatus: 502, message: 'ERP数据同步失败' },
 
   // === 商城API ===
-  MALL_API_UNAUTHORIZED: { httpStatus: 502, message: '商城API授权失败' },
-  MALL_API_TIMEOUT: { httpStatus: 504, message: '商城API超时' },
-  MALL_API_ERROR: { httpStatus: 502, message: '商城API错误' },
-  MALL_DATA_INVALID: { httpStatus: 502, message: '商城数据格式异常' },
+  MALL_API_UNAUTHORIZED: { httpStatus: 502, message: '商城API认证失败' },
+  MALL_API_TIMEOUT: { httpStatus: 504, message: '商城API请求超时' },
+  MALL_API_ERROR: { httpStatus: 502, message: '商城API返回异常' },
+  MALL_DATA_INVALID: { httpStatus: 502, message: '商城API返回数据格式异常' },
 
   // === AI ===
-  AI_RATE_LIMITED: { httpStatus: 429, message: 'AI调用频率限制' },
-  AI_SERVICE_UNAVAILABLE: { httpStatus: 503, message: 'AI服务不可用' },
-  AI_CONTEXT_TOO_LONG: { httpStatus: 400, message: '对话上下文超出限制' },
+  AI_RATE_LIMITED: { httpStatus: 429, message: 'AI调用频率超限' },
+  AI_SERVICE_UNAVAILABLE: { httpStatus: 503, message: 'AI服务暂不可用' },
+  AI_CONTEXT_TOO_LONG: { httpStatus: 400, message: '对话上下文超出长度限制' },
 
   // === 客服 ===
   CS_SESSION_NOT_FOUND: { httpStatus: 404, message: '客服会话不存在' },
   CS_MESSAGE_NOT_DRAFT: { httpStatus: 400, message: '只能确认草稿状态的消息' },
-  CS_ESCALATED: { httpStatus: 200, message: '已升级至人工处理' },
+  CS_ESCALATED: { httpStatus: 200, message: '已升级到人工处理' },
 
   // === 系统 ===
   INTERNAL_ERROR: { httpStatus: 500, message: '服务器内部错误' },
   SERVICE_UNAVAILABLE: { httpStatus: 503, message: '服务暂不可用' },
 
   // === 工具 ===
-  TOOL_TIMEOUT: { httpStatus: 504, message: '工具执行超时' },
-  TOOL_DEGRADED: { httpStatus: 200, message: '工具部分降级' },
+  TOOL_TIMEOUT: { httpStatus: 504, message: '工具调用超时' },
+  TOOL_DEGRADED: { httpStatus: 200, message: '工具降级返回缓存数据' },
   TOOL_CHAIN_PARTIAL: { httpStatus: 207, message: '链式调用部分失败' },
 
   // === ACI ===
@@ -68,13 +68,13 @@ export const ERROR_CODES = {
   ACI_DATA_INCOMPLETE: { httpStatus: 422, message: 'ACI判断数据不完整' },
 
   // === 缓存 ===
-  CACHE_STALE: { httpStatus: 200, message: '缓存数据可能过期' },
+  CACHE_STALE: { httpStatus: 200, message: '缓存数据过期' },
 
   // === 配额 ===
-  API_QUOTA_EXCEEDED: { httpStatus: 429, message: 'API配额已用尽' },
+  API_QUOTA_EXCEEDED: { httpStatus: 429, message: 'API配额超限' },
 
   // === SSE ===
-  SSE_RECONNECT: { httpStatus: 200, message: 'SSE需要重连' },
+  SSE_RECONNECT: { httpStatus: 200, message: 'SSE重连中' },
 } as const;
 
 /** 注册表中的合法错误码类型 */

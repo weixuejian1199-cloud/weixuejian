@@ -1,0 +1,28 @@
+# ============================================================
+# 生产环境覆盖
+# 用法: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# ============================================================
+
+services:
+  backend:
+    image: registry.cn-beijing.aliyuncs.com/enterprise-ws/backend:latest
+    build: !reset null
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+    restart: always
+
+  postgres:
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c effective_cache_size=768MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=128MB
+      -c max_connections=100
+      -c log_min_duration_statement=500
+      -c log_statement=ddl
+    restart: always
+
+  redis:
+    restart: always

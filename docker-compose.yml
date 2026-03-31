@@ -18,12 +18,25 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       JWT_SECRET: ${JWT_SECRET}
       CORS_ORIGINS: ${CORS_ORIGINS}
+      # 飞书灵犀 Bridge（可选，不设则不启动）
+      FEISHU_LINGXI_APP_ID: ${FEISHU_LINGXI_APP_ID:-}
+      FEISHU_LINGXI_APP_SECRET: ${FEISHU_LINGXI_APP_SECRET:-}
+      FEISHU_LINGXI_SERVICE_TENANT_ID: ${FEISHU_LINGXI_SERVICE_TENANT_ID:-}
+      FEISHU_LINGXI_SERVICE_USER_ID: ${FEISHU_LINGXI_SERVICE_USER_ID:-}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.5"
+          memory: 256M
     logging:
       driver: json-file
       options:
@@ -46,6 +59,14 @@ services:
       timeout: 3s
       retries: 5
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
     logging:
       driver: json-file
       options:
@@ -71,6 +92,14 @@ services:
       timeout: 3s
       retries: 5
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 384M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
     logging:
       driver: json-file
       options:

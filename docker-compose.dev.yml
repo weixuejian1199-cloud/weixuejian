@@ -22,6 +22,12 @@ services:
       - ./tsconfig.base.json:/app/tsconfig.base.json
 
   postgres:
+    command: >
+      postgres
+      -c log_min_duration_statement=200
+      -c log_statement=ddl
+      -c shared_buffers=128MB
+      -c work_mem=4MB
     environment:
       POSTGRES_PASSWORD: postgres_local_dev
 

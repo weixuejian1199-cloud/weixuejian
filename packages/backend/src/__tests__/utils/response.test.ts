@@ -53,9 +53,7 @@ describe('sendSuccess', () => {
     } as unknown as Response;
 
     sendSuccess(res, {});
-    expect(json).toHaveBeenCalledWith(
-      expect.objectContaining({ requestId: 'unknown' }),
-    );
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({ requestId: 'unknown' }));
   });
 });
 

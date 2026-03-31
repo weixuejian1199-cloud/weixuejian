@@ -97,10 +97,29 @@ export class MallAdapter {
   async getItems(filters: ItemFilter = {}): Promise<PaginatedResult<MallItem>> {
     const parsed = itemFilterSchema.parse(filters);
     const params = this._buildParams(parsed);
-    return this._callApi<{ ItemID: number; ItemName: string; Keywords?: string | null; IsShelf: boolean; CreateDate?: string | null; SortID?: number | null; Price?: number | null }, MallItem>(
+    return this._callApi<
+      {
+        ItemID: number;
+        ItemName: string;
+        Keywords?: string | null;
+        IsShelf: boolean;
+        CreateDate?: string | null;
+        SortID?: number | null;
+        Price?: number | null;
+      },
+      MallItem
+    >(
       '/api/Open/ItemPageList',
       params,
-      rawItemSchema as ZodSchema<{ ItemID: number; ItemName: string; Keywords?: string | null; IsShelf: boolean; CreateDate?: string | null; SortID?: number | null; Price?: number | null }>,
+      rawItemSchema as ZodSchema<{
+        ItemID: number;
+        ItemName: string;
+        Keywords?: string | null;
+        IsShelf: boolean;
+        CreateDate?: string | null;
+        SortID?: number | null;
+        Price?: number | null;
+      }>,
       'items',
       this._transformItem,
     );
@@ -122,7 +141,9 @@ export class MallAdapter {
 
   // ─── AC-07: 供应商提现查询 ─────────────────────────────
 
-  async getSupplierWithdraws(filters: WithdrawFilter = {}): Promise<PaginatedResult<SupplierWithdraw>> {
+  async getSupplierWithdraws(
+    filters: WithdrawFilter = {},
+  ): Promise<PaginatedResult<SupplierWithdraw>> {
     const parsed = withdrawFilterSchema.parse(filters);
     const params = this._buildParams(parsed);
     return this._callApi(
@@ -205,10 +226,7 @@ export class MallAdapter {
         // 最后一次重试也失败
         if (attempt >= MAX_RETRIES) break;
 
-        this.log.warn(
-          { err, endpoint, attempt: attempt + 1 },
-          'API call failed, retrying',
-        );
+        this.log.warn({ err, endpoint, attempt: attempt + 1 }, 'API call failed, retrying');
         await this._sleep(RETRY_DELAY_MS);
       }
     }
@@ -254,7 +272,11 @@ export class MallAdapter {
       });
     } catch (err) {
       if (err instanceof DOMException && err.name === 'TimeoutError') {
-        throw new MallApiError('MALL_API_TIMEOUT', `Request to ${endpoint} timed out (${REQUEST_TIMEOUT_MS}ms)`, { cause: err });
+        throw new MallApiError(
+          'MALL_API_TIMEOUT',
+          `Request to ${endpoint} timed out (${REQUEST_TIMEOUT_MS}ms)`,
+          { cause: err },
+        );
       }
       throw new MallApiError('MALL_API_ERROR', `Network error calling ${endpoint}`, { cause: err });
     }
@@ -354,7 +376,15 @@ export class MallAdapter {
 
   // ─── 数据转换（PascalCase → camelCase）─────────────────
 
-  private _transformUser(raw: { UserID: number; LoginID?: string | null; UserName?: string | null; Avatar?: string | null; LevelID?: number | null; CreateDate?: string | null; Phone?: string | null }): MallUser {
+  private _transformUser(raw: {
+    UserID: number;
+    LoginID?: string | null;
+    UserName?: string | null;
+    Avatar?: string | null;
+    LevelID?: number | null;
+    CreateDate?: string | null;
+    Phone?: string | null;
+  }): MallUser {
     return {
       userId: raw.UserID,
       loginId: raw.LoginID ?? null,
@@ -366,7 +396,20 @@ export class MallAdapter {
     };
   }
 
-  private _transformOrder(raw: { OrderItemID: number; OrderItemNo: string; UserID: number; SupplierID: number; SupplierName?: string | null; Status: number; ProcessNode: number; PayDate?: string | null; TotalAmount: number; ItemName?: string | null; Quantity?: number; CreateDate?: string | null }): MallOrder {
+  private _transformOrder(raw: {
+    OrderItemID: number;
+    OrderItemNo: string;
+    UserID: number;
+    SupplierID: number;
+    SupplierName?: string | null;
+    Status: number;
+    ProcessNode: number;
+    PayDate?: string | null;
+    TotalAmount: number;
+    ItemName?: string | null;
+    Quantity?: number;
+    CreateDate?: string | null;
+  }): MallOrder {
     return {
       orderItemId: raw.OrderItemID,
       orderItemNo: raw.OrderItemNo,
@@ -383,7 +426,15 @@ export class MallAdapter {
     };
   }
 
-  private _transformItem(raw: { ItemID: number; ItemName: string; Keywords?: string | null; IsShelf: boolean; CreateDate?: string | null; SortID?: number | null; Price?: number | null }): MallItem {
+  private _transformItem(raw: {
+    ItemID: number;
+    ItemName: string;
+    Keywords?: string | null;
+    IsShelf: boolean;
+    CreateDate?: string | null;
+    SortID?: number | null;
+    Price?: number | null;
+  }): MallItem {
     return {
       itemId: raw.ItemID,
       itemName: raw.ItemName,
@@ -395,7 +446,14 @@ export class MallAdapter {
     };
   }
 
-  private _transformSupplier(raw: { SupplierID: number; SupplierName: string; ContactPerson?: string | null; ContactPhone?: string | null; SettleRuleID?: number | null; CreateDate?: string | null }): MallSupplier {
+  private _transformSupplier(raw: {
+    SupplierID: number;
+    SupplierName: string;
+    ContactPerson?: string | null;
+    ContactPhone?: string | null;
+    SettleRuleID?: number | null;
+    CreateDate?: string | null;
+  }): MallSupplier {
     return {
       supplierId: raw.SupplierID,
       supplierName: raw.SupplierName,
@@ -406,7 +464,15 @@ export class MallAdapter {
     };
   }
 
-  private _transformSupplierWithdraw(raw: { SupplierID: number; PayNo: string; BankAccountNo?: string | null; TranAmount: number; Status: number; FinishDate?: string | null; CreateDate?: string | null }): SupplierWithdraw {
+  private _transformSupplierWithdraw(raw: {
+    SupplierID: number;
+    PayNo: string;
+    BankAccountNo?: string | null;
+    TranAmount: number;
+    Status: number;
+    FinishDate?: string | null;
+    CreateDate?: string | null;
+  }): SupplierWithdraw {
     return {
       supplierId: raw.SupplierID,
       payNo: raw.PayNo,
@@ -418,7 +484,14 @@ export class MallAdapter {
     };
   }
 
-  private _transformUserWithdraw(raw: { UserID: number; PayNo: string; Award: number; Status: number; TranType?: number | null; CreateDate?: string | null }): UserWithdraw {
+  private _transformUserWithdraw(raw: {
+    UserID: number;
+    PayNo: string;
+    Award: number;
+    Status: number;
+    TranType?: number | null;
+    CreateDate?: string | null;
+  }): UserWithdraw {
     return {
       userId: raw.UserID,
       payNo: raw.PayNo,

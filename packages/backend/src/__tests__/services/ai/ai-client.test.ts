@@ -70,21 +70,28 @@ describe('ai-client', () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer test-api-key',
+            Authorization: 'Bearer test-api-key',
           },
         }),
       );
     });
 
     it('应该传递 tools 参数', async () => {
-      const tools = [{
-        type: 'function' as const,
-        function: { name: 'test', description: 'test tool', parameters: {} },
-      }];
+      const tools = [
+        {
+          type: 'function' as const,
+          function: { name: 'test', description: 'test tool', parameters: {} },
+        },
+      ];
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          choices: [{ message: { role: 'assistant', content: null, tool_calls: [] }, finish_reason: 'tool_calls' }],
+          choices: [
+            {
+              message: { role: 'assistant', content: null, tool_calls: [] },
+              finish_reason: 'tool_calls',
+            },
+          ],
           usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
         }),
       });
@@ -237,4 +244,3 @@ describe('ai-client', () => {
     });
   });
 });
-

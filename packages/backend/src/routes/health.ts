@@ -42,7 +42,10 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): 
   return Promise.race([
     promise,
     new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} health check timeout (${timeoutMs}ms)`)), timeoutMs),
+      setTimeout(
+        () => reject(new Error(`${label} health check timeout (${timeoutMs}ms)`)),
+        timeoutMs,
+      ),
     ),
   ]);
 }
@@ -80,22 +83,31 @@ async function checkComponents(requestId: string): Promise<{
   return { components, allHealthy };
 }
 
+/** async route handler — 统一错误捕获 */
+function asyncHandler(fn: (req: Request, res: Response) => Promise<void>) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    fn(req, res).catch(next);
+  };
+}
+
 /**
  * GET /health — 轻量级健康检查
  */
-basicHealthRouter.get('/', (req: Request, res: Response, next: NextFunction) => {
-  void (async () => {
+basicHealthRouter.get(
+  '/',
+  asyncHandler(async (req, res) => {
     const { components, allHealthy } = await checkComponents(req.requestId);
     sendSuccess(res, { status: allHealthy ? 'healthy' : 'degraded', components });
-  })().catch(next);
-});
+  }),
+);
 
 /**
  * GET /api/v1/health — 详细健康检查，含版本、运行时间、环境
  * 生产环境隐藏 version 和 environment 详情
  */
-detailHealthRouter.get('/', (req: Request, res: Response, next: NextFunction) => {
-  void (async () => {
+detailHealthRouter.get(
+  '/',
+  asyncHandler(async (req, res) => {
     const { components, allHealthy } = await checkComponents(req.requestId);
 
     const data: Record<string, unknown> = {
@@ -110,7 +122,7 @@ detailHealthRouter.get('/', (req: Request, res: Response, next: NextFunction) =>
     }
 
     sendSuccess(res, data);
-  })().catch(next);
-});
+  }),
+);
 
 export { basicHealthRouter, detailHealthRouter };

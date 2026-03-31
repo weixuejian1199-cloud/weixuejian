@@ -27,7 +27,28 @@ vi.mock('../../utils/logger.js', () => ({
   }),
 }));
 
-import { createRateLimit, createTenantRateLimit, createUserRateLimit, createAiRateLimit } from '../../middleware/rate-limit.js';
+const { mockEnv } = vi.hoisted(() => {
+  const envObj: Record<string, unknown> = {
+    NODE_ENV: 'test',
+    PORT: 3000,
+    DATABASE_URL: 'test',
+    REDIS_URL: 'test',
+    JWT_SECRET: 'test-secret-key-must-be-at-least-32-characters-long',
+    CORS_ORIGINS: 'http://localhost:3000',
+  };
+  return { mockEnv: envObj };
+});
+
+vi.mock('../../lib/env.js', () => ({
+  env: mockEnv,
+}));
+
+import {
+  createRateLimit,
+  createTenantRateLimit,
+  createUserRateLimit,
+  createAiRateLimit,
+} from '../../middleware/rate-limit.js';
 
 function createMockReqRes(overrides: Partial<Record<string, unknown>> = {}) {
   const json = vi.fn();
@@ -211,7 +232,7 @@ describe('createTenantRateLimit', () => {
 
   it('应该支持环境变量配置限额', async () => {
     mockNormalResult(51);
-    process.env['RATE_LIMIT_TENANT_MAX'] = '50';
+    mockEnv['RATE_LIMIT_TENANT_MAX'] = 50;
 
     const limiter = createTenantRateLimit();
     const { req, res, next, status } = createMockReqRes({ tenantId: 'tenant-xyz' });
@@ -220,7 +241,7 @@ describe('createTenantRateLimit', () => {
     expect(status).toHaveBeenCalledWith(429);
     expect(next).not.toHaveBeenCalled();
 
-    delete process.env['RATE_LIMIT_TENANT_MAX'];
+    delete mockEnv['RATE_LIMIT_TENANT_MAX'];
   });
 });
 
@@ -233,7 +254,7 @@ describe('createUserRateLimit', () => {
     mockNormalResult(1);
 
     const limiter = createUserRateLimit();
-    const { req, res, next } = createMockReqRes({ userId: 'user-123' });
+    const { req, res, next } = createMockReqRes({ user: { userId: 'user-123', role: 'employee' } });
     await limiter(req, res, next);
 
     const zremCall = mockPipeline.zremrangebyscore.mock.calls[0]!;
@@ -245,7 +266,9 @@ describe('createUserRateLimit', () => {
     mockNormalResult(31);
 
     const limiter = createUserRateLimit();
-    const { req, res, next, status } = createMockReqRes({ userId: 'user-123' });
+    const { req, res, next, status } = createMockReqRes({
+      user: { userId: 'user-123', role: 'employee' },
+    });
     await limiter(req, res, next);
 
     expect(status).toHaveBeenCalledWith(429);
@@ -254,16 +277,18 @@ describe('createUserRateLimit', () => {
 
   it('应该支持环境变量配置限额', async () => {
     mockNormalResult(21);
-    process.env['RATE_LIMIT_USER_MAX'] = '20';
+    mockEnv['RATE_LIMIT_USER_MAX'] = 20;
 
     const limiter = createUserRateLimit();
-    const { req, res, next, status } = createMockReqRes({ userId: 'user-xyz' });
+    const { req, res, next, status } = createMockReqRes({
+      user: { userId: 'user-xyz', role: 'employee' },
+    });
     await limiter(req, res, next);
 
     expect(status).toHaveBeenCalledWith(429);
     expect(next).not.toHaveBeenCalled();
 
-    delete process.env['RATE_LIMIT_USER_MAX'];
+    delete mockEnv['RATE_LIMIT_USER_MAX'];
   });
 });
 
@@ -276,7 +301,10 @@ describe('createAiRateLimit', () => {
     mockNormalResult(1);
 
     const limiter = createAiRateLimit();
-    const { req, res, next } = createMockReqRes({ userId: 'user-456', path: '/api/v1/ai/chat' });
+    const { req, res, next } = createMockReqRes({
+      user: { userId: 'user-456', role: 'employee' },
+      path: '/api/v1/ai/chat',
+    });
     await limiter(req, res, next);
 
     const zremCall = mockPipeline.zremrangebyscore.mock.calls[0]!;
@@ -288,7 +316,10 @@ describe('createAiRateLimit', () => {
     mockNormalResult(11);
 
     const limiter = createAiRateLimit();
-    const { req, res, next, status, json } = createMockReqRes({ userId: 'user-456', path: '/api/v1/ai/chat' });
+    const { req, res, next, status, json } = createMockReqRes({
+      user: { userId: 'user-456', role: 'employee' },
+      path: '/api/v1/ai/chat',
+    });
     await limiter(req, res, next);
 
     expect(status).toHaveBeenCalledWith(429);
@@ -305,7 +336,9 @@ describe('createAiRateLimit', () => {
     mockNormalResult(11);
 
     const limiter = createAiRateLimit();
-    const { req, res, next, setHeader } = createMockReqRes({ userId: 'user-456' });
+    const { req, res, next, setHeader } = createMockReqRes({
+      user: { userId: 'user-456', role: 'employee' },
+    });
     await limiter(req, res, next);
 
     expect(setHeader).toHaveBeenCalledWith('Retry-After', 60);
@@ -316,7 +349,9 @@ describe('createAiRateLimit', () => {
     mockPipeline.exec.mockRejectedValue(new Error('ECONNREFUSED'));
 
     const limiter = createAiRateLimit();
-    const { req, res, next, status } = createMockReqRes({ userId: 'user-456' });
+    const { req, res, next, status } = createMockReqRes({
+      user: { userId: 'user-456', role: 'employee' },
+    });
     await limiter(req, res, next);
 
     expect(status).toHaveBeenCalledWith(503);
@@ -325,15 +360,17 @@ describe('createAiRateLimit', () => {
 
   it('应该支持环境变量配置限额', async () => {
     mockNormalResult(6);
-    process.env['RATE_LIMIT_AI_MAX'] = '5';
+    mockEnv['RATE_LIMIT_AI_MAX'] = 5;
 
     const limiter = createAiRateLimit();
-    const { req, res, next, status } = createMockReqRes({ userId: 'user-ai' });
+    const { req, res, next, status } = createMockReqRes({
+      user: { userId: 'user-ai', role: 'employee' },
+    });
     await limiter(req, res, next);
 
     expect(status).toHaveBeenCalledWith(429);
     expect(next).not.toHaveBeenCalled();
 
-    delete process.env['RATE_LIMIT_AI_MAX'];
+    delete mockEnv['RATE_LIMIT_AI_MAX'];
   });
 });

@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 
+// Hoisted mocks for prisma
+const mockConversationFindFirst = vi.fn();
+const mockMessageFindMany = vi.fn();
+const mockMessageCount = vi.fn();
+
 // Mock all dependencies
 vi.mock('../../services/ai/chat-orchestrator.js', () => ({
   orchestrateChat: vi.fn(),
@@ -9,6 +14,18 @@ vi.mock('../../services/ai/chat-orchestrator.js', () => ({
 
 vi.mock('../../services/ai/conversation-service.js', () => ({
   listConversations: vi.fn(),
+}));
+
+vi.mock('../../lib/prisma.js', () => ({
+  prisma: {
+    user: { findUnique: vi.fn().mockResolvedValue({ name: '测试用户' }) },
+    tenant: { findUnique: vi.fn().mockResolvedValue({ name: '测试租户' }) },
+    conversation: { findFirst: (...args: unknown[]) => mockConversationFindFirst(...args) },
+    message: {
+      findMany: (...args: unknown[]) => mockMessageFindMany(...args),
+      count: (...args: unknown[]) => mockMessageCount(...args),
+    },
+  },
 }));
 
 vi.mock('../../utils/logger.js', () => ({
@@ -50,10 +67,7 @@ describe('AI routes', () => {
 
   describe('POST /ai/chat', () => {
     it('应该验证请求体 — 空消息返回 400', async () => {
-      const res = await request(app)
-        .post('/ai/chat')
-        .send({ message: '' })
-        .expect(400);
+      const res = await request(app).post('/ai/chat').send({ message: '' }).expect(400);
 
       expect(res.body.success).toBe(false);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
@@ -80,14 +94,19 @@ describe('AI routes', () => {
     it('应该返回 SSE content-type', async () => {
       const mockGen = async function* () {
         yield { type: 'text_chunk', content: '你好', messageId: 'msg-1', index: 0 };
-        yield { type: 'stream_end', conversationId: 'conv-1', messageId: 'msg-1', totalDuration: 100, totalTokens: 10 };
+        yield {
+          type: 'stream_end',
+          conversationId: 'conv-1',
+          messageId: 'msg-1',
+          totalDuration: 100,
+          totalTokens: 10,
+        };
       };
-      vi.mocked(orchestrateChat).mockReturnValueOnce(mockGen() as ReturnType<typeof orchestrateChat>);
+      vi.mocked(orchestrateChat).mockReturnValueOnce(
+        mockGen() as ReturnType<typeof orchestrateChat>,
+      );
 
-      const res = await request(app)
-        .post('/ai/chat')
-        .send({ message: '你好' })
-        .expect(200);
+      const res = await request(app).post('/ai/chat').send({ message: '你好' }).expect(200);
 
       expect(res.headers['content-type']).toContain('text/event-stream');
     });
@@ -96,13 +115,19 @@ describe('AI routes', () => {
       const mockGen = async function* () {
         yield { type: 'thinking', content: '思考中...', messageId: 'msg-1' };
         yield { type: 'text_chunk', content: '回复', messageId: 'msg-1', index: 0 };
-        yield { type: 'stream_end', conversationId: 'conv-1', messageId: 'msg-1', totalDuration: 200, totalTokens: 20 };
+        yield {
+          type: 'stream_end',
+          conversationId: 'conv-1',
+          messageId: 'msg-1',
+          totalDuration: 200,
+          totalTokens: 20,
+        };
       };
-      vi.mocked(orchestrateChat).mockReturnValueOnce(mockGen() as ReturnType<typeof orchestrateChat>);
+      vi.mocked(orchestrateChat).mockReturnValueOnce(
+        mockGen() as ReturnType<typeof orchestrateChat>,
+      );
 
-      const res = await request(app)
-        .post('/ai/chat')
-        .send({ message: '你好' });
+      const res = await request(app).post('/ai/chat').send({ message: '你好' });
 
       // SSE 格式验证
       expect(res.text).toContain('event: message');
@@ -117,9 +142,7 @@ describe('AI routes', () => {
         throw new Error('Unexpected error');
       });
 
-      const res = await request(app)
-        .post('/ai/chat')
-        .send({ message: '你好' });
+      const res = await request(app).post('/ai/chat').send({ message: '你好' });
 
       expect(res.text).toContain('"type":"error"');
       expect(res.text).toContain('INTERNAL_ERROR');
@@ -142,9 +165,7 @@ describe('AI routes', () => {
         total: 1,
       });
 
-      const res = await request(app)
-        .get('/ai/conversations')
-        .expect(200);
+      const res = await request(app).get('/ai/conversations').expect(200);
 
       expect(res.body.success).toBe(true);
       expect(res.body.data).toHaveLength(1);
@@ -158,9 +179,7 @@ describe('AI routes', () => {
         total: 0,
       });
 
-      await request(app)
-        .get('/ai/conversations?page=2&pageSize=10')
-        .expect(200);
+      await request(app).get('/ai/conversations?page=2&pageSize=10').expect(200);
 
       expect(listConversations).toHaveBeenCalledWith('tenant-1', 'user-1', 2, 10);
     });
@@ -171,11 +190,97 @@ describe('AI routes', () => {
         total: 0,
       });
 
-      await request(app)
-        .get('/ai/conversations')
-        .expect(200);
+      await request(app).get('/ai/conversations').expect(200);
 
       expect(listConversations).toHaveBeenCalledWith('tenant-1', 'user-1', 1, 20);
+    });
+  });
+
+  describe('GET /ai/conversations/:id/messages', () => {
+    const validConversationId = '00000000-0000-0000-0000-000000000001';
+
+    it('应该返回消息列表', async () => {
+      mockConversationFindFirst.mockResolvedValueOnce({ id: validConversationId });
+      const mockMessages = [
+        {
+          id: 'msg-1',
+          role: 'user',
+          content: '你好',
+          toolCalls: null,
+          toolResults: null,
+          createdAt: new Date('2026-03-30T10:00:00Z'),
+        },
+        {
+          id: 'msg-2',
+          role: 'assistant',
+          content: '你好！有什么可以帮你的？',
+          toolCalls: null,
+          toolResults: null,
+          createdAt: new Date('2026-03-30T10:00:01Z'),
+        },
+      ];
+      mockMessageFindMany.mockResolvedValueOnce(mockMessages);
+      mockMessageCount.mockResolvedValueOnce(2);
+
+      const res = await request(app)
+        .get(`/ai/conversations/${validConversationId}/messages`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.items).toHaveLength(2);
+      expect(res.body.data.total).toBe(2);
+      expect(res.body.meta.page).toBe(1);
+      expect(res.body.meta.pageSize).toBe(50);
+    });
+
+    it('会话不存在应该返回 404', async () => {
+      mockConversationFindFirst.mockResolvedValueOnce(null);
+
+      const res = await request(app)
+        .get(`/ai/conversations/${validConversationId}/messages`)
+        .expect(404);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('RESOURCE_NOT_FOUND');
+    });
+
+    it('无效分页参数应该返回 400', async () => {
+      const res = await request(app)
+        .get(`/ai/conversations/${validConversationId}/messages?page=-1`)
+        .expect(400);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('无效UUID应该返回 400', async () => {
+      const res = await request(app)
+        .get('/ai/conversations/not-a-uuid/messages')
+        .expect(400);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('别人的会话应该返回 404（findFirst 按 tenantId+userId 查不到）', async () => {
+      // findFirst with tenantId + userId filter returns null for other user's conversation
+      mockConversationFindFirst.mockResolvedValueOnce(null);
+
+      const res = await request(app)
+        .get(`/ai/conversations/${validConversationId}/messages`)
+        .expect(404);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('RESOURCE_NOT_FOUND');
+      // Verify the query included tenantId and userId
+      expect(mockConversationFindFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: 'tenant-1',
+            userId: 'user-1',
+          }),
+        }),
+      );
     });
   });
 
@@ -189,10 +294,7 @@ describe('AI routes', () => {
       });
       noAuthApp.use('/ai', aiRouter);
 
-      const res = await request(noAuthApp)
-        .post('/ai/chat')
-        .send({ message: '你好' })
-        .expect(401);
+      const res = await request(noAuthApp).post('/ai/chat').send({ message: '你好' }).expect(401);
 
       expect(res.body.error.code).toBe('AUTH_INVALID_TOKEN');
     });

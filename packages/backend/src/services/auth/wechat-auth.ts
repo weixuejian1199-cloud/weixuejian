@@ -187,7 +187,10 @@ export async function bindPhone(
       data: { deletedAt: new Date(), wechatOpenid: null },
     });
 
-    logger.info({ mergedFrom: userId, mergedTo: existingByPhone.id, tenantId }, 'User accounts merged');
+    logger.info(
+      { mergedFrom: userId, mergedTo: existingByPhone.id, tenantId },
+      'User accounts merged',
+    );
 
     return { merged: true, finalUserId: existingByPhone.id };
   }

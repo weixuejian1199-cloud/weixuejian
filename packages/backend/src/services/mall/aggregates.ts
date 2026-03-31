@@ -6,13 +6,14 @@
  * 返回 completeness 让调用方知道数据完整度。
  */
 import type { MallAdapter } from '../../adapters/erp/mall-adapter.js';
-import {
-  buildAggregateCacheKey,
-  getCache,
-  setAggregateCache,
-} from '../../adapters/erp/cache.js';
+import { buildAggregateCacheKey, getCache, setAggregateCache } from '../../adapters/erp/cache.js';
 import { logger } from '../../utils/logger.js';
-import type { AggregateResult, SalesStats, SupplierRank, StatusDistribution } from '../../adapters/erp/types.js';
+import type {
+  AggregateResult,
+  SalesStats,
+  SupplierRank,
+  StatusDistribution,
+} from '../../adapters/erp/types.js';
 
 /** 聚合查询最多遍历的页数（避免耗尽 API 配额）*/
 const MAX_AGGREGATE_PAGES = 100;
@@ -63,9 +64,7 @@ export async function getSalesStats(
     data: {
       totalAmount: Math.round(totalAmount * 100) / 100,
       orderCount,
-      avgOrderAmount: orderCount > 0
-        ? Math.round((totalAmount / orderCount) * 100) / 100
-        : 0,
+      avgOrderAmount: orderCount > 0 ? Math.round((totalAmount / orderCount) * 100) / 100 : 0,
     },
     computedAt: new Date().toISOString(),
     completeness: totalRecords > 0 ? Math.min(scannedRecords / totalRecords, 1) : 1,
@@ -92,7 +91,10 @@ export async function getTopSuppliers(
   const cached = await getCache<AggregateResult<SupplierRank[]>>(cacheKey);
   if (cached) return cached.data;
 
-  const supplierMap = new Map<number, { name: string | null; orderCount: number; amount: number }>();
+  const supplierMap = new Map<
+    number,
+    { name: string | null; orderCount: number; amount: number }
+  >();
   let scannedRecords = 0;
   let totalRecords = 0;
 

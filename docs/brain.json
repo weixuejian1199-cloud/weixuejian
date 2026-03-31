@@ -1,7 +1,7 @@
 {
   "projectName": "企业AI工作站",
-  "version": "2.5.1",
-  "lastUpdated": "2026-03-30",
+  "version": "2.7.0",
+  "lastUpdated": "2026-03-31",
 
   "projectBrief": {
     "_instruction": "新对话必读。读完这一段就能理解项目全貌，不需要打开其他文档。",
@@ -15,7 +15,7 @@
         "财务系统（最核心）— 替代金蝶/用友，ERP数据进来后直接内部处理：凭证/记账/报表/成本/报税，不需要外部财务软件",
         "客服系统（ACI客服中枢）— 对标七鱼/美洽，决策中枢定位，AI判断+人类授权+系统执行，90%AI+10%人工确认",
         "运营分析 — 选品/定价/活动/异常检测",
-        "结算对账 — 供应商对账/结算",
+        "结算对账 — 供应商/平台对账（Phase 2，已删除Phase 1 scope）",
         "报表系统 — 早报/周报/异常告警"
       ],
       "hand": "时皙Life商城(app-mall) — 大脑的执行端，对标李佳琦小程序，AI直接控制一切（同库无边界）",
@@ -115,26 +115,26 @@
       "_description": "企业AI工作站的两条手臂。这是整个系统最核心的能力架构，缺一不可。",
       "claudeCode": {
         "role": "最强大脑 — 造产品+可以做一切",
-        "deployment": "阿里云ECS + PM2进程守护 + Agent SDK(@anthropic-ai/claude-agent-sdk) + 自建Bridge API(Express) + 飞书SDK(@larksuiteoapi/node-sdk)，ADR-028",
-        "capability": "读写代码、执行命令、Git操作、架构决策、查数据、管业务——什么都能干。能力远大于OpenClaw",
+        "deployment": "Mac本地 + PM2进程守护 + CLI spawn(claude --print) + 飞书SDK(@larksuiteoapi/node-sdk)，ADR-028。注：ECS因Anthropic API中国IP封锁(403)已弃用",
+        "capability": "读写代码、执行命令、Git操作、架构决策、查数据、管业务——什么都能干。能力远大于AI对话引擎",
         "model": "Claude Opus 4.6",
         "users": "老板（驾驶舱）+ 9人研发团队",
         "access": "不需要守电脑。创始人在手机上通过小程序/飞书就能给Claude Code下开发指令、查看任务进度、审查代码",
         "cost": "Claude订阅额度，用在刀刃上（重要决策、开发迭代、复杂分析）",
         "originalVision": "创始人最初的需求就是'不想一直守在电脑前'，Claude Code部署在云服务器+Bridge API+小程序壳=随时随地远程开发迭代"
       },
-      "openClaw": {
+      "aiChatEngine": {
         "role": "日常大脑 — 跑产品，连接一切通讯渠道",
-        "deployment": "已在Qiyao项目跑通，连接了飞书。之后扩展到微信/Telegram",
+        "deployment": "已验证飞书集成。之后扩展到微信/Telegram",
         "capability": "业务查询、AI对话、客服判断、报表、多渠道消息路由。是'对话即一切'的真正实现层",
-        "model": "百炼Qwen（Qwen3-Max/Qwen3.5-Plus），成本低",
+        "model": "通义千问（Qwen3-Max/Qwen3.5-Plus），成本低",
         "users": "所有员工+买家+客服",
         "access": "飞书/微信/Telegram/小程序，任何通讯渠道都是系统入口",
-        "cost": "百炼按量付费，处理90%日常操作",
-        "source": "目前在Qiyao项目（不是ATLAS），Phase 2合并到工作站时是核心合并项"
+        "cost": "DashScope按量付费，处理90%日常操作",
+        "techReference": "技术参考：外部已验证的多渠道AI网关架构、飞书/Telegram消息路由、人格系统设计"
       },
-      "relationship": "Claude Code > OpenClaw（能力层面）。两个独立飞书号：飞书号1连Claude Code（开发/迭代/架构/分析/一切），飞书号2连OpenClaw（日常业务/查数据/客服/报表）。两者都从手机可达，创始人不需要守电脑。",
-      "aiModels": "百炼可用模型：Qwen3-Max(强)/Qwen3.5-Plus(快省)/Qwen-VL-Max(图片)/text-embedding-v3(RAG)"
+      "relationship": "Claude Code > AI对话引擎（能力层面）。两个独立飞书号：飞书号1连Claude Code（开发/迭代/架构/分析/一切），飞书号2连AI对话引擎（日常业务/查数据/客服/报表）。两者都从手机可达，创始人不需要守电脑。",
+      "aiModels": "通义千问可用模型：Qwen3-Max(强)/Qwen3.5-Plus(快省)/Qwen-VL-Max(图片)/text-embedding-v3(RAG)"
     },
     "techStack": "Node.js 20+ / TypeScript strict / Express 4 / Prisma 6 / PostgreSQL 15+pgvector / Redis 7 / BullMQ / Zod / Taro 4+React 18+NutUI / Vitest / pnpm 10 / Docker Compose / 阿里云 / GitHub Actions",
     "monorepo": "packages/backend(统一后端) + packages/app-workstation(员工端Taro) + packages/app-mall(买家端Taro,Phase2) + packages/shared(共享类型)",
@@ -145,12 +145,32 @@
       "每个会话只处理一个US，每个AC完成就git commit",
       "方案先行——宁慢勿糙，不匆忙开工",
       "01主文档是数据模型权威源，05全局架构是产品能力权威源",
-      "砍功能比加功能重要——Phase 1只做最小可对话系统"
+      "砍功能比加功能重要——Phase 1只做最小可对话系统",
+      "RULE-21: 测试只增不减——禁止删除测试文件(session-guard自动拦截)",
+      "RULE-22: 禁止as unknown类型绕过——用正确的类型定义(session-guard自动拦截)",
+      "RULE-23: 环境变量必须走env.ts Zod schema——禁止直接process.env(session-guard警告)",
+      "RULE-24: ADR影响扩散——架构决策后grep全文档扫描影响范围，不清理不提交"
     ],
+    "sessionGuard": {
+      "_description": "v2.7新增 — 会话门禁系统。参考Anthropic 'Effective Harnesses for Long-Running Agents'，把规则变成自动化门禁",
+      "_philosophy": "之前的问题根因：规则写在文档里但没有写进代码里。9个Agent都在往前跑，没有一个Agent在回头看。",
+      "script": "scripts/session-guard.ts",
+      "gates": {
+        "start": "会话启动门禁 — brain.json完整性/测试全绿/TypeScript零错误/Git干净",
+        "commit": "提交前门禁 — 禁删测试/禁类型绕过/禁直接process.env",
+        "end": "会话结束门禁 — progress.txt已更新/brain.json无遗留in-progress/测试全绿/无未提交修改",
+        "adr-impact": "ADR扩散门禁 — 架构决策后grep全文档扫描关键词影响范围"
+      },
+      "rootCauseAnalysis": {
+        "problem": "v2.6审计发现：5个任务状态滞后/16个错误码不一致/15处供应商对账残留/3个P0 bug/死代码积累",
+        "rootCause": "规则是清单不是门禁。会话结束协议写了'更新brain.json'但不更新也不拦截。Critic只审方案和代码不审文档一致性。测试覆盖没有门槛。",
+        "solution": "Anthropic Harness模式——init.sh式启动检查/feature_list.json式真理来源/不允许删除测试式硬约束"
+      }
+    },
     "mergerSources": {
       "aibiXiaotong": "AIBI小酮(Python/FastAPI+百炼) → 营养师工具Agent(tools/health/aibi-ketogenic/)，Phase 2合并",
-      "qiyao": "Qiyao含两个核心资产：(1)OpenClaw引擎(已跑通飞书，核心合并项) (2)数据分析(7分析器+对账)。Phase 2合并。注意：供应商对账模块只有统计没有逻辑，必须重新设计；OpenClaw是系统核心能力，不是可选的",
-      "atlas": "ATLAS(WebSocket IM+SSE+文件流+监控) → 选择性合并到对话通道和驾驶舱，Phase 3。注意：OpenClaw不在ATLAS而在Qiyao",
+      "externalAnalysis": "技术参考：已验证的6个数据分析器(指标/异常/健康分/时间趋势/达人质量/利润)+12项核心指标+8种异常检测。Phase 2评估是否重写为TypeScript集成。供应商对账模块已删除",
+      "externalIM": "技术参考：已验证的WebSocket IM+SSE流式输出+文件上传分析流程+系统监控面板。选择性合并到对话通道和驾驶舱，Phase 3",
       "shishi": "时皙商城(27表/207验收/22页面) → 已决策合并(ADR-022)，技术栈迁移(NestJS→Express, MySQL→PostgreSQL, uni-app→Taro)，Phase 2-3"
     },
     "currentStatus": "Phase 1a 进行中。脚手架已完成(US-P1a-001 ✅ commit 9b60167)。v2.3更新：9人团队全面审查完成 — 双飞书对接从Wave9提前到Wave4(验证通道先行)、多租户Phase1简化(节省1天)、供应商对账模块删除(BL-002/BL-011)、新增Phase1a技术Spike(百炼tool_call+Bridge API原型)、AiJudgmentRecord结构化判断记录、AI幻觉防护写入对话引擎、直达模式跳过Master Agent、E2E冒烟测试。v2.4更新：全面审查补强 — ACI规则冲突修复、中强度词枚举、安全设计方案、前后端接口契约、工具错误处理框架、团队流程补强。v2.5更新：供应链策略确认(ADR-031) — 爱库存封闭不可行已删除，确认1+1策略(ztdy基本盘+1688增量)，Phase 1b加1688 Spike，Phase 2新增5个Backlog(BL-024~028)。下一步：Wave 3 MallAdapter。"
@@ -168,14 +188,15 @@
   },
 
   "missingRoles": {
-    "_note": "v2.4审查后识别的缺失岗位，规划在Phase 2补充",
-    "securityAgent": "安全合规Agent — 密钥轮换/数据加密/审计/PIPL合规",
-    "sreAgent": "SRE Agent — 监控告警/容量规划/性能优化",
+    "_note": "v2.6审计后更新的缺失岗位。DocSync已在v2.6审计中实际运作，建议Phase 1b正式化",
+    "docSyncAgent": "文档一致性守护Agent — 每次提交自动检查brain.json任务状态/错误码/部署描述与代码的一致性（v2.6审计发现文档严重滞后，5个任务状态+16个错误码+部署描述全部过时）",
+    "securityAgent": "安全合规Agent — 密钥轮换/数据加密/审计/PIPL合规（v2.6审计发现HS256降级漏洞、限流key失效）",
+    "sreAgent": "SRE Agent — 监控告警/容量规划/性能优化/CI-CD（v2.6审计发现无GitHub Actions pipeline）",
     "customerSuccessAgent": "客户成功Agent — SLA追踪/用户反馈/续约"
   },
 
-  "currentPhase": "Phase 1a",
-  "phaseGoal": "Phase 1a（第1-3周）：项目脚手架+精简Schema(AI/系统层)+健康检查API+Docker本地环境+MallAdapter接入ztdy-open真实数据；Phase 1b（第4-9周）：JWT认证+多租户+AI对话引擎(百炼Qwen+SSE+tool_call)+5个运营查询真实场景+ACI客服MVP(退货审核判断)+双飞书对接(Agent SDK Bridge+OpenClaw)+限流+备份",
+  "currentPhase": "Phase 1b",
+  "phaseGoal": "Phase 1a（第1-3周）：项目脚手架+精简Schema(AI/系统层)+健康检查API+Docker本地环境+MallAdapter接入ztdy-open真实数据；Phase 1b（第4-9周）：JWT认证+多租户+AI对话引擎(通义千问+SSE+tool_call)+5个运营查询真实场景+ACI客服MVP(退货审核判断)+双飞书对接(Bridge+AI对话引擎)+限流+备份",
   "phaseDeadline": "2026-06-06",
   "phaseNote": "v2.3排期（9人团队审查后）：Phase 1a目标4月20日（含2个技术Spike），Phase 1b目标6月6日。总工期30-35工作日。关键变化：双飞书从Wave9→Wave4(验证通道先行)，多租户简化节省1天，供应商对账删除。方案先行——方案不清晰不开工。",
 
@@ -331,7 +352,7 @@
     {
       "id": "US-P1b-001",
       "title": "JWT 认证中间件 + 微信小程序登录流",
-      "status": "pending",
+      "status": "done",
       "assignee": "BE Agent",
       "story": "AS 用户 I WANT 安全的登录认证系统 SO THAT 我的数据受到保护且登录体验流畅",
       "ac": [
@@ -363,7 +384,7 @@
     {
       "id": "US-P1b-002",
       "title": "多租户中间件 + 数据隔离基础",
-      "status": "pending",
+      "status": "done",
       "assignee": "BE Agent + Data Agent",
       "story": "AS SaaS平台 I WANT 可靠的多租户数据隔离 SO THAT 不同企业的数据绝对不会互相泄露",
       "ac": [
@@ -391,7 +412,7 @@
     {
       "id": "US-P1b-003",
       "title": "AI 对话引擎（百炼Qwen + SSE + tool_call）",
-      "status": "pending",
+      "status": "done",
       "assignee": "BE Agent",
       "story": "AS 用户 I WANT 对着AI说一句话就能查到真实业务数据 SO THAT 不需要登录多个系统手动查询",
       "ac": [
@@ -479,15 +500,15 @@
     },
     {
       "id": "US-P1b-006",
-      "title": "双飞书对接：Claude Code + OpenClaw（替代 Taro 前端）",
-      "status": "in-progress",
+      "title": "双飞书对接：Claude Code + AI对话引擎（替代 Taro 前端）",
+      "status": "done",
       "assignee": "BE Agent",
       "story": "AS 老板 I WANT 在飞书直接跟两个大脑对话 SO THAT 不需要守电脑、随时随地开发迭代+管理业务",
       "ac": [
-        "AC-01: 飞书号1对接Claude Code — 阿里云服务器tmux部署+Bridge API，飞书消息→Claude Code→飞书回复",
+        "AC-01: 飞书号1对接Claude Code — Mac本地部署+Bridge API，飞书消息→Claude Code→飞书回复",
         "AC-02: 飞书号1功能验证：在飞书给Claude Code下开发指令、查看文件、审查代码、执行任务",
-        "AC-03: 飞书号2对接OpenClaw — 从Qiyao迁移OpenClaw飞书通道核心代码，连接工作站AI对话引擎",
-        "AC-04: 飞书号2功能验证：OpenClaw消息→路由到AI对话引擎(US-P1b-003)→tool_call查真实数据→飞书回复",
+        "AC-03: 飞书号2对接AI对话引擎 — 实现飞书通道核心代码，连接工作站AI对话引擎",
+        "AC-04: 飞书号2功能验证：飞书消息→路由到AI对话引擎(US-P1b-003)→tool_call查真实数据→飞书回复",
         "AC-05: ACI客服判断结果也能在飞书号2查看和确认",
         "AC-06: 两个飞书号的对话记录分别存入Conversation/Message表",
         "AC-07: 基础错误处理：AI不可用时飞书返回友好提示",
@@ -495,7 +516,7 @@
         "AC-默认-02: 所有飞书操作记入AuditLog"
       ],
       "scope": {
-        "include": "Claude Code飞书Bridge API、OpenClaw飞书通道迁移、与AI对话引擎对接、会话存储",
+        "include": "Claude Code飞书Bridge API、飞书通道实现、与AI对话引擎对接、会话存储",
         "exclude": "不做Taro前端（推迟到Phase 2）、不做微信/Telegram通道（Phase 2扩展）"
       },
       "priority": "P0-最高",
@@ -505,12 +526,12 @@
       "phase": "1b",
       "createdAt": "2026-03-30",
       "updatedAt": "2026-03-30",
-      "updateNote": "v2.5拆分为Phase A/B：Phase A(Wave 4, AC-01/02)=Bridge生产化完成。关键变更：ECS部署因Anthropic API中国IP封锁(403)改为Mac本地部署。代码迁移scripts/bridge→packages/bridge(300行+配置/日志/部署)。改进：按chatId隔离并发、pino结构化日志、session TTL 4h过期、限流10条/分、发送重试3次。Phase B(Wave 7.5, AC-03~07)=OpenClaw飞书接入AI对话引擎，依赖P1b-003"
+      "updateNote": "v2.5拆分为Phase A/B：Phase A(Wave 4, AC-01/02)=Bridge生产化完成。关键变更：ECS部署因Anthropic API中国IP封锁(403)改为Mac本地部署。代码迁移scripts/bridge→packages/bridge(300行+配置/日志/部署)。改进：按chatId隔离并发、pino结构化日志、session TTL 4h过期、限流10条/分、发送重试3次。Phase B(Wave 7.5, AC-03~07)=飞书号2接入AI对话引擎，依赖P1b-003"
     },
     {
       "id": "US-P1b-007",
       "title": "Rate Limiting 增强（多维度+按路由配置）",
-      "status": "pending",
+      "status": "done",
       "assignee": "BE Agent",
       "story": "AS 平台运维 I WANT 细粒度的API限流机制 SO THAT 不同接口可以有不同的限流策略",
       "ac": [
@@ -539,7 +560,7 @@
     {
       "id": "US-P1b-008",
       "title": "数据库备份自动化脚本",
-      "status": "pending",
+      "status": "done",
       "assignee": "DevOps Agent + Data Agent",
       "story": "AS 系统管理员 I WANT 自动化数据库备份 SO THAT 数据丢失时可以恢复（RPO < 1小时）",
       "ac": [
@@ -664,7 +685,7 @@
         "estimatedDays": 1,
         "phase": "1a",
         "status": "done",
-        "note": "SPIKE-001: qwen3.5-plus tool_call完全兼容OpenAI格式(commit b9b9d9a)。SPIKE-002: 飞书SDK认证正常,Bot名启钥Qiyao,消息API链路通(commit 1045060)。Webhook接收需公网服务器,Phase 1b部署时验证。"
+        "note": "SPIKE-001: qwen3.5-plus tool_call完全兼容OpenAI格式(commit b9b9d9a)。SPIKE-002: 飞书SDK认证正常,消息API链路通(commit 1045060)。长连接模式已验证可用。"
       },
       {
         "wave": "--- Phase 1b 分界线 --- 目标交付：2026-06-06",
@@ -674,7 +695,7 @@
       {
         "wave": 4,
         "tasks": ["US-P1b-006"],
-        "description": "【提前】双飞书对接：飞书号1(Agent SDK Bridge→Claude Code) + 飞书号2(OpenClaw迁移)。这是验证所有后续功能的通道，必须先做。Bridge API约600-800行核心代码",
+        "description": "【提前】双飞书对接：飞书号1(Bridge→Claude Code) + 飞书号2(AI对话引擎)。这是验证所有后续功能的通道，必须先做。Bridge API约600-800行核心代码",
         "parallel": false,
         "estimatedDays": 5,
         "phase": "1b",
@@ -750,8 +771,8 @@
     ],
     "totalEstimatedDays": "30-35个工作日（含Critic双重审查5天 + 工作量重估 + 多租户简化节省1天）",
     "criticalPath": "001(✅) → 002/005/006(✅) → 010/011(✅安全基线) → 009(✅MallAdapter) → SPIKE-001/002(下一步) → P1b-006(飞书) → P1b-001 → P1b-002 → P1b-003(6天最重) → P1b-004 → P1b-005 → P1b-007/008",
-    "phase1aDeliverable": "可运行的后端+Docker环境+安全中间件套件(fail-secure)+错误码注册表(38码)+Schema 21表+40测试全绿+6个ztdy API已接通+健康检查可访问+百炼tool_call已验证+Bridge API原型已验证（目标4月20日）",
-    "phase1bDeliverable": "飞书号1→Claude Code可对话（最先交付）；飞书号2→OpenClaw→AI查ztdy真实数据→飞书回复；ACI退货审核判断可工作+判断记录可回放（目标6月6日）",
+    "phase1aDeliverable": "可运行的后端+Docker环境+安全中间件套件(fail-secure)+错误码注册表(38码)+Schema 21表+175测试全绿+6个ztdy API已接通+健康检查可访问+百炼tool_call已验证+Bridge API原型已验证（目标4月20日）",
+    "phase1bDeliverable": "飞书号1→Claude Code可对话（最先交付）；飞书号2→AI对话引擎→查ztdy真实数据→飞书回复；ACI退货审核判断可工作+判断记录可回放（目标6月6日）",
     "v23ChangeLog": "9人团队全面审查v2.3：(1)双飞书Wave9→Wave4（验证通道先行）(2)多租户Phase1简化（硬编码默认租户，节省1天）(3)新增SPIKE-001/002在Phase1a验证技术风险(4)删除供应商对账(BL-002/BL-011)(5)新增AiJudgmentRecord表(6)AI幻觉防护写入AI对话引擎(7)直达模式跳过Master Agent(8)E2E冒烟测试(9)MallAdapter按数据类型差异化缓存TTL(10)ACI标注数据集30-50个case"
   },
 
@@ -767,31 +788,31 @@
     },
     {
       "id": "BL-002",
-      "title": "合并Qiyao数据分析引擎到工作站（不含对账）",
-      "description": "Qiyao有6个分析器(指标/异常/健康分/时间趋势/达人质量/利润)+12项核心指标+8种异常检测。重写为TypeScript。⚠️供应商对账模块已删除——已接入ztdy-open API，对账只是一个工具不值得投入重新设计",
+      "title": "电商数据分析引擎（技术参考已验证方案）",
+      "description": "技术参考：已验证的6个分析器(指标/异常/健康分/时间趋势/达人质量/利润)+12项核心指标+8种异常检测。Phase 2评估后重写为TypeScript。供应商对账模块已删除",
       "priority": "P1",
       "targetPhase": "Phase 2",
-      "source": "qiyao-workstation（/Users/weixuejian/claude-workspace/qiyao-workstation/）",
+      "source": "外部已验证项目（技术参考）",
       "date": "2026-03-29",
       "updatedAt": "2026-03-30",
       "updateNote": "v2.3: 创始人决策删除供应商对账模块，已有ztdy API无需对账"
     },
     {
       "id": "BL-003",
-      "title": "合并ATLAS文件分析流和IM通讯能力",
-      "description": "ATLAS的S3文件上传→分析→输出流程、WebSocket IM即时通讯、SSE流式输出(心跳+超时回滚)、OpenClaw Monitor监控面板。选择性合并到工作站AI对话通道和系统驾驶舱",
+      "title": "文件分析流和IM通讯能力（技术参考已验证方案）",
+      "description": "技术参考：已验证的S3文件上传→分析→输出流程、WebSocket IM即时通讯、SSE流式输出(心跳+超时回滚)、系统监控面板。选择性合并到工作站AI对话通道和系统驾驶舱",
       "priority": "P2",
       "targetPhase": "Phase 3",
-      "source": "atlas项目（服务器8.131.109.208:/root/atlas-report）",
+      "source": "外部已验证项目（技术参考）",
       "date": "2026-03-29"
     },
     {
       "id": "BL-004",
       "title": "统一AI人格系统设计",
-      "description": "参考OpenClaw的SOUL.md人格系统+行为准则+保密规则，为工作站各角色Agent设计统一的人格/语气/边界规范",
+      "description": "技术参考：已验证的AI人格系统+行为准则+保密规则，为工作站各角色Agent设计统一的人格/语气/边界规范",
       "priority": "P1",
       "targetPhase": "Phase 2",
-      "source": "qiyao-workstation/SOUL.md + AGENTS.md",
+      "source": "外部已验证项目（技术参考）",
       "date": "2026-03-29"
     },
     {
@@ -1021,8 +1042,8 @@
     "queue": "BullMQ (基于Redis)",
     "validation": "Zod",
     "frontend": "Taro 4 + React 18 + NutUI + Zustand 5",
-    "engine_claudeCode": "飞书号1·Claude Code（最强大脑）— Claude Opus 4.6，阿里云服务器tmux+Bridge API，飞书/小程序可达",
-    "engine_openClaw": "飞书号2·OpenClaw（日常大脑）— 百炼Qwen，已在Qiyao跑通飞书，连接一切通讯渠道",
+    "engine_claudeCode": "飞书号1·Claude Code（最强大脑）— Claude Opus 4.6，Mac本地+Bridge API，飞书/小程序可达",
+    "engine_aiChat": "飞书号2·AI对话引擎（日常大脑）— 通义千问，已验证飞书集成，连接一切通讯渠道",
     "ai_dashscope_models": "Qwen3-Max(强)/Qwen3.5-Plus(快省)/Qwen-VL-Max(图片)/text-embedding-v3(RAG)",
     "testing": "Vitest 3 + Supertest (Phase 1b) + Playwright (Phase 2)",
     "monitoring": "Prometheus + Grafana (Phase 1b)",
@@ -1196,8 +1217,8 @@
     },
     {
       "id": "ADR-027",
-      "title": "双引擎架构：Claude Code(造产品+最强大脑) + OpenClaw(跑产品+日常大脑)",
-      "reason": "创始人最初需求：不想守电脑，随时随地管公司和迭代系统。Claude Code部署在云服务器(tmux)+Bridge API，从小程序/飞书远程可达，能力最强（开发/架构/分析/一切）。OpenClaw已在Qiyao跑通飞书，百炼驱动，成本低，处理90%日常操作。两者并列是系统最核心的能力架构。Phase 1b先接入OpenClaw飞书通道验证AI对话，Taro前端推迟到Phase 2",
+      "title": "双引擎架构：Claude Code(造产品+最强大脑) + AI对话引擎(跑产品+日常大脑)",
+      "reason": "创始人最初需求：不想守电脑，随时随地管公司和迭代系统。Claude Code部署在本地Mac+Bridge API，从飞书远程可达，能力最强（开发/架构/分析/一切）。AI对话引擎基于通义千问，成本低，处理90%日常操作。两者并列是系统最核心的能力架构。Phase 1b先接入飞书通道验证AI对话，Taro前端推迟到Phase 2",
       "status": "accepted",
       "date": "2026-03-30"
     },
@@ -1425,6 +1446,19 @@
       "无 SQL 注入、XSS、CSRF 风险",
       "密钥/密码不出现在代码或日志中",
       "权限校验在中间件和业务层双重执行"
+    ],
+    "docSync": [
+      "brain.json activeTasks 中当前US的status已更新为done",
+      "新增/修改错误码已同步到brain.json errorCodes注册表",
+      "如涉及架构变更(部署/模块增删/策略变化)，已运行session-guard.ts adr-impact扫描全文档",
+      "claude-progress.txt已更新（完成了什么/遗留什么/下一步）",
+      "无 as unknown as Record 类型绕过(RULE-22)",
+      "环境变量走 env.ts Zod schema(RULE-23)"
+    ],
+    "testIntegrity": [
+      "核心模块不允许零测试覆盖（chat-orchestrator/wechat-auth/jwt-service/mall-adapter等）",
+      "未删除任何已有测试文件(RULE-21)",
+      "session-guard.ts commit 检查通过"
     ]
   },
 
@@ -1681,12 +1715,12 @@
       "version": "2.1.0",
       "date": "2026-03-30",
       "author": "CTO + 创始人",
-      "summary": "双引擎架构明确 + OpenClaw飞书替代Taro前端验证",
+      "summary": "双引擎架构明确 + 飞书对话替代Taro前端验证",
       "changes": [
-        "ADR-027: 双引擎架构(Claude Code+OpenClaw)明确为系统最核心能力",
-        "projectBrief.aiEngines → projectBrief.dualEngines: 重新定义Claude Code(最强大脑,云服务器远程可达)和OpenClaw(日常大脑,已跑通飞书)",
-        "US-P1b-006: 从'Taro前端最小对话页'改为'OpenClaw飞书接入'，Phase 1用飞书验证AI对话",
-        "mergerSources.qiyao: 明确OpenClaw是核心合并项（不是可选的），目前在Qiyao不在ATLAS",
+        "ADR-027: 双引擎架构(Claude Code+AI对话引擎)明确为系统最核心能力",
+        "projectBrief.dualEngines: 重新定义Claude Code(最强大脑,远程可达)和AI对话引擎(日常大脑,已验证飞书)",
+        "US-P1b-006: 从'Taro前端最小对话页'改为'飞书对话接入'，Phase 1用飞书验证AI对话",
+        "mergerSources: 外部已验证技术资产标注为技术参考",
         "清除扣子(Coze)所有产品依赖引用，只保留07-UI设计规范中的竞品对标参考",
         "Taro前端对话页推迟到Phase 2"
       ]

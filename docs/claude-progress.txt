@@ -1,9 +1,46 @@
 # 进度接力
 
 ## 最后更新
-- 时间：2026-03-31 01:25
+- 时间：2026-03-31 10:00
 - Agent：CTO Agent
-- 任务：Wave 7 AI对话引擎 + P1b-007 限流增强 + P1b-008 数据库备份 — 三路并行完成
+- 任务：Wave 7.5 飞书号2「灵犀」接入AI对话引擎
+
+## Wave 7.5: 灵犀桥接 ✅ 代码完成（待部署测试）
+- 新建 services/feishu-bridge/lingxi-bridge.ts — 灵犀桥接核心模块(~280行)
+  - 飞书WSClient长连接 + orchestrateChat直调（零HTTP开销）
+  - 会话映射(feishuChatId→conversationId) + TTL 4小时
+  - 去重/限流/队列/输入校验 — 复用Bridge 1成熟模式
+  - 特殊指令: "新对话"/"重置"/"状态"
+  - 功能开关: FEISHU_LINGXI_APP_ID不设则不启动
+- 修改 app.ts — feature-flagged启动+优雅关闭
+- 修改 env.ts — 4个新环境变量(APP_ID/SECRET/TENANT_ID/USER_ID)
+- 修改 docker-compose.yml — 透传4个环境变量
+- 新增 20个测试(lingxi-bridge.test.ts)
+- 基线: 226测试全绿 / TypeScript零错误 / ESLint零错误
+- 下一步: 部署到ECS，配置灵犀env，实际飞书消息验证闭环
+
+## v2.7 会话门禁系统 ✅ 完成
+- 新建 scripts/session-guard.ts — 启动/提交/结束三道门禁 + ADR影响扩散检查
+- 升级 CLAUDE.md v2.7 — 启动协议和结束协议从"清单"变"门禁脚本调用"
+- 新增 RULE-21~24: 测试只增不减/禁类型绕过/env集中管理/ADR影响扩散
+- brain.json 新增 sessionGuard 段落（含rootCauseAnalysis）+ definitionOfDone 新增 docSync/testIntegrity 检查项
+- Critic Agent 升级为三维度审查: 安全+架构+文档一致性
+- 团队文档 v3.1 更新
+- 设计理念参考：Anthropic "Effective Harnesses for Long-Running Agents"
+
+## v2.6 CTO全面审计 ✅ 全部完成
+- 3个P0 bug修复: 限流key失效/HS256降级/userName硬编码
+- sendError自动查表重构 + 16个错误码message对齐brain.json
+- +26测试: chat-orchestrator(14) + wechat-auth(12)
+- brain.json全量同步: 5个任务状态+currentPhase+deployment+测试数量
+- 供应商对账15处残留清理(5个文档26处标注)
+- Schema补强: 级联策略(20处)+UserShop索引+confidence改Decimal+Notification补updatedAt
+- 基础设施: prisma/pino-pretty移devDeps+RATE_LIMIT加Zod+Dockerfile chmod+engines收紧
+- 死代码清理: 4空壳路由+7个.gitkeep+注释路由删除
+- CLAUDE.md版本对齐v2.6
+- Memory清理: 删2(aci_hub+erp_status)+更新4+新建2(phase_status+tech_decisions)
+- 团队升级: missingRoles增DocSync Agent+v3.1能力升级(BE/QA/Critic/DevOps)
+- 验证: 201测试全绿/TypeScript零错误/ESLint零错误
 
 ## Phase 1b 进行中
 
@@ -30,7 +67,7 @@
 - pg-wal-archive.conf + crontab.example
 
 ### 验证结果
-- 175测试全绿 (17文件，从123增长到175，+52新测试)
+- 201测试全绿 (19文件，从175增长到201，+26新测试 via v2.6审计)
 - ESLint零错误
 - TypeScript编译零错误
 

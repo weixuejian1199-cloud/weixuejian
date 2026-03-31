@@ -82,7 +82,10 @@ vi.mock('../../lib/prisma.js', () => ({
 
 vi.mock('../../utils/logger.js', () => ({
   childLogger: () => ({
-    info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
   }),
 }));
 
@@ -118,11 +121,16 @@ describe('Auth Routes', () => {
       mockPrismaTenantFindUnique.mockResolvedValue({ id: tid, status: 'active' });
       mockCode2Session.mockResolvedValue({ openid: 'wx-openid-1' });
       mockFindOrCreateByWechat.mockResolvedValue({
-        userId: 'u1', tenantId: tid, role: 'buyer',
-        isNewUser: false, needsPhone: false,
+        userId: 'u1',
+        tenantId: tid,
+        role: 'buyer',
+        isNewUser: false,
+        needsPhone: false,
       });
       mockIssueTokenPair.mockResolvedValue({
-        accessToken: 'at-1', refreshToken: 'rt-1', expiresIn: 900,
+        accessToken: 'at-1',
+        refreshToken: 'rt-1',
+        expiresIn: 900,
       });
 
       const app = createApp();
@@ -140,9 +148,7 @@ describe('Auth Routes', () => {
 
     it('缺少code应该返回400', async () => {
       const app = createApp();
-      const res = await request(app)
-        .post('/auth/wechat-login')
-        .send({ tenantId: 't1' });
+      const res = await request(app).post('/auth/wechat-login').send({ tenantId: 't1' });
 
       expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
@@ -164,11 +170,16 @@ describe('Auth Routes', () => {
       mockPrismaTenantFindUnique.mockResolvedValue({ id: tid, status: 'active' });
       mockCode2Session.mockResolvedValue({ openid: 'wx-new' });
       mockFindOrCreateByWechat.mockResolvedValue({
-        userId: 'u-new', tenantId: tid, role: 'buyer',
-        isNewUser: true, needsPhone: true,
+        userId: 'u-new',
+        tenantId: tid,
+        role: 'buyer',
+        isNewUser: true,
+        needsPhone: true,
       });
       mockIssueTokenPair.mockResolvedValue({
-        accessToken: 'at-new', refreshToken: 'rt-new', expiresIn: 900,
+        accessToken: 'at-new',
+        refreshToken: 'rt-new',
+        expiresIn: 900,
       });
 
       const app = createApp();
@@ -184,13 +195,13 @@ describe('Auth Routes', () => {
   describe('POST /auth/refresh', () => {
     it('有效refreshToken应该返回新token pair', async () => {
       mockRotateTokenPair.mockResolvedValue({
-        accessToken: 'at-2', refreshToken: 'rt-2', expiresIn: 900,
+        accessToken: 'at-2',
+        refreshToken: 'rt-2',
+        expiresIn: 900,
       });
 
       const app = createApp();
-      const res = await request(app)
-        .post('/auth/refresh')
-        .send({ refreshToken: 'rt-old' });
+      const res = await request(app).post('/auth/refresh').send({ refreshToken: 'rt-old' });
 
       expect(res.status).toBe(200);
       expect(res.body.data.accessToken).toBe('at-2');
@@ -202,9 +213,7 @@ describe('Auth Routes', () => {
       mockRotateTokenPair.mockRejectedValue(new TokenRotationError('INVALID_REFRESH_TOKEN'));
 
       const app = createApp();
-      const res = await request(app)
-        .post('/auth/refresh')
-        .send({ refreshToken: 'rt-invalid' });
+      const res = await request(app).post('/auth/refresh').send({ refreshToken: 'rt-invalid' });
 
       expect(res.status).toBe(401);
       expect(res.body.error.code).toBe('AUTH_REFRESH_INVALID');
@@ -212,9 +221,7 @@ describe('Auth Routes', () => {
 
     it('缺少refreshToken应该返回400', async () => {
       const app = createApp();
-      const res = await request(app)
-        .post('/auth/refresh')
-        .send({});
+      const res = await request(app).post('/auth/refresh').send({});
 
       expect(res.status).toBe(400);
     });
@@ -262,10 +269,14 @@ describe('Auth Routes', () => {
     it('账号合并应该返回新token', async () => {
       mockBindPhone.mockResolvedValue({ merged: true, finalUserId: 'u-merged' });
       mockPrismaUserFindUnique.mockResolvedValue({
-        id: 'u-merged', tenantId: 't1', role: { name: 'buyer' },
+        id: 'u-merged',
+        tenantId: 't1',
+        role: { name: 'buyer' },
       });
       mockIssueTokenPair.mockResolvedValue({
-        accessToken: 'at-merged', refreshToken: 'rt-merged', expiresIn: 900,
+        accessToken: 'at-merged',
+        refreshToken: 'rt-merged',
+        expiresIn: 900,
       });
 
       const app = createApp();

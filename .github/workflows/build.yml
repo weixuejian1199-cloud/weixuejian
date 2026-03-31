@@ -8,6 +8,7 @@ name: Docker Build
 on:
   push:
     branches: [main]
+    tags: ["v*.*.*"]
 
 concurrency:
   group: build-${{ github.ref }}
@@ -31,6 +32,26 @@ jobs:
           file: ./Dockerfile
           target: production
           push: false
-          tags: enterprise-workstation:${{ github.sha }}
+          tags: |
+            enterprise-workstation:${{ github.sha }}
+            enterprise-workstation:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Login to Alibaba Cloud ACR
+        uses: docker/login-action@v3
+        with:
+          registry: registry.cn-beijing.aliyuncs.com
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Push to ACR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: production
+          push: true
+          tags: |
+            registry.cn-beijing.aliyuncs.com/enterprise-ws/backend:${{ github.sha }}
+            registry.cn-beijing.aliyuncs.com/enterprise-ws/backend:latest

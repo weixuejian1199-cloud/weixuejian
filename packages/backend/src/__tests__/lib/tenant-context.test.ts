@@ -6,7 +6,12 @@ vi.mock('../../lib/prisma.js', () => ({
   },
 }));
 
-import { tenantStorage, getTenantId, getUserId, getTenantPrisma } from '../../lib/tenant-context.js';
+import {
+  tenantStorage,
+  getTenantId,
+  getUserId,
+  getTenantPrisma,
+} from '../../lib/tenant-context.js';
 
 describe('TenantContext', () => {
   describe('getTenantId', () => {

@@ -18,7 +18,7 @@
   ↓
 Master Agent（意图识别 → 路由）
   ↓              ↓              ↓
-Finance Agent  Operation Agent  Settlement Agent  ...
+Finance Agent  Operation Agent  ~~Settlement Agent~~(Phase 2+)  ...
   ↓              ↓              ↓
 工具调用（查询数据库/ERP/计算）
   ↓
@@ -53,7 +53,7 @@ const routeToAgentTool = {
       agent: {
         type: 'string',
         enum: ['finance', 'operation', 'settlement', 'report', 'customer_service', 'system', 'parallel'],
-        description: '目标Agent：finance=财务相关，operation=运营/销售/投流/库存，settlement=供应商结算对账，report=早报/汇总报表，customer_service=客服工单/售后处理/买��咨询（人工客服在工作站使用），system=系统运维（仅super_admin），parallel=需要多Agent协同'
+        description: '目标Agent：finance=财务相关，operation=运营/销售/投流/库存，settlement=供应商结算对账（Phase 2+，Phase 1已删除），report=早报/汇总报表，customer_service=客服工单/售后处理/买家咨询（人工客服在工作站使用），system=系统运维（仅super_admin），parallel=需要多Agent协同'
       },
       task: { type: 'string', description: '转交给子Agent的任务描述' },
       agents: {
@@ -74,7 +74,7 @@ const routeToAgentTool = {
 |-----------|--------|---------|
 | 销售、GMV、订单、今天卖了、各平台 | Operation Agent | operation+ |
 | 利润、流水、报税、收入、成本、财务 | Finance Agent | finance+ |
-| 供应商、结算、对账、退款责任、付款 | Settlement Agent | procurement+ |
+| 供应商、结算、对账、退款责任、付款 | Settlement Agent（Phase 2+，Phase 1已删除） | procurement+ |
 | 早报、汇总、全公司、各部门、整体情况 | Report Agent | admin+ |
 | 系统健康、有没有报错、修改代码、部署、日志 | System Agent | super_admin 专属 |
 | 今天整体、全面分析、公司情况 | Master → 多 Agent 并行 | admin+ |
@@ -252,6 +252,8 @@ compare_platform_data(period)             // 平台对比
 
 ## 六、Settlement Agent
 
+> ⚠️ **已从 Phase 1 删除**（ADR-030 决策）。保留文档供 Phase 2+ 参考。
+
 ### 职责
 供应商对账、退款归因、结算单自动生成与核算。
 
@@ -330,7 +332,7 @@ send_notification(user_ids, content)  // 推送通知
 
 ## 七.5、Customer Service Agent（客服子系统，独立于工具市场）
 
-> **重要区分**：客服是核心子 Agent（与 Finance/Operation/Settlement 同级），不是工具市场中的工具。
+> **重要区分**：客服是核心子 Agent（与 Finance/Operation 同级；Settlement 已从 Phase 1 删除），不是工具市场中的工具。
 > AIBI小酮是健康咨询类工具 Agent（营养师），不是客服。客服处理售后订单，小酮提供营养知识。
 
 ### 职责
@@ -845,19 +847,19 @@ function filterOutput(response) {
 }
 ```
 
-### 双引擎权限统一（Claude Code + OpenClaw）
+### 双引擎权限统一（Claude Code + AI对话引擎）
 
-两个引擎（飞书号1·Claude Code / 飞书号2·OpenClaw）调用后端工具函数时，权限检查统一在 API Gateway 层完成，确保无论从哪个引擎发起的请求都经过相同的权限校验：
+两个引擎（飞书号1·Claude Code / 飞书号2·AI对话引擎）调用后端工具函数时，权限检查统一在 API Gateway 层完成，确保无论从哪个引擎发起的请求都经过相同的权限校验：
 
 ```
-Claude Code(飞书号1) ──┐
-                       ├──→ API Gateway（统一权限中间件） ──→ 工具函数
-OpenClaw(飞书号2)  ──┘
-                       │
-                       ├── JWT 校验（身份）
-                       ├── RBAC 校验（角色权限）
-                       ├── DataScope 校验（数据范围）
-                       └── 配额校验（调用限额）
+Claude Code(飞书号1)   ──┐
+                         ├──→ API Gateway（统一权限中间件） ──→ 工具函数
+AI对话引擎(飞书号2)  ──┘
+                         │
+                         ├── JWT 校验（身份）
+                         ├── RBAC 校验（角色权限）
+                         ├── DataScope 校验（数据范围）
+                         └── 配额校验（调用限额）
 ```
 
 **关键规则**：
@@ -865,7 +867,7 @@ OpenClaw(飞书号2)  ──┘
 - 引擎本身不做权限判断，只负责调用 API Gateway 暴露的接口
 - 工具函数级别的权限映射表统一维护在数据库 `ToolPermission` 表中
 - 当两个引擎对同一资源发起冲突操作时，API Gateway 用分布式锁（Redis）保证操作原子性
-- 审计日志统一记录请求来源引擎（`source: 'claude-code' | 'openclaw'`），便于追溯
+- 审计日志统一记录请求来源引擎（`source: 'claude-code' | 'ai-chat'`），便于追溯
 
 ### System Agent 硬性拦截
 
@@ -1026,7 +1028,7 @@ const SIMPLE_QUERY_PATTERNS = [
 |--------|------|-----------|
 | 财务知识库 | 税率表、平台结算规则、会计科目 | Finance |
 | 运营知识库 | 投流规则、营销日历、历史活动 | Operation |
-| 结算知识库 | 供应商合同、退款判定规则 | Settlement |
+| 结算知识库 | 供应商合同、退款判定规则 | Settlement（Phase 2+） |
 | 系统知识库 | 架构文档、API规范、Schema | System |
 | 报表模板库 | 早报/结算单/税务申报模板 | Report |
 | 客服知识库 | 退换货政策(按品类)、FAQ��商���说明、话术模板 | Customer Service |
@@ -1108,7 +1110,7 @@ interface AgentResponse {
 | `refund.spike` | 单店铺1小时内退款率 > 阈值 | Operation Agent | 推送异常告警给运营 |
 | `sync.failed` | ERP 同步连续失败 3 次 | System Agent | 推送告警给管理员 |
 | `quota.warning` | 租户 AI 配额使用 > 80% | Report Agent | 推送配额预警给管理员 |
-| `settlement.due` | 供应商结算周期到期 | Settlement Agent | 自动生成结算单草稿 |
+| `settlement.due` | 供应商结算周期到期 | Settlement Agent（Phase 2+） | 自动生成结算单草稿 |
 | `daily.report` | 每天 08:00 cron | Report Agent | 生成并推送每日早报 |
 
 ### 16.2 实现架构

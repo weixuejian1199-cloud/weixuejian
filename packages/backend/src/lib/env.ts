@@ -17,7 +17,7 @@ const envSchema = z.object({
   // RS256模式：配置JWT_PRIVATE_KEY + JWT_PUBLIC_KEY (PEM格式)
   // HS256降级：仅使用JWT_SECRET（开发环境兼容）
   JWT_PRIVATE_KEY: z.string().optional(), // RS256 PEM私钥（生产必须）
-  JWT_PUBLIC_KEY: z.string().optional(),  // RS256 PEM公钥（生产必须）
+  JWT_PUBLIC_KEY: z.string().optional(), // RS256 PEM公钥（生产必须）
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
@@ -26,9 +26,7 @@ const envSchema = z.object({
   APP_DOMAIN: z.string().optional(),
 
   // ═══ 日志级别 ══════════════════════════════════════════
-  LOG_LEVEL: z
-    .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
-    .optional(),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).optional(),
 
   // ═══ AI（百炼）═══════════════════════════════════════════
   DASHSCOPE_API_KEY: z.string().optional(),
@@ -52,6 +50,20 @@ const envSchema = z.object({
   ALIYUN_ACCESS_KEY_SECRET: z.string().optional(),
   ALIYUN_OSS_BUCKET: z.string().optional(),
   ALIYUN_OSS_REGION: z.string().optional(),
+
+  // ═══ 飞书灵犀 Bridge（Wave 7.5）═══════════════════════
+  FEISHU_LINGXI_APP_ID: z.string().optional(),
+  FEISHU_LINGXI_APP_SECRET: z.string().optional(),
+  FEISHU_LINGXI_SERVICE_TENANT_ID: z.string().uuid().optional(),
+  FEISHU_LINGXI_SERVICE_USER_ID: z.string().uuid().optional(),
+
+  // ═══ 限流配置（US-P1b-007）═══════════════════════════
+  RATE_LIMIT_TENANT_MAX: z.coerce.number().int().positive().optional(),
+  RATE_LIMIT_TENANT_WINDOW_MS: z.coerce.number().int().positive().optional(),
+  RATE_LIMIT_USER_MAX: z.coerce.number().int().positive().optional(),
+  RATE_LIMIT_USER_WINDOW_MS: z.coerce.number().int().positive().optional(),
+  RATE_LIMIT_AI_MAX: z.coerce.number().int().positive().optional(),
+  RATE_LIMIT_AI_WINDOW_MS: z.coerce.number().int().positive().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -69,7 +81,21 @@ function validateEnv(): Env {
     process.exit(1);
   }
 
-  return result.data;
+  const data = result.data;
+
+  // fail-secure: 生产环境强制要求 RS256 密钥对
+  if (data.NODE_ENV === 'production') {
+    if (!data.JWT_PRIVATE_KEY || !data.JWT_PUBLIC_KEY) {
+      console.error(
+        '\n❌ Production environment requires RS256 keys.\n' +
+          '  JWT_PRIVATE_KEY and JWT_PUBLIC_KEY must be set (PEM format).\n' +
+          '  HS256 fallback is not allowed in production.\n',
+      );
+      process.exit(1);
+    }
+  }
+
+  return data;
 }
 
 /** 类型安全的环境变量，应用启动时已验证 */

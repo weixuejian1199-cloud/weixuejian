@@ -52,7 +52,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'getOrderStatusDistribution',
-      description: '查询订单状态分布。ProcessNode: 0=待付款, 1=已付款, 2=待发货, 3=已发货, 4=已收货, 5=已完成。',
+      description:
+        '查询订单状态分布。ProcessNode: 0=待付款, 1=已付款, 2=待发货, 3=已发货, 4=已收货, 5=已完成。',
       parameters: {
         type: 'object',
         properties: {
@@ -117,7 +118,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
 
 // ─── 工具执行器 ──────────────────────────────────────────
 
-type ToolHandler = (adapter: MallAdapter, tenantId: string, args: Record<string, unknown>) => Promise<unknown>;
+type ToolHandler = (
+  adapter: MallAdapter,
+  tenantId: string,
+  args: Record<string, unknown>,
+) => Promise<unknown>;
 
 const toolHandlers: Record<string, ToolHandler> = {
   async getSalesStats(adapter, tenantId, args) {
@@ -223,10 +228,7 @@ export async function executeTool(
     const result = await handler(adapter, tenantId, args);
     const duration = Date.now() - startTime;
 
-    logger.info(
-      { toolName, tenantId, duration, argsKeys: Object.keys(args) },
-      'Tool executed',
-    );
+    logger.info({ toolName, tenantId, duration, argsKeys: Object.keys(args) }, 'Tool executed');
 
     return {
       toolCallId,
@@ -253,9 +255,12 @@ export async function executeTool(
 /**
  * 幻觉防护：附加数据来源和查询时间
  */
-function attachDataSource<T>(data: T, source: string): T & { _dataSource: string; _queryTime: string } {
+function attachDataSource<T>(
+  data: T,
+  source: string,
+): T & { _dataSource: string; _queryTime: string } {
   return {
-    ...data as object,
+    ...(data as object),
     _dataSource: source,
     _queryTime: new Date().toISOString(),
   } as T & { _dataSource: string; _queryTime: string };

@@ -79,7 +79,7 @@ export async function chatCompletion(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(body),
       signal: controller.signal,
@@ -145,7 +145,7 @@ export async function* chatStream(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(body),
       signal: controller.signal,
@@ -181,9 +181,7 @@ export async function* chatStream(
 /**
  * 解析 SSE 流为 StreamChunk
  */
-async function* parseSSEStream(
-  body: ReadableStream<Uint8Array>,
-): AsyncGenerator<StreamChunk> {
+async function* parseSSEStream(body: ReadableStream<Uint8Array>): AsyncGenerator<StreamChunk> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';

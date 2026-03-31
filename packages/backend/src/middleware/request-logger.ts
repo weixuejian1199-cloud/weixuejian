@@ -8,18 +8,12 @@ const SENSITIVE_PATH_PREFIXES = ['/api/v1/auth'];
  * 请求日志中间件 — 在响应完成时记录请求详情
  * 记录：method, path, status, duration, ip, userId, tenantId, requestId
  */
-export function requestLogger(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): void {
+export function requestLogger(req: Request, res: Response, next: NextFunction): void {
   const startTime = Date.now();
 
   res.on('finish', () => {
     const duration = Date.now() - startTime;
-    const isSensitivePath = SENSITIVE_PATH_PREFIXES.some((prefix) =>
-      req.path.startsWith(prefix),
-    );
+    const isSensitivePath = SENSITIVE_PATH_PREFIXES.some((prefix) => req.path.startsWith(prefix));
 
     const logData: Record<string, unknown> = {
       method: req.method,

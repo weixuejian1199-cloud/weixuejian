@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { redis } from '../lib/redis.js';
 import { sendError } from '../utils/response.js';
 import { childLogger } from '../utils/logger.js';
+import { env } from '../lib/env.js';
 
 export interface RateLimitOptions {
   /** 时间窗口（毫秒） */
@@ -32,11 +33,7 @@ export function createRateLimit(options: RateLimitOptions) {
     message = '请求过于频繁，请稍后再试',
   } = options;
 
-  return async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const log = childLogger(req.requestId ?? 'unknown');
     const key = `ratelimit:${keyGenerator(req)}`;
     const now = Date.now();
@@ -99,27 +96,19 @@ export function createRateLimit(options: RateLimitOptions) {
 // 多维度限流预设（US-P1b-007）
 // ═══════════════════════════════════════════════════════════════
 
-/** 环境变量驱动的限流配置，带合理默认值 */
-function envInt(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (!raw) return fallback;
-  const parsed = parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
 /**
  * 租户级限流：同一租户所有用户共享配额
  * 默认 100 req/min，环境变量 RATE_LIMIT_TENANT_MAX 可调
  */
 export function createTenantRateLimit() {
-  const max = envInt('RATE_LIMIT_TENANT_MAX', 100);
-  const windowMs = envInt('RATE_LIMIT_TENANT_WINDOW_MS', 60_000);
+  const max = env.RATE_LIMIT_TENANT_MAX ?? 100;
+  const windowMs = env.RATE_LIMIT_TENANT_WINDOW_MS ?? 60_000;
 
   return createRateLimit({
     windowMs,
     max,
     keyGenerator: (req: Request) => {
-      const tenantId = (req as unknown as Record<string, unknown>)['tenantId'];
+      const tenantId = req.tenantId;
       // 没有 tenantId 时用 IP 兜底（未认证路由不会挂此中间件）
       return `tenant:${tenantId ?? req.ip}`;
     },
@@ -132,14 +121,14 @@ export function createTenantRateLimit() {
  * 默认 30 req/min，环境变量 RATE_LIMIT_USER_MAX 可调
  */
 export function createUserRateLimit() {
-  const max = envInt('RATE_LIMIT_USER_MAX', 30);
-  const windowMs = envInt('RATE_LIMIT_USER_WINDOW_MS', 60_000);
+  const max = env.RATE_LIMIT_USER_MAX ?? 30;
+  const windowMs = env.RATE_LIMIT_USER_WINDOW_MS ?? 60_000;
 
   return createRateLimit({
     windowMs,
     max,
     keyGenerator: (req: Request) => {
-      const userId = (req as unknown as Record<string, unknown>)['userId'];
+      const userId = req.user?.userId;
       return `user:${userId ?? req.ip}`;
     },
     message: '请求过于频繁，请稍后再试',
@@ -151,14 +140,14 @@ export function createUserRateLimit() {
  * 默认 10 req/min，环境变量 RATE_LIMIT_AI_MAX 可调
  */
 export function createAiRateLimit() {
-  const max = envInt('RATE_LIMIT_AI_MAX', 10);
-  const windowMs = envInt('RATE_LIMIT_AI_WINDOW_MS', 60_000);
+  const max = env.RATE_LIMIT_AI_MAX ?? 10;
+  const windowMs = env.RATE_LIMIT_AI_WINDOW_MS ?? 60_000;
 
   return createRateLimit({
     windowMs,
     max,
     keyGenerator: (req: Request) => {
-      const userId = (req as unknown as Record<string, unknown>)['userId'];
+      const userId = req.user?.userId;
       return `ai:${userId ?? req.ip}`;
     },
     message: 'AI调用频率限制，请稍后再试',
