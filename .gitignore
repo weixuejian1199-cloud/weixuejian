@@ -11,7 +11,7 @@ dist/
 *.pem
 
 # Database
-prisma/migrations/
+# prisma/migrations/ should be tracked for reproducible deployments
 
 # Test
 coverage/

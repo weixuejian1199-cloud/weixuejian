@@ -121,6 +121,7 @@ model Tenant {
   payments                Payment[]
   afterSales              AfterSale[]
   toolInstances           ToolInstance[]
+  toolDefinitions         ToolDefinition[]
 
   @@map("tenants")
 }
@@ -192,7 +193,6 @@ model RefreshToken {
 
   @@index([tenantId, userId])
   @@index([tenantId, tokenHash])
-  @@index([tokenHash])
   @@index([tenantId, expiresAt])
   @@index([expiresAt])
   @@map("refresh_tokens")
@@ -232,6 +232,7 @@ model Message {
   toolCalls      Json?
   toolResults    Json?
   createdAt      DateTime    @default(now())
+  deletedAt      DateTime?
 
   tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -242,6 +243,7 @@ model Message {
   @@map("messages")
 }
 
+/// 审计日志：不可变记录，无deletedAt（设计决策：审计数据不允许软删除）
 model AuditLog {
   id           BigInt   @id @default(autoincrement())
   tenantId     String
@@ -275,6 +277,7 @@ model Notification {
   readAt    DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   user   User   @relation(fields: [userId], references: [id])
@@ -303,6 +306,7 @@ model CustomerServiceSession {
   resolvedAt     DateTime?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
 
   tenant       Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   assignedUser User?  @relation("AssignedUser", fields: [assignedUserId], references: [id])
@@ -326,9 +330,10 @@ model CustomerServiceMessage {
   msgType   String          @default("text")
   metadata  Json?
   createdAt DateTime        @default(now())
+  deletedAt DateTime?
 
   tenant  Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  session CustomerServiceSession @relation(fields: [sessionId], references: [id])
+  session CustomerServiceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId, createdAt])
   @@index([tenantId, createdAt])
@@ -352,9 +357,10 @@ model CustomerServiceTicket {
   processedAt     DateTime?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
 
   tenant      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  session     CustomerServiceSession @relation(fields: [sessionId], references: [id])
+  session     CustomerServiceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   aiJudgment  AiJudgmentRecord?      @relation("TicketJudgment", fields: [aiJudgmentId], references: [id])
 
   aiJudgmentRecords AiJudgmentRecord[] @relation("TicketJudgmentHistory")
@@ -389,10 +395,11 @@ model AiJudgmentRecord {
   processingTimeMs  Int?
   modelUsed         String?
   createdAt         DateTime    @default(now())
+  deletedAt         DateTime?
 
   tenant  Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  session CustomerServiceSession? @relation(fields: [sessionId], references: [id])
-  ticket  CustomerServiceTicket?  @relation("TicketJudgmentHistory", fields: [ticketId], references: [id])
+  session CustomerServiceSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  ticket  CustomerServiceTicket?  @relation("TicketJudgmentHistory", fields: [ticketId], references: [id], onDelete: SetNull)
   user    User                    @relation(fields: [userId], references: [id])
 
   primaryTicket CustomerServiceTicket[] @relation("TicketJudgment")
@@ -536,6 +543,7 @@ model UserShop {
   role      String   @default("operator") // owner/manager/operator
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   user   User   @relation(fields: [userId], references: [id])
@@ -606,7 +614,7 @@ model SyncLog {
   createdAt        DateTime   @default(now())
 
   tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  erpConnection ERPConnection @relation(fields: [erpConnectionId], references: [id])
+  erpConnection ERPConnection @relation(fields: [erpConnectionId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, erpConnectionId])
   @@index([tenantId, status])
@@ -630,6 +638,7 @@ model Payment {
   paidAt          DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
@@ -672,6 +681,7 @@ model AfterSale {
 
 model ToolDefinition {
   id           String       @id @default(cuid())
+  tenantId     String
   name         String
   displayName  String
   description  String?      @db.Text
@@ -683,10 +693,13 @@ model ToolDefinition {
   isBuiltin    Boolean      @default(false)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
+  deletedAt    DateTime?
 
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   instances ToolInstance[]
 
-  @@unique([name, version])
+  @@unique([tenantId, name, version])
+  @@index([tenantId])
   @@map("tool_definitions")
 }
 
@@ -699,6 +712,7 @@ model ToolInstance {
   activatedAt      DateTime @default(now())
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+  deletedAt        DateTime?
 
   tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   toolDefinition ToolDefinition @relation(fields: [toolDefinitionId], references: [id])
