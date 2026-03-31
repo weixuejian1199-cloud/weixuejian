@@ -1,0 +1,82 @@
+groups:
+  - name: backend-alerts
+    rules:
+      # ─── 服务可用性 ──────────────────────────────────
+      - alert: BackendDown
+        expr: up{job="backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend 服务不可用"
+          description: "后端服务已超过1分钟无响应"
+
+      - alert: PostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL 数据库不可用"
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis 缓存不可用"
+
+      # ─── 错误率 ────────────────────────────────────────
+      - alert: HighErrorRate
+        expr: rate(http_requests_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HTTP 5xx 错误率过高"
+          description: "5分钟内5xx错误率超过10%"
+
+      - alert: HighLatency
+        expr: http_request_duration_seconds_avg > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "请求延迟过高"
+          description: "平均响应时间超过2秒"
+
+      # ─── 资源使用 ──────────────────────────────────────
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes / 1024 / 1024 > 450
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backend 内存使用超过 450MB (限制 512MB)"
+
+      - alert: HighEventLoopLag
+        expr: nodejs_eventloop_lag_seconds > 0.5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node.js Event Loop 延迟过高"
+
+      # ─── 业务指标 ──────────────────────────────────────
+      - alert: RateLimitTriggered
+        expr: rate(rate_limit_rejected_total[5m]) > 1
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "限流频繁触发，可能存在异常流量"
+
+      - alert: AIServiceErrors
+        expr: rate(ai_request_errors_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI 服务错误率过高"
+          description: "百炼API调用失败率超过5%"

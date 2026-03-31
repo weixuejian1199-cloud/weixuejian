@@ -75,7 +75,9 @@ function validateEnv(): Env {
     const formatted = result.error.issues
       .map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`)
       .join('\n');
-    console.error(
+    // env.ts 是 logger 的上游依赖（logger imports env），不能反向 import logger
+    // 使用 process.stderr.write 替代 console.error
+    process.stderr.write(
       `\n❌ Environment validation failed:\n${formatted}\n\nPlease check your .env file.\n`,
     );
     process.exit(1);
@@ -86,7 +88,7 @@ function validateEnv(): Env {
   // fail-secure: 生产环境强制要求 RS256 密钥对
   if (data.NODE_ENV === 'production') {
     if (!data.JWT_PRIVATE_KEY || !data.JWT_PUBLIC_KEY) {
-      console.error(
+      process.stderr.write(
         '\n❌ Production environment requires RS256 keys.\n' +
           '  JWT_PRIVATE_KEY and JWT_PUBLIC_KEY must be set (PEM format).\n' +
           '  HS256 fallback is not allowed in production.\n',

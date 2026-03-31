@@ -1,6 +1,7 @@
 # 企业工作站 · 研发有机体 Agent 团队
 
-> 版本：v3.1 · 2026-03-31 · 本文档定义 AI 研发团队的架构、职责分工、协作流程和治理规则
+> 版本：v3.2 · 2026-03-31 · 本文档定义 AI 研发团队的架构、职责分工、协作流程和治理规则
+> v3.2 变更：v3.2全面审计统一版本号，6路审计修复（事务安全/外键约束/环境变量同步/Prometheus告警/CS数据层测试/AuditLog保留策略）
 > v3.1 变更：**CTO全面审计后能力升级** — BE Agent+tenantId隔离自检、QA Agent+核心模块覆盖率门槛(chat-orchestrator/wechat-auth不可零覆盖)、Critic+文档同步检查(每次AC完成同步brain.json状态)、DevOps+CI/CD pipeline建设。新增DocSync Agent(文档一致性守护)。9人→10人。
 > v3.0 变更：**全员能力升级** — 9人Agent重新定位至行业顶尖标准，每个角色增加量化能力指标/自动化检查项/输出质量门槛；新增RULE-19~RULE-20；升级Critic为双维度审查(安全+架构)
 > v2.4 变更：9人团队审查修复 — Critic备选机制/REJECT回环/brain.json并发保护/P0 Hotfix例外(RULE-18)/Critic量化标准/Fast-track责任人/会话中断恢复/RULE-01与RULE-14协调

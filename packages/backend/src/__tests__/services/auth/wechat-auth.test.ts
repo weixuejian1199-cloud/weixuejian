@@ -18,8 +18,8 @@ vi.mock('../../../lib/env.js', () => ({
   },
 }));
 
-vi.mock('../../../lib/prisma.js', () => ({
-  prisma: {
+vi.mock('../../../lib/prisma.js', () => {
+  const txProxy = {
     user: {
       findFirst: mockUserFindFirst,
       findUnique: mockUserFindUnique,
@@ -29,8 +29,14 @@ vi.mock('../../../lib/prisma.js', () => ({
     role: {
       findFirst: mockRoleFindFirst,
     },
-  },
-}));
+  };
+  return {
+    prisma: {
+      ...txProxy,
+      $transaction: vi.fn(async (fn: (tx: typeof txProxy) => Promise<unknown>) => fn(txProxy)),
+    },
+  };
+});
 
 vi.mock('../../../utils/logger.js', () => ({
   logger: {

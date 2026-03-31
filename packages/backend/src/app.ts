@@ -20,6 +20,7 @@ import {
 } from './middleware/rate-limit.js';
 import { notFoundHandler, globalErrorHandler } from './middleware/error-handler.js';
 import { basicHealthRouter, detailHealthRouter } from './routes/health.js';
+import { metricsRouter } from './routes/metrics.js';
 import { authRouter } from './routes/auth/index.js';
 import { aiRouter } from './routes/ai/index.js';
 import { csRouter } from './routes/cs/index.js';
@@ -80,6 +81,7 @@ app.use(requestLogger);
 // ─── 公开路由（不需要认证和限流） ─────────────────────────
 app.use('/health', basicHealthRouter);
 app.use('/api/v1/health', detailHealthRouter);
+app.use('/api/v1/metrics', metricsRouter);
 
 // ─── 全局速率限制（认证路由之前） ─────────────────────────
 app.use(

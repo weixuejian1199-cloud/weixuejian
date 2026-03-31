@@ -21,7 +21,6 @@ enum AgentType {
   master
   finance
   operation
-  settlement
   report
   customer_service
   system
@@ -142,8 +141,9 @@ model User {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  role   Role   @relation(fields: [roleId], references: [id])
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  role       Role        @relation(fields: [roleId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
   refreshTokens     RefreshToken[]
   conversations     Conversation[]
@@ -239,7 +239,7 @@ model Message {
   user         User         @relation(fields: [userId], references: [id])
 
   @@index([conversationId, createdAt])
-  @@index([tenantId, userId])
+  @@index([tenantId, userId, createdAt])
   @@map("messages")
 }
 
@@ -261,6 +261,7 @@ model AuditLog {
 
   @@index([tenantId, createdAt])
   @@index([tenantId, userId, action])
+  @@index([createdAt])
   @@map("audit_logs")
 }
 
@@ -529,6 +530,7 @@ model Department {
   tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   parent   Department?  @relation("DepartmentTree", fields: [parentId], references: [id])
   children Department[] @relation("DepartmentTree")
+  users    User[]
 
   @@unique([tenantId, name, parentId])
   @@index([tenantId, path])

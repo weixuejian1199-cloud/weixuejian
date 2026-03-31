@@ -1,7 +1,7 @@
 # 企业 AI 工作站 · Claude Code 项目指引
 
 > 本文件是 Claude Code 每次新会话的自动入口。启动时先读这个文件，再按指引操作。
-> v2.7 · 2026-03-31
+> v3.2 · 2026-03-31
 > 设计理念参考：Anthropic "Effective Harnesses for Long-Running Agents" — 把规则变成门禁，把清单变成脚本
 
 ## 项目概述

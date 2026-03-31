@@ -154,54 +154,57 @@ export async function bindPhone(
   tenantId: string,
   phone: string,
 ): Promise<{ merged: boolean; finalUserId: string }> {
-  // 检查手机号是否已被其他用户使用
-  const existingByPhone = await prisma.user.findFirst({
-    where: {
-      tenantId,
-      phone,
-      deletedAt: null,
-      id: { not: userId },
-    },
-  });
-
-  if (existingByPhone) {
-    // 手机号已存在：将当前用户的 openid 转移到手机号用户
-    const currentUser = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { wechatOpenid: true },
+  // 事务保护：账号合并涉及多步DB操作，需原子性防止并发脏读
+  return prisma.$transaction(async (tx) => {
+    // 检查手机号是否已被其他用户使用
+    const existingByPhone = await tx.user.findFirst({
+      where: {
+        tenantId,
+        phone,
+        deletedAt: null,
+        id: { not: userId },
+      },
     });
 
-    if (currentUser?.wechatOpenid) {
-      await prisma.user.update({
-        where: { id: existingByPhone.id },
-        data: {
-          wechatOpenid: currentUser.wechatOpenid,
-          lastLoginAt: new Date(),
-        },
+    if (existingByPhone) {
+      // 手机号已存在：将当前用户的 openid 转移到手机号用户
+      const currentUser = await tx.user.findUnique({
+        where: { id: userId },
+        select: { wechatOpenid: true },
       });
+
+      if (currentUser?.wechatOpenid) {
+        await tx.user.update({
+          where: { id: existingByPhone.id },
+          data: {
+            wechatOpenid: currentUser.wechatOpenid,
+            lastLoginAt: new Date(),
+          },
+        });
+      }
+
+      // 软删除临时用户
+      await tx.user.update({
+        where: { id: userId },
+        data: { deletedAt: new Date(), wechatOpenid: null },
+      });
+
+      logger.info(
+        { mergedFrom: userId, mergedTo: existingByPhone.id, tenantId },
+        'User accounts merged',
+      );
+
+      return { merged: true, finalUserId: existingByPhone.id };
     }
 
-    // 软删除临时用户
-    await prisma.user.update({
+    // 手机号未被使用：直接绑定
+    await tx.user.update({
       where: { id: userId },
-      data: { deletedAt: new Date(), wechatOpenid: null },
+      data: { phone },
     });
 
-    logger.info(
-      { mergedFrom: userId, mergedTo: existingByPhone.id, tenantId },
-      'User accounts merged',
-    );
-
-    return { merged: true, finalUserId: existingByPhone.id };
-  }
-
-  // 手机号未被使用：直接绑定
-  await prisma.user.update({
-    where: { id: userId },
-    data: { phone },
-  });
-
-  return { merged: false, finalUserId: userId };
+    return { merged: false, finalUserId: userId };
+  }, { timeout: 10000 });
 }
 
 // ─── 错误类 ─────────────────────────────────────────────────

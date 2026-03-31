@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger.js';
+import { recordHttpRequest } from '../routes/metrics.js';
 
 /** 敏感路径前缀 — 不记录请求体 */
 const SENSITIVE_PATH_PREFIXES = ['/api/v1/auth'];
@@ -13,6 +14,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
 
   res.on('finish', () => {
     const duration = Date.now() - startTime;
+    recordHttpRequest(res.statusCode, duration);
     const isSensitivePath = SENSITIVE_PATH_PREFIXES.some((prefix) => req.path.startsWith(prefix));
 
     const logData: Record<string, unknown> = {
