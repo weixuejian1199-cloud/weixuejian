@@ -1173,7 +1173,11 @@
       "priority": "P1",
       "targetPhase": "Phase 2",
       "source": "CTO团队审查v2.3-Architect Agent",
-      "date": "2026-03-30"
+      "date": "2026-03-30",
+      "status": "done",
+      "completionDate": "2026-03-31",
+      "testCount": 22,
+      "notes": "670→692测试: Schema+服务层+路由层+决策回放"
     },
     {
       "id": "BL-024",

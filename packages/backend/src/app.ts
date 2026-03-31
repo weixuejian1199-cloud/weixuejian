@@ -26,6 +26,7 @@ import { aiRouter } from './routes/ai/index.js';
 import { csRouter } from './routes/cs/index.js';
 import { toolsRouter } from './routes/tools/index.js';
 import { privacyRouter } from './routes/privacy/index.js';
+import { confirmationRouter } from './routes/confirmation/index.js';
 
 const app = express();
 
@@ -123,6 +124,9 @@ protectedRouter.use('/tools', toolsRouter);
 
 // ─── PIPL合规（数据导出/删除） ──────────────────────────
 protectedRouter.use('/privacy', privacyRouter);
+
+// ─── 操作确认记录（BL-023） ─────────────────────────────
+protectedRouter.use('/confirmations', confirmationRouter);
 
 app.use('/api/v1', protectedRouter);
 

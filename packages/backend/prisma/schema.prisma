@@ -122,6 +122,7 @@ model Tenant {
   afterSales              AfterSale[]
   toolInstances           ToolInstance[]
   toolDefinitions         ToolDefinition[]
+  confirmationRecords     ConfirmationRecord[]
 
   @@map("tenants")
 }
@@ -218,6 +219,7 @@ model Conversation {
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages Message[]
+  confirmationRecords ConfirmationRecord[]
 
   @@index([tenantId, userId, createdAt])
   @@map("conversations")
@@ -493,6 +495,14 @@ enum AfterSaleStatus {
   cancelled
 }
 
+enum ConfirmationStatus {
+  pending
+  confirmed
+  rejected
+  expired
+  cancelled
+}
+
 enum ToolCategory {
   health
   finance
@@ -679,6 +689,54 @@ model AfterSale {
   @@index([tenantId, userId, status])
   @@index([tenantId, status, createdAt])
   @@map("after_sales")
+}
+
+// ──────────────────────────────────────────
+// Confirmation & Decision Replay (Phase 2, BL-023 / ADR-019)
+// ──────────────────────────────────────────
+
+/// 操作确认记录：AI生成确认请求 → 用户确认/拒绝 → 记录完整决策链
+model ConfirmationRecord {
+  id                 String             @id @default(uuid())
+  tenantId           String
+  userId             String
+  conversationId     String?
+  agentType          AgentType          @default(master)
+
+  // 确认请求
+  title              String             /// 操作标题，如"退货审批：订单#12345"
+  description        String             @db.Text /// 操作描述
+  riskLevel          RiskLevel          @default(LOW)
+  operationType      String             /// 操作类型：refund/price_change/shelf_toggle/order_cancel等
+  resourceType       String?            /// 关联资源类型：order/product/supplier
+  resourceId         String?            /// 关联资源ID
+  changeDetails      Json               /// 变更明细：{before, after, fields}
+  expiresAt          DateTime?          /// 确认超时时间
+
+  // 用户响应
+  status             ConfirmationStatus @default(pending)
+  respondedAt        DateTime?
+  responseReason     String?            @db.Text /// 用户拒绝理由
+
+  // AI决策链回放（核心：完整还原决策过程）
+  aiInput            Json               /// AI收到的原始输入/上下文
+  aiRecommendation   String             @db.Text /// AI给出的建议（如"建议批准"）
+  triggeredRules     Json               /// 触发的规则列表 [{ruleId, ruleName, result, weight}]
+  evidence           Json               /// 决策证据 [{type, source, data, timestamp}]
+
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  deletedAt          DateTime?
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([tenantId, userId, createdAt])
+  @@index([tenantId, operationType, createdAt])
+  @@index([tenantId, resourceType, resourceId])
+  @@index([tenantId, riskLevel, status])
+  @@map("confirmation_records")
 }
 
 // ──────────────────────────────────────────

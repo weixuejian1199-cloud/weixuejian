@@ -1,9 +1,28 @@
 # 进度接力
 
 ## 最后更新
-- 时间：2026-03-31 21:00
+- 时间：2026-03-31 22:00
 - Agent：CTO Agent
-- 任务：BL-020提交 + BL-021 AI幻觉防护增强
+- 任务：BL-020提交 + BL-021 AI幻觉防护 + BL-023 确认记录+决策回放
+
+## BL-023 操作确认记录+AI决策回放 ✅ 完成 (670→692测试)
+- **Schema**: ConfirmationRecord模型 + ConfirmationStatus枚举 + 5个索引
+  - 完整决策链: aiInput/triggeredRules/evidence/aiRecommendation
+  - ADR-019落地: riskLevel/operationType/expiresAt/changeDetails
+- **服务层**: confirmation-service.ts
+  - createConfirmation: AI生成确认请求
+  - respondToConfirmation: 用户确认/拒绝 + 过期自动检测 + 审计日志
+  - listConfirmations: 分页列表 + status/operationType/riskLevel过滤
+  - getDecisionReplay: 完整决策链回放(输入→规则→证据→建议→用户决策)
+- **路由层**: 4个端点
+  - POST /api/v1/confirmations — 创建确认请求
+  - POST /api/v1/confirmations/:id/respond — 用户确认/拒绝
+  - GET /api/v1/confirmations — 确认记录列表
+  - GET /api/v1/confirmations/:id/replay — 决策回放
+- **改造**: app.ts注册路由 + prisma.ts租户守卫 + error-codes新增3码
+- **测试(+22)**: Schema校验(5) + 创建(2) + 响应(5) + 列表(4) + 回放(3) + Zod(3)
+- 基线: 692测试全绿(52文件) / TypeScript零错误
+- **下一步**: Wave 1供应链(等外部反馈) / Wave 2其他项
 
 ## BL-021 AI幻觉防护增强 ✅ 完成 (628→670测试)
 - **新增文件(1)**:

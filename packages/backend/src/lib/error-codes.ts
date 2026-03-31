@@ -73,6 +73,11 @@ export const ERROR_CODES = {
   TOOL_ALREADY_ACTIVE: { httpStatus: 200, message: '工具已激活' },
   TOOL_INSTANCE_NOT_FOUND: { httpStatus: 404, message: '工具实例不存在' },
 
+  // === 确认记录 ===
+  CONFIRMATION_NOT_FOUND: { httpStatus: 404, message: '确认记录不存在' },
+  CONFIRMATION_ALREADY_RESPONDED: { httpStatus: 400, message: '确认记录已被响应' },
+  CONFIRMATION_EXPIRED: { httpStatus: 400, message: '确认记录已过期' },
+
   // === ACI ===
   ACI_RULE_CONFLICT: { httpStatus: 500, message: 'ACI规则冲突' },
   ACI_DATA_INCOMPLETE: { httpStatus: 422, message: 'ACI判断数据不完整' },

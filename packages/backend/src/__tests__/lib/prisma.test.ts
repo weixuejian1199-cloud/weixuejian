@@ -18,7 +18,7 @@ describe('Prisma tenant guard', () => {
   const TENANT_SCOPED_MODELS = new Set([
     'Conversation', 'Message', 'RefreshToken', 'User',
     'CustomerServiceSession', 'CustomerServiceMessage', 'CustomerServiceTicket',
-    'AuditLog',
+    'AuditLog', 'ConfirmationRecord',
   ]);
 
   const WRITE_ACTIONS = new Set([
@@ -71,7 +71,7 @@ describe('Prisma tenant guard', () => {
     const expected = [
       'Conversation', 'Message', 'RefreshToken', 'User',
       'CustomerServiceSession', 'CustomerServiceMessage', 'CustomerServiceTicket',
-      'AuditLog',
+      'AuditLog', 'ConfirmationRecord',
     ];
     expect([...TENANT_SCOPED_MODELS].sort()).toEqual(expected.sort());
   });

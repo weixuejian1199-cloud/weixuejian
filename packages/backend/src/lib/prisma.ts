@@ -9,7 +9,7 @@ const isProduction = env.NODE_ENV === 'production';
 const TENANT_SCOPED_MODELS: ReadonlySet<string> = new Set([
   'Conversation', 'Message', 'RefreshToken', 'User',
   'CustomerServiceSession', 'CustomerServiceMessage', 'CustomerServiceTicket',
-  'AuditLog',
+  'AuditLog', 'ConfirmationRecord',
 ]);
 
 const WRITE_ACTIONS: ReadonlySet<string> = new Set([
