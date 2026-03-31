@@ -441,7 +441,7 @@
     {
       "id": "US-P1b-004",
       "title": "5个运营查询场景验证（真实数据）",
-      "status": "pending",
+      "status": "done",
       "assignee": "BE Agent",
       "story": "AS 老板 I WANT 对AI说一句话就能看到真实经营数据 SO THAT 随时掌握生意状况",
       "ac": [

@@ -5,6 +5,14 @@
 - Agent：CTO Agent
 - 任务：v3.0 八路进阶审计 + P1全量修复
 
+## Wave 8: 5个运营查询工具 ✅ 完成
+- 新增3个工具: getSlowSuppliers/getUserGrowthTrend/getSupplierWithdraws
+- 工具总数 6→9，测试 226→250（+24）
+- 5个AC场景全覆盖: AC-01/05已有工具 + AC-02/03/04新增
+- 修复BE bug: getSlowSuppliers并发batch早退机制
+- 基线: 250测试全绿 / TypeScript零错误 / ESLint零错误
+- 下一步: Wave 9 (ACI客服MVP US-P1b-005)
+
 ## v3.0 八路审计 ✅ 完成 (89→92分)
 - 8路并行审计: 文档一致性/代码质量/数据模型/测试质量/基础设施/Memory/产品一致性/安全专项
 - P1修复: RULE-23(5文件process.env→env对象) + Memory密钥明文清理
@@ -152,5 +160,5 @@
 - P1b-007: Rate Limiting增强 ✅ 完成
 - P1b-008: 数据库备份自动化 ✅ 完成
 - Wave 7.5: P1b-006B 飞书号2接入AI对话引擎 ✅ 完成 + v3.0审计P1修复
-- Wave 8: P1b-004 5个运营查询 (2d) ← 下一步
+- Wave 8: P1b-004 5个运营查询 ✅ 完成 (工具6→9, 测试226→250)
 - Wave 9: P1b-005 ACI客服MVP (3d)
