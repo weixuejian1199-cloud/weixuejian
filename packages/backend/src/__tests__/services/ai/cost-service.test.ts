@@ -93,26 +93,26 @@ beforeEach(() => {
 describe('calculateCost', () => {
   it('should calculate cost for qwen-plus', () => {
     const cost = calculateCost('qwen-plus', 1000, 500);
-    // 1000/1000 * 0.0008 + 500/1000 * 0.002 = 0.0008 + 0.001 = 0.0018
+    // 百炼套餐统一费率: 1000/1000 * 0.0008 + 500/1000 * 0.002 = 0.0008 + 0.001 = 0.0018
     expect(cost).toBeCloseTo(0.0018, 6);
   });
 
-  it('should calculate cost for qwen-turbo', () => {
-    const cost = calculateCost('qwen-turbo', 2000, 1000);
-    // 2000/1000 * 0.0003 + 1000/1000 * 0.0006 = 0.0006 + 0.0006 = 0.0012
-    expect(cost).toBeCloseTo(0.0012, 6);
+  it('should calculate cost for qwen-turbo (same rate as plus in bundle)', () => {
+    const cost = calculateCost('qwen-turbo', 1000, 500);
+    // 百炼套餐统一费率，与 qwen-plus 相同
+    expect(cost).toBeCloseTo(0.0018, 6);
   });
 
-  it('should calculate cost for qwen-max', () => {
+  it('should calculate cost for qwen-max (same rate in bundle)', () => {
     const cost = calculateCost('qwen-max', 1000, 1000);
-    // 1000/1000 * 0.02 + 1000/1000 * 0.06 = 0.02 + 0.06 = 0.08
-    expect(cost).toBeCloseTo(0.08, 6);
+    // 1000/1000 * 0.0008 + 1000/1000 * 0.002 = 0.0028
+    expect(cost).toBeCloseTo(0.0028, 6);
   });
 
   it('should use fallback pricing for unknown model', () => {
     const cost = calculateCost('unknown-model', 1000, 1000);
-    // Fallback: 0.02 + 0.06 = 0.08 (same as qwen-max, most expensive)
-    expect(cost).toBeCloseTo(0.08, 6);
+    // Fallback = 套餐统一价: 0.0008 + 0.002 = 0.0028
+    expect(cost).toBeCloseTo(0.0028, 6);
   });
 
   it('should return 0 for zero tokens', () => {
@@ -142,10 +142,11 @@ describe('pricing config', () => {
     }
   });
 
-  it('should downgrade to cheaper models', () => {
-    // Each step in the chain should have lower output pricing
+  it('should have all downgrade targets in pricing table', () => {
+    // 百炼套餐费率统一，降级目的是省token（小模型回复更简短）
     for (const [from, to] of Object.entries(DOWNGRADE_CHAIN)) {
-      expect(MODEL_PRICING[to]!.outputPer1K).toBeLessThan(MODEL_PRICING[from]!.outputPer1K);
+      expect(MODEL_PRICING[from]).toBeDefined();
+      expect(MODEL_PRICING[to]).toBeDefined();
     }
   });
 });

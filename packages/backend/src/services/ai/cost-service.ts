@@ -13,18 +13,23 @@ import { logger } from '../../utils/logger.js';
 import type { AgentType, Prisma } from '@prisma/client';
 
 // ─── 模型定价（CNY/1K tokens）──────────────────────────────
+// 百炼套餐模式：所有模型统一费率。按量付费时可按模型差异化定价。
+// SaaS 扩展时可迁移到 DB 表支持按租户定价。
 
 export const MODEL_PRICING: Record<string, { inputPer1K: number; outputPer1K: number }> = {
-  'qwen-turbo':  { inputPer1K: 0.0003, outputPer1K: 0.0006 },
+  'qwen-turbo':  { inputPer1K: 0.0008, outputPer1K: 0.002 },
   'qwen-plus':   { inputPer1K: 0.0008, outputPer1K: 0.002 },
-  'qwen-max':    { inputPer1K: 0.02,   outputPer1K: 0.06 },
-  'qwen-vl-max': { inputPer1K: 0.02,   outputPer1K: 0.06 },
+  'qwen-max':    { inputPer1K: 0.0008, outputPer1K: 0.002 },
+  'qwen-vl-max': { inputPer1K: 0.0008, outputPer1K: 0.002 },
 };
 
-/** 未知模型回退定价 — fail-secure：按最贵计费 */
-const FALLBACK_PRICING = { inputPer1K: 0.02, outputPer1K: 0.06 };
+/** 未知模型回退定价 — fail-secure：按套餐统一价计费 */
+const FALLBACK_PRICING = { inputPer1K: 0.0008, outputPer1K: 0.002 };
 
-/** 模型降级链 */
+/**
+ * 模型降级链 — 百炼套餐费率统一，降级目的是省 token（小模型回复更简短）
+ * 而非省钱。接近配额时切到轻量模型延长可用轮次。
+ */
 export const DOWNGRADE_CHAIN: Record<string, string> = {
   'qwen-max':    'qwen-plus',
   'qwen-vl-max': 'qwen-plus',
