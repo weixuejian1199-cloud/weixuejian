@@ -69,6 +69,9 @@ export const ERROR_CODES = {
   TOOL_TIMEOUT: { httpStatus: 504, message: '工具调用超时' },
   TOOL_DEGRADED: { httpStatus: 200, message: '工具降级返回缓存数据' },
   TOOL_CHAIN_PARTIAL: { httpStatus: 207, message: '链式调用部分失败' },
+  TOOL_NOT_FOUND: { httpStatus: 404, message: '工具定义不存在' },
+  TOOL_ALREADY_ACTIVE: { httpStatus: 200, message: '工具已激活' },
+  TOOL_INSTANCE_NOT_FOUND: { httpStatus: 404, message: '工具实例不存在' },
 
   // === ACI ===
   ACI_RULE_CONFLICT: { httpStatus: 500, message: 'ACI规则冲突' },

@@ -18,7 +18,7 @@ const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式必须为YY
 const pageIndex = z.number().int().min(1).default(1);
 const pageSize = z.number().int().min(1).max(50).default(20);
 
-const toolParamSchemas: Record<string, z.ZodTypeAny> = {
+export const toolParamSchemas: Record<string, z.ZodTypeAny> = {
   getSalesStats: z.object({ startDate: dateStr, endDate: dateStr }),
   getTopSuppliers: z.object({
     metric: z.enum(['orderCount', 'amount']),
@@ -208,13 +208,13 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
 
 // ─── 工具执行器 ──────────────────────────────────────────
 
-type ToolHandler = (
+export type ToolHandler = (
   adapter: MallAdapter,
   tenantId: string,
   args: Record<string, unknown>,
 ) => Promise<unknown>;
 
-const toolHandlers: Record<string, ToolHandler> = {
+export const toolHandlers: Record<string, ToolHandler> = {
   async getSalesStats(adapter, tenantId, args) {
     const result = await aggregates.getSalesStats(adapter, tenantId, {
       start: String(args['startDate']),
