@@ -1,9 +1,23 @@
 # 进度接力
 
 ## 最后更新
-- 时间：2026-03-31 15:30
+- 时间：2026-03-31 17:00
 - Agent：CTO Agent
-- 任务：v3.3 健康冲刺 — 租户隔离修复 + 机制升级 + 测试补全
+- 任务：Phase 2a Wave 10 — BL-009 工具市场 MVP
+
+## Phase 2a: BL-009 工具市场 MVP ✅ 完成 (454→488测试)
+- **架构**: DB驱动的工具发现 + 执行委托 + 硬编码降级
+- **新增服务层(4文件)**:
+  - builtin-tools.ts: 9个内置工具元数据映射
+  - tool-definition-service.ts: ToolDefinition CRUD + 幂等seed
+  - tool-instance-service.ts: 激活/停用/列表（全幂等）
+  - tool-resolver.ts: 桥接层(DB→OpenAI格式 + 执行委托 + 降级)
+- **路由层**: 6个REST端点(/api/v1/tools下)
+- **编排器集成**: chat-orchestrator从静态TOOL_DEFINITIONS切换为动态getActiveToolDefinitions
+- **种子脚本**: 时皙租户9个工具定义+9个激活实例
+- **ECS部署验证**: 种子成功 + PM2重启 + 灵犀桥接正常
+- 基线: 488测试全绿(43文件) / TypeScript零错误
+- **下一步**: BL-004 AI人格系统 / ACI观察期数据收集
 
 ## v3.3 健康冲刺 ✅ 完成 (408→454测试)
 - **P0 租户隔离修复(5处)**:
