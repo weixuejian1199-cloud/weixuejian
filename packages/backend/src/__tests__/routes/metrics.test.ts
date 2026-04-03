@@ -13,6 +13,15 @@ vi.mock('../../lib/redis.js', () => ({
   },
 }));
 
+// Mock alert service — 避免 alert.ts 加载 env.ts 触发环境校验
+vi.mock('../../lib/alert.js', () => ({
+  recordHttpDuration: vi.fn(),
+  recordRpaResult: vi.fn(),
+  startAlertScheduler: vi.fn(),
+  stopAlertScheduler: vi.fn(),
+  checkAndAlert: vi.fn(),
+}));
+
 import { recordHttpRequest, recordRateLimitRejection, recordAiRequest, recordAiTokens, recordAiQuotaBlocked, recordAiModelDowngrade } from '../../routes/metrics.js';
 
 describe('metrics', () => {

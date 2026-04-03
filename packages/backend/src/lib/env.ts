@@ -51,6 +51,9 @@ const envSchema = z.object({
   ALIYUN_OSS_BUCKET: z.string().optional(),
   ALIYUN_OSS_REGION: z.string().optional(),
 
+  // ═══ 监控告警 Webhook（DEBT-002）══════════════════════
+  ALERT_FEISHU_WEBHOOK: z.string().url().optional(),   // 飞书告警机器人 Webhook URL
+
   // ═══ 飞书灵犀 Bridge（Wave 7.5）═══════════════════════
   FEISHU_LINGXI_APP_ID: z.string().optional(),
   FEISHU_LINGXI_APP_SECRET: z.string().optional(),
@@ -61,6 +64,16 @@ const envSchema = z.object({
   AI_DAILY_TOKEN_LIMIT: z.coerce.number().int().positive().optional(),
   AI_MONTHLY_BUDGET_YUAN: z.coerce.number().positive().optional(),
   AI_DOWNGRADE_MODEL: z.string().optional(),
+
+  // ═══ 数据库连接池 ══════════════════════════════════════
+  DB_POOL_SIZE: z.coerce.number().int().positive().default(10), // Prisma 连接池大小
+  DB_POOL_TIMEOUT: z.coerce.number().int().positive().default(10), // 等待连接超时（秒）
+
+  // ═══ Metrics 端点保护 ═══════════════════════════════
+  METRICS_TOKEN: z.string().min(16).optional(), // Prometheus Bearer Token（生产必须）
+
+  // ═══ RPA 内部查询（不落盘、不启浏览器，仅读 rpa-data JSON）════════
+  RPA_INTERNAL_TOKEN: z.string().min(16).optional(), // Bearer；未配置则不挂载 /api/v1/internal/rpa
 
   // ═══ 限流配置（US-P1b-007）═══════════════════════════
   RATE_LIMIT_TENANT_MAX: z.coerce.number().int().positive().optional(),

@@ -7,8 +7,22 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { redis } from '../lib/redis.js';
+import { recordHttpDuration } from '../lib/alert.js';
 
 const metricsRouter = Router();
+
+let rpaCollectTotal = 0;
+let rpaCollectFailedTotal = 0;
+let rpaCollectDurationSum = 0;
+
+/** 记录 RPA 采集结果（由各平台 RPA runner 调用） */
+export function recordRpaCollect(source: string, success: boolean, durationMs?: number): void {
+  rpaCollectTotal++;
+  if (!success) rpaCollectFailedTotal++;
+  if (durationMs) rpaCollectDurationSum += durationMs / 1000;
+  // 同步给告警服务做失败率计算
+  import('../lib/alert.js').then(({ recordRpaResult }) => recordRpaResult(source, success)).catch(() => {});
+}
 
 // ─── 运行时计数器（进程内累积）──────────────────────────────
 
@@ -30,6 +44,7 @@ export function recordHttpRequest(statusCode: number, durationMs: number): void 
   httpRequestDurationSum += durationMs / 1000;
   httpRequestCount++;
   if (statusCode >= 500) httpRequestsErrorsTotal++;
+  recordHttpDuration(durationMs); // 同步给告警服务做 P99 计算
 }
 
 /** 记录限流拒绝 */
@@ -133,6 +148,19 @@ metricsRouter.get('/', async (_req, res) => {
     lines.push('# HELP ai_model_downgrade_total Total AI model downgrades');
     lines.push('# TYPE ai_model_downgrade_total counter');
     lines.push(`ai_model_downgrade_total ${aiModelDowngradeTotal}`);
+
+    // RPA 采集指标
+    lines.push('# HELP rpa_collect_total Total RPA collection runs');
+    lines.push('# TYPE rpa_collect_total counter');
+    lines.push(`rpa_collect_total ${rpaCollectTotal}`);
+
+    lines.push('# HELP rpa_collect_failed_total Total failed RPA collection runs');
+    lines.push('# TYPE rpa_collect_failed_total counter');
+    lines.push(`rpa_collect_failed_total ${rpaCollectFailedTotal}`);
+
+    lines.push('# HELP rpa_collect_duration_seconds_sum Total RPA collection duration');
+    lines.push('# TYPE rpa_collect_duration_seconds_sum counter');
+    lines.push(`rpa_collect_duration_seconds_sum ${rpaCollectDurationSum.toFixed(3)}`);
 
     // Dependency health (1 = healthy, 0 = unhealthy)
     lines.push('# HELP dependency_up Whether a dependency is reachable (1=up, 0=down)');

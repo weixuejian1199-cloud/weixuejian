@@ -21,12 +21,14 @@ import {
 import { notFoundHandler, globalErrorHandler } from './middleware/error-handler.js';
 import { basicHealthRouter, detailHealthRouter } from './routes/health.js';
 import { metricsRouter } from './routes/metrics.js';
+import { startAlertScheduler } from './lib/alert.js';
 import { authRouter } from './routes/auth/index.js';
 import { aiRouter } from './routes/ai/index.js';
 import { csRouter } from './routes/cs/index.js';
 import { toolsRouter } from './routes/tools/index.js';
 import { privacyRouter } from './routes/privacy/index.js';
 import { confirmationRouter } from './routes/confirmation/index.js';
+import { rpaInternalRouter } from './routes/rpa-internal.js';
 
 const app = express();
 
@@ -84,7 +86,27 @@ app.use(requestLogger);
 // ─── 公开路由（不需要认证和限流） ─────────────────────────
 app.use('/health', basicHealthRouter);
 app.use('/api/v1/health', detailHealthRouter);
-app.use('/api/v1/metrics', metricsRouter);
+// Metrics 端点：配置了 METRICS_TOKEN 则需要 Bearer 认证（生产环境推荐）
+app.use('/api/v1/metrics', (req, res, next) => {
+  const token = env.METRICS_TOKEN;
+  if (!token) return next(); // 未配置则开放（开发环境）
+  const auth = req.headers.authorization;
+  if (auth === `Bearer ${token}`) return next();
+  res.status(401).send('Unauthorized');
+}, metricsRouter);
+
+// RPA 落盘结果只读（配置了 RPA_INTERNAL_TOKEN 才挂载）
+if (env.RPA_INTERNAL_TOKEN) {
+  app.use(
+    '/api/v1/internal/rpa',
+    (req, res, next) => {
+      const auth = req.headers.authorization;
+      if (auth === `Bearer ${env.RPA_INTERNAL_TOKEN}`) return next();
+      res.status(401).send('Unauthorized');
+    },
+    rpaInternalRouter,
+  );
+}
 
 // ─── 全局速率限制（认证路由之前） ─────────────────────────
 app.use(
@@ -218,5 +240,8 @@ async function start(): Promise<void> {
 }
 
 void start();
+
+// 启动飞书告警调度器（每分钟检查 RULE-A/B/C，需配置 ALERT_FEISHU_WEBHOOK）
+startAlertScheduler();
 
 export { app };
