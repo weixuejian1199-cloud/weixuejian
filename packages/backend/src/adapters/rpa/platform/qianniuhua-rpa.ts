@@ -568,7 +568,16 @@ export class QianniuhuaRPA extends BasePlatformRPA<UnifiedInventorySignal> {
         return false;
       }
 
-      const body = (await page.textContent('body').catch(() => '')) ?? '';
+      // 骨架屏阶段 body 文字极少，额外等待最多 8 秒让内容渲染
+      let body = (await page.textContent('body').catch(() => '')) ?? '';
+      if (body.length < 200 && current.includes('qnh.meituan.com')) {
+        for (let i = 0; i < 4; i++) {
+          await this.humanDelay(1800, 2200);
+          body = (await page.textContent('body').catch(() => '')) ?? '';
+          if (body.length >= 200) break;
+        }
+      }
+
       if (
         /短信验证码|获取验证码/.test(body) &&
         /登录|登陆/.test(body) &&
@@ -654,6 +663,35 @@ export class QianniuhuaRPA extends BasePlatformRPA<UnifiedInventorySignal> {
       logs.push(
         `截图失败: ${e instanceof Error ? e.message.slice(0, 80) : String(e)}`,
       );
+    }
+
+    // DOM 勘探：截图更多关键页面（用于 docs/21 规格补全）
+    const explorerPages: Array<{ name: string; hash: string }> = [
+      { name: 'inventory', hash: '#/inventory/list' },
+      { name: 'purchase',  hash: '#/purchase/list' },
+      { name: 'finance',   hash: '#/finance/bill' },
+      { name: 'orders',    hash: '#/order/list' },
+    ];
+    for (const p of explorerPages) {
+      try {
+        await page.evaluate(
+          ({ h }: { h: string }) => {
+            (globalThis as unknown as { location: { hash: string } }).location.hash = h;
+          },
+          { h: p.hash },
+        );
+        await this.humanDelay(2500, 3500);
+        const ss = await this.takeDryRunScreenshot(page, `qianniuhua_${p.name}`);
+        // Extract visible table headers for spec draft
+        const headers = await page.evaluate(() => {
+          const g = globalThis as unknown as { document: { querySelectorAll: (s: string) => ArrayLike<{ textContent: string | null }> } };
+          const ths = Array.from(g.document.querySelectorAll('th, [class*="cell"][class*="header"]'));
+          return ths.map(el => el.textContent?.trim()).filter(Boolean).slice(0, 20) as string[];
+        });
+        logs.push(`[${p.name}] hash:${p.hash} | 截图:${ss} | headers:${JSON.stringify(headers)}`);
+      } catch (e) {
+        logs.push(`[${p.name}] 截图失败: ${e instanceof Error ? e.message.slice(0, 60) : String(e)}`);
+      }
     }
 
     const body = (await page.textContent('body').catch(() => '')) ?? '';
