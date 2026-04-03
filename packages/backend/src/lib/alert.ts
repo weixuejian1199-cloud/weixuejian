@@ -6,12 +6,15 @@
  *   RULE-B  API P99 响应时间 > 2000ms（最近 100 次请求）
  *   RULE-C  进程堆内存 > 500MB
  *
- * 使用方式：
- *   import { alertService } from './alert.js';
- *   alertService.recordRpaResult(source, success);
- *   alertService.checkAndAlert();          // 由 cron 每分钟调用
+ * 支持两种发送方式（优先级：方式一 > 方式二）：
+ *   方式一 — 自定义机器人 Webhook：
+ *     .env:  ALERT_FEISHU_WEBHOOK=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
  *
- * 配置：.env 中添加 ALERT_FEISHU_WEBHOOK=https://open.feishu.cn/open-apis/bot/v2/hook/...
+ *   方式二 — 应用机器人（使用现有 App ID + Secret）：
+ *     .env:  ALERT_FEISHU_APP_ID=cli_xxx
+ *            ALERT_FEISHU_APP_SECRET=xxx
+ *            ALERT_FEISHU_CHAT_ID=oc_xxx   （目标群的 chat_id）
+ *     获取 chat_id：在飞书群里 @ 机器人，或通过飞书开放平台 → 群列表 API 查询
  */
 
 import { env } from './env.js';
@@ -56,24 +59,26 @@ export function recordHttpDuration(durationMs: number): void {
 // ─── 告警检查（每分钟执行一次）──────────────────────────────
 
 export async function checkAndAlert(): Promise<void> {
-  const webhook = env.ALERT_FEISHU_WEBHOOK;
-  if (!webhook) return;
+  // 任意一种告警渠道配置即可运行
+  const hasChannel = env.ALERT_FEISHU_WEBHOOK ||
+    (env.ALERT_FEISHU_APP_ID && env.ALERT_FEISHU_APP_SECRET && env.ALERT_FEISHU_CHAT_ID);
+  if (!hasChannel) return;
 
   await Promise.all([
-    checkRpaFailureRate(webhook),
-    checkHttpP99(webhook),
-    checkHeapMemory(webhook),
+    checkRpaFailureRate(),
+    checkHttpP99(),
+    checkHeapMemory(),
   ]);
 }
 
-async function checkRpaFailureRate(webhook: string): Promise<void> {
+async function checkRpaFailureRate(): Promise<void> {
   for (const [source, w] of rpaWindows.entries()) {
     if (w.total < 5) continue; // 样本不足，不告警
     const failRate = w.failed / w.total;
     if (failRate > 0.05) {
       const key = `rpa_fail_${source}`;
       if (isCoolingDown(key)) continue;
-      await sendFeishuAlert(webhook, {
+      await sendFeishuAlert({
         rule: 'RULE-A',
         level: 'error',
         title: `🔴 RPA 采集失败率过高`,
@@ -84,14 +89,14 @@ async function checkRpaFailureRate(webhook: string): Promise<void> {
   }
 }
 
-async function checkHttpP99(webhook: string): Promise<void> {
+async function checkHttpP99(): Promise<void> {
   if (httpDurations.length < 20) return; // 样本不足
   const sorted = [...httpDurations].sort((a, b) => a - b);
   const p99 = sorted[Math.floor(sorted.length * 0.99)] ?? 0;
   if (p99 > 2000) {
     const key = 'http_p99';
     if (isCoolingDown(key)) return;
-    await sendFeishuAlert(webhook, {
+    await sendFeishuAlert({
       rule: 'RULE-B',
       level: 'warn',
       title: `🟡 API P99 响应时间过高`,
@@ -101,12 +106,12 @@ async function checkHttpP99(webhook: string): Promise<void> {
   }
 }
 
-async function checkHeapMemory(webhook: string): Promise<void> {
+async function checkHeapMemory(): Promise<void> {
   const heapMB = process.memoryUsage().heapUsed / 1024 / 1024;
   if (heapMB > 500) {
     const key = 'heap_memory';
     if (isCoolingDown(key)) return;
-    await sendFeishuAlert(webhook, {
+    await sendFeishuAlert({
       rule: 'RULE-C',
       level: 'warn',
       title: `🟡 进程堆内存超限`,
@@ -125,38 +130,84 @@ interface AlertPayload {
   body: string;
 }
 
-async function sendFeishuAlert(webhook: string, payload: AlertPayload): Promise<void> {
-  const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-  const text = `**【企业AI工作站告警】${payload.title}**\n\n${payload.body}\n\n规则：${payload.rule} | 时间：${timestamp}`;
-
+/** 获取飞书 App Token（方式二：应用机器人） */
+async function getFeishuAppToken(appId: string, appSecret: string): Promise<string | null> {
   try {
-    const res = await fetch(webhook, {
+    const res = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        msg_type: 'interactive',
-        card: {
-          config: { wide_screen_mode: true },
-          header: {
-            title: { tag: 'plain_text', content: payload.title },
-            template: payload.level === 'error' ? 'red' : 'yellow',
-          },
-          elements: [
-            {
-              tag: 'div',
-              text: { tag: 'lark_md', content: text },
-            },
-          ],
-        },
-      }),
+      body: JSON.stringify({ app_id: appId, app_secret: appSecret }),
       signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) {
-      console.warn(`[alert] 飞书 Webhook 返回 ${res.status}`);
+    const data = await res.json() as { code: number; tenant_access_token?: string };
+    if (data.code === 0 && data.tenant_access_token) return data.tenant_access_token;
+  } catch { /* ignore */ }
+  return null;
+}
+
+async function sendFeishuAlert(payload: AlertPayload): Promise<void> {
+  const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+  const cardContent = {
+    msg_type: 'interactive',
+    card: {
+      config: { wide_screen_mode: true },
+      header: {
+        title: { tag: 'plain_text', content: payload.title },
+        template: payload.level === 'error' ? 'red' : 'yellow',
+      },
+      elements: [{
+        tag: 'div',
+        text: {
+          tag: 'lark_md',
+          content: `${payload.body}\n\n规则：${payload.rule} | 时间：${timestamp}`,
+        },
+      }],
+    },
+  };
+
+  // 方式一：自定义 Webhook
+  if (env.ALERT_FEISHU_WEBHOOK) {
+    try {
+      const res = await fetch(env.ALERT_FEISHU_WEBHOOK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cardContent),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) console.warn(`[alert] Webhook 返回 ${res.status}`);
+      return;
+    } catch (err) {
+      console.warn(`[alert] Webhook 失败: ${err instanceof Error ? err.message : String(err)}`);
     }
-  } catch (err) {
-    console.warn(`[alert] 飞书 Webhook 发送失败: ${err instanceof Error ? err.message : String(err)}`);
   }
+
+  // 方式二：应用机器人（App ID + Secret + Chat ID）
+  const { ALERT_FEISHU_APP_ID, ALERT_FEISHU_APP_SECRET, ALERT_FEISHU_CHAT_ID } = env;
+  if (ALERT_FEISHU_APP_ID && ALERT_FEISHU_APP_SECRET && ALERT_FEISHU_CHAT_ID) {
+    const token = await getFeishuAppToken(ALERT_FEISHU_APP_ID, ALERT_FEISHU_APP_SECRET);
+    if (!token) { console.warn('[alert] 获取飞书 App Token 失败'); return; }
+    try {
+      const res = await fetch(`https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          receive_id: ALERT_FEISHU_CHAT_ID,
+          msg_type: 'interactive',
+          content: JSON.stringify(cardContent.card),
+        }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) console.warn(`[alert] App 消息发送返回 ${res.status}`);
+    } catch (err) {
+      console.warn(`[alert] App 消息发送失败: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    return;
+  }
+
+  // 未配置任何告警渠道，静默跳过
 }
 
 // ─── 工具 ────────────────────────────────────────────────────

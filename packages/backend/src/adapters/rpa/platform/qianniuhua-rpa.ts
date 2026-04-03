@@ -680,7 +680,17 @@ export class QianniuhuaRPA extends BasePlatformRPA<UnifiedInventorySignal> {
           },
           { h: p.hash },
         );
-        await this.humanDelay(2500, 3500);
+        // 等待内容渲染：先固定等 2s，再轮询最多 8s 直到出现实质内容
+        await this.humanDelay(2000, 2500);
+        const deadline = Date.now() + 8000;
+        while (Date.now() < deadline) {
+          const bodyLen = await page.evaluate(() => {
+            const g = globalThis as unknown as { document: { body: { textContent: string | null } } };
+            return (g.document.body.textContent ?? '').trim().length;
+          });
+          if (bodyLen > 300) break;
+          await this.humanDelay(800, 1200);
+        }
         const ss = await this.takeDryRunScreenshot(page, `qianniuhua_${p.name}`);
         // Extract visible table headers for spec draft
         const headers = await page.evaluate(() => {

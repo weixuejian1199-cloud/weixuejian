@@ -52,7 +52,10 @@ const envSchema = z.object({
   ALIYUN_OSS_REGION: z.string().optional(),
 
   // ═══ 监控告警 Webhook（DEBT-002）══════════════════════
-  ALERT_FEISHU_WEBHOOK: z.string().url().optional(),   // 飞书告警机器人 Webhook URL
+  ALERT_FEISHU_WEBHOOK: z.string().url().optional(),   // 飞书自定义机器人 Webhook（方式一）
+  ALERT_FEISHU_APP_ID: z.string().optional(),          // 飞书应用 App ID（方式二，与 SECRET 配合）
+  ALERT_FEISHU_APP_SECRET: z.string().optional(),      // 飞书应用 App Secret（方式二）
+  ALERT_FEISHU_CHAT_ID: z.string().optional(),         // 告警消息发送目标群 Chat ID
 
   // ═══ 飞书灵犀 Bridge（Wave 7.5）═══════════════════════
   FEISHU_LINGXI_APP_ID: z.string().optional(),
