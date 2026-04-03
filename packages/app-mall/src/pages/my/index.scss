@@ -1,0 +1,412 @@
+@import '../../styles/variables.scss';
+
+.my-page {
+  min-height: 100vh;
+  background: $color-bg-page;
+  padding-bottom: $spacing-lg;
+}
+
+/* ===== User Header ===== */
+.user-header {
+  padding: $spacing-md $spacing-base $spacing-lg;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: $spacing-base;
+}
+
+.avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: $radius-circle;
+  flex-shrink: 0;
+}
+
+.avatar-placeholder {
+  width: 60px;
+  height: 60px;
+  border-radius: $radius-circle;
+  background: #E8DDD0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.avatar-emoji {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.user-meta {
+  flex: 1;
+}
+
+.user-name-row {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.user-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: $color-text-primary;
+}
+
+.vip-badge {
+  background: $color-gold;
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.vic-badge {
+  background: $color-vic;
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.user-id {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  margin-top: $spacing-xs;
+}
+
+.user-points {
+  font-size: 13px;
+  color: $color-gold;
+  margin-top: 2px;
+  font-weight: 500;
+}
+
+.settings-icon {
+  width: 22px;
+  height: 22px;
+  color: $color-text-tertiary;
+}
+
+/* ===== Level Progress ===== */
+.level-progress {
+  margin: $spacing-base $spacing-base 0;
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  padding: $card-padding $spacing-base;
+}
+
+.level-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $spacing-sm;
+}
+
+.level-current {
+  font-size: 13px;
+  color: $color-text-primary;
+  font-weight: 500;
+}
+
+.level-target {
+  font-size: $font-size-sm;
+  color: $color-gold;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: $color-bg-input;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: $color-gold;
+  border-radius: 3px;
+}
+
+.level-hint {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-top: $spacing-sm;
+}
+
+/* ===== Checkin Status ===== */
+.checkin-status {
+  margin: 10px $spacing-base 0;
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  padding: $spacing-md $spacing-base;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cs-left {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.cs-emoji {
+  font-size: 18px;
+}
+
+.cs-text {
+  font-size: 13px;
+  color: $color-text-primary;
+}
+
+.cs-highlight {
+  color: $color-gold;
+  font-weight: 600;
+}
+
+.cs-btn {
+  background: $color-bg-input;
+  color: $color-secondary;
+  font-size: $font-size-sm;
+  padding: 5px 14px;
+  border-radius: $radius-pill;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* ===== Orders Card ===== */
+.orders-card {
+  margin: $spacing-base $spacing-base 0;
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  padding: $spacing-base;
+}
+
+.orders-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $card-padding;
+}
+
+.orders-title {
+  font-size: $font-size-base;
+  font-weight: 600;
+  color: $color-text-primary;
+}
+
+.orders-all {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+}
+
+.orders-grid {
+  display: flex;
+  justify-content: space-around;
+}
+
+.order-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.order-icon {
+  font-size: 24px;
+}
+
+.order-label {
+  font-size: $font-size-xs;
+  color: $color-text-secondary;
+}
+
+.order-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: $color-danger;
+  color: #fff;
+  font-size: 9px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+/* ===== Recommend Card ===== */
+.recommend-card {
+  margin: 10px $spacing-base 0;
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  padding: $spacing-base;
+}
+
+.rec-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: $card-padding;
+}
+
+.rec-title {
+  font-size: $font-size-base;
+  font-weight: 600;
+  color: $color-text-primary;
+}
+
+.rec-badge {
+  font-size: 10px;
+  color: $color-success;
+  background: #F0F9F4;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.rec-stats {
+  display: flex;
+  justify-content: space-around;
+  text-align: center;
+}
+
+.rec-stat-item {
+  padding: $spacing-xs 0;
+}
+
+.rec-stat-value {
+  font-size: $font-size-price;
+  font-weight: 700;
+  color: $color-text-primary;
+  font-family: $font-family-num;
+
+  &--gold {
+    color: $color-gold;
+  }
+}
+
+.rec-stat-label {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-top: 2px;
+}
+
+/* ===== Wallet Row ===== */
+.wallet-row {
+  margin: 10px $spacing-base 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.wallet-item {
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  padding: $card-padding;
+  text-align: center;
+}
+
+.wallet-value {
+  font-size: $font-size-price;
+  font-weight: 700;
+  color: $color-text-primary;
+  font-family: $font-family-num;
+
+  &--gold {
+    color: $color-gold;
+  }
+}
+
+.wallet-label {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-top: $spacing-xs;
+}
+
+/* ===== Quick Entries ===== */
+.quick-entries {
+  margin: 10px $spacing-base 0;
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  padding: $spacing-base;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px 0;
+}
+
+.quick-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.quick-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: $radius-md;
+  background: $color-bg-input;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.quick-label {
+  font-size: $font-size-xs;
+  color: $color-text-secondary;
+}
+
+/* ===== Function List ===== */
+.func-list {
+  margin: 10px $spacing-base 0;
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  overflow: hidden;
+}
+
+.func-item {
+  padding: $card-padding $spacing-base;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid $color-bg-divider;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.func-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.func-icon {
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+}
+
+.func-name {
+  font-size: $font-size-base;
+  color: $color-text-primary;
+}
+
+.func-arrow {
+  font-size: $font-size-sm;
+  color: $color-text-placeholder;
+}

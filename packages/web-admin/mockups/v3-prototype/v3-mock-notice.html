@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>演示占位说明 - 时皙 AI 工作站</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, 'SF Pro Display', 'PingFang SC', 'Helvetica Neue', sans-serif;
+    color: #1A1A1A;
+    background: #FAFAFA;
+    min-height: 100vh;
+    padding: 48px 24px;
+    line-height: 1.6;
+  }
+  .card {
+    max-width: 520px;
+    margin: 0 auto;
+    background: #fff;
+    border: 1px solid #F0F0F0;
+    border-radius: 12px;
+    padding: 28px 32px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.04);
+  }
+  h1 { font-size: 18px; font-weight: 600; margin-bottom: 12px; }
+  p { font-size: 14px; color: #666; margin-bottom: 16px; }
+  .links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+  .links a {
+    font-size: 13px;
+    color: #1A1A1A;
+    text-decoration: none;
+    padding: 8px 14px;
+    border: 1px solid #E8E8E8;
+    border-radius: 8px;
+    background: #fff;
+  }
+  .links a:hover { background: #F3F3F3; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1 id="notifications">静态原型 · 功能占位</h1>
+    <p>此处为演示占位：完整列表、第三方对接或尚未接入的模块，在正式产品中会替换为真实页面或接口。</p>
+    <p id="topic-purchase" style="display:none">采购视角工作台仍在规划中，后续版本将从作战指挥台统一进入。</p>
+    <div class="links">
+      <a href="v3-02-super-admin.html">返回作战指挥台</a>
+      <a href="v3-01-login.html">返回登录</a>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var q = new URLSearchParams(location.search);
+      if (q.get('topic') === 'purchase') {
+        var el = document.getElementById('topic-purchase');
+        if (el) el.style.display = 'block';
+      }
+    })();
+  </script>
+</body>
+</html>

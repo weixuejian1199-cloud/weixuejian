@@ -1,0 +1,2877 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>时皙 AI 工作站 - 出纳工作台</title>
+<style>
+:root {
+  --text-primary: #1A1A1A;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --bg: #FFFFFF;
+  --sidebar-bg: #F9F9F9;
+  --sidebar-border: #F0F0F0;
+  --divider: #F0F0F0;
+  --input-border: #E8E8E8;
+  --input-bg: #F5F5F5;
+  --hover-bg: #F3F3F3;
+  --active-bg: #EFEFEF;
+  --accent: #1A1A1A;
+  --green: #00B42A;
+  --red: #E53835;
+  --orange: #FF7D00;
+  --blue: #4F6EF7;
+  --font: -apple-system, 'SF Pro Display', 'PingFang SC', 'Helvetica Neue', sans-serif;
+  --font-mono: 'SF Mono', 'Roboto Mono', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font);
+  color: var(--text-primary);
+  background: var(--bg);
+  overflow: hidden;
+  height: 100vh;
+  min-width: 1024px;
+}
+
+/* ========== Header ========== */
+.header {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 52px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--divider);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  z-index: 100;
+}
+.header-left {
+  display: flex; align-items: center; gap: 10px;
+}
+.logo {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; font-size: 16px;
+}
+.header-title {
+  font-size: 15px; font-weight: 600; color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+.header-back-cc {
+  margin-left: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.header-back-cc:hover { color: var(--text-primary); }
+.header-nav {
+  display: flex; align-items: center; gap: 4px; margin-left: 24px;
+}
+.header-nav a {
+  font-size: 13px; color: var(--text-secondary); text-decoration: none;
+  padding: 6px 12px; border-radius: 6px; transition: all .15s;
+}
+.header-nav a:hover { background: var(--hover-bg); color: var(--text-primary); }
+.header-nav a.active { background: var(--active-bg); color: var(--text-primary); font-weight: 500; }
+.header-right {
+  display: flex; align-items: center; gap: 16px;
+}
+.notification-btn {
+  position: relative;
+  width: 36px; height: 36px;
+  border: none; background: none; cursor: pointer;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-secondary);
+  transition: background .15s;
+}
+.notification-btn:hover { background: var(--hover-bg); }
+.notification-dot {
+  position: absolute; top: 6px; right: 8px;
+  width: 7px; height: 7px;
+  background: var(--red);
+  border-radius: 50%;
+  border: 2px solid var(--bg);
+}
+.user-info {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 4px 8px 4px 4px;
+  border-radius: 8px;
+  transition: background .15s;
+}
+.user-info:hover { background: var(--hover-bg); }
+.user-avatar {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 13px; font-weight: 600;
+}
+.user-role-tag {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--input-bg);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* ========== Sidebar ========== */
+.sidebar {
+  position: fixed; top: 52px; left: 0; bottom: 32px;
+  width: 240px;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+  z-index: 50;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+.sidebar-section { padding: 8px 12px 4px; }
+.sidebar-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 8px 8px 4px;
+}
+.sidebar-divider {
+  height: 1px;
+  background: var(--divider);
+  margin: 4px 16px;
+}
+
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  margin: 1px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: all .15s;
+  position: relative;
+}
+.nav-item:hover { background: var(--hover-bg); color: var(--text-primary); }
+.nav-item.active {
+  background: var(--active-bg);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.nav-item.disabled {
+  opacity: .4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+.nav-badge {
+  margin-left: auto;
+  background: var(--red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+.new-tag {
+  font-size: 9px;
+  font-weight: 700;
+  color: #4F6EF7;
+  background: #EEF1FE;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 6px;
+}
+
+.chat-item {
+  display: flex; flex-direction: column;
+  padding: 8px 12px;
+  margin: 1px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.chat-item:hover { background: var(--hover-bg); }
+.chat-item.active { background: var(--active-bg); }
+.chat-item-title {
+  font-size: 13px; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chat-item-time {
+  font-size: 11px; color: var(--text-muted); margin-top: 2px;
+}
+
+.sidebar-bottom {
+  margin-top: auto;
+  border-top: 1px solid var(--divider);
+  padding: 8px 12px;
+}
+.sidebar-bottom .nav-item { margin: 0; }
+
+/* ========== Main Content ========== */
+.main {
+  position: fixed;
+  top: 52px; left: 240px; right: 0; bottom: 32px;
+  overflow-y: auto;
+  background: var(--input-bg);
+  padding: 20px 24px;
+}
+.main::-webkit-scrollbar { width: 6px; }
+.main::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+
+/* View sections */
+.view-content { display: none; }
+.view-content.active { display: block; }
+
+/* KPI Cards */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.kpi-card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 18px 20px;
+  cursor: default;
+  transition: box-shadow .2s, transform .2s;
+}
+.kpi-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,.06);
+  transform: translateY(-2px);
+}
+.kpi-label {
+  font-size: 12px; color: var(--text-muted); margin-bottom: 8px;
+}
+.kpi-value {
+  font-size: 26px; font-weight: 700; color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+.kpi-change {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 12px; font-weight: 500; margin-top: 6px;
+}
+.kpi-change.up-green { color: var(--green); }
+.kpi-change.down-green { color: var(--green); }
+.kpi-change.up-red { color: var(--red); }
+.kpi-change.down-red { color: var(--red); }
+.kpi-change.neutral-orange { color: var(--orange); }
+.kpi-sub {
+  font-size: 11px; color: var(--text-muted); margin-top: 2px;
+}
+.kpi-sub.warning { color: var(--orange); }
+
+/* Content Grid */
+.content-grid {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 20px;
+}
+.card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--divider);
+}
+.card-title {
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+}
+.card-action {
+  font-size: 12px; color: var(--text-muted); cursor: pointer;
+  transition: color .15s;
+  background: none; border: none; font-family: var(--font);
+}
+.card-action:hover { color: var(--text-primary); }
+
+/* Tables */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.data-table th {
+  text-align: left;
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  background: var(--input-bg);
+  border-bottom: 1px solid var(--divider);
+}
+.data-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--divider);
+  color: var(--text-secondary);
+}
+.data-table tr { transition: background .15s; cursor: pointer; }
+.data-table tbody tr:hover { background: var(--hover-bg); }
+.data-table .amount {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.data-table .code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* Type Tags */
+.type-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.type-tag.income { background: #E8F7E8; color: var(--green); }
+.type-tag.expense { background: #FEF2F2; color: var(--red); }
+.type-tag.platform { background: #E6F0FF; color: #3366CC; }
+.type-tag.refund { background: var(--input-bg); color: var(--text-secondary); }
+.type-tag.customer { background: #E8F7E8; color: var(--green); }
+
+/* Status Tags */
+.status-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.status-tag.normal { background: #E8F7E8; color: var(--green); }
+.status-tag.warning { background: #FFF7E6; color: var(--orange); }
+.status-tag.pending { background: #FFF7E6; color: var(--orange); }
+.status-tag.approved { background: #E8F7E8; color: var(--green); }
+.status-tag.confirmed { background: #E8F7E8; color: var(--green); }
+.status-tag.rejected { background: #FEF2F2; color: var(--red); }
+.status-tag.transit { background: var(--input-bg); color: var(--text-secondary); }
+
+/* Action Buttons */
+.action-btn {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all .15s;
+}
+.action-btn.primary {
+  background: var(--accent);
+  color: #FFFFFF;
+  border: none;
+}
+.action-btn.primary:hover { opacity: .85; }
+.action-btn.secondary {
+  background: none;
+  color: var(--text-muted);
+  border: 1px solid var(--input-border);
+}
+.action-btn.secondary:hover { color: var(--text-primary); border-color: var(--text-muted); }
+
+/* Urgent Row */
+.row-urgent { background: #FEF8F8; }
+.row-urgent:hover { background: #FCF0F0 !important; }
+
+/* Tab Bar */
+.tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--divider);
+  background: var(--bg);
+  padding: 0 20px;
+}
+.tab-item {
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all .15s;
+  font-family: var(--font);
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+}
+.tab-item:hover { color: var(--text-primary); }
+.tab-item.active {
+  color: var(--text-primary);
+  font-weight: 500;
+  border-bottom-color: var(--accent);
+}
+.tab-badge {
+  font-size: 10px;
+  background: var(--red);
+  color: #fff;
+  padding: 0 5px;
+  border-radius: 8px;
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+/* Top Action Bar */
+.view-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.view-top-bar .left { display: flex; align-items: center; gap: 12px; }
+.view-top-bar .right { display: flex; align-items: center; gap: 8px; }
+
+/* AI Chat Panel */
+.ai-panel {
+  display: flex; flex-direction: column;
+  height: 100%;
+  min-height: 480px;
+}
+.ai-messages {
+  flex: 1;
+  padding: 16px 20px;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.ai-messages::-webkit-scrollbar { width: 4px; }
+.ai-messages::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+
+.msg {
+  max-width: 92%;
+  line-height: 1.6;
+}
+.msg.user {
+  align-self: flex-end;
+  background: var(--accent);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 14px 14px 4px 14px;
+  font-size: 13px;
+}
+.msg.ai {
+  align-self: flex-start;
+  background: var(--input-bg);
+  padding: 12px 16px;
+  border-radius: 4px 14px 14px 14px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.msg.ai .msg-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.msg.ai ul {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+.msg.ai li { margin-bottom: 3px; }
+.msg.ai .msg-warning {
+  color: var(--orange);
+  font-weight: 500;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.ai-input-bar {
+  padding: 12px 16px;
+  border-top: 1px solid var(--divider);
+  display: flex; gap: 8px;
+}
+.ai-input {
+  flex: 1;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-family: var(--font);
+  background: var(--input-bg);
+  outline: none;
+  transition: border-color .15s;
+}
+.ai-input:focus { border-color: var(--accent); }
+.ai-send-btn {
+  width: 36px; height: 36px;
+  border: none;
+  background: var(--accent);
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  transition: opacity .15s;
+}
+.ai-send-btn:hover { opacity: .85; }
+
+/* ========== Footer ========== */
+.footer {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: 32px;
+  background: var(--bg);
+  border-top: 1px solid var(--divider);
+  display: flex; align-items: center;
+  padding: 0 20px;
+  font-size: 11px;
+  color: var(--text-muted);
+  gap: 24px;
+  z-index: 100;
+}
+.footer-dot {
+  width: 6px; height: 6px;
+  background: var(--green);
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+.footer-right {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* ========== Period Selector ========== */
+.period-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 10px 16px;
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+}
+.period-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.period-arrow {
+  width: 28px; height: 28px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+.period-arrow:hover { background: var(--hover-bg); border-color: var(--accent); color: var(--text-primary); }
+.period-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 120px;
+  text-align: center;
+}
+.period-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--input-bg);
+  border-radius: 6px;
+  padding: 2px;
+}
+.period-tab {
+  font-size: 12px;
+  padding: 4px 14px;
+  border: none;
+  background: transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.period-tab.active {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.period-tab:hover:not(.active) { color: var(--text-secondary); }
+
+/* ========== Mode Toggle ========== */
+.mode-toggle {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text-muted);
+}
+.mode-toggle-switch {
+  position: relative;
+  width: 36px; height: 20px;
+  background: var(--input-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background .2s;
+}
+.mode-toggle-switch.active { background: var(--accent); }
+.mode-toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 16px; height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform .2s;
+}
+.mode-toggle-switch.active::after { transform: translateX(16px); }
+
+/* ========== Mini Chart ========== */
+.mini-chart {
+  display: flex; align-items: flex-end; gap: 8px;
+  height: 80px;
+  padding: 0 4px;
+}
+.mini-chart-bar {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.mini-chart-bar .bar {
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+  transition: height .3s;
+}
+.mini-chart-bar .bar.positive { background: var(--green); }
+.mini-chart-bar .bar.negative { background: var(--red); border-radius: 0 0 3px 3px; }
+.mini-chart-bar .label {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+.mini-chart-bar .value {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+.mini-chart-bar .value.positive { color: var(--green); }
+.mini-chart-bar .value.negative { color: var(--red); }
+
+/* ========== Notification Panel ========== */
+.notification-panel {
+  position: fixed;
+  top: 52px;
+  right: 16px;
+  width: 360px;
+  max-height: 480px;
+  background: #FFFFFF;
+  border: 1px solid #F0F0F0;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+  z-index: 300;
+  display: none;
+  overflow: hidden;
+}
+.notification-panel.open { display: flex; flex-direction: column; }
+.noti-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #F0F0F0;
+}
+.noti-header-title { font-size: 14px; font-weight: 600; color: #1A1A1A; }
+.noti-mark-read {
+  font-size: 12px; color: #999999; background: none; border: none;
+  cursor: pointer; font-family: inherit; transition: color 0.15s;
+}
+.noti-mark-read:hover { color: #1A1A1A; }
+.noti-list {
+  flex: 1; overflow-y: auto; max-height: 380px;
+}
+.noti-list::-webkit-scrollbar { width: 4px; }
+.noti-list::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+.noti-item {
+  display: flex; gap: 10px; padding: 12px 16px;
+  border-bottom: 1px solid #F0F0F0;
+  cursor: pointer; transition: background 0.15s;
+}
+.noti-item:hover { background: #F9F9F9; }
+.noti-item:last-child { border-bottom: none; }
+.noti-item.unread { background: #FAFAFA; }
+.noti-item.unread .noti-title { font-weight: 600; }
+.noti-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 14px;
+}
+.noti-icon.warn { background: #FFF7E6; color: #FF7D00; }
+.noti-icon.danger { background: #FEF2F2; color: #E53835; }
+.noti-icon.info { background: #F0F5FF; color: #4F6EF7; }
+.noti-icon.success { background: #E8F7E8; color: #00B42A; }
+.noti-content { flex: 1; min-width: 0; }
+.noti-title {
+  font-size: 13px; color: #1A1A1A; line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.noti-time { font-size: 11px; color: #999999; margin-top: 2px; }
+.noti-footer {
+  padding: 10px 16px; border-top: 1px solid #F0F0F0; text-align: center;
+}
+.noti-footer a {
+  font-size: 12px; color: #999999; text-decoration: none; transition: color 0.15s;
+}
+.noti-footer a:hover { color: #1A1A1A; }
+
+/* ========== Modal ========== */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,.4);
+  z-index: 500;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-card {
+  background: var(--bg);
+  border-radius: 16px;
+  width: 440px;
+  padding: 28px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.15);
+  animation: fadeInUp .25s ease;
+}
+.modal-card h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  color: var(--text-primary);
+}
+.modal-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--divider);
+}
+.modal-row:last-of-type { border-bottom: none; }
+.modal-row .label { color: var(--text-muted); }
+.modal-row .value { color: var(--text-primary); font-weight: 500; }
+.modal-row .value.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.modal-warning {
+  margin-top: 16px;
+  padding: 10px 14px;
+  background: #FFF7E6;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--orange);
+  font-weight: 500;
+}
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  justify-content: flex-end;
+}
+.modal-actions .action-btn { padding: 8px 20px; font-size: 13px; }
+
+/* ========== Welcome Modal ========== */
+.welcome-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,.35);
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.welcome-card {
+  background: var(--bg);
+  border-radius: 20px;
+  width: 460px;
+  padding: 36px;
+  box-shadow: 0 24px 64px rgba(0,0,0,.18);
+  text-align: center;
+  animation: fadeInUp .35s ease;
+}
+.welcome-card h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.welcome-card .subtitle {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-bottom: 24px;
+}
+.welcome-features {
+  text-align: left;
+  margin-bottom: 28px;
+}
+.welcome-features .feature {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.welcome-features .feature .check {
+  color: var(--green);
+  font-weight: 700;
+  font-size: 14px;
+}
+.welcome-actions {
+  display: flex; gap: 10px; justify-content: center;
+}
+.welcome-actions .action-btn { padding: 10px 28px; font-size: 14px; border-radius: 10px; }
+
+/* ========== Recon Cards ========== */
+.recon-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.recon-card {
+  padding: 20px;
+  border: 2px solid var(--divider);
+  border-radius: 12px;
+  text-align: center;
+}
+.recon-card.ok { border-color: var(--green); }
+.recon-card.diff { border-color: var(--orange); }
+.recon-card .recon-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+.recon-card .recon-value {
+  font-size: 22px; font-weight: 700;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.recon-card .recon-status { font-size: 13px; font-weight: 600; margin-top: 6px; }
+.recon-arrow { font-size: 20px; color: var(--text-muted); }
+
+/* ========== Calendar ========== */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--divider);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.calendar-header-cell {
+  background: var(--input-bg);
+  padding: 8px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.calendar-cell {
+  background: var(--bg);
+  padding: 6px 8px;
+  min-height: 80px;
+  font-size: 11px;
+  vertical-align: top;
+}
+.calendar-cell.empty { background: var(--input-bg); }
+.calendar-cell .day-num {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.calendar-cell .day-num.today {
+  background: var(--accent);
+  color: #fff;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+}
+.calendar-event {
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.calendar-event.cal-income { background: #E8F7E8; color: var(--green); }
+.calendar-event.cal-expense { background: #FEF2F2; color: var(--red); }
+.calendar-event.cal-tax { background: #E6F0FF; color: var(--blue); }
+
+/* ========== Report Card ========== */
+.report-card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 24px 28px;
+  margin-bottom: 20px;
+}
+.report-card h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.report-card .report-date {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+.report-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 20px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--divider);
+}
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.report-table th {
+  text-align: left;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--divider);
+}
+.report-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--divider);
+  color: var(--text-secondary);
+}
+.report-table .amount {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+.report-table tr.total-row td {
+  font-weight: 600;
+  color: var(--text-primary);
+  border-top: 2px solid var(--accent);
+}
+.report-warn {
+  padding: 10px 14px;
+  background: #FFF7E6;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--orange);
+  font-weight: 500;
+  margin-top: 8px;
+}
+
+/* ========== Summary Bar ========== */
+.summary-bar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 20px;
+  background: var(--input-bg);
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--divider);
+}
+.summary-bar .amount {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ========== Recon Detail Table ========== */
+.recon-detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.recon-detail-table td {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--divider);
+}
+.recon-detail-table td:first-child {
+  color: var(--text-secondary);
+}
+.recon-detail-table td:last-child {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.recon-detail-table tr.total td {
+  font-weight: 600;
+  border-top: 2px solid var(--accent);
+}
+.recon-detail-table tr.conclusion td {
+  color: var(--green);
+  font-weight: 600;
+  font-size: 14px;
+  border-top: 2px solid var(--green);
+}
+
+/* ========== Forecast Card ========== */
+.forecast-card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 20px;
+}
+.forecast-card h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.forecast-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.forecast-row .label { color: var(--text-secondary); }
+.forecast-row .value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.forecast-divider {
+  height: 1px;
+  background: var(--divider);
+  margin: 8px 0;
+}
+.safety-check {
+  margin-top: 12px;
+  font-size: 12px;
+}
+.safety-check .item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 0;
+}
+.safety-check .safe { color: var(--green); }
+.safety-check .warn { color: var(--orange); }
+
+/* ========== Animations ========== */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.kpi-card { animation: fadeInUp .4s ease both; }
+.kpi-card:nth-child(2) { animation-delay: .05s; }
+.kpi-card:nth-child(3) { animation-delay: .1s; }
+.kpi-card:nth-child(4) { animation-delay: .15s; }
+.card { animation: fadeInUp .4s ease .2s both; }
+</style>
+</head>
+<body>
+
+<!-- ========== HEADER ========== -->
+<header class="header">
+  <div class="header-left">
+    <div class="logo">S</div>
+    <span class="header-title">时皙 AI 工作站</span>
+    <a class="header-back-cc" href="v3-02-super-admin.html">返回指挥中心</a>
+    <!-- 模块切换导航已移除：岗位无权限跨模块 -->
+  </div>
+  <div class="header-right">
+    <button class="notification-btn" id="notiBtn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      </svg>
+      <span class="notification-dot"></span>
+    </button>
+    <div class="user-info">
+      <div class="user-avatar" onclick="if(confirm('确认退出登录？'))window.location.href='v3-01-login.html'" style="cursor:pointer" title="退出登录">张</div>
+      <span class="user-role-tag">出纳</span>
+    </div>
+  </div>
+</header>
+
+<!-- ========== SIDEBAR ========== -->
+<nav class="sidebar">
+  <!-- 创始人·作战台入口（侧栏第一项语义，与工具中心一致）：仅 super_admin 可见 -->
+  <div class="sidebar-section" data-role-required="super_admin" style="display:none">
+    <a class="nav-item" href="v3-02-super-admin.html" style="text-decoration:none;color:inherit">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <span>AI 今日看板</span>
+      <span class="nav-badge">3</span>
+    </a>
+  </div>
+  <div class="sidebar-divider" data-role-required="super_admin" style="display:none"></div>
+  <div class="sidebar-section">
+    <div class="nav-item active" data-view="overview">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+        <rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+      <span data-label="overview">资金概览</span>
+    </div>
+    <div class="nav-item" data-view="chat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      <span>AI 对话</span>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <!-- 收付管理 -->
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">收付管理</div>
+    <div class="nav-item" data-view="income">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="17" y1="17" x2="7" y2="7"/><polyline points="7 17 7 7 17 7"/></svg>
+      <span>收款登记</span>
+      <span class="new-tag">NEW</span>
+    </div>
+    <div class="nav-item" data-view="payment">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="7" x2="17" y2="17"/><polyline points="17 7 17 17 7 17"/></svg>
+      <span>付款执行</span>
+      <span class="new-tag">NEW</span>
+      <span class="nav-badge">3</span>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <!-- 日常管理 -->
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">日常管理</div>
+    <div class="nav-item" data-view="journal">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      <span data-label="journal">银行日记账</span>
+    </div>
+    <div class="nav-item" data-view="bank-recon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+      <span data-label="bank-recon">银行对账</span>
+      <span class="nav-badge">2</span>
+    </div>
+    <div class="nav-item" data-view="calendar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>结算日历</span>
+      <span class="new-tag">NEW</span>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <!-- 资金管理 -->
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">资金管理</div>
+    <div class="nav-item" data-view="fund-report">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      <span>资金日报</span>
+      <span class="new-tag">NEW</span>
+    </div>
+    <div class="nav-item" data-view="bills">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <span data-label="bills">票据管理</span>
+      <span class="new-tag">NEW</span>
+    </div>
+    <div class="nav-item disabled" title="即将上线">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+      <span>资金预测</span>
+      <span style="font-size:9px;color:var(--text-muted);margin-left:auto">即将上线</span>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">对话记录</div>
+    <div class="chat-item active" data-chat="1">
+      <span class="chat-item-title">招商银行3月流水核对</span>
+      <span class="chat-item-time">10分钟前</span>
+    </div>
+    <div class="chat-item" data-chat="2">
+      <span class="chat-item-title">供应商付款-华美包材</span>
+      <span class="chat-item-time">2小时前</span>
+    </div>
+    <div class="chat-item" data-chat="3">
+      <span class="chat-item-title">本周资金收支汇总</span>
+      <span class="chat-item-time">昨天</span>
+    </div>
+  </div>
+
+  <div class="sidebar-bottom">
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      <span>设置</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ========== MAIN CONTENT ========== -->
+<main class="main">
+
+<!-- ============================================================ -->
+<!-- VIEW 1: 资金概览 (overview) -->
+<!-- ============================================================ -->
+<section class="view-content active" data-view="overview">
+  <!-- Period Selector -->
+  <div class="period-bar">
+    <div class="period-nav">
+      <button class="period-arrow" onclick="switchPeriod(-1)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span class="period-label" id="periodLabel">2026年03月</span>
+      <button class="period-arrow" onclick="switchPeriod(1)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <div class="mode-toggle">
+        <span id="modeLabel">小白模式</span>
+        <div class="mode-toggle-switch" id="modeSwitch" onclick="toggleMode()"></div>
+        <span>专业模式</span>
+      </div>
+      <div class="period-tabs">
+        <button class="period-tab active" onclick="setPeriodType(this)">月度</button>
+        <button class="period-tab" onclick="setPeriodType(this)">季度</button>
+        <button class="period-tab" onclick="setPeriodType(this)">年度</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI Row -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">资金总余额</div>
+      <div class="kpi-value" data-target="2511700" data-prefix="¥">¥0</div>
+      <div class="kpi-change up-green">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+        环比 +5.8%
+      </div>
+      <div class="kpi-sub">3个账户</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">今日收入</div>
+      <div class="kpi-value" data-target="96800" data-prefix="¥">¥0</div>
+      <div class="kpi-change up-green">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+        同比 +22.3%
+      </div>
+      <div class="kpi-sub">2笔到账</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">今日支出</div>
+      <div class="kpi-value" data-target="77400" data-prefix="¥">¥0</div>
+      <div class="kpi-change down-green">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        同比 -3.2%
+      </div>
+      <div class="kpi-sub">3笔付款</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">待付款项</div>
+      <div class="kpi-value" data-target="184200" data-prefix="¥">¥0</div>
+      <div class="kpi-change neutral-orange">3笔待执行</div>
+      <div class="kpi-sub warning" style="color:var(--orange)">1笔紧急（到期&le;3天）</div>
+    </div>
+  </div>
+
+  <!-- Content Grid -->
+  <div class="content-grid">
+    <!-- Left Column -->
+    <div class="left-col">
+
+      <!-- 账户余额总览 -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <span class="card-title">账户余额总览</span>
+          <button class="card-action" onclick="switchView('bank-recon')">对账 &rarr;</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>账户名称</th>
+              <th>银行</th>
+              <th>账号尾号</th>
+              <th>余额</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="color:var(--text-primary);font-weight:500">招商银行·基本户</td>
+              <td>招商银行</td>
+              <td class="code">8892</td>
+              <td class="amount">¥1,886,700.00</td>
+              <td><span class="status-tag normal">已对平</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-primary);font-weight:500">工商银行·一般户</td>
+              <td>工商银行</td>
+              <td class="code">3356</td>
+              <td class="amount">¥620,100.00</td>
+              <td><span class="status-tag warning">差异2笔</span></td>
+            </tr>
+            <tr>
+              <td style="color:var(--text-primary);font-weight:500">现金</td>
+              <td>—</td>
+              <td class="code">—</td>
+              <td class="amount">¥4,900.00</td>
+              <td><span class="status-tag normal">正常</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 资金趋势迷你图 -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <span class="card-title">最近7天净现金流</span>
+          <button class="card-action">详情 &rarr;</button>
+        </div>
+        <div style="padding:16px 20px">
+          <div class="mini-chart">
+            <div class="mini-chart-bar">
+              <div class="value positive">+12k</div>
+              <div class="bar positive" style="height:24px"></div>
+              <div class="label">3/25</div>
+            </div>
+            <div class="mini-chart-bar">
+              <div class="bar negative" style="height:16px"></div>
+              <div class="value negative">-8k</div>
+              <div class="label">3/26</div>
+            </div>
+            <div class="mini-chart-bar">
+              <div class="value positive">+35k</div>
+              <div class="bar positive" style="height:56px"></div>
+              <div class="label">3/27</div>
+            </div>
+            <div class="mini-chart-bar">
+              <div class="bar negative" style="height:35px"></div>
+              <div class="value negative">-22k</div>
+              <div class="label">3/28</div>
+            </div>
+            <div class="mini-chart-bar">
+              <div class="value positive">+15k</div>
+              <div class="bar positive" style="height:30px"></div>
+              <div class="label">3/29</div>
+            </div>
+            <div class="mini-chart-bar">
+              <div class="value positive">+28k</div>
+              <div class="bar positive" style="height:45px"></div>
+              <div class="label">3/30</div>
+            </div>
+            <div class="mini-chart-bar">
+              <div class="value positive">+19k</div>
+              <div class="bar positive" style="height:38px"></div>
+              <div class="label">3/31</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 今日收付明细 -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <span class="card-title">今日收付明细</span>
+          <button class="card-action" onclick="switchView('income')">+ 登记收付款</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>类型</th>
+              <th>摘要</th>
+              <th>对方单位</th>
+              <th>账户</th>
+              <th>金额</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>09:32</td>
+              <td><span class="type-tag income">收</span></td>
+              <td>抖店T+1结算到账</td>
+              <td>字节跳动</td>
+              <td>招商基本户</td>
+              <td class="amount" style="color:var(--green)">+¥68,200.00</td>
+            </tr>
+            <tr>
+              <td>10:15</td>
+              <td><span class="type-tag income">收</span></td>
+              <td>天猫3月货款结算</td>
+              <td>阿里巴巴</td>
+              <td>招商基本户</td>
+              <td class="amount" style="color:var(--green)">+¥28,600.00</td>
+            </tr>
+            <tr>
+              <td>11:20</td>
+              <td><span class="type-tag expense">付</span></td>
+              <td>供应商货款</td>
+              <td>华美包材</td>
+              <td>招商基本户</td>
+              <td class="amount" style="color:var(--red)">-¥45,000.00</td>
+            </tr>
+            <tr>
+              <td>14:00</td>
+              <td><span class="type-tag expense">付</span></td>
+              <td>顺丰物流月结</td>
+              <td>顺丰速运</td>
+              <td>招商基本户</td>
+              <td class="amount" style="color:var(--red)">-¥32,100.00</td>
+            </tr>
+            <tr>
+              <td>15:30</td>
+              <td><span class="type-tag expense">付</span></td>
+              <td>办公零星支出</td>
+              <td>—</td>
+              <td>现金</td>
+              <td class="amount" style="color:var(--red)">-¥300.00</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 银行对账·未达账项 -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <span class="card-title">银行对账 · 未达账项</span>
+          <button class="card-action" onclick="switchView('bank-recon')">查看对账详情 &rarr;</button>
+        </div>
+        <div style="padding:16px 20px">
+          <div style="display:flex;gap:16px;margin-bottom:16px">
+            <div style="flex:1;padding:12px 16px;background:var(--input-bg);border-radius:8px;border:1px solid var(--divider)">
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">招商银行 · 基本户</div>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:15px;font-weight:600;font-family:var(--font-mono);font-variant-numeric:tabular-nums">¥1,886,700</span>
+                <span style="font-size:11px;font-weight:500;color:var(--green);background:#E8F7E8;padding:2px 8px;border-radius:4px">已对平</span>
+              </div>
+            </div>
+            <div style="flex:1;padding:12px 16px;background:var(--input-bg);border-radius:8px;border:1px solid var(--divider)">
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">工商银行 · 一般户</div>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:15px;font-weight:600;font-family:var(--font-mono);font-variant-numeric:tabular-nums">¥620,100</span>
+                <span style="font-size:11px;font-weight:500;color:var(--orange);background:#FFF7E6;padding:2px 8px;border-radius:4px">差异 2 笔</span>
+              </div>
+            </div>
+          </div>
+          <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:10px">工商银行未达账项（差异 ¥23,100）</div>
+          <table class="data-table">
+            <thead>
+              <tr><th>类型</th><th>摘要</th><th>金额</th><th>状态</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span style="font-size:11px;font-weight:500;background:#E6F0FF;color:#3366CC;padding:2px 8px;border-radius:4px">银行已收企业未收</span></td>
+                <td>淘宝结算到账（银行已入）</td>
+                <td class="amount">¥18,600.00</td>
+                <td><span class="status-tag pending">待登记</span></td>
+              </tr>
+              <tr>
+                <td><span style="font-size:11px;font-weight:500;background:#FEF2F2;color:var(--red);padding:2px 8px;border-radius:4px">企业已付银行未付</span></td>
+                <td>转账支票-原料款（在途）</td>
+                <td class="amount">¥4,500.00</td>
+                <td><span class="status-tag transit">在途</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 待付款审批 -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">待付款审批</span>
+          <button class="card-action" onclick="switchView('payment')">查看全部 &rarr;</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>申请日期</th>
+              <th>申请人</th>
+              <th>付款事由</th>
+              <th>金额</th>
+              <th>付款账户</th>
+              <th>到期日</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="row-urgent">
+              <td>03-31</td>
+              <td>李芳</td>
+              <td>供应商货款-美达化工</td>
+              <td class="amount">¥85,000.00</td>
+              <td>工商一般户</td>
+              <td style="color:var(--red);font-weight:500">04-02</td>
+              <td>
+                <button class="action-btn primary" onclick="openPayModal('PAY-031')">执行付款</button>
+                <button class="action-btn secondary" style="margin-left:4px">驳回</button>
+              </td>
+            </tr>
+            <tr>
+              <td>03-30</td>
+              <td>李芳</td>
+              <td>3月员工工资</td>
+              <td class="amount">¥86,400.00</td>
+              <td>招商基本户</td>
+              <td>04-05</td>
+              <td>
+                <button class="action-btn primary" onclick="openPayModal('PAY-030')">执行付款</button>
+                <button class="action-btn secondary" style="margin-left:4px">驳回</button>
+              </td>
+            </tr>
+            <tr>
+              <td>03-29</td>
+              <td>张敏</td>
+              <td>信息流推广费</td>
+              <td class="amount">¥12,800.00</td>
+              <td>招商基本户</td>
+              <td>04-10</td>
+              <td>
+                <button class="action-btn primary" onclick="openPayModal('PAY-029')">执行付款</button>
+                <button class="action-btn secondary" style="margin-left:4px">驳回</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- Right Column: AI Chat -->
+    <div class="card ai-panel">
+      <div class="card-header">
+        <span class="card-title">AI 出纳助手</span>
+        <button class="card-action">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        </button>
+      </div>
+      <div class="ai-messages" id="aiMessages">
+        <div class="msg user">今天有哪些款要付？</div>
+        <div class="msg ai">
+          <div class="msg-title">今日待付款项共3笔，合计 ¥184,200</div>
+          <div style="margin-top:6px;font-size:12px;color:var(--text-muted);margin-bottom:8px">按紧急程度排列：</div>
+          <ul>
+            <li><strong>美达化工货款 ¥85,000</strong>（明天到期）<br><span style="color:var(--text-muted);font-size:12px">→ 建议从工商一般户支付，支付后余额 ¥535,100</span></li>
+            <li><strong>3月员工工资 ¥86,400</strong>（4月5日到期）<br><span style="color:var(--text-muted);font-size:12px">→ 建议从招商基本户支付，支付后余额 ¥1,800,300</span></li>
+            <li><strong>信息流推广费 ¥12,800</strong>（4月10日到期）<br><span style="color:var(--text-muted);font-size:12px">→ 建议从招商基本户支付</span></li>
+          </ul>
+          <div class="msg-warning">提醒：执行美达化工付款后，工商一般户余额将低于60万安全线，建议安排内部调拨。</div>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" id="aiInput" type="text" placeholder="输入出纳指令，如：查询今日到账、执行付款、银行对账..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button class="ai-send-btn" onclick="sendMsg()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- VIEW 2: 收款登记 (income) -->
+<!-- ============================================================ -->
+<section class="view-content" data-view="income">
+  <div class="content-grid">
+    <div class="left-col">
+      <div class="card" style="margin-bottom:0">
+        <div class="tab-bar">
+          <button class="tab-item active" onclick="setTab(this)">全部</button>
+          <button class="tab-item" onclick="setTab(this)">平台回款</button>
+          <button class="tab-item" onclick="setTab(this)">其他收款</button>
+          <button class="tab-item" onclick="setTab(this)">待确认 <span class="tab-badge">1</span></button>
+        </div>
+        <div class="card-header" style="border-bottom:none;padding-bottom:0">
+          <span class="card-title">收款登记</span>
+          <button class="action-btn primary">+ 登记收款</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>收款类型</th>
+              <th>来源/平台</th>
+              <th>对方单位</th>
+              <th>金额</th>
+              <th>到账账户</th>
+              <th>关联单据</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>03-31</td>
+              <td><span class="type-tag platform">平台结算</span></td>
+              <td>抖店</td>
+              <td>字节跳动</td>
+              <td class="amount" style="color:var(--green)">¥68,200.00</td>
+              <td>招商基本户</td>
+              <td class="code">结算单#D0331</td>
+              <td><span class="status-tag confirmed">已确认</span></td>
+              <td><button class="action-btn secondary">查看</button></td>
+            </tr>
+            <tr style="background:#FFFBF0">
+              <td>03-31</td>
+              <td><span class="type-tag platform">平台结算</span></td>
+              <td>天猫</td>
+              <td>阿里巴巴</td>
+              <td class="amount" style="color:var(--green)">¥28,600.00</td>
+              <td>招商基本户</td>
+              <td class="code">结算单#T0331</td>
+              <td><span class="status-tag pending">待确认</span></td>
+              <td>
+                <button class="action-btn primary">确认</button>
+                <button class="action-btn secondary" style="margin-left:4px">退回</button>
+              </td>
+            </tr>
+            <tr>
+              <td>03-30</td>
+              <td><span class="type-tag customer">客户回款</span></td>
+              <td>线下</td>
+              <td>美丽联合</td>
+              <td class="amount" style="color:var(--green)">¥15,000.00</td>
+              <td>工商一般户</td>
+              <td class="code">合同#C2026-08</td>
+              <td><span class="status-tag confirmed">已确认</span></td>
+              <td><button class="action-btn secondary">查看</button></td>
+            </tr>
+            <tr>
+              <td>03-29</td>
+              <td><span class="type-tag platform">平台结算</span></td>
+              <td>小红书</td>
+              <td>小红书</td>
+              <td class="amount" style="color:var(--green)">¥38,700.00</td>
+              <td>招商基本户</td>
+              <td class="code">结算单#X0329</td>
+              <td><span class="status-tag confirmed">已确认</span></td>
+              <td><button class="action-btn secondary">查看</button></td>
+            </tr>
+            <tr>
+              <td>03-28</td>
+              <td><span class="type-tag refund">退款返还</span></td>
+              <td>天猫</td>
+              <td>阿里巴巴</td>
+              <td class="amount" style="color:var(--green)">¥860.00</td>
+              <td>招商基本户</td>
+              <td class="code">运费险理赔</td>
+              <td><span class="status-tag confirmed">已确认</span></td>
+              <td><button class="action-btn secondary">查看</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="summary-bar">
+          <span>本月收款 <span class="amount">86</span> 笔</span>
+          <span>合计 <span class="amount">¥1,286,400</span></span>
+          <span>待确认 <span class="amount" style="color:var(--orange)">1</span> 笔</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Panel -->
+    <div class="card ai-panel">
+      <div class="card-header">
+        <span class="card-title">AI 出纳助手</span>
+      </div>
+      <div class="ai-messages">
+        <div class="msg user">今天有什么款到了</div>
+        <div class="msg ai">
+          <div class="msg-title">今日到账 2 笔，合计 ¥96,800</div>
+          <ul>
+            <li><strong>抖店T+1结算 ¥68,200</strong>（已自动确认）</li>
+            <li><strong>天猫3月结算 ¥28,600</strong>（待您确认）</li>
+          </ul>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-secondary);padding:8px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--divider)">
+            天猫这笔需要确认的原因：结算金额与订单系统差异 ¥860（运费险理赔已单独到账）。
+          </div>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-secondary)">要我帮您确认吗？</div>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" type="text" placeholder="问问收款情况..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button class="ai-send-btn" onclick="sendMsg()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- VIEW 3: 付款执行 (payment) -->
+<!-- ============================================================ -->
+<section class="view-content" data-view="payment">
+  <div class="content-grid">
+    <div class="left-col">
+      <div class="card" style="margin-bottom:0">
+        <div class="tab-bar">
+          <button class="tab-item active" onclick="setTab(this)">待执行 <span class="tab-badge">3</span></button>
+          <button class="tab-item" onclick="setTab(this)">已执行</button>
+          <button class="tab-item" onclick="setTab(this)">已驳回</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>申请编号</th>
+              <th>申请日期</th>
+              <th>申请人</th>
+              <th>付款事由</th>
+              <th>金额</th>
+              <th>付款账户</th>
+              <th>审批人</th>
+              <th>到期日</th>
+              <th>紧急度</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="row-urgent">
+              <td class="code">PAY-031</td>
+              <td>03-31</td>
+              <td>李芳</td>
+              <td>供应商货款-美达化工</td>
+              <td class="amount">¥85,000.00</td>
+              <td>工商一般户</td>
+              <td style="color:var(--green)">张总 &#10003;</td>
+              <td style="color:var(--red);font-weight:500">04-02</td>
+              <td><span style="font-size:12px">&#128308; 紧急</span></td>
+              <td>
+                <button class="action-btn primary" onclick="openPayModal('PAY-031')">执行付款</button>
+                <button class="action-btn secondary" style="margin-left:4px">驳回</button>
+              </td>
+            </tr>
+            <tr>
+              <td class="code">PAY-030</td>
+              <td>03-30</td>
+              <td>李芳</td>
+              <td>3月员工工资</td>
+              <td class="amount">¥86,400.00</td>
+              <td>招商基本户</td>
+              <td style="color:var(--green)">张总 &#10003;</td>
+              <td>04-05</td>
+              <td><span style="font-size:12px">&#128993; 一般</span></td>
+              <td>
+                <button class="action-btn primary" onclick="openPayModal('PAY-030')">执行付款</button>
+                <button class="action-btn secondary" style="margin-left:4px">驳回</button>
+              </td>
+            </tr>
+            <tr>
+              <td class="code">PAY-029</td>
+              <td>03-29</td>
+              <td>张敏</td>
+              <td>信息流推广费-巨量引擎</td>
+              <td class="amount">¥12,800.00</td>
+              <td>招商基本户</td>
+              <td style="color:var(--green)">张总 &#10003;</td>
+              <td>04-10</td>
+              <td><span style="font-size:12px">&#128994; 宽裕</span></td>
+              <td>
+                <button class="action-btn primary" onclick="openPayModal('PAY-029')">执行付款</button>
+                <button class="action-btn secondary" style="margin-left:4px">驳回</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- AI Panel -->
+    <div class="card ai-panel">
+      <div class="card-header">
+        <span class="card-title">AI 出纳助手</span>
+      </div>
+      <div class="ai-messages">
+        <div class="msg user">今天有哪些款要付</div>
+        <div class="msg ai">
+          <div class="msg-title">今日待付款项共3笔，合计 ¥184,200</div>
+          <div style="margin-top:6px;font-size:12px;color:var(--text-muted);margin-bottom:8px">按紧急程度排列：</div>
+          <ul>
+            <li><strong>美达化工货款 ¥85,000</strong>（明天到期）<br><span style="color:var(--text-muted);font-size:12px">→ 建议从工商一般户支付，支付后余额 ¥535,100</span></li>
+            <li><strong>3月员工工资 ¥86,400</strong>（4月5日到期）<br><span style="color:var(--text-muted);font-size:12px">→ 建议从招商基本户支付</span></li>
+            <li><strong>信息流推广费 ¥12,800</strong>（4月10日到期）<br><span style="color:var(--text-muted);font-size:12px">→ 建议从招商基本户支付</span></li>
+          </ul>
+          <div class="msg-warning">提醒：执行美达化工付款后，工商一般户余额将低于60万安全线，建议安排内部调拨。</div>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" type="text" placeholder="问问付款情况..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button class="ai-send-btn" onclick="sendMsg()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- VIEW 4: 银行日记账 (journal) -->
+<!-- ============================================================ -->
+<section class="view-content" data-view="journal">
+  <div class="content-grid">
+    <div class="left-col">
+      <div class="card" style="margin-bottom:0">
+        <div class="tab-bar">
+          <button class="tab-item active" onclick="setTab(this)">招商银行·基本户</button>
+          <button class="tab-item" onclick="setTab(this)">工商银行·一般户</button>
+          <button class="tab-item" onclick="setTab(this)">现金</button>
+        </div>
+        <div class="card-header" style="border-bottom:none;padding-bottom:0">
+          <span class="card-title" data-label="journal-title">银行日记账</span>
+          <div style="display:flex;gap:8px">
+            <button class="action-btn secondary">导出Excel</button>
+            <button class="action-btn secondary">打印</button>
+          </div>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>凭证号</th>
+              <th>摘要</th>
+              <th>对方单位</th>
+              <th>收入</th>
+              <th>支出</th>
+              <th>余额</th>
+              <th>经手人</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>03-31</td>
+              <td class="code">收-018</td>
+              <td>抖店T+1结算到账</td>
+              <td>字节跳动</td>
+              <td class="amount" style="color:var(--green)">+¥68,200.00</td>
+              <td class="amount">—</td>
+              <td class="amount">¥1,890,200.00</td>
+              <td>系统</td>
+            </tr>
+            <tr>
+              <td>03-31</td>
+              <td class="code">付-031</td>
+              <td>付供应商货款</td>
+              <td>华美包材</td>
+              <td class="amount">—</td>
+              <td class="amount" style="color:var(--red)">-¥45,000.00</td>
+              <td class="amount">¥1,822,000.00</td>
+              <td>王丽</td>
+            </tr>
+            <tr>
+              <td>03-30</td>
+              <td class="code">收-017</td>
+              <td>天猫3月货款结算</td>
+              <td>阿里巴巴</td>
+              <td class="amount" style="color:var(--green)">+¥28,600.00</td>
+              <td class="amount">—</td>
+              <td class="amount">¥1,867,000.00</td>
+              <td>系统</td>
+            </tr>
+            <tr>
+              <td>03-30</td>
+              <td class="code">付-030</td>
+              <td>顺丰物流月结</td>
+              <td>顺丰速运</td>
+              <td class="amount">—</td>
+              <td class="amount" style="color:var(--red)">-¥32,100.00</td>
+              <td class="amount">¥1,838,400.00</td>
+              <td>王丽</td>
+            </tr>
+            <tr>
+              <td>03-29</td>
+              <td class="code">收-016</td>
+              <td>小红书订单结算</td>
+              <td>小红书</td>
+              <td class="amount" style="color:var(--green)">+¥38,700.00</td>
+              <td class="amount">—</td>
+              <td class="amount">¥1,870,500.00</td>
+              <td>系统</td>
+            </tr>
+            <tr>
+              <td>03-28</td>
+              <td class="code">付-029</td>
+              <td>办公用品采购</td>
+              <td>京东企业购</td>
+              <td class="amount">—</td>
+              <td class="amount" style="color:var(--red)">-¥2,340.00</td>
+              <td class="amount">¥1,831,800.00</td>
+              <td>王丽</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="summary-bar">
+          <span>本月合计：收入 <span class="amount" style="color:var(--green)">¥486,200.00</span></span>
+          <span>支出 <span class="amount" style="color:var(--red)">¥298,640.00</span></span>
+          <span>净流入 <span class="amount" style="color:var(--green)">¥187,560.00</span></span>
+          <span>期末余额 <span class="amount">¥1,890,200.00</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Panel -->
+    <div class="card ai-panel">
+      <div class="card-header">
+        <span class="card-title">AI 出纳助手</span>
+      </div>
+      <div class="ai-messages">
+        <div class="msg user">招商银行这个月收了多少钱</div>
+        <div class="msg ai">
+          <div class="msg-title">招商银行基本户3月收入明细</div>
+          <div style="margin-top:8px;font-size:13px">
+            <div style="font-weight:600;margin-bottom:4px">平台结算：¥386,200（占79.4%）</div>
+            <ul style="font-size:12px;color:var(--text-secondary)">
+              <li>抖店 ¥198,400</li>
+              <li>天猫 ¥126,800</li>
+              <li>小红书 ¥61,000</li>
+            </ul>
+            <div style="font-weight:600;margin:8px 0 4px">其他收入：¥100,000（占20.6%）</div>
+            <ul style="font-size:12px;color:var(--text-secondary)">
+              <li>客户回款 ¥85,000</li>
+              <li>运费险理赔 ¥15,000</li>
+            </ul>
+            <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--divider);font-weight:600">合计收入：¥486,200</div>
+          </div>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" type="text" placeholder="查询银行日记账..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button class="ai-send-btn" onclick="sendMsg()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- VIEW 5: 银行对账 (bank-recon) -->
+<!-- ============================================================ -->
+<section class="view-content" data-view="bank-recon">
+  <div class="content-grid">
+    <div class="left-col">
+      <div class="card" style="margin-bottom:20px">
+        <div class="tab-bar">
+          <button class="tab-item active" onclick="setTab(this)">招商银行·基本户</button>
+          <button class="tab-item" onclick="setTab(this)">工商银行·一般户</button>
+        </div>
+        <div class="card-header" style="border-bottom:none;padding-bottom:0">
+          <span class="card-title" data-label="recon-title">银行对账</span>
+          <div style="display:flex;gap:8px">
+            <button class="action-btn secondary">导入银行对账单(CSV)</button>
+            <button class="action-btn primary">AI自动对账</button>
+          </div>
+        </div>
+
+        <!-- Reconciliation Status Cards -->
+        <div style="padding:20px">
+          <div class="recon-row">
+            <div class="recon-card ok">
+              <div class="recon-label">企业账面余额</div>
+              <div class="recon-value">¥1,886,700</div>
+            </div>
+            <div class="recon-arrow">&#8596;</div>
+            <div class="recon-card ok">
+              <div class="recon-label">银行对账单余额</div>
+              <div class="recon-value">¥1,886,700</div>
+            </div>
+            <div class="recon-arrow">&#8594;</div>
+            <div class="recon-card ok">
+              <div class="recon-label">对账结果</div>
+              <div class="recon-value" style="color:var(--green);font-size:28px">&#10003;</div>
+              <div class="recon-status" style="color:var(--green)">已对平 · 差异: ¥0</div>
+            </div>
+          </div>
+
+          <!-- Balance Reconciliation Table -->
+          <div style="font-size:14px;font-weight:600;margin-bottom:12px;color:var(--text-primary)">
+            银行存款余额调节表（招商银行·基本户 2026年3月）
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+            <div>
+              <table class="recon-detail-table">
+                <tr><td>企业账面余额</td><td>¥1,886,700.00</td></tr>
+                <tr><td>加：银行已收企业未收</td><td>¥0.00</td></tr>
+                <tr><td>减：银行已付企业未付</td><td>¥0.00</td></tr>
+                <tr class="total"><td>调节后余额</td><td>¥1,886,700.00</td></tr>
+              </table>
+            </div>
+            <div>
+              <table class="recon-detail-table">
+                <tr><td>银行对账单余额</td><td>¥1,886,700.00</td></tr>
+                <tr><td>加：企业已收银行未收</td><td>¥0.00</td></tr>
+                <tr><td>减：企业已付银行未付</td><td>¥0.00</td></tr>
+                <tr class="total"><td>调节后余额</td><td>¥1,886,700.00</td></tr>
+              </table>
+            </div>
+          </div>
+          <div style="text-align:center;padding:12px;background:#E8F7E8;border-radius:8px;color:var(--green);font-weight:600;font-size:14px">
+            结论：调节后余额一致 &#10003;
+          </div>
+        </div>
+        <div style="padding:0 20px 16px;text-align:right">
+          <button class="action-btn secondary">生成余额调节表PDF</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Panel -->
+    <div class="card ai-panel">
+      <div class="card-header">
+        <span class="card-title">AI 出纳助手</span>
+      </div>
+      <div class="ai-messages">
+        <div class="msg user">工商银行的差异帮我查一下</div>
+        <div class="msg ai">
+          <div class="msg-title">工商银行一般户3月存在 2 笔未达账项，差异 ¥23,100</div>
+          <ul>
+            <li>
+              <strong>银行已收企业未收 ¥18,600</strong><br>
+              <span style="font-size:12px;color:var(--text-secondary)">→ 淘宝结算到账（银行3/30入账，企业未登记）</span><br>
+              <span style="font-size:12px;color:var(--green)">→ 建议：登记收款并生成凭证</span>
+            </li>
+            <li style="margin-top:8px">
+              <strong>企业已付银行未付 ¥4,500</strong><br>
+              <span style="font-size:12px;color:var(--text-secondary)">→ 转账支票-原料款（3/29开出，银行在途）</span><br>
+              <span style="font-size:12px;color:var(--text-secondary)">→ 预计到账：4/1-4/2</span>
+            </li>
+          </ul>
+          <div style="margin-top:10px;font-size:12px;color:var(--text-secondary)">要我帮您登记第1笔收款吗？</div>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" type="text" placeholder="查询对账情况..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button class="ai-send-btn" onclick="sendMsg()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- VIEW 6: 资金日报 (fund-report) -->
+<!-- ============================================================ -->
+<section class="view-content" data-view="fund-report">
+  <div class="content-grid">
+    <div class="left-col">
+      <!-- Top bar with date and actions -->
+      <div class="view-top-bar">
+        <div class="left">
+          <span style="font-size:14px;font-weight:600;color:var(--text-primary)">资金日报</span>
+          <span style="font-size:13px;color:var(--text-secondary);padding:4px 12px;border:1px solid var(--input-border);border-radius:6px;background:var(--bg)">2026-03-31</span>
+        </div>
+        <div class="right">
+          <button class="action-btn secondary">导出PDF</button>
+          <button class="action-btn primary">发送日报</button>
+        </div>
+      </div>
+
+      <div class="report-card">
+        <h3>时皙品牌 · 资金日报</h3>
+        <div class="report-date">2026年3月31日（周二）</div>
+
+        <div class="report-section-title">一、资金余额</div>
+        <table class="report-table">
+          <thead>
+            <tr><th>账户名称</th><th>昨日余额</th><th>今日收入</th><th>今日支出</th><th>今日余额</th><th>变动</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-weight:500;color:var(--text-primary)">招商银行·基本户</td>
+              <td class="amount">¥1,867,000</td>
+              <td class="amount" style="color:var(--green)">+¥96,800</td>
+              <td class="amount" style="color:var(--red)">-¥77,100</td>
+              <td class="amount" style="font-weight:600">¥1,886,700</td>
+              <td class="amount" style="color:var(--green)">+¥19,700</td>
+            </tr>
+            <tr>
+              <td style="font-weight:500;color:var(--text-primary)">工商银行·一般户</td>
+              <td class="amount">¥620,100</td>
+              <td class="amount">¥0</td>
+              <td class="amount">¥0</td>
+              <td class="amount" style="font-weight:600">¥620,100</td>
+              <td class="amount">¥0</td>
+            </tr>
+            <tr>
+              <td style="font-weight:500;color:var(--text-primary)">现金</td>
+              <td class="amount">¥5,200</td>
+              <td class="amount">¥0</td>
+              <td class="amount" style="color:var(--red)">-¥300</td>
+              <td class="amount" style="font-weight:600">¥4,900</td>
+              <td class="amount" style="color:var(--red)">-¥300</td>
+            </tr>
+            <tr class="total-row">
+              <td>合计</td>
+              <td class="amount">¥2,492,300</td>
+              <td class="amount" style="color:var(--green)">+¥96,800</td>
+              <td class="amount" style="color:var(--red)">-¥77,400</td>
+              <td class="amount">¥2,511,700</td>
+              <td class="amount" style="color:var(--green)">+¥19,400</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="report-section-title">二、大额收支（&ge;¥10,000）</div>
+        <table class="report-table">
+          <thead>
+            <tr><th>时间</th><th>类型</th><th>摘要</th><th>金额</th><th>对方</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>09:32</td>
+              <td><span class="type-tag income">收</span></td>
+              <td>抖店T+1结算</td>
+              <td class="amount" style="color:var(--green)">+¥68,200</td>
+              <td>字节跳动</td>
+            </tr>
+            <tr>
+              <td>10:15</td>
+              <td><span class="type-tag income">收</span></td>
+              <td>天猫3月结算</td>
+              <td class="amount" style="color:var(--green)">+¥28,600</td>
+              <td>阿里巴巴</td>
+            </tr>
+            <tr>
+              <td>11:20</td>
+              <td><span class="type-tag expense">付</span></td>
+              <td>供应商货款-华美</td>
+              <td class="amount" style="color:var(--red)">-¥45,000</td>
+              <td>华美包材</td>
+            </tr>
+            <tr>
+              <td>14:00</td>
+              <td><span class="type-tag expense">付</span></td>
+              <td>顺丰物流月结</td>
+              <td class="amount" style="color:var(--red)">-¥32,100</td>
+              <td>顺丰速运</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="report-section-title">三、明日资金预测</div>
+        <div style="font-size:13px;line-height:1.8;color:var(--text-secondary);padding:0 4px">
+          预计收入：¥52,000（拼多多T+3结算 ¥35,000 + 美团结算 ¥17,000）<br>
+          预计支出：¥85,000（美达化工货款，已审批待执行）<br>
+          预计净流出：<span style="color:var(--red);font-weight:500">-¥33,000</span>
+        </div>
+        <div class="report-warn">
+          执行美达付款后，工商一般户将低于60万安全线
+        </div>
+
+        <div class="report-section-title">四、本月累计</div>
+        <div style="display:flex;gap:24px;font-size:13px;color:var(--text-secondary);padding:4px">
+          <span>累计收入：<span style="font-family:var(--font-mono);font-weight:600;color:var(--green)">¥1,286,400</span></span>
+          <span>累计支出：<span style="font-family:var(--font-mono);font-weight:600;color:var(--red)">¥1,098,900</span></span>
+          <span>净流入：<span style="font-family:var(--font-mono);font-weight:600;color:var(--green)">¥187,500</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Panel -->
+    <div class="card ai-panel">
+      <div class="card-header">
+        <span class="card-title">AI 出纳助手</span>
+      </div>
+      <div class="ai-messages">
+        <div class="msg user">生成今天的资金日报发给老板</div>
+        <div class="msg ai">
+          <div class="msg-title">资金日报已生成，要点摘要：</div>
+          <ul>
+            <li>今日净流入 <strong>+¥19,400</strong></li>
+            <li>资金总余额 <strong>¥2,511,700</strong></li>
+            <li style="color:var(--orange)">明日预计净流出 ¥33,000（美达货款）</li>
+          </ul>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="action-btn secondary" style="font-size:11px">查看完整日报</button>
+            <button class="action-btn secondary" style="font-size:11px">导出PDF</button>
+            <button class="action-btn primary" style="font-size:11px">发送邮件</button>
+          </div>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" type="text" placeholder="生成或发送日报..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button class="ai-send-btn" onclick="sendMsg()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- VIEW 7: 结算日历 (calendar) -->
+<!-- ============================================================ -->
+<section class="view-content" data-view="calendar">
+  <div class="content-grid" style="grid-template-columns:3fr 1.5fr">
+    <div class="left-col">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">4月结算日历</span>
+          <div style="display:flex;gap:8px">
+            <button class="action-btn secondary">&larr; 3月</button>
+            <button class="action-btn secondary">5月 &rarr;</button>
+          </div>
+        </div>
+        <div style="padding:16px 20px">
+          <div class="calendar-grid">
+            <div class="calendar-header-cell">日</div>
+            <div class="calendar-header-cell">一</div>
+            <div class="calendar-header-cell">二</div>
+            <div class="calendar-header-cell">三</div>
+            <div class="calendar-header-cell">四</div>
+            <div class="calendar-header-cell">五</div>
+            <div class="calendar-header-cell">六</div>
+
+            <!-- Row 1: Mar 30 - Apr 5 -->
+            <div class="calendar-cell empty"></div>
+            <div class="calendar-cell empty"></div>
+            <div class="calendar-cell">
+              <div class="day-num"><span class="day-num today">1</span></div>
+              <div class="calendar-event cal-expense">美达 85K</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">2</div>
+              <div class="calendar-event cal-income">拼多多 35K</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">3</div>
+              <div class="calendar-event cal-income">美团 17K</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">4</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">5</div>
+              <div class="calendar-event cal-expense">员工工资 86.4K</div>
+            </div>
+
+            <!-- Row 2: Apr 6-12 -->
+            <div class="calendar-cell">
+              <div class="day-num">6</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">7</div>
+              <div class="calendar-event cal-income">天猫Q2 ~180K</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">8</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">9</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">10</div>
+              <div class="calendar-event cal-expense">推广费 12.8K</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">11</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">12</div>
+            </div>
+
+            <!-- Row 3: Apr 13-19 -->
+            <div class="calendar-cell">
+              <div class="day-num">13</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">14</div>
+              <div class="calendar-event cal-tax">税务申报截止</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">15</div>
+              <div class="calendar-event cal-tax">增值税截止</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">16</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">17</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">18</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">19</div>
+            </div>
+
+            <!-- Row 4: Apr 20-26 -->
+            <div class="calendar-cell">
+              <div class="day-num">20</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">21</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">22</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">23</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">24</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">25</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">26</div>
+            </div>
+
+            <!-- Row 5: Apr 27-30 -->
+            <div class="calendar-cell">
+              <div class="day-num">27</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">28</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">29</div>
+            </div>
+            <div class="calendar-cell">
+              <div class="day-num">30</div>
+            </div>
+            <div class="calendar-cell empty"></div>
+            <div class="calendar-cell empty"></div>
+            <div class="calendar-cell empty"></div>
+          </div>
+
+          <div style="display:flex;gap:16px;margin-top:12px;font-size:11px;color:var(--text-muted)">
+            <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:4px"></span>收入</span>
+            <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:4px"></span>支出</span>
+            <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--blue);margin-right:4px"></span>税务</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Forecast + AI -->
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <div class="forecast-card">
+        <h4>未来7天资金预测</h4>
+        <div class="forecast-row">
+          <span class="label">预计收入</span>
+          <span class="value" style="color:var(--green)">¥235,000</span>
+        </div>
+        <div class="forecast-row">
+          <span class="label">预计支出</span>
+          <span class="value" style="color:var(--red)">¥184,200</span>
+        </div>
+        <div class="forecast-divider"></div>
+        <div class="forecast-row">
+          <span class="label">净流入</span>
+          <span class="value" style="color:var(--green)">+¥50,800</span>
+        </div>
+        <div class="forecast-divider"></div>
+        <div class="forecast-row">
+          <span class="label">预计最低余额点</span>
+          <span class="value">4月2日</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);text-align:right">¥2,426,700（美达付款后）</div>
+
+        <div class="safety-check">
+          <div style="font-size:12px;font-weight:600;margin-bottom:4px">安全线检查</div>
+          <div class="item safe">&#10003; 招商基本户 安全</div>
+          <div class="item warn">&#9888; 工商一般户 4月2日低于60万</div>
+        </div>
+      </div>
+
+      <div class="card ai-panel" style="flex:1;min-height:280px">
+        <div class="card-header">
+          <span class="card-title">AI 出纳助手</span>
+        </div>
+        <div class="ai-messages">
+          <div class="msg user">这周有什么钱要进来</div>
+          <div class="msg ai">
+            <div class="msg-title">本周（4/1-4/5）预期资金流入 3 笔</div>
+            <ul>
+              <li><strong>4/1 拼多多T+3结算</strong> ¥35,000</li>
+              <li><strong>4/3 美团闪购结算</strong> ¥17,000</li>
+              <li><strong>4/7 天猫Q2首批结算</strong> 约¥180,000</li>
+            </ul>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:6px">合计预期收入：约¥232,000</div>
+            <div style="font-size:12px;margin-top:8px;font-weight:500">同期预期支出：</div>
+            <ul style="font-size:12px">
+              <li>4/2 美达化工货款 ¥85,000（已审批）</li>
+              <li>4/5 员工工资 ¥86,400（已审批）</li>
+            </ul>
+            <div style="margin-top:8px;font-size:12px;color:var(--green);font-weight:500">净流入约 +¥60,600，资金安全。</div>
+          </div>
+        </div>
+        <div class="ai-input-bar">
+          <input class="ai-input" type="text" placeholder="查询结算日程..." onkeydown="if(event.key==='Enter')sendMsg()">
+          <button class="ai-send-btn" onclick="sendMsg()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- VIEW 8: 票据管理 (bills) -->
+<!-- ============================================================ -->
+<section class="view-content" data-view="bills">
+  <div class="content-grid">
+    <div class="left-col">
+      <div class="card" style="margin-bottom:0">
+        <div class="card-header">
+          <span class="card-title" data-label="bills-title">票据管理</span>
+          <button class="action-btn primary">+ 登记票据</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>票据编号</th>
+              <th>类型</th>
+              <th>出票日期</th>
+              <th>到期日</th>
+              <th>金额</th>
+              <th>出票人/收款人</th>
+              <th>用途</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="code">CK-2026-08</td>
+              <td><span class="type-tag platform">转账支票</span></td>
+              <td>03-29</td>
+              <td style="color:var(--orange);font-weight:500">04-02</td>
+              <td class="amount">¥4,500.00</td>
+              <td>我方 → 美达化工</td>
+              <td>原料采购尾款</td>
+              <td><span class="status-tag transit">在途</span></td>
+            </tr>
+            <tr>
+              <td class="code">CK-2026-07</td>
+              <td><span class="type-tag platform">转账支票</span></td>
+              <td>03-15</td>
+              <td>03-20</td>
+              <td class="amount">¥12,000.00</td>
+              <td>我方 → 顺丰</td>
+              <td>2月物流尾款</td>
+              <td><span class="status-tag confirmed">已兑付 &#10003;</span></td>
+            </tr>
+            <tr>
+              <td class="code">AH-2026-01</td>
+              <td><span style="font-size:11px;font-weight:500;background:#FFF7E6;color:var(--orange);padding:2px 8px;border-radius:4px">银行承兑</span></td>
+              <td>02-28</td>
+              <td>05-28</td>
+              <td class="amount">¥50,000.00</td>
+              <td>美丽联合 → 我方</td>
+              <td>合作保证金</td>
+              <td><span class="status-tag pending">未到期</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="summary-bar">
+          <span>在途票据 <span class="amount">1</span> 张 <span class="amount">¥4,500</span></span>
+          <span>未到期应收 <span class="amount">1</span> 张 <span class="amount">¥50,000</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Panel -->
+    <div class="card ai-panel">
+      <div class="card-header">
+        <span class="card-title">AI 出纳助手</span>
+      </div>
+      <div class="ai-messages">
+        <div class="msg ai">
+          <div class="msg-title">票据概况</div>
+          <ul>
+            <li>在途票据 1 张（CK-2026-08 ¥4,500，预计4/2到期）</li>
+            <li>未到期应收 1 张（AH-2026-01 ¥50,000，5/28到期）</li>
+            <li>本月已兑付 1 张（¥12,000）</li>
+          </ul>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:6px">CK-2026-08明天到期，请关注银行扣款通知。</div>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" type="text" placeholder="查询票据信息..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button class="ai-send-btn" onclick="sendMsg()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- VIEW: AI 对话 (chat) - Full screen chat -->
+<!-- ============================================================ -->
+<section class="view-content" data-view="chat">
+  <div class="card" style="height:calc(100vh - 140px)">
+    <div class="ai-panel" style="height:100%">
+      <div class="card-header">
+        <span class="card-title">AI 出纳助手 · 对话模式</span>
+        <button class="card-action">新建对话</button>
+      </div>
+      <div class="ai-messages" style="flex:1">
+        <div class="msg ai">
+          <div class="msg-title">您好，我是AI出纳助手</div>
+          <div>可以帮您查询资金状况、执行付款、银行对账、生成日报等。请问有什么需要？</div>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" type="text" placeholder="输入出纳指令..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button class="ai-send-btn" onclick="sendMsg()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ========== FOOTER ========== -->
+<footer class="footer">
+  <span><span class="footer-dot"></span>系统正常</span>
+  <span>AI引擎：通义千问</span>
+  <span id="footerSlogan">出纳工作台 · 管钱不管账</span>
+  <span>当前期间：2026年第03期</span>
+  <span class="footer-right">v3.0.0</span>
+</footer>
+
+<!-- ========== Payment Confirmation Modal ========== -->
+<div class="modal-overlay" id="payModal">
+  <div class="modal-card">
+    <h3>确认付款</h3>
+    <div class="modal-row"><span class="label">付款事由</span><span class="value" id="modalReason">供应商货款-美达化工</span></div>
+    <div class="modal-row"><span class="label">金额</span><span class="value mono" id="modalAmount">¥85,000.00</span></div>
+    <div class="modal-row"><span class="label">收款方</span><span class="value" id="modalPayee">美达化工有限公司</span></div>
+    <div class="modal-row"><span class="label">收款账号</span><span class="value mono" id="modalAccount">6222 **** **** 3356</span></div>
+    <div class="modal-row"><span class="label">付款账户</span><span class="value" id="modalFrom">工商银行·一般户（余额¥620,100）</span></div>
+    <div class="modal-row"><span class="label">付款后余额</span><span class="value mono" id="modalAfter">¥535,100</span></div>
+    <div class="modal-warning" id="modalWarning">付款后余额低于60万安全线</div>
+    <div class="modal-actions">
+      <button class="action-btn secondary" onclick="closePayModal()">取消</button>
+      <button class="action-btn primary" onclick="confirmPayment()">确认付款</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== Welcome Modal ========== -->
+<div class="welcome-overlay" id="welcomeModal">
+  <div class="welcome-card">
+    <h2>欢迎使用出纳工作台</h2>
+    <div class="subtitle">这是您的AI资金管理助手</div>
+    <div class="welcome-features">
+      <div class="feature"><span class="check">&#10003;</span>实时追踪每一笔收付款</div>
+      <div class="feature"><span class="check">&#10003;</span>AI自动银行对账</div>
+      <div class="feature"><span class="check">&#10003;</span>智能资金预测和安全预警</div>
+      <div class="feature"><span class="check">&#10003;</span>一键生成资金日报</div>
+    </div>
+    <div class="welcome-actions">
+      <button class="action-btn primary" onclick="closeWelcome()">开始体验</button>
+      <button class="action-btn secondary" onclick="closeWelcome(true)">不再提示</button>
+    </div>
+  </div>
+</div>
+
+<!-- Notification Panel -->
+<div class="notification-panel" id="notificationPanel">
+  <div class="noti-header">
+    <span class="noti-header-title">通知中心</span>
+    <button class="noti-mark-read" onclick="document.querySelectorAll('.noti-item.unread').forEach(i=>i.classList.remove('unread'))">全部已读</button>
+  </div>
+  <div class="noti-list">
+    <div class="noti-item unread">
+      <div class="noti-icon danger">!</div>
+      <div class="noti-content">
+        <div class="noti-title">美达化工货款明天到期，请尽快执行付款 ¥85,000</div>
+        <div class="noti-time">30 分钟前 · 付款提醒</div>
+      </div>
+    </div>
+    <div class="noti-item unread">
+      <div class="noti-icon warn">!</div>
+      <div class="noti-content">
+        <div class="noti-title">工商银行一般户对账差异2笔，合计 ¥23,100</div>
+        <div class="noti-time">1 小时前 · 对账预警</div>
+      </div>
+    </div>
+    <div class="noti-item unread">
+      <div class="noti-icon success">&#10003;</div>
+      <div class="noti-content">
+        <div class="noti-title">抖店T+1结算到账 ¥68,200，已自动登记至招商基本户</div>
+        <div class="noti-time">2 小时前 · 到账通知</div>
+      </div>
+    </div>
+    <div class="noti-item">
+      <div class="noti-icon info">i</div>
+      <div class="noti-content">
+        <div class="noti-title">张敏提交付款申请：3月员工工资 ¥86,400</div>
+        <div class="noti-time">3 小时前 · 审批通知</div>
+      </div>
+    </div>
+    <div class="noti-item">
+      <div class="noti-icon warn">!</div>
+      <div class="noti-content">
+        <div class="noti-title">招商基本户今日支出较大，请关注余额变动</div>
+        <div class="noti-time">5 小时前 · 资金预警</div>
+      </div>
+    </div>
+  </div>
+  <div class="noti-footer">
+    <a href="v3-mock-notice.html#notifications">查看全部通知 &rarr;</a>
+  </div>
+</div>
+
+<!-- ========== SCRIPTS ========== -->
+<script>
+// ============ View Switching ============
+function switchView(viewName) {
+  // Update sidebar
+  document.querySelectorAll('.nav-item[data-view]').forEach(function(n) { n.classList.remove('active'); });
+  var targetNav = document.querySelector('.nav-item[data-view="' + viewName + '"]');
+  if (targetNav) targetNav.classList.add('active');
+
+  // Update content
+  document.querySelectorAll('.view-content').forEach(function(v) { v.classList.remove('active'); });
+  var targetView = document.querySelector('.view-content[data-view="' + viewName + '"]');
+  if (targetView) targetView.classList.add('active');
+
+  // Re-trigger KPI animations for overview
+  if (viewName === 'overview') {
+    document.querySelectorAll('.kpi-value[data-target]').forEach(function(el, i) {
+      setTimeout(function() {
+        countUp(el, +el.dataset.target, el.dataset.prefix || '', 1200);
+      }, i * 80);
+    });
+  }
+}
+
+// Sidebar nav click
+document.querySelectorAll('.nav-item[data-view]').forEach(function(item) {
+  item.addEventListener('click', function() {
+    var view = item.getAttribute('data-view');
+    if (view) switchView(view);
+  });
+});
+
+// Chat list click
+document.querySelectorAll('.chat-item[data-chat]').forEach(function(item) {
+  item.addEventListener('click', function() {
+    document.querySelectorAll('.chat-item').forEach(function(n) { n.classList.remove('active'); });
+    item.classList.add('active');
+  });
+});
+
+// ============ Count-up Animation ============
+function countUp(el, target, prefix, duration) {
+  var start = performance.now();
+  var fmt = function(n) { return prefix + n.toLocaleString('zh-CN'); };
+  var step = function(ts) {
+    var p = Math.min((ts - start) / duration, 1);
+    var ease = 1 - Math.pow(1 - p, 3);
+    el.textContent = fmt(Math.round(target * ease));
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+document.querySelectorAll('.kpi-value[data-target]').forEach(function(el, i) {
+  setTimeout(function() {
+    countUp(el, +el.dataset.target, el.dataset.prefix || '', 1200);
+  }, i * 80);
+});
+
+// ============ Tab Switching ============
+function setTab(btn) {
+  var bar = btn.parentElement;
+  bar.querySelectorAll('.tab-item').forEach(function(t) { t.classList.remove('active'); });
+  btn.classList.add('active');
+}
+
+// ============ AI Send Message ============
+function sendMsg() {
+  var input = document.querySelector('.view-content.active .ai-input') || document.getElementById('aiInput');
+  if (!input) return;
+  var text = input.value.trim();
+  if (!text) return;
+  var container = input.closest('.ai-panel') ? input.closest('.ai-panel').querySelector('.ai-messages') : document.getElementById('aiMessages');
+  if (!container) return;
+
+  var msg = document.createElement('div');
+  msg.className = 'msg user';
+  msg.textContent = text;
+  msg.style.animation = 'fadeInUp .3s ease';
+  container.appendChild(msg);
+  input.value = '';
+  container.scrollTop = container.scrollHeight;
+
+  setTimeout(function() {
+    var ai = document.createElement('div');
+    ai.className = 'msg ai';
+    ai.style.animation = 'fadeInUp .3s ease';
+    ai.innerHTML = '<div style="color:var(--text-muted);font-size:12px">正在查询资金数据...</div>';
+    container.appendChild(ai);
+    container.scrollTop = container.scrollHeight;
+  }, 600);
+}
+
+// ============ Period Selector ============
+var currentYear = 2026, currentMonth = 3;
+function switchPeriod(dir) {
+  currentMonth += dir;
+  if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+  if (currentMonth < 1) { currentMonth = 12; currentYear--; }
+  document.getElementById('periodLabel').textContent = currentYear + '年' + String(currentMonth).padStart(2,'0') + '月';
+}
+function setPeriodType(btn) {
+  document.querySelectorAll('.period-tab').forEach(function(t) { t.classList.remove('active'); });
+  btn.classList.add('active');
+}
+
+// ============ Mode Toggle (Simple/Pro) ============
+var isProMode = false;
+function toggleMode() {
+  isProMode = !isProMode;
+  var sw = document.getElementById('modeSwitch');
+  sw.classList.toggle('active', isProMode);
+
+  // Update labels
+  var labels = {
+    'journal': isProMode ? '银行日记账' : '银行流水',
+    'bank-recon': isProMode ? '银行对账' : '对银行账',
+    'bills': isProMode ? '票据管理' : '支票/汇票',
+    'overview': isProMode ? '资金概览' : '资金概览'
+  };
+  document.querySelectorAll('[data-label]').forEach(function(el) {
+    var key = el.getAttribute('data-label');
+    if (labels[key]) el.textContent = labels[key];
+  });
+
+  // Update footer
+  document.getElementById('footerSlogan').textContent = isProMode ? '出纳工作台 · 管钱不管账' : '出纳工作台 · 守好每一分钱';
+}
+
+// ============ Payment Modal ============
+var paymentData = {
+  'PAY-031': {
+    reason: '供应商货款-美达化工',
+    amount: '¥85,000.00',
+    payee: '美达化工有限公司',
+    account: '6222 **** **** 3356',
+    from: '工商银行·一般户（余额¥620,100）',
+    after: '¥535,100',
+    warning: '付款后余额低于60万安全线'
+  },
+  'PAY-030': {
+    reason: '3月员工工资',
+    amount: '¥86,400.00',
+    payee: '时皙品牌员工（15人）',
+    account: '批量代发',
+    from: '招商银行·基本户（余额¥1,886,700）',
+    after: '¥1,800,300',
+    warning: ''
+  },
+  'PAY-029': {
+    reason: '信息流推广费-巨量引擎',
+    amount: '¥12,800.00',
+    payee: '北京巨量引擎科技有限公司',
+    account: '1100 **** **** 8890',
+    from: '招商银行·基本户（余额¥1,886,700）',
+    after: '¥1,873,900',
+    warning: ''
+  }
+};
+
+function openPayModal(id) {
+  var d = paymentData[id];
+  if (!d) return;
+  document.getElementById('modalReason').textContent = d.reason;
+  document.getElementById('modalAmount').textContent = d.amount;
+  document.getElementById('modalPayee').textContent = d.payee;
+  document.getElementById('modalAccount').textContent = d.account;
+  document.getElementById('modalFrom').textContent = d.from;
+  document.getElementById('modalAfter').textContent = d.after;
+  var warn = document.getElementById('modalWarning');
+  if (d.warning) {
+    warn.textContent = d.warning;
+    warn.style.display = 'block';
+  } else {
+    warn.style.display = 'none';
+  }
+  document.getElementById('payModal').classList.add('open');
+}
+
+function closePayModal() {
+  document.getElementById('payModal').classList.remove('open');
+}
+
+function confirmPayment() {
+  closePayModal();
+  // Simple feedback
+  alert('付款指令已提交，等待银行处理。');
+}
+
+// Close modal on overlay click
+document.getElementById('payModal').addEventListener('click', function(e) {
+  if (e.target === this) closePayModal();
+});
+
+// ============ Welcome Modal ============
+function closeWelcome(neverShow) {
+  document.getElementById('welcomeModal').style.display = 'none';
+  if (neverShow) {
+    try { localStorage.setItem('cashier_welcome_dismissed', '1'); } catch(e) {}
+  }
+}
+
+// Check if welcome should show
+(function() {
+  try {
+    if (localStorage.getItem('cashier_welcome_dismissed') === '1') {
+      document.getElementById('welcomeModal').style.display = 'none';
+    }
+  } catch(e) {}
+})();
+
+// ============ Notification Panel ============
+(function() {
+  var notiBtn = document.getElementById('notiBtn');
+  var notiPanel = document.getElementById('notificationPanel');
+  if (notiBtn && notiPanel) {
+    notiBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      notiPanel.classList.toggle('open');
+    });
+    document.addEventListener('click', function(e) {
+      if (!notiPanel.contains(e.target)) {
+        notiPanel.classList.remove('open');
+      }
+    });
+  }
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,4368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>作战指挥台 - 时皙 AI 工作站</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --text-primary: #1A1A1A;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --bg: #FFFFFF;
+  --sidebar-bg: #F9F9F9;
+  --sidebar-border: #F0F0F0;
+  --divider: #F0F0F0;
+  --input-border: #E8E8E8;
+  --input-bg: #F5F5F5;
+  --hover-bg: #F3F3F3;
+  --active-bg: #EFEFEF;
+  --accent: #1A1A1A;
+  --green: #00B42A;
+  --red: #E53835;
+  --orange: #FF7D00;
+  --blue: #4F6EF7;
+  --font: -apple-system, 'SF Pro Display', 'PingFang SC', 'Helvetica Neue', sans-serif;
+  --font-mono: 'SF Mono', 'Roboto Mono', monospace;
+}
+
+body {
+  font-family: var(--font);
+  color: var(--text-primary);
+  background: var(--bg);
+  min-width: 1024px;
+  overflow: hidden;
+  height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ========== HEADER ========== */
+.header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 52px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--divider);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  z-index: 100;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.logo span {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+}
+.header-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 24px;
+}
+.header-nav a {
+  text-decoration: none;
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.header-nav a:hover { background: var(--hover-bg); color: var(--text-primary); }
+.header-nav a.active { background: var(--active-bg); color: var(--text-primary); font-weight: 600; }
+
+/* Mode Toggle */
+.mode-toggle {
+  display: flex; align-items: center; gap: 6px;
+}
+.mode-label {
+  font-size: 12px; color: var(--text-muted); font-weight: 500;
+  transition: color .15s;
+}
+.mode-label.active { color: var(--text-primary); font-weight: 600; }
+.toggle-switch {
+  width: 36px; height: 20px;
+  background: var(--accent);
+  border-radius: 10px;
+  position: relative;
+  cursor: pointer;
+  transition: background .2s;
+}
+.toggle-knob {
+  width: 16px; height: 16px;
+  background: #FFFFFF;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px; right: 2px;
+  transition: all .2s;
+}
+.toggle-switch.simple .toggle-knob {
+  right: auto; left: 2px;
+}
+.toggle-switch.simple {
+  background: var(--text-muted);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Notification bell */
+.notification-btn {
+  position: relative;
+  width: 36px; height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.notification-btn:hover { background: var(--hover-bg); }
+.notification-dot {
+  position: absolute;
+  top: 7px; right: 8px;
+  width: 7px; height: 7px;
+  background: var(--red);
+  border-radius: 50%;
+  border: 1.5px solid var(--bg);
+}
+
+/* Notification panel */
+.notification-panel {
+  position: fixed;
+  top: 52px; right: 20px;
+  width: 360px;
+  max-height: 420px;
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.1);
+  z-index: 300;
+  display: none;
+  overflow: hidden;
+}
+.notification-panel.open { display: block; animation: fadeInUp .2s ease; }
+.notif-panel-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--divider);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.notif-panel-header strong { font-size: 14px; }
+.notif-panel-header span { font-size: 12px; color: var(--text-muted); cursor: pointer; }
+.notif-panel-header span:hover { color: var(--text-primary); }
+.notif-panel-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+.notif-panel-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--divider);
+  display: flex;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.notif-panel-item:hover { background: var(--hover-bg); }
+.notif-panel-item.unread { background: #FAFAFA; }
+.notif-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.notif-body { flex: 1; min-width: 0; }
+.notif-body-title { font-size: 13px; font-weight: 500; line-height: 1.4; }
+.notif-body-time { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+/* User avatar */
+.user-avatar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 8px 4px 4px;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+.user-avatar:hover { background: var(--hover-bg); }
+.avatar-circle {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+}
+.avatar-info {
+  display: flex;
+  flex-direction: column;
+}
+.avatar-name {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+.avatar-tag {
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+/* ========== SIDEBAR ========== */
+.sidebar {
+  position: fixed;
+  top: 52px;
+  left: 0;
+  bottom: 32px;
+  width: 240px;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  z-index: 50;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+
+.sidebar-section {
+  padding: 8px 12px 4px;
+}
+.sidebar-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 8px 8px 4px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  margin: 1px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.12s;
+  text-decoration: none;
+  position: relative;
+  user-select: none;
+}
+.nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+.nav-item:hover { background: var(--hover-bg); color: var(--text-primary); }
+.nav-item.active {
+  background: var(--active-bg);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.nav-badge {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--divider);
+  padding: 1px 7px;
+  border-radius: 10px;
+}
+.nav-badge.red {
+  background: var(--red);
+  color: #fff;
+}
+.sidebar-divider {
+  height: 1px;
+  background: var(--divider);
+  margin: 4px 16px;
+}
+
+/* Role group */
+.role-group {
+  margin-bottom: 2px;
+}
+.role-group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  margin: 1px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.12s;
+  user-select: none;
+}
+.role-group-header svg { width: 18px; height: 18px; flex-shrink: 0; }
+.role-group-header:hover { background: var(--hover-bg); color: var(--text-primary); }
+.role-chevron {
+  margin-left: auto;
+  font-size: 10px;
+  transition: transform 0.2s;
+  color: var(--text-muted);
+}
+.role-group.open .role-chevron { transform: rotate(90deg); }
+.role-children {
+  display: none;
+  padding-left: 16px;
+}
+.role-group.open .role-children { display: block; }
+.role-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.12s;
+  text-decoration: none;
+}
+.role-child:hover { background: var(--hover-bg); color: var(--text-primary); }
+
+/* Chat history */
+.chat-item {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  margin: 1px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.chat-item:hover { background: var(--hover-bg); }
+.chat-item.active { background: var(--active-bg); }
+.chat-item-title {
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-item-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ========== MAIN CONTENT ========== */
+.main {
+  position: fixed;
+  top: 52px; left: 240px; right: 0; bottom: 32px;
+  overflow-y: auto;
+  background: var(--input-bg);
+  padding: 20px 24px;
+}
+.main::-webkit-scrollbar { width: 6px; }
+.main::-webkit-scrollbar-thumb { background: #DDDDDD; border-radius: 3px; }
+
+.view-content { display: none; }
+.view-content.active { display: block; animation: fadeInUp .3s ease; }
+
+/* ========== CARDS ========== */
+.card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+  transition: box-shadow 0.2s;
+}
+.card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.03); }
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.card-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.card-action {
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.12s;
+}
+.card-action:hover { background: var(--hover-bg); color: var(--text-primary); }
+
+/* ========== VIEW 1: BRIEFING ========== */
+.health-ring-container {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+.health-ring {
+  width: 100px; height: 100px;
+  border-radius: 50%;
+  background: conic-gradient(#00B42A 0deg, #2DD55B 147.6deg, #7CE38B 295.2deg, var(--divider) 295.2deg 360deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+  transition: transform 0.3s;
+}
+.health-ring:hover { transform: scale(1.05); }
+.health-ring-inner {
+  width: 76px; height: 76px;
+  background: var(--bg);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+.health-score {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+.health-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.health-text h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.health-text p {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.briefing-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.briefing-card {
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  padding: 16px;
+  padding-left: 20px;
+  transition: box-shadow 0.2s, transform 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.briefing-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: var(--accent);
+  border-radius: 10px 0 0 10px;
+}
+.briefing-card:nth-child(1)::before { background: var(--accent); }
+.briefing-card:nth-child(2)::before { background: var(--green); }
+.briefing-card:nth-child(3)::before { background: var(--blue); }
+.briefing-card:nth-child(4)::before { background: var(--orange); }
+.briefing-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.06); transform: translateY(-1px); }
+.briefing-card-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.briefing-card-value {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.briefing-card-change {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.up { color: var(--green); }
+.down { color: var(--red); }
+.warn { color: var(--orange); }
+
+/* AI briefing */
+.ai-briefing {
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+.ai-briefing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.ai-briefing-header:hover { background: var(--hover-bg); }
+.ai-briefing-title {
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tag-new {
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--accent);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+}
+.ai-briefing-time {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.ai-briefing-chevron {
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+.ai-briefing.open .ai-briefing-chevron { transform: rotate(180deg); }
+.ai-briefing-body {
+  display: none;
+  padding: 0 20px 16px;
+  border-top: 1px solid var(--divider);
+}
+.ai-briefing.open .ai-briefing-body { display: block; }
+.ai-briefing-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--divider);
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  display: flex;
+  gap: 8px;
+}
+.ai-briefing-item:last-child { border-bottom: none; }
+.ai-briefing-num {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.ai-briefing-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--divider);
+  text-align: right;
+}
+.ai-briefing-footer button {
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.ai-briefing-footer button:hover { text-decoration: underline; }
+
+/* Pending items */
+.pending-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.pending-col-header {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pending-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--divider);
+  padding: 1px 7px;
+  border-radius: 10px;
+  color: var(--text-muted);
+}
+.pending-item {
+  padding: 10px 12px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.pending-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.04); border-color: var(--input-border); }
+.pending-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.pending-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.pending-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.pending-tag.finance { background: #EBF5FF; color: #1677FF; }
+.pending-tag.cs { background: #FFF7E6; color: var(--orange); }
+.pending-tag.ops { background: #F0FFF0; color: var(--green); }
+.pending-tag.system { background: #F5F5F5; color: var(--text-secondary); }
+
+/* Alert list */
+.alert-list { margin-bottom: 0; }
+.alert-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--divider);
+}
+.alert-item:last-child { border-bottom: none; }
+.alert-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.alert-dot.red { background: var(--red); }
+.alert-dot.orange { background: var(--orange); }
+.alert-dot.blue { background: var(--blue); }
+.alert-text {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.alert-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.alert-action {
+  font-size: 12px;
+  color: var(--accent);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.12s;
+}
+.alert-action:hover { background: var(--active-bg); }
+
+/* ========== VIEW 2: OVERVIEW ========== */
+.time-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+.time-tab {
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: none;
+  border: 1px solid var(--divider);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.time-tab:hover { background: var(--hover-bg); }
+.time-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* CSS chart bars */
+.chart-area {
+  margin-bottom: 20px;
+}
+.chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  height: 180px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--divider);
+  margin-bottom: 8px;
+}
+.chart-bar-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+}
+.chart-bar {
+  width: 100%;
+  max-width: 48px;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, var(--accent) 0%, #555 100%);
+  transition: height 0.5s ease;
+  position: relative;
+}
+.chart-bar-val {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.chart-bar-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  font-family: var(--font-mono);
+}
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 8px;
+}
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.legend-dot {
+  width: 10px; height: 10px;
+  border-radius: 2px;
+}
+
+/* Horizontal bar chart */
+.hbar-chart { margin-bottom: 0; }
+.hbar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.hbar-row:last-child { margin-bottom: 0; }
+.hbar-label {
+  width: 48px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: right;
+  flex-shrink: 0;
+}
+.hbar-track {
+  flex: 1;
+  height: 24px;
+  background: var(--input-bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.hbar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s ease;
+  display: flex;
+  align-items: center;
+  padding-left: 8px;
+}
+.hbar-fill span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #fff;
+  font-weight: 500;
+}
+.hbar-pct {
+  width: 40px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Two column panels */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--divider);
+  font-size: 13px;
+}
+.metric-row:last-child { border-bottom: none; }
+.metric-label { color: var(--text-secondary); }
+.metric-value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* P&L table */
+.pl-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.pl-table th, .pl-table td {
+  padding: 10px 16px;
+  text-align: left;
+  font-size: 13px;
+  border-bottom: 1px solid var(--divider);
+}
+.pl-table th {
+  font-weight: 500;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.pl-table td:nth-child(2), .pl-table th:nth-child(2) { text-align: right; }
+.pl-table td:nth-child(3), .pl-table th:nth-child(3) { text-align: right; }
+.pl-table .amount {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.pl-table tr:last-child {
+  font-weight: 600;
+  background: var(--input-bg);
+}
+
+/* ========== VIEW 3: COMMAND ========== */
+.view-content[data-view="command"] {
+  background: var(--bg);
+  margin: -20px -24px;
+  padding: 20px 24px;
+}
+.command-center {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  max-width: 720px;
+  margin: 0 auto;
+  min-height: calc(100vh - 52px - 32px - 40px);
+  padding: 0 24px;
+  padding-bottom: 15vh;
+}
+.command-welcome {
+  text-align: left;
+  width: 100%;
+  margin-bottom: 28px;
+  animation: fadeInUp 0.6s ease 0.1s both;
+}
+.command-welcome h2 {
+  font-size: 26px;
+  font-weight: 300;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.command-welcome p {
+  font-size: 38px;
+  font-weight: 400;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+
+/* Gemini two-layer input box */
+.command-box {
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid #E0E0E0;
+  border-radius: 28px;
+  padding: 18px 24px 10px;
+  margin-bottom: 20px;
+  animation: fadeInUp 0.6s ease 0.2s both;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.command-box:focus-within {
+  border-color: transparent;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04), 0 0 0 4px rgba(0,0,0,0.02);
+}
+.command-box textarea {
+  width: 100%;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 16px;
+  font-family: var(--font);
+  color: var(--text-primary);
+  resize: none;
+  min-height: 28px;
+  max-height: 200px;
+  line-height: 1.5;
+  overflow-y: auto;
+}
+.command-box textarea::placeholder { color: #BDBDBD; }
+.command-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0 4px;
+}
+.command-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.command-tool-btn {
+  width: 36px; height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: background 0.15s, color 0.15s;
+}
+.command-tool-btn:hover {
+  background: var(--hover-bg);
+  color: var(--text-secondary);
+}
+.command-send-btn {
+  width: 36px; height: 36px;
+  background: var(--accent);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s;
+  opacity: 0.2;
+  pointer-events: none;
+}
+.command-send-btn.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+.command-send-btn.active:hover { opacity: 0.85; }
+
+.command-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 0;
+  animation: fadeInUp 0.6s ease 0.3s both;
+}
+.command-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border: 1px solid #E0E0E0;
+  border-radius: 22px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.12s;
+  background: var(--bg);
+  white-space: nowrap;
+}
+.command-chip:hover {
+  background: var(--hover-bg);
+  border-color: #CCC;
+  color: var(--text-primary);
+}
+.command-chip:active {
+  background: var(--active-bg);
+}
+.command-chip svg {
+  width: 14px; height: 14px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+/* Command history */
+.command-history {
+  width: 100%;
+}
+.cmd-history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--divider);
+  font-size: 13px;
+}
+.cmd-history-item:last-child { border-bottom: none; }
+.cmd-time {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  width: 50px;
+}
+.cmd-text {
+  flex: 1;
+  color: var(--text-secondary);
+}
+.cmd-status {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.cmd-status.done { background: #E8F8EA; color: var(--green); }
+.cmd-status.running { background: #EBF5FF; color: #1677FF; }
+.cmd-status.failed { background: #FFF1F0; color: var(--red); }
+
+/* Command conversation demo */
+.cmd-conversation {
+  width: 100%;
+  margin-top: 16px;
+}
+.cmd-msg {
+  margin-bottom: 16px;
+  max-width: 90%;
+}
+.cmd-msg.user {
+  margin-left: auto;
+  text-align: right;
+}
+.cmd-msg-bubble {
+  display: inline-block;
+  padding: 12px 16px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: left;
+}
+.cmd-msg.user .cmd-msg-bubble {
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.cmd-msg.ai .cmd-msg-bubble {
+  background: var(--input-bg);
+  border-bottom-left-radius: 4px;
+}
+.cmd-msg.ai table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 13px;
+}
+.cmd-msg.ai table th, .cmd-msg.ai table td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--divider);
+}
+.cmd-msg.ai table th {
+  font-weight: 500;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.cmd-msg.ai .amount { font-family: var(--font-mono); font-weight: 600; }
+
+/* ========== VIEW 4: TASKS ========== */
+.kanban {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.kanban-col-header {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kanban-count {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--divider);
+  padding: 1px 8px;
+  border-radius: 10px;
+  color: var(--text-muted);
+}
+.kanban-card {
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.kanban-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.kanban-card-title {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+.kanban-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.kanban-avatar {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.kanban-tag {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.kanban-tag.p0 { background: #FFF1F0; color: var(--red); }
+.kanban-tag.p1 { background: #FFF7E6; color: var(--orange); }
+.kanban-tag.p2 { background: #EBF5FF; color: #1677FF; }
+.kanban-tag.dept-finance { background: #F0EEFF; color: #6B5CE7; }
+.kanban-tag.dept-cs { background: #FFF7E6; color: var(--orange); }
+.kanban-tag.dept-ops { background: #E8F8EA; color: var(--green); }
+.kanban-tag.dept-purchase { background: #EBF5FF; color: #1677FF; }
+.kanban-due {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+/* Approval */
+.approval-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+.approval-tab {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: none;
+  border: 1px solid var(--divider);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.approval-tab:hover { background: var(--hover-bg); }
+.approval-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.approval-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--divider);
+}
+.approval-item:last-child { border-bottom: none; }
+.approval-info { flex: 1; min-width: 0; }
+.approval-title { font-size: 13px; font-weight: 500; margin-bottom: 3px; }
+.approval-meta { font-size: 12px; color: var(--text-muted); }
+.approval-amount {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 14px;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+.approval-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.btn-approve, .btn-reject {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid;
+  transition: all 0.12s;
+}
+.btn-approve {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+.btn-approve:hover { opacity: 0.9; }
+.btn-reject {
+  background: var(--bg);
+  color: var(--red);
+  border-color: var(--red);
+}
+.btn-reject:hover { background: #FFF1F0; }
+
+/* Calendar */
+.calendar-week {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+}
+.calendar-day {
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  padding: 10px;
+  min-height: 120px;
+}
+.calendar-day-header {
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+}
+.calendar-day-header.today { color: var(--accent); font-weight: 700; }
+.calendar-event {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  margin-bottom: 4px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.calendar-event.purple { background: #F0EEFF; color: #6B5CE7; }
+.calendar-event.green { background: #E8F8EA; color: var(--green); }
+.calendar-event.orange { background: #FFF7E6; color: var(--orange); }
+.calendar-event.blue { background: #EBF5FF; color: #1677FF; }
+.calendar-event.gray { background: var(--input-bg); color: var(--text-secondary); }
+
+/* ========== VIEW 5: NOTIFICATIONS ========== */
+.notif-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+.notif-tab {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: none;
+  border: 1px solid var(--divider);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.notif-tab:hover { background: var(--hover-bg); }
+.notif-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.notif-layout {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: 20px;
+}
+.notif-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--divider);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.notif-list-item:last-child { border-bottom: none; }
+.notif-list-item:hover { background: var(--hover-bg); margin: 0 -12px; padding-left: 12px; padding-right: 12px; border-radius: 8px; }
+.notif-list-item.unread .notif-list-title { font-weight: 600; }
+.notif-list-icon {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.notif-list-icon.red { background: #FFF1F0; }
+.notif-list-icon.orange { background: #FFF7E6; }
+.notif-list-icon.blue { background: #EBF5FF; }
+.notif-list-icon.green { background: #E8F8EA; }
+.notif-list-icon.gray { background: var(--input-bg); }
+.notif-list-body { flex: 1; min-width: 0; }
+.notif-list-title { font-size: 13px; line-height: 1.4; margin-bottom: 4px; }
+.notif-list-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.notif-source-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.notif-unread-dot {
+  width: 6px; height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+/* Notification stats panel */
+.notif-stats {
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 20px;
+  position: sticky;
+  top: 0;
+}
+.notif-stats h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.notif-stat-big {
+  font-family: var(--font-mono);
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.notif-stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+.notif-stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--divider);
+  font-size: 13px;
+}
+.notif-stat-row:last-child { border-bottom: none; }
+.notif-stat-val {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* ========== VIEW 6: REPORTS ========== */
+.report-preview {
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, #FAFAFA 0%, #FFFFFF 100%);
+}
+.report-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.report-preview-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+.report-ai-tag {
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--accent);
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.report-section {
+  margin-bottom: 16px;
+}
+.report-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+.report-kpi {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+.report-kpi .val {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 20px;
+}
+.report-kpi .change {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.report-channel-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.report-channel-label {
+  width: 48px;
+  color: var(--text-secondary);
+}
+.report-channel-bar {
+  flex: 1;
+  height: 18px;
+  background: var(--input-bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.report-channel-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+}
+.report-channel-val {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  width: 60px;
+  text-align: right;
+}
+.report-event-item {
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  display: flex;
+  gap: 8px;
+}
+.report-event-num {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.report-suggestion {
+  padding: 8px 12px;
+  background: var(--input-bg);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+/* Report history table */
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.report-table th, .report-table td {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 13px;
+  border-bottom: 1px solid var(--divider);
+}
+.report-table th {
+  font-weight: 500;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.report-type-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.report-type-tag.weekly { background: #EBF5FF; color: #1677FF; }
+.report-type-tag.monthly { background: #F0EEFF; color: #6B5CE7; }
+.report-status-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.report-status-tag.done { background: #E8F8EA; color: var(--green); }
+.report-status-tag.pending { background: #FFF7E6; color: var(--orange); }
+.report-dl-btn {
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.report-dl-btn:hover { background: var(--hover-bg); }
+
+.report-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+.btn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--input-border);
+  background: var(--bg);
+  color: var(--text-primary);
+  transition: all 0.12s;
+  font-family: var(--font);
+}
+.btn:hover { background: var(--hover-bg); }
+.btn.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.btn.primary:hover { opacity: 0.9; }
+
+/* ========== PLATFORM AUTH VIEW ========== */
+.pa-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.pa-summary-card {
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  padding: 16px 20px;
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.pa-summary-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  border-radius: 10px 0 0 10px;
+}
+.pa-summary-card:nth-child(1)::before { background: var(--accent); }
+.pa-summary-card:nth-child(2)::before { background: var(--green); }
+.pa-summary-card:nth-child(3)::before { background: var(--orange); }
+.pa-summary-card:nth-child(4)::before { background: var(--blue); }
+.pa-summary-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.06); transform: translateY(-1px); }
+.pa-summary-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.pa-summary-value {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.pa-summary-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.pa-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.pa-card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 20px;
+  transition: box-shadow 0.2s;
+  position: relative;
+}
+.pa-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.03); }
+.pa-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.pa-platform-icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.pa-platform-icon.douyin { background: #1A1A1A; color: #fff; }
+.pa-platform-icon.tmall { background: #FF0036; color: #fff; }
+.pa-platform-icon.xhs { background: #FE2C55; color: #fff; }
+.pa-platform-icon.meituan { background: #FFD100; color: #1A1A1A; }
+.pa-platform-icon.qianchuan { background: #3B7CFF; color: #fff; }
+.pa-platform-icon.zhitongche { background: #FF6A00; color: #fff; }
+.pa-platform-icon.miniapp { background: #07C160; color: #fff; }
+.pa-platform-icon.cmb { background: #E21E29; color: #fff; }
+.pa-platform-icon.icbc { background: #C8000A; color: #fff; }
+.pa-platform-icon.alipay { background: #1677FF; color: #fff; }
+.pa-platform-icon.wxpay { background: #07C160; color: #fff; }
+.pa-platform-icon.ceb { background: #7B2D8E; color: #fff; }
+.pa-platform-icon.ccb { background: #003DA5; color: #fff; }
+.pa-platform-icon.cmbc { background: #00A65A; color: #fff; }
+.pa-platform-icon.boc { background: #C8000A; color: #fff; }
+.pa-platform-icon.intl { background: #1A1A1A; color: #fff; }
+.pa-platform-icon.mybank { background: #FF6A00; color: #fff; }
+.pa-platform-icon.video { background: #07C160; color: #fff; }
+.pa-platform-icon.eleme { background: #1677FF; color: #fff; }
+
+.pa-account-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.pa-account-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--text-secondary);
+}
+.pa-account-chip.more {
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font);
+  font-weight: 500;
+  cursor: pointer;
+}
+.pa-account-count {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.pa-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 20px;
+}
+.pa-section-divider::before,
+.pa-section-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--divider);
+}
+.pa-section-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.pa-platform-icon.unbound { background: var(--input-bg); color: var(--text-muted); }
+.pa-platform-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+.pa-card-status {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.pa-card-status.bound { background: #E8F8EA; color: var(--green); }
+.pa-card-status.unbound { background: var(--input-bg); color: var(--text-muted); }
+.pa-card-status.expiring { background: #FFF7E6; color: var(--orange); }
+.pa-card-status.expired { background: #FFF1F0; color: var(--red); }
+
+.pa-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.pa-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.pa-card-row-label { color: var(--text-muted); font-size: 12px; }
+.pa-card-row-value { font-size: 13px; }
+.pa-card-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.pa-data-tag {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.pa-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--divider);
+}
+.pa-next-sync {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.pa-card-actions {
+  display: flex;
+  gap: 6px;
+}
+.pa-action-btn {
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.12s;
+  font-family: var(--font);
+}
+.pa-action-btn:hover { background: var(--hover-bg); }
+.pa-action-btn.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.pa-action-btn.primary:hover { opacity: 0.9; }
+
+.pa-card.is-unbound { opacity: 0.65; }
+.pa-card.is-unbound:hover { opacity: 1; }
+
+.pa-readonly-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #EBF5FF;
+  border: 1px solid #D0E3FF;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #1677FF;
+  margin-bottom: 20px;
+}
+.pa-readonly-banner svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+/* Sync log table */
+.pa-log-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 12px 0;
+  color: var(--text-primary);
+  user-select: none;
+}
+.pa-log-toggle .chevron {
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+.pa-log-toggle.open .chevron { transform: rotate(180deg); }
+.pa-log-table {
+  width: 100%;
+  border-collapse: collapse;
+  display: none;
+}
+.pa-log-table.open { display: table; }
+.pa-log-table th, .pa-log-table td {
+  padding: 10px 16px;
+  text-align: left;
+  font-size: 13px;
+  border-bottom: 1px solid var(--divider);
+}
+.pa-log-table th {
+  font-weight: 500;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.pa-log-status {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.pa-log-status.success { background: #E8F8EA; color: var(--green); }
+.pa-log-status.fail { background: #FFF1F0; color: var(--red); }
+
+/* Modal for binding */
+.pa-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 500;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.pa-modal-overlay.open { display: flex; }
+.pa-modal {
+  background: var(--bg);
+  border-radius: 16px;
+  padding: 32px;
+  width: 440px;
+  max-width: 90vw;
+  animation: fadeInUp 0.2s ease;
+}
+.pa-modal h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.pa-modal p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+.pa-modal-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.pa-modal-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.pa-modal-step-num {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--input-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+.pa-modal-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #FFF7E6;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--orange);
+  margin-bottom: 20px;
+}
+.pa-modal-btns {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* ========== VIEW 2 ENHANCEMENTS ========== */
+/* Donut chart for channel GMV */
+.donut-chart-container {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 8px 0;
+}
+.donut-chart {
+  width: 160px; height: 160px;
+  border-radius: 50%;
+  background: conic-gradient(
+    #1A1A1A 0deg 151.2deg,
+    #555 151.2deg 262.8deg,
+    #888 262.8deg 316.8deg,
+    #BBB 316.8deg 345.6deg,
+    #DDD 345.6deg 360deg
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+.donut-chart-inner {
+  width: 100px; height: 100px;
+  background: var(--bg);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.donut-chart-inner .donut-total {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+}
+.donut-chart-inner .donut-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.donut-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.12s;
+}
+.donut-legend-item:hover { background: var(--hover-bg); }
+.donut-legend-dot {
+  width: 12px; height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.donut-legend-val {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  margin-left: auto;
+  padding-left: 12px;
+}
+.donut-legend-pct {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  width: 36px;
+  text-align: right;
+}
+
+/* Customer health progress bars */
+.metric-row-enhanced {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--divider);
+  font-size: 13px;
+  transition: background 0.12s;
+}
+.metric-row-enhanced:last-child { border-bottom: none; }
+.metric-row-enhanced:hover { background: var(--hover-bg); margin: 0 -8px; padding-left: 8px; padding-right: 8px; border-radius: 6px; }
+.metric-label-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+.metric-label-text { color: var(--text-secondary); }
+.metric-progress-track {
+  width: 100%;
+  height: 6px;
+  background: var(--input-bg);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.metric-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+.metric-value-enhanced {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+/* Inventory health color coding */
+.inv-metric {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--divider);
+  font-size: 13px;
+  transition: background 0.12s;
+}
+.inv-metric:last-child { border-bottom: none; }
+.inv-metric:hover { background: var(--hover-bg); margin: 0 -8px; padding-left: 8px; padding-right: 8px; border-radius: 6px; }
+.inv-label { color: var(--text-secondary); }
+.inv-value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.inv-status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.inv-status-dot.red { background: var(--red); }
+.inv-status-dot.orange { background: var(--orange); }
+.inv-status-dot.green { background: var(--green); }
+
+/* Briefing card value hover */
+.briefing-card-value {
+  transition: color 0.15s;
+}
+.briefing-card:hover .briefing-card-value {
+  color: var(--accent);
+}
+
+/* Alert expand/collapse animation */
+.alert-item {
+  flex-wrap: wrap;
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+.alert-detail {
+  width: 100%;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, padding 0.3s ease;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  padding: 0 20px 0 20px;
+}
+.alert-item.expanded .alert-detail {
+  max-height: 100px;
+  padding: 8px 20px 4px;
+}
+.alert-expand-btn {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.12s;
+  flex-shrink: 0;
+}
+.alert-expand-btn:hover { background: var(--hover-bg); color: var(--text-primary); }
+
+/* ========== AI FLOAT BUTTON ========== */
+.ai-float-btn {
+  position: fixed;
+  bottom: 52px;
+  right: 24px;
+  width: 48px; height: 48px;
+  background: var(--accent);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  transition: all 0.2s;
+  z-index: 90;
+}
+.ai-float-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.2);
+}
+.ai-float-btn svg { width: 22px; height: 22px; }
+.view-content[data-view="command"] .ai-float-btn { display: none; }
+
+/* ========== COMMAND CONVERSATION ========== */
+.cmd-ai-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.cmd-ai-action-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--divider);
+  border-radius: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg);
+  cursor: pointer;
+  transition: all 0.12s;
+  font-family: var(--font);
+}
+.cmd-ai-action-btn:hover {
+  background: var(--hover-bg);
+  border-color: var(--input-border);
+  color: var(--text-primary);
+}
+.cmd-ai-action-btn.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.cmd-ai-action-btn.primary:hover { opacity: 0.9; }
+
+/* ========== FOOTER ========== */
+.footer {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 32px;
+  background: var(--bg);
+  border-top: 1px solid var(--divider);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  font-size: 11px;
+  color: var(--text-muted);
+  gap: 24px;
+  z-index: 100;
+}
+.footer-dot {
+  width: 6px; height: 6px;
+  background: var(--green);
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* ========== ONBOARDING MODAL ========== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.3);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+.modal-overlay.hidden { display: none; }
+.modal-box {
+  background: var(--bg);
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  animation: fadeInUp .3s ease;
+}
+.modal-box h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.modal-box p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+.modal-steps {
+  margin-bottom: 24px;
+}
+.modal-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+}
+.modal-step-num {
+  width: 24px; height: 24px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.modal-step-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  padding-top: 2px;
+}
+.modal-btn {
+  width: 100%;
+  padding: 12px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: opacity 0.15s;
+}
+.modal-btn:hover { opacity: 0.9; }
+</style>
+</head>
+<body>
+
+<!-- ========== HEADER ========== -->
+<header class="header">
+  <div class="header-left">
+    <div class="logo"><span>S</span></div>
+    <span class="header-title">时皙 AI 工作站</span>
+    <!-- 模块切换导航已移除：岗位无权限跨模块，super_admin通过sidebar Roles切换 -->
+  </div>
+  <div class="header-right">
+    <div class="mode-toggle">
+      <span class="mode-label" id="modeLabelSimple">小白</span>
+      <div class="toggle-switch" id="modeToggle" onclick="toggleMode()">
+        <div class="toggle-knob"></div>
+      </div>
+      <span class="mode-label active" id="modeLabelPro">专业</span>
+    </div>
+    <button class="notification-btn" onclick="toggleNotifPanel()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="notification-dot"></span>
+    </button>
+    <div class="user-avatar">
+      <div class="avatar-circle">魏</div>
+      <div class="avatar-info">
+        <span class="avatar-name">魏总</span>
+        <span class="avatar-tag">超级管理员</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Notification popup panel -->
+<div class="notification-panel" id="notifPanel">
+  <div class="notif-panel-header">
+    <strong>通知 <span style="font-family:var(--font-mono);color:var(--text-muted);font-weight:400;font-size:12px">8条未读</span></strong>
+    <span onclick="switchView('notifications');toggleNotifPanel()">查看全部</span>
+  </div>
+  <div class="notif-panel-list">
+    <div class="notif-panel-item unread">
+      <div class="notif-icon" style="background:#FFF1F0">&#128680;</div>
+      <div class="notif-body">
+        <div class="notif-body-title">客诉升级：天猫用户投诉物流延迟超48小时</div>
+        <div class="notif-body-time">10 分钟前 · 客服部</div>
+      </div>
+    </div>
+    <div class="notif-panel-item unread">
+      <div class="notif-icon" style="background:#FFF7E6">&#9888;&#65039;</div>
+      <div class="notif-body">
+        <div class="notif-body-title">库存预警：眼霜精华套装仅剩23件</div>
+        <div class="notif-body-time">32 分钟前 · 运营部</div>
+      </div>
+    </div>
+    <div class="notif-panel-item">
+      <div class="notif-icon" style="background:#EBF5FF">&#128203;</div>
+      <div class="notif-body">
+        <div class="notif-body-title">退款审批：¥2,380 天猫退款单待审批</div>
+        <div class="notif-body-time">1 小时前 · 财务部</div>
+      </div>
+    </div>
+    <div class="notif-panel-item">
+      <div class="notif-icon" style="background:#E8F8EA">&#10024;</div>
+      <div class="notif-body">
+        <div class="notif-body-title">AI周报已生成：第14周经营周报</div>
+        <div class="notif-body-time">2 小时前 · 系统</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SIDEBAR ========== -->
+<aside class="sidebar">
+  <div class="sidebar-section">
+    <div class="nav-item active" data-view="briefing">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <span>AI 今日看板</span>
+      <span class="nav-badge red">3</span>
+    </div>
+    <div class="nav-item" data-view="overview">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <span>经营全貌</span>
+    </div>
+    <div class="nav-item" data-view="command">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+      <span>作战指令台</span>
+    </div>
+    <div class="nav-item" data-view="tasks">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="15" y2="16"/></svg>
+      <span>任务与协作</span>
+      <span class="nav-badge">5</span>
+    </div>
+    <div class="nav-item" data-view="notifications">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span>通知中心</span>
+      <span class="nav-badge red">8</span>
+    </div>
+    <div class="nav-item" data-view="reports">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      <span>周报/月报</span>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">Roles</div>
+    <div class="role-group" id="roleFinance">
+      <div class="role-group-header" onclick="toggleRole('roleFinance')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span>财务</span>
+        <span class="role-chevron">&#9654;</span>
+      </div>
+      <div class="role-children">
+        <a class="role-child" href="v3-04a-accounting.html">&#8594; 进入会计视角</a>
+        <a class="role-child" href="v3-04b-cashier.html">&#8594; 进入出纳视角</a>
+      </div>
+    </div>
+    <div class="role-group" id="roleCS">
+      <div class="role-group-header" onclick="toggleRole('roleCS')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+        <span>客服</span>
+        <span class="role-chevron">&#9654;</span>
+      </div>
+      <div class="role-children">
+        <a class="role-child" href="v3-03-cs-workspace.html">&#8594; 进入客服视角</a>
+      </div>
+    </div>
+    <div class="role-group" id="roleOps">
+      <div class="role-group-header" onclick="toggleRole('roleOps')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span>运营</span>
+        <span class="role-chevron">&#9654;</span>
+      </div>
+      <div class="role-children">
+        <a class="role-child" href="v3-05-ops.html">&#8594; 进入运营视角</a>
+      </div>
+    </div>
+    <div class="role-group" id="rolePurchase">
+      <div class="role-group-header" onclick="toggleRole('rolePurchase')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        <span>采购</span>
+        <span class="role-chevron">&#9654;</span>
+      </div>
+      <div class="role-children">
+        <a class="role-child" href="v3-mock-notice.html?topic=purchase">&#8594; 进入采购视角</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">系统</div>
+    <div class="nav-item" onclick="alert('系统设置开发中')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>系统设置</span>
+    </div>
+    <div class="nav-item" data-view="platform-auth">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>
+      <span>平台授权</span>
+    </div>
+    <a class="nav-item" href="v3-07-admin-config.html" style="text-decoration:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      <span>工具中心</span>
+    </a>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section" style="flex:1">
+    <div class="sidebar-section-title">Chats</div>
+    <div class="chat-item">
+      <div class="chat-item-title">本周经营分析</div>
+      <div class="chat-item-time">10分钟前</div>
+    </div>
+    <div class="chat-item">
+      <div class="chat-item-title">天猫退货率追踪</div>
+      <div class="chat-item-time">1小时前</div>
+    </div>
+    <div class="chat-item">
+      <div class="chat-item-title">现金流预测</div>
+      <div class="chat-item-time">3小时前</div>
+    </div>
+    <div class="chat-item">
+      <div class="chat-item-title">抖音投放优化</div>
+      <div class="chat-item-time">昨天</div>
+    </div>
+    <div class="chat-item">
+      <div class="chat-item-title">供应商账期谈判</div>
+      <div class="chat-item-time">昨天</div>
+    </div>
+  </div>
+</aside>
+
+<!-- ========== MAIN CONTENT ========== -->
+<main class="main">
+
+<!-- ==================== VIEW 1: AI BRIEFING ==================== -->
+<section class="view-content active" data-view="briefing">
+
+  <!-- Health Ring -->
+  <div class="health-ring-container">
+    <div class="health-ring">
+      <div class="health-ring-inner">
+        <span class="health-score">82</span>
+        <span class="health-label">/100</span>
+      </div>
+    </div>
+    <div class="health-text">
+      <h3>经营健康度</h3>
+      <p>经营状态良好，3 项需关注</p>
+    </div>
+  </div>
+
+  <!-- 4-grid KPI -->
+  <div class="briefing-grid">
+    <div class="briefing-card">
+      <div class="briefing-card-label">今日 GMV</div>
+      <div class="briefing-card-value">&#165;82,400</div>
+      <div class="briefing-card-change up">&#8593; 12.3% <span style="color:var(--text-muted)">较昨日</span></div>
+    </div>
+    <div class="briefing-card">
+      <div class="briefing-card-label">今日净利润</div>
+      <div class="briefing-card-value">&#165;18,600</div>
+      <div class="briefing-card-change up">&#8593; 8.1% <span style="color:var(--text-muted)">较昨日</span></div>
+    </div>
+    <div class="briefing-card">
+      <div class="briefing-card-label">客户满意度</div>
+      <div class="briefing-card-value">4.7<span style="font-size:14px;font-weight:400;color:var(--text-muted)">/5.0</span></div>
+      <div class="briefing-card-change warn">&#8595; 0.1 <span style="color:var(--text-muted)">较上周</span></div>
+    </div>
+    <div class="briefing-card">
+      <div class="briefing-card-label">库存健康度</div>
+      <div class="briefing-card-value">87%</div>
+      <div class="briefing-card-change up">&#8593; 2% <span style="color:var(--text-muted)">较上周</span></div>
+    </div>
+  </div>
+
+  <!-- AI Briefing -->
+  <div class="ai-briefing open" id="aiBriefing">
+    <div class="ai-briefing-header" onclick="toggleBriefing()">
+      <span class="ai-briefing-title">
+        AI 今日简报 <span class="tag-new">NEW</span>
+      </span>
+      <span style="display:flex;align-items:center;gap:12px">
+        <span class="ai-briefing-time">08:00 自动生成</span>
+        <span class="ai-briefing-chevron">&#9660;</span>
+      </span>
+    </div>
+    <div class="ai-briefing-body">
+      <div class="ai-briefing-item"><span class="ai-briefing-num">01</span>昨日全平台 GMV &#165;78,200，环比 +6.8%，抖店占 52% 为最大渠道</div>
+      <div class="ai-briefing-item"><span class="ai-briefing-num">02</span>天猫旗舰店 3 条差评集中在"物流慢"，建议协调仓储加快发货时效</div>
+      <div class="ai-briefing-item"><span class="ai-briefing-num">03</span>美团闪购连续 3 天下滑 -11.2%，可能与竞品促销活动有关</div>
+      <div class="ai-briefing-item"><span class="ai-briefing-num">04</span>抖音千川 ROI 从 2.4 降至 1.8，建议优化素材或调整投放人群</div>
+      <div class="ai-briefing-item"><span class="ai-briefing-num">05</span>眼霜精华套装库存仅剩 23 件，低于安全线（50件），建议紧急补货</div>
+    </div>
+    <div class="ai-briefing-footer">
+      <button onclick="switchView('command')">追问详情 &#8594;</button>
+    </div>
+  </div>
+
+  <!-- Pending items -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">待处理事项</span>
+    </div>
+    <div class="pending-grid">
+      <div>
+        <div class="pending-col-header">待审批 <span class="pending-count">2</span></div>
+        <div class="pending-item">
+          <div class="pending-item-title">天猫退款审批 &#165;2,380</div>
+          <div class="pending-item-meta">
+            <span class="pending-tag finance">财务</span>
+            <span>14:30</span>
+          </div>
+        </div>
+        <div class="pending-item">
+          <div class="pending-item-title">采购合同签署确认</div>
+          <div class="pending-item-meta">
+            <span class="pending-tag ops">运营</span>
+            <span>11:20</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="pending-col-header">待跟进 <span class="pending-count">3</span></div>
+        <div class="pending-item">
+          <div class="pending-item-title">天猫差评"物流慢"处理</div>
+          <div class="pending-item-meta">
+            <span class="pending-tag cs">客服</span>
+            <span>09:15</span>
+          </div>
+        </div>
+        <div class="pending-item">
+          <div class="pending-item-title">抖音千川 ROI 优化方案</div>
+          <div class="pending-item-meta">
+            <span class="pending-tag ops">运营</span>
+            <span>昨天</span>
+          </div>
+        </div>
+        <div class="pending-item">
+          <div class="pending-item-title">眼霜精华套装补货跟进</div>
+          <div class="pending-item-meta">
+            <span class="pending-tag ops">运营</span>
+            <span>昨天</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="pending-col-header">今日到期 <span class="pending-count">1</span></div>
+        <div class="pending-item">
+          <div class="pending-item-title">美团闪购促销方案提交</div>
+          <div class="pending-item-meta">
+            <span class="pending-tag ops">运营</span>
+            <span>今天 18:00</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alert list -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">异常预警</span>
+      <span class="card-subtitle">最近 24 小时</span>
+    </div>
+    <div class="alert-list">
+      <div class="alert-item" onclick="toggleAlert(this)">
+        <span class="alert-dot red"></span>
+        <span class="alert-text">眼霜精华套装库存仅剩 23 件，低于安全线 50 件，建议紧急补货</span>
+        <span class="alert-time">08:30</span>
+        <button class="alert-expand-btn">展开</button>
+        <button class="alert-action" onclick="event.stopPropagation();switchView('command')">AI 处理</button>
+        <div class="alert-detail">当前库存 23 件，安全线 50 件。近 7 天日均销量 8 件，预计 3 天内断货。建议紧急联系供应商补货 200 件。</div>
+      </div>
+      <div class="alert-item" onclick="toggleAlert(this)">
+        <span class="alert-dot red"></span>
+        <span class="alert-text">天猫旗舰店客诉 3 条差评集中"物流慢"，满意度下降风险</span>
+        <span class="alert-time">09:15</span>
+        <button class="alert-expand-btn">展开</button>
+        <button class="alert-action" onclick="event.stopPropagation();switchView('command')">AI 处理</button>
+        <div class="alert-detail">近 3 天收到 3 条差评，均反映"发货慢、物流延迟"。涉及订单集中在华东地区，建议协调仓储优化该区域发货时效。</div>
+      </div>
+      <div class="alert-item" onclick="toggleAlert(this)">
+        <span class="alert-dot orange"></span>
+        <span class="alert-text">美团闪购连续 3 天 GMV 下滑 -11.2%，需排查原因</span>
+        <span class="alert-time">10:00</span>
+        <button class="alert-expand-btn">展开</button>
+        <button class="alert-action" onclick="event.stopPropagation();switchView('command')">AI 处理</button>
+        <div class="alert-detail">美团闪购近 3 天 GMV 分别为 &#165;3,200 / &#165;2,800 / &#165;2,600，持续下滑。同期竞品"XX品牌"正在做满减促销，可能分流用户。</div>
+      </div>
+      <div class="alert-item" onclick="toggleAlert(this)">
+        <span class="alert-dot orange"></span>
+        <span class="alert-text">抖音千川 ROI 从 2.4 降至 1.8，投放效率下降</span>
+        <span class="alert-time">10:45</span>
+        <button class="alert-expand-btn">展开</button>
+        <button class="alert-action" onclick="event.stopPropagation();switchView('command')">AI 处理</button>
+        <div class="alert-detail">千川近 7 天 ROI 趋势：2.4 → 2.3 → 2.1 → 2.0 → 1.9 → 1.8 → 1.8。素材点击率从 3.2% 降至 2.1%，判断素材老化。建议更换素材。</div>
+      </div>
+      <div class="alert-item" onclick="toggleAlert(this)">
+        <span class="alert-dot blue"></span>
+        <span class="alert-text">京东自营结算款 &#165;46,800 已到账，待确认入账</span>
+        <span class="alert-time">11:20</span>
+        <button class="alert-expand-btn">展开</button>
+        <button class="alert-action" onclick="event.stopPropagation();switchView('command')">AI 处理</button>
+        <div class="alert-detail">京东自营 3 月最后一批结算款 &#165;46,800 已到企业对公账户，请财务确认入账并核对金额是否与订单汇总一致。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW 2: OVERVIEW ==================== -->
+<section class="view-content" data-view="overview">
+
+  <!-- Time tabs -->
+  <div class="time-tabs">
+    <button class="time-tab" onclick="switchTimeTab(this)">今日</button>
+    <button class="time-tab" onclick="switchTimeTab(this)">本周</button>
+    <button class="time-tab active" onclick="switchTimeTab(this)">本月</button>
+    <button class="time-tab" onclick="switchTimeTab(this)">本季</button>
+  </div>
+
+  <!-- GMV Trend chart -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">GMV 趋势（近 7 天）</span>
+      <span class="card-subtitle">单位：万元</span>
+    </div>
+    <div class="chart-area">
+      <div class="chart-bars">
+        <div class="chart-bar-group">
+          <div class="chart-bar" style="height:73%"><span class="chart-bar-val">6.2</span></div>
+          <span class="chart-bar-label">3/27</span>
+        </div>
+        <div class="chart-bar-group">
+          <div class="chart-bar" style="height:84%"><span class="chart-bar-val">7.1</span></div>
+          <span class="chart-bar-label">3/28</span>
+        </div>
+        <div class="chart-bar-group">
+          <div class="chart-bar" style="height:68%"><span class="chart-bar-val">5.8</span></div>
+          <span class="chart-bar-label">3/29</span>
+        </div>
+        <div class="chart-bar-group">
+          <div class="chart-bar" style="height:99%"><span class="chart-bar-val">8.4</span></div>
+          <span class="chart-bar-label">3/30</span>
+        </div>
+        <div class="chart-bar-group">
+          <div class="chart-bar" style="height:92%"><span class="chart-bar-val">7.8</span></div>
+          <span class="chart-bar-label">3/31</span>
+        </div>
+        <div class="chart-bar-group">
+          <div class="chart-bar" style="height:96%"><span class="chart-bar-val">8.2</span></div>
+          <span class="chart-bar-label">4/1</span>
+        </div>
+        <div class="chart-bar-group">
+          <div class="chart-bar" style="height:100%"><span class="chart-bar-val">8.5</span></div>
+          <span class="chart-bar-label">4/2</span>
+        </div>
+      </div>
+      <div class="chart-legend">
+        <span class="chart-legend-item"><span class="legend-dot" style="background:#1A1A1A"></span>天猫</span>
+        <span class="chart-legend-item"><span class="legend-dot" style="background:#666"></span>抖音</span>
+        <span class="chart-legend-item"><span class="legend-dot" style="background:#999"></span>美团</span>
+        <span class="chart-legend-item"><span class="legend-dot" style="background:#CCC"></span>京东</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Channel GMV distribution - Donut Chart -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">渠道 GMV 占比</span>
+      <span class="card-subtitle">本月累计</span>
+    </div>
+    <div class="donut-chart-container">
+      <div class="donut-chart">
+        <div class="donut-chart-inner">
+          <span class="donut-total">&#165;248万</span>
+          <span class="donut-label">总 GMV</span>
+        </div>
+      </div>
+      <div class="donut-legend">
+        <div class="donut-legend-item">
+          <span class="donut-legend-dot" style="background:#1A1A1A"></span>
+          <span>天猫</span>
+          <span class="donut-legend-val">&#165;104.2万</span>
+          <span class="donut-legend-pct">42%</span>
+        </div>
+        <div class="donut-legend-item">
+          <span class="donut-legend-dot" style="background:#555"></span>
+          <span>抖音</span>
+          <span class="donut-legend-val">&#165;76.9万</span>
+          <span class="donut-legend-pct">31%</span>
+        </div>
+        <div class="donut-legend-item">
+          <span class="donut-legend-dot" style="background:#888"></span>
+          <span>美团</span>
+          <span class="donut-legend-val">&#165;37.2万</span>
+          <span class="donut-legend-pct">15%</span>
+        </div>
+        <div class="donut-legend-item">
+          <span class="donut-legend-dot" style="background:#BBB"></span>
+          <span>京东</span>
+          <span class="donut-legend-val">&#165;19.8万</span>
+          <span class="donut-legend-pct">8%</span>
+        </div>
+        <div class="donut-legend-item">
+          <span class="donut-legend-dot" style="background:#DDD"></span>
+          <span>其他</span>
+          <span class="donut-legend-val">&#165;9.9万</span>
+          <span class="donut-legend-pct">4%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Two column panels -->
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">客户健康度</span>
+      </div>
+      <div class="metric-row-enhanced">
+        <div class="metric-label-group">
+          <span class="metric-label-text">客户满意度</span>
+          <div class="metric-progress-track"><div class="metric-progress-fill" style="width:94%;background:var(--green)"></div></div>
+        </div>
+        <span class="metric-value-enhanced">4.7<span style="font-weight:400;color:var(--text-muted);font-size:12px">/5.0</span></span>
+      </div>
+      <div class="metric-row-enhanced">
+        <div class="metric-label-group">
+          <span class="metric-label-text">复购率</span>
+          <div class="metric-progress-track"><div class="metric-progress-fill" style="width:32%;background:var(--blue)"></div></div>
+        </div>
+        <span class="metric-value-enhanced">32%</span>
+      </div>
+      <div class="metric-row-enhanced">
+        <div class="metric-label-group">
+          <span class="metric-label-text">客诉率</span>
+          <div class="metric-progress-track"><div class="metric-progress-fill" style="width:12%;background:var(--orange)"></div></div>
+        </div>
+        <span class="metric-value-enhanced" style="color:var(--orange)">1.2%</span>
+      </div>
+      <div class="metric-row-enhanced">
+        <div class="metric-label-group">
+          <span class="metric-label-text">NPS</span>
+          <div class="metric-progress-track"><div class="metric-progress-fill" style="width:68%;background:var(--accent)"></div></div>
+        </div>
+        <span class="metric-value-enhanced">68</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">库存健康度</span>
+      </div>
+      <div class="inv-metric">
+        <span class="inv-label">缺货 SKU</span>
+        <span class="inv-value"><span class="inv-status-dot red"></span><span style="color:var(--red)">3</span></span>
+      </div>
+      <div class="inv-metric">
+        <span class="inv-label">滞销 SKU</span>
+        <span class="inv-value"><span class="inv-status-dot orange"></span><span style="color:var(--orange)">12</span></span>
+      </div>
+      <div class="inv-metric">
+        <span class="inv-label">达标率</span>
+        <span class="inv-value"><span class="inv-status-dot green"></span>87%</span>
+      </div>
+      <div class="inv-metric">
+        <span class="inv-label">周转天数</span>
+        <span class="inv-value"><span class="inv-status-dot green"></span>23 天</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Monthly P&L -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">月度 P&L 摘要</span>
+      <span class="card-subtitle">2026年3月</span>
+    </div>
+    <table class="pl-table">
+      <thead><tr><th>项目</th><th>金额</th><th>占比</th></tr></thead>
+      <tbody>
+        <tr><td>营业收入</td><td class="amount">&#165;248 万</td><td class="amount">100%</td></tr>
+        <tr><td>营业成本</td><td class="amount">&#165;142 万</td><td class="amount">57.3%</td></tr>
+        <tr><td>毛利</td><td class="amount">&#165;106 万</td><td class="amount" style="color:var(--green)">42.7%</td></tr>
+        <tr><td>期间费用</td><td class="amount">&#165;68 万</td><td class="amount">27.4%</td></tr>
+        <tr><td>净利润</td><td class="amount">&#165;38 万</td><td class="amount" style="color:var(--green)">15.3%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ==================== VIEW 3: COMMAND ==================== -->
+<section class="view-content" data-view="command">
+  <div class="command-center">
+    <div class="command-welcome">
+      <h2>你好，魏总</h2>
+      <p>今天需要我做什么？</p>
+    </div>
+    <div class="command-box">
+      <textarea id="cmdInput" rows="1" placeholder="输入指令，例如：出本周经营周报..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCommand();}"></textarea>
+      <div class="command-toolbar">
+        <div class="command-toolbar-left">
+          <button class="command-tool-btn" title="附件">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <button class="command-tool-btn" title="报表">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="15" x2="8" y2="9"/><line x1="12" y1="15" x2="12" y2="7"/><line x1="16" y1="15" x2="16" y2="11"/></svg>
+          </button>
+          <button class="command-tool-btn" title="日历">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </button>
+          <button class="command-tool-btn" title="语音">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          </button>
+        </div>
+        <button class="command-send-btn" id="cmdSendBtn" onclick="sendCommand()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="command-chips">
+      <div class="command-chip" onclick="fillCommand('出本周经营周报')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        出本周经营周报
+      </div>
+      <div class="command-chip" onclick="simulateChat('天猫退货率趋势')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        天猫退货率趋势
+      </div>
+      <div class="command-chip" onclick="fillCommand('现金流够不够发工资')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+        现金流够不够发工资
+      </div>
+      <div class="command-chip" onclick="fillCommand('抖音ROI下降原因')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        抖音 ROI 下降原因
+      </div>
+      <div class="command-chip" onclick="fillCommand('给客服主管派任务')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+        给客服主管派任务
+      </div>
+      <div class="command-chip" onclick="fillCommand('生成供应商对账单')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
+        生成供应商对账单
+      </div>
+    </div>
+
+    <!-- Conversation area (hidden by default, shown after chip click) -->
+    <div class="cmd-conversation" id="cmdConversation" style="display:none">
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== VIEW 4: TASKS ==================== -->
+<section class="view-content" data-view="tasks">
+
+  <!-- Kanban -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">任务看板</span>
+    </div>
+    <div class="kanban">
+      <!-- TODO -->
+      <div>
+        <div class="kanban-col-header">待办 <span class="kanban-count">4</span></div>
+        <div class="kanban-card">
+          <div class="kanban-card-title">美团闪购促销方案制定</div>
+          <div class="kanban-card-meta">
+            <span class="kanban-avatar">李</span>
+            <span class="kanban-tag p0">P0</span>
+            <span class="kanban-tag dept-ops">运营</span>
+            <span class="kanban-due">4/2</span>
+          </div>
+        </div>
+        <div class="kanban-card">
+          <div class="kanban-card-title">眼霜精华套装紧急补货</div>
+          <div class="kanban-card-meta">
+            <span class="kanban-avatar">张</span>
+            <span class="kanban-tag p0">P0</span>
+            <span class="kanban-tag dept-purchase">采购</span>
+            <span class="kanban-due">4/3</span>
+          </div>
+        </div>
+        <div class="kanban-card">
+          <div class="kanban-card-title">天猫差评"物流慢"集中回复</div>
+          <div class="kanban-card-meta">
+            <span class="kanban-avatar">王</span>
+            <span class="kanban-tag p1">P1</span>
+            <span class="kanban-tag dept-cs">客服</span>
+            <span class="kanban-due">4/3</span>
+          </div>
+        </div>
+        <div class="kanban-card">
+          <div class="kanban-card-title">Q1 财务报表审核</div>
+          <div class="kanban-card-meta">
+            <span class="kanban-avatar">陈</span>
+            <span class="kanban-tag p1">P1</span>
+            <span class="kanban-tag dept-finance">财务</span>
+            <span class="kanban-due">4/5</span>
+          </div>
+        </div>
+      </div>
+      <!-- IN PROGRESS -->
+      <div>
+        <div class="kanban-col-header">进行中 <span class="kanban-count">3</span></div>
+        <div class="kanban-card">
+          <div class="kanban-card-title">抖音千川投放素材优化</div>
+          <div class="kanban-card-meta">
+            <span class="kanban-avatar">赵</span>
+            <span class="kanban-tag p0">P0</span>
+            <span class="kanban-tag dept-ops">运营</span>
+            <span class="kanban-due">4/4</span>
+          </div>
+        </div>
+        <div class="kanban-card">
+          <div class="kanban-card-title">天猫退款 &#165;2,380 审批流程</div>
+          <div class="kanban-card-meta">
+            <span class="kanban-avatar">陈</span>
+            <span class="kanban-tag p1">P1</span>
+            <span class="kanban-tag dept-finance">财务</span>
+            <span class="kanban-due">4/2</span>
+          </div>
+        </div>
+        <div class="kanban-card">
+          <div class="kanban-card-title">供应商华美包材对账</div>
+          <div class="kanban-card-meta">
+            <span class="kanban-avatar">张</span>
+            <span class="kanban-tag p2">P2</span>
+            <span class="kanban-tag dept-finance">财务</span>
+            <span class="kanban-due">4/6</span>
+          </div>
+        </div>
+      </div>
+      <!-- DONE -->
+      <div>
+        <div class="kanban-col-header">已完成 <span class="kanban-count">3</span></div>
+        <div class="kanban-card" style="opacity:0.6">
+          <div class="kanban-card-title">3月经营周报生成</div>
+          <div class="kanban-card-meta">
+            <span class="kanban-avatar">AI</span>
+            <span class="kanban-tag dept-ops">运营</span>
+            <span class="kanban-due">4/1</span>
+          </div>
+        </div>
+        <div class="kanban-card" style="opacity:0.6">
+          <div class="kanban-card-title">京东结算款 &#165;46,800 入账</div>
+          <div class="kanban-card-meta">
+            <span class="kanban-avatar">陈</span>
+            <span class="kanban-tag dept-finance">财务</span>
+            <span class="kanban-due">4/1</span>
+          </div>
+        </div>
+        <div class="kanban-card" style="opacity:0.6">
+          <div class="kanban-card-title">小红书种草内容排期</div>
+          <div class="kanban-card-meta">
+            <span class="kanban-avatar">李</span>
+            <span class="kanban-tag dept-ops">运营</span>
+            <span class="kanban-due">3/31</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Approval -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">审批流</span>
+    </div>
+    <div class="approval-tabs">
+      <button class="approval-tab active" onclick="switchApprovalTab(this)">待我审批 (3)</button>
+      <button class="approval-tab" onclick="switchApprovalTab(this)">我发起的 (2)</button>
+      <button class="approval-tab" onclick="switchApprovalTab(this)">已完成 (5)</button>
+    </div>
+    <div>
+      <div class="approval-item">
+        <div class="approval-info">
+          <div class="approval-title">天猫退款审批 - 订单 #TM20260401-0892</div>
+          <div class="approval-meta">陈会计发起 · 14:30 · 客户申请退货退款</div>
+        </div>
+        <span class="approval-amount">&#165;2,380</span>
+        <div class="approval-actions">
+          <button class="btn-approve">通过</button>
+          <button class="btn-reject">拒绝</button>
+        </div>
+      </div>
+      <div class="approval-item">
+        <div class="approval-info">
+          <div class="approval-title">采购合同 - 华美包材 Q2 框架协议</div>
+          <div class="approval-meta">张采购发起 · 11:20 · 季度原料采购</div>
+        </div>
+        <span class="approval-amount">&#165;85,000</span>
+        <div class="approval-actions">
+          <button class="btn-approve">通过</button>
+          <button class="btn-reject">拒绝</button>
+        </div>
+      </div>
+      <div class="approval-item">
+        <div class="approval-info">
+          <div class="approval-title">抖音千川追加投放预算</div>
+          <div class="approval-meta">赵运营发起 · 09:45 · 测试新素材需追加预算</div>
+        </div>
+        <span class="approval-amount">&#165;15,000</span>
+        <div class="approval-actions">
+          <button class="btn-approve">通过</button>
+          <button class="btn-reject">拒绝</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Team Calendar -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">团队日历</span>
+      <span class="card-subtitle">第 14 周</span>
+    </div>
+    <div class="calendar-week">
+      <div class="calendar-day">
+        <div class="calendar-day-header">周一 3/30</div>
+        <div class="calendar-event purple">Q1财务结算</div>
+        <div class="calendar-event green">周报生成</div>
+      </div>
+      <div class="calendar-day">
+        <div class="calendar-day-header">周二 3/31</div>
+        <div class="calendar-event orange">千川素材评审</div>
+        <div class="calendar-event blue">供应商对账</div>
+        <div class="calendar-event gray">团队周会</div>
+      </div>
+      <div class="calendar-day">
+        <div class="calendar-day-header today">周三 4/1</div>
+        <div class="calendar-event purple">京东结算确认</div>
+        <div class="calendar-event green">小红书排期</div>
+      </div>
+      <div class="calendar-day">
+        <div class="calendar-day-header today">周四 4/2 (今天)</div>
+        <div class="calendar-event orange">美团促销方案</div>
+        <div class="calendar-event blue">客诉处理跟进</div>
+        <div class="calendar-event purple">退款审批</div>
+      </div>
+      <div class="calendar-day">
+        <div class="calendar-day-header">周五 4/3</div>
+        <div class="calendar-event green">补货订单确认</div>
+        <div class="calendar-event gray">差评回复完成</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW 5: NOTIFICATIONS ==================== -->
+<section class="view-content" data-view="notifications">
+
+  <div class="notif-tabs">
+    <button class="notif-tab active" onclick="switchNotifTab(this)">全部 (18)</button>
+    <button class="notif-tab" onclick="switchNotifTab(this)">紧急 (3)</button>
+    <button class="notif-tab" onclick="switchNotifTab(this)">重要 (5)</button>
+    <button class="notif-tab" onclick="switchNotifTab(this)">普通 (10)</button>
+  </div>
+
+  <div class="notif-layout">
+    <div>
+      <div class="notif-list-item unread">
+        <div class="notif-unread-dot"></div>
+        <div class="notif-list-icon red">&#128680;</div>
+        <div class="notif-list-body">
+          <div class="notif-list-title">客诉升级：天猫用户投诉物流延迟超 48 小时，要求全额退款</div>
+          <div class="notif-list-meta"><span class="notif-source-tag" style="background:#FFF7E6;color:var(--orange)">客服</span> 10 分钟前</div>
+        </div>
+      </div>
+      <div class="notif-list-item unread">
+        <div class="notif-unread-dot"></div>
+        <div class="notif-list-icon red">&#128680;</div>
+        <div class="notif-list-body">
+          <div class="notif-list-title">库存预警：眼霜精华套装库存仅剩 23 件，低于安全线</div>
+          <div class="notif-list-meta"><span class="notif-source-tag" style="background:#E8F8EA;color:var(--green)">运营</span> 32 分钟前</div>
+        </div>
+      </div>
+      <div class="notif-list-item unread">
+        <div class="notif-unread-dot"></div>
+        <div class="notif-list-icon red">&#9888;&#65039;</div>
+        <div class="notif-list-body">
+          <div class="notif-list-title">抖音千川 ROI 降至 1.8，低于预警阈值 2.0</div>
+          <div class="notif-list-meta"><span class="notif-source-tag" style="background:#E8F8EA;color:var(--green)">运营</span> 1 小时前</div>
+        </div>
+      </div>
+      <div class="notif-list-item unread">
+        <div class="notif-unread-dot"></div>
+        <div class="notif-list-icon orange">&#128203;</div>
+        <div class="notif-list-body">
+          <div class="notif-list-title">退款审批：天猫订单 #TM20260401-0892，金额 &#165;2,380</div>
+          <div class="notif-list-meta"><span class="notif-source-tag" style="background:#F0EEFF;color:#6B5CE7">财务</span> 1 小时前</div>
+        </div>
+      </div>
+      <div class="notif-list-item unread">
+        <div class="notif-unread-dot"></div>
+        <div class="notif-list-icon orange">&#128203;</div>
+        <div class="notif-list-body">
+          <div class="notif-list-title">采购合同审批：华美包材 Q2 框架协议 &#165;85,000</div>
+          <div class="notif-list-meta"><span class="notif-source-tag" style="background:#F0EEFF;color:#6B5CE7">财务</span> 2 小时前</div>
+        </div>
+      </div>
+      <div class="notif-list-item unread">
+        <div class="notif-unread-dot"></div>
+        <div class="notif-list-icon blue">&#128176;</div>
+        <div class="notif-list-body">
+          <div class="notif-list-title">京东自营结算款 &#165;46,800 已到账，请确认入账</div>
+          <div class="notif-list-meta"><span class="notif-source-tag" style="background:#F0EEFF;color:#6B5CE7">财务</span> 3 小时前</div>
+        </div>
+      </div>
+      <div class="notif-list-item unread">
+        <div class="notif-unread-dot"></div>
+        <div class="notif-list-icon green">&#10024;</div>
+        <div class="notif-list-body">
+          <div class="notif-list-title">AI 周报已自动生成：第 14 周经营周报</div>
+          <div class="notif-list-meta"><span class="notif-source-tag" style="background:var(--input-bg);color:var(--text-secondary)">系统</span> 3 小时前</div>
+        </div>
+      </div>
+      <div class="notif-list-item unread">
+        <div class="notif-unread-dot"></div>
+        <div class="notif-list-icon orange">&#9888;&#65039;</div>
+        <div class="notif-list-body">
+          <div class="notif-list-title">美团闪购 GMV 连续 3 天下滑 -11.2%</div>
+          <div class="notif-list-meta"><span class="notif-source-tag" style="background:#E8F8EA;color:var(--green)">运营</span> 4 小时前</div>
+        </div>
+      </div>
+      <div class="notif-list-item">
+        <div style="width:6px"></div>
+        <div class="notif-list-icon blue">&#128203;</div>
+        <div class="notif-list-body">
+          <div class="notif-list-title">抖音千川追加投放预算 &#165;15,000 待审批</div>
+          <div class="notif-list-meta"><span class="notif-source-tag" style="background:#E8F8EA;color:var(--green)">运营</span> 5 小时前</div>
+        </div>
+      </div>
+      <div class="notif-list-item">
+        <div style="width:6px"></div>
+        <div class="notif-list-icon gray">&#9881;</div>
+        <div class="notif-list-body">
+          <div class="notif-list-title">系统更新：AI 引擎已升级至 v3.3，新增自动预警功能</div>
+          <div class="notif-list-meta"><span class="notif-source-tag" style="background:var(--input-bg);color:var(--text-secondary)">系统</span> 6 小时前</div>
+        </div>
+      </div>
+      <div class="notif-list-item">
+        <div style="width:6px"></div>
+        <div class="notif-list-icon green">&#10024;</div>
+        <div class="notif-list-body">
+          <div class="notif-list-title">AI 日报已生成：4月1日经营日报</div>
+          <div class="notif-list-meta"><span class="notif-source-tag" style="background:var(--input-bg);color:var(--text-secondary)">系统</span> 昨天 08:00</div>
+        </div>
+      </div>
+      <div class="notif-list-item">
+        <div style="width:6px"></div>
+        <div class="notif-list-icon blue">&#128176;</div>
+        <div class="notif-list-body">
+          <div class="notif-list-title">天猫 3 月结算单已出，金额 &#165;189,340</div>
+          <div class="notif-list-meta"><span class="notif-source-tag" style="background:#F0EEFF;color:#6B5CE7">财务</span> 昨天 14:00</div>
+        </div>
+      </div>
+    </div>
+    <div class="notif-stats">
+      <h4>通知统计</h4>
+      <div class="notif-stat-big">8</div>
+      <div class="notif-stat-label">条未读通知</div>
+      <div class="notif-stat-row"><span>财务</span><span class="notif-stat-val">3</span></div>
+      <div class="notif-stat-row"><span>客服</span><span class="notif-stat-val">4</span></div>
+      <div class="notif-stat-row"><span>运营</span><span class="notif-stat-val">3</span></div>
+      <div class="notif-stat-row"><span>系统</span><span class="notif-stat-val">2</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW 6: REPORTS ==================== -->
+<section class="view-content" data-view="reports">
+
+  <!-- Weekly report preview -->
+  <div class="report-preview">
+    <div class="report-preview-header">
+      <div>
+        <div class="report-preview-title">2026 年第 14 周经营周报（3/30 - 4/5）</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px">AI 自动生成 · 2026-04-02 08:00</div>
+      </div>
+      <span class="report-ai-tag">AI 生成</span>
+    </div>
+
+    <div class="report-section">
+      <div class="report-section-title">本周 GMV</div>
+      <div class="report-kpi">
+        <span class="val">&#165;58.2 万</span>
+        <span class="change up">环比 +5.3%</span>
+      </div>
+    </div>
+
+    <div class="report-section">
+      <div class="report-section-title">各渠道表现</div>
+      <div class="report-channel-row">
+        <span class="report-channel-label">天猫</span>
+        <div class="report-channel-bar"><div class="report-channel-fill" style="width:42%"></div></div>
+        <span class="report-channel-val">&#165;24.5 万</span>
+      </div>
+      <div class="report-channel-row">
+        <span class="report-channel-label">抖音</span>
+        <div class="report-channel-bar"><div class="report-channel-fill" style="width:31%"></div></div>
+        <span class="report-channel-val">&#165;18.1 万</span>
+      </div>
+      <div class="report-channel-row">
+        <span class="report-channel-label">美团</span>
+        <div class="report-channel-bar"><div class="report-channel-fill" style="width:15%"></div></div>
+        <span class="report-channel-val">&#165;8.7 万</span>
+      </div>
+      <div class="report-channel-row">
+        <span class="report-channel-label">京东</span>
+        <div class="report-channel-bar"><div class="report-channel-fill" style="width:8%"></div></div>
+        <span class="report-channel-val">&#165;4.6 万</span>
+      </div>
+      <div class="report-channel-row">
+        <span class="report-channel-label">其他</span>
+        <div class="report-channel-bar"><div class="report-channel-fill" style="width:4%"></div></div>
+        <span class="report-channel-val">&#165;2.3 万</span>
+      </div>
+    </div>
+
+    <div class="report-section">
+      <div class="report-section-title">关键事件</div>
+      <div class="report-event-item"><span class="report-event-num">01</span>抖音千川 ROI 从 2.4 降至 1.8，素材老化明显，已安排优化</div>
+      <div class="report-event-item"><span class="report-event-num">02</span>天猫旗舰店出现 3 条集中差评，主因"物流慢"，已协调仓储</div>
+      <div class="report-event-item"><span class="report-event-num">03</span>眼霜精华套装库存告急（23件），已启动紧急补货流程</div>
+    </div>
+
+    <div class="report-section" style="margin-bottom:0">
+      <div class="report-section-title">AI 建议</div>
+      <div class="report-suggestion">1. 建议将抖音千川素材更新周期从 14 天缩短至 7 天，保持创意新鲜度</div>
+      <div class="report-suggestion">2. 建议与物流服务商谈判次日达覆盖率，目标从 68% 提升至 85%</div>
+      <div class="report-suggestion" style="margin-bottom:0">3. 建议眼霜精华套装安全库存线从 50 件调高至 80 件，避免断货风险</div>
+    </div>
+  </div>
+
+  <!-- History table -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">历史报告</span>
+    </div>
+    <table class="report-table">
+      <thead><tr><th>日期范围</th><th>类型</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>
+        <tr><td>3/30 - 4/5</td><td><span class="report-type-tag weekly">周报</span></td><td><span class="report-status-tag pending">生成中</span></td><td><button class="report-dl-btn" disabled style="opacity:0.5">下载</button></td></tr>
+        <tr><td>3/23 - 3/29</td><td><span class="report-type-tag weekly">周报</span></td><td><span class="report-status-tag done">已生成</span></td><td><button class="report-dl-btn">下载</button></td></tr>
+        <tr><td>3/16 - 3/22</td><td><span class="report-type-tag weekly">周报</span></td><td><span class="report-status-tag done">已生成</span></td><td><button class="report-dl-btn">下载</button></td></tr>
+        <tr><td>3/9 - 3/15</td><td><span class="report-type-tag weekly">周报</span></td><td><span class="report-status-tag done">已生成</span></td><td><button class="report-dl-btn">下载</button></td></tr>
+        <tr><td>3/2 - 3/8</td><td><span class="report-type-tag weekly">周报</span></td><td><span class="report-status-tag done">已生成</span></td><td><button class="report-dl-btn">下载</button></td></tr>
+        <tr><td>2026年3月</td><td><span class="report-type-tag monthly">月报</span></td><td><span class="report-status-tag done">已生成</span></td><td><button class="report-dl-btn">下载</button></td></tr>
+        <tr><td>2026年2月</td><td><span class="report-type-tag monthly">月报</span></td><td><span class="report-status-tag done">已生成</span></td><td><button class="report-dl-btn">下载</button></td></tr>
+        <tr><td>2026年1月</td><td><span class="report-type-tag monthly">月报</span></td><td><span class="report-status-tag done">已生成</span></td><td><button class="report-dl-btn">下载</button></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Actions -->
+  <div class="report-actions">
+    <button class="btn primary">生成本周报告</button>
+    <button class="btn">发送至飞书群</button>
+    <button class="btn">导出 PDF</button>
+  </div>
+</section>
+
+<!-- ========== VIEW 7: PLATFORM AUTH ========== -->
+<section class="view-content" data-view="platform-auth">
+
+  <!-- Readonly banner -->
+  <div class="pa-readonly-banner">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span>RPA 仅读取数据，绝不进行任何写操作（不改价、不发货、不回评、不投放）。Cookie 加密存储在本地，不上传服务器。</span>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="pa-summary">
+    <div class="pa-summary-card">
+      <div class="pa-summary-label">已绑定渠道</div>
+      <div class="pa-summary-value">16 <span style="font-size:14px;font-weight:400;color:var(--text-muted)">/ 16</span></div>
+      <div class="pa-summary-sub">渠道 6 · 对公行 6 · 个人行 2 · 支付 2</div>
+    </div>
+    <div class="pa-summary-card">
+      <div class="pa-summary-label">数据同步正常</div>
+      <div class="pa-summary-value" style="color:var(--green)">15</div>
+      <div class="pa-summary-sub">今日已完成 42 次采集（含 26 个银行账户）</div>
+    </div>
+    <div class="pa-summary-card">
+      <div class="pa-summary-label">需要续期</div>
+      <div class="pa-summary-value" style="color:var(--orange)">1</div>
+      <div class="pa-summary-sub">千川 Cookie 剩余 2 天</div>
+    </div>
+    <div class="pa-summary-card">
+      <div class="pa-summary-label">上次全量同步</div>
+      <div class="pa-summary-value" style="font-size:18px">03:12</div>
+      <div class="pa-summary-sub">今天凌晨 · 全部成功</div>
+    </div>
+  </div>
+
+  <!-- ===== 电商 & 即时零售渠道 ===== -->
+  <div class="pa-section-divider">
+    <span class="pa-section-label">电商 &amp; 即时零售渠道</span>
+  </div>
+  <div class="pa-grid">
+
+    <!-- 抖店 — 已绑定 -->
+    <div class="pa-card">
+      <div class="pa-card-head">
+        <div class="pa-platform-icon douyin">抖</div>
+        <div class="pa-platform-name">抖店</div>
+        <span class="pa-card-status bound">已绑定</span>
+      </div>
+      <div class="pa-card-body">
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">店铺</span>
+          <span class="pa-card-row-value">时皙美妆旗舰店</span>
+        </div>
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">上次同步</span>
+          <span class="pa-card-row-value" style="color:var(--green)">今天 03:12 ✓</span>
+        </div>
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">Cookie 有效期</span>
+          <span class="pa-card-row-value">剩余 18 天</span>
+        </div>
+        <div class="pa-card-tags">
+          <span class="pa-data-tag">结算单</span>
+          <span class="pa-data-tag">佣金明细</span>
+          <span class="pa-data-tag">经营概览</span>
+        </div>
+      </div>
+      <div class="pa-card-footer">
+        <span class="pa-next-sync">下次同步：今天 04:00</span>
+        <div class="pa-card-actions">
+          <button class="pa-action-btn" onclick="togglePaLog()">日志</button>
+          <button class="pa-action-btn" onclick="alert('手动同步已触发')">同步</button>
+          <button class="pa-action-btn">管理</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 视频号 — 已绑定 -->
+    <div class="pa-card">
+      <div class="pa-card-head">
+        <div class="pa-platform-icon video">视</div>
+        <div class="pa-platform-name">视频号小店</div>
+        <span class="pa-card-status bound">已绑定</span>
+      </div>
+      <div class="pa-card-body">
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">店铺</span>
+          <span class="pa-card-row-value">时皙官方店</span>
+        </div>
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">上次同步</span>
+          <span class="pa-card-row-value" style="color:var(--green)">今天 03:08 ✓</span>
+        </div>
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">Cookie 有效期</span>
+          <span class="pa-card-row-value">剩余 22 天</span>
+        </div>
+        <div class="pa-card-tags">
+          <span class="pa-data-tag">结算单</span>
+          <span class="pa-data-tag">订单数据</span>
+          <span class="pa-data-tag">经营数据</span>
+        </div>
+      </div>
+      <div class="pa-card-footer">
+        <span class="pa-next-sync">下次同步：今天 04:00</span>
+        <div class="pa-card-actions">
+          <button class="pa-action-btn">日志</button>
+          <button class="pa-action-btn">同步</button>
+          <button class="pa-action-btn">管理</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 美团 — 已绑定 -->
+    <div class="pa-card">
+      <div class="pa-card-head">
+        <div class="pa-platform-icon meituan">美</div>
+        <div class="pa-platform-name">美团</div>
+        <span class="pa-card-status bound">已绑定</span>
+      </div>
+      <div class="pa-card-body">
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">店铺</span>
+          <span class="pa-card-row-value">时皙美妆美团店</span>
+        </div>
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">上次同步</span>
+          <span class="pa-card-row-value" style="color:var(--green)">今天 03:18 ✓</span>
+        </div>
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">Cookie 有效期</span>
+          <span class="pa-card-row-value">剩余 20 天</span>
+        </div>
+        <div class="pa-card-tags">
+          <span class="pa-data-tag">结算单</span>
+          <span class="pa-data-tag">订单数据</span>
+          <span class="pa-data-tag">经营概览</span>
+        </div>
+      </div>
+      <div class="pa-card-footer">
+        <span class="pa-next-sync">下次同步：今天 04:00</span>
+        <div class="pa-card-actions">
+          <button class="pa-action-btn">日志</button>
+          <button class="pa-action-btn">同步</button>
+          <button class="pa-action-btn">管理</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 闪购(饿了么) — 已绑定 -->
+    <div class="pa-card">
+      <div class="pa-card-head">
+        <div class="pa-platform-icon eleme">饿</div>
+        <div class="pa-platform-name">闪购 / 饿了么</div>
+        <span class="pa-card-status bound">已绑定</span>
+      </div>
+      <div class="pa-card-body">
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">店铺</span>
+          <span class="pa-card-row-value">时皙美妆饿了么店</span>
+        </div>
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">上次同步</span>
+          <span class="pa-card-row-value" style="color:var(--green)">今天 03:20 ✓</span>
+        </div>
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">Cookie 有效期</span>
+          <span class="pa-card-row-value">剩余 15 天</span>
+        </div>
+        <div class="pa-card-tags">
+          <span class="pa-data-tag">结算单</span>
+          <span class="pa-data-tag">订单数据</span>
+        </div>
+      </div>
+      <div class="pa-card-footer">
+        <span class="pa-next-sync">下次同步：今天 04:00</span>
+        <div class="pa-card-actions">
+          <button class="pa-action-btn">日志</button>
+          <button class="pa-action-btn">同步</button>
+          <button class="pa-action-btn">管理</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 京东到家 — 已绑定 -->
+    <div class="pa-card">
+      <div class="pa-card-head">
+        <div class="pa-platform-icon unbound" style="background:#FFEEF0;color:#E53835">京</div>
+        <div class="pa-platform-name">京东到家</div>
+        <span class="pa-card-status bound">已绑定</span>
+      </div>
+      <div class="pa-card-body">
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">店铺</span>
+          <span class="pa-card-row-value">时皙美妆京东到家店</span>
+        </div>
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">上次同步</span>
+          <span class="pa-card-row-value" style="color:var(--green)">今天 03:22 ✓</span>
+        </div>
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">Cookie 有效期</span>
+          <span class="pa-card-row-value">剩余 19 天</span>
+        </div>
+        <div class="pa-card-tags">
+          <span class="pa-data-tag">结算单</span>
+          <span class="pa-data-tag">订单数据</span>
+          <span class="pa-data-tag">经营数据</span>
+        </div>
+      </div>
+      <div class="pa-card-footer">
+        <span class="pa-next-sync">下次同步：今天 04:00</span>
+        <div class="pa-card-actions">
+          <button class="pa-action-btn">日志</button>
+          <button class="pa-action-btn">同步</button>
+          <button class="pa-action-btn">管理</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 千川/万相台 — 即将过期 -->
+    <div class="pa-card">
+      <div class="pa-card-head">
+        <div class="pa-platform-icon qianchuan">川</div>
+        <div class="pa-platform-name">千川 / 万相台</div>
+        <span class="pa-card-status expiring">即将过期</span>
+      </div>
+      <div class="pa-card-body">
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">账户</span>
+          <span class="pa-card-row-value">时皙投放账户</span>
+        </div>
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">上次同步</span>
+          <span class="pa-card-row-value" style="color:var(--orange)">昨天 03:15 ✓</span>
+        </div>
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">Cookie 有效期</span>
+          <span class="pa-card-row-value" style="color:var(--orange);font-weight:600">剩余 2 天 !</span>
+        </div>
+        <div class="pa-card-tags">
+          <span class="pa-data-tag">推广费用明细</span>
+          <span class="pa-data-tag">投放效果</span>
+          <span class="pa-data-tag">ROI 数据</span>
+        </div>
+      </div>
+      <div class="pa-card-footer">
+        <span class="pa-next-sync" style="color:var(--orange)">建议立即续期</span>
+        <div class="pa-card-actions">
+          <button class="pa-action-btn primary" onclick="openPaModal('千川 / 万相台')" style="background:var(--orange);border-color:var(--orange)">续期</button>
+          <button class="pa-action-btn">管理</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== 对公银行账户 ===== -->
+  <div class="pa-section-divider">
+    <span class="pa-section-label">对公银行账户</span>
+  </div>
+  <div class="pa-grid">
+
+    <!-- 光大银行（对公·主力）— 已绑定·多账户 -->
+    <div class="pa-card">
+      <div class="pa-card-head">
+        <div class="pa-platform-icon ceb">光</div>
+        <div class="pa-platform-name">光大银行 <span class="pa-account-count">13 个账户</span></div>
+        <span class="pa-card-status bound">已绑定</span>
+      </div>
+      <div class="pa-card-body">
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">类型</span>
+          <span class="pa-card-row-value">对公 · 主力行</span>
+        </div>
+        <div class="pa-account-list">
+          <span class="pa-account-chip">****6601</span>
+          <span class="pa-account-chip">****6602</span>
+          <span class="pa-account-chip">****6603</span>
+          <span class="pa-account-chip">****8810</span>
+          <span class="pa-account-chip more" onclick="alert('查看全部 13 个光大银行账户')">+9</span>
+        </div>
+        <div class="pa-card-row" style="margin-top:4px">
+          <span class="pa-card-row-label">上次同步</span>
+          <span class="pa-card-row-value" style="color:var(--green)">今天 06:00 ✓ 全部成功</span>
+        </div>
+        <div class="pa-card-tags">
+          <span class="pa-data-tag">交易流水</span>
+          <span class="pa-data-tag">电子回单</span>
+          <span class="pa-data-tag">账户余额</span>
+          <span class="pa-data-tag">对账单</span>
+        </div>
+      </div>
+      <div class="pa-card-footer">
+        <span class="pa-next-sync">下次同步：明天 06:00</span>
+        <div class="pa-card-actions">
+          <button class="pa-action-btn">日志</button>
+          <button class="pa-action-btn">同步</button>
+          <button class="pa-action-btn" onclick="alert('添加新的光大银行账户')">+ 账户</button>
+          <button class="pa-action-btn">管理</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 建设银行（对公）— 已绑定 -->
+    <div class="pa-card">
+      <div class="pa-card-head">
+        <div class="pa-platform-icon ccb">建</div>
+        <div class="pa-platform-name">建设银行 <span class="pa-account-count">2 个账户</span></div>
+        <span class="pa-card-status bound">已绑定</span>
+      </div>
+      <div class="pa-card-body">
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">类型</span>
+          <span class="pa-card-row-value">对公</span>
+        </div>
+        <div class="pa-account-list">
+          <span class="pa-account-chip">****3307</span>
+          <span class="pa-account-chip">****3308</span>
+        </div>
+        <div class="pa-card-row" style="margin-top:4px">
+          <span class="pa-card-row-label">上次同步</span>
+          <span class="pa-card-row-value" style="color:var(--green)">今天 06:02 ✓</span>
+        </div>
+        <div class="pa-card-tags">
+          <span class="pa-data-tag">交易流水</span>
+          <span class="pa-data-tag">电子回单</span>
+          <span class="pa-data-tag">账户余额</span>
+        </div>
+      </div>
+      <div class="pa-card-footer">
+        <span class="pa-next-sync">下次同步：明天 06:00</span>
+        <div class="pa-card-actions">
+          <button class="pa-action-btn">日志</button>
+          <button class="pa-action-btn">同步</button>
+          <button class="pa-action-btn">+ 账户</button>
+          <button class="pa-action-btn">管理</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 民生银行（对公）— 已绑定 -->
+    <div class="pa-card">
+      <div class="pa-card-head">
+        <div class="pa-platform-icon cmbc">民</div>
+        <div class="pa-platform-name">民生银行 <span class="pa-account-count">1 个账户</span></div>
+        <span class="pa-card-status bound">已绑定</span>
+      </div>
+      <div class="pa-card-body">
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">类型</span>
+          <span class="pa-card-row-value">对公</span>
+        </div>
+        <div class="pa-account-list">
+          <span class="pa-account-chip">****5520</span>
+        </div>
+        <div class="pa-card-row" style="margin-top:4px">
+          <span class="pa-card-row-label">上次同步</span>
+          <span class="pa-card-row-value" style="color:var(--green)">今天 06:05 ✓</span>
+        </div>
+        <div class="pa-card-tags">
+          <span class="pa-data-tag">交易流水</span>
+          <span class="pa-data-tag">电子回单</span>
+          <span class="pa-data-tag">账户余额</span>
+        </div>
+      </div>
+      <div class="pa-card-footer">
+        <span class="pa-next-sync">下次同步：明天 06:00</span>
+        <div class="pa-card-actions">
+          <button class="pa-action-btn">日志</button>
+          <button class="pa-action-btn">同步</button>
+          <button class="pa-action-btn">管理</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 中国银行（对公）— 已绑定 -->
+    <div class="pa-card">
+      <div class="pa-card-head">
+        <div class="pa-platform-icon boc">中</div>
+        <div class="pa-platform-name">中国银行 <span class="pa-account-count">1 个账户</span></div>
+        <span class="pa-card-status bound">已绑定</span>
+      </div>
+      <div class="pa-card-body">
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">类型</span>
+          <span class="pa-card-row-value">对公</span>
+        </div>
+        <div class="pa-account-list">
+          <span class="pa-account-chip">****7701</span>
+        </div>
+        <div class="pa-card-row" style="margin-top:4px">
+          <span class="pa-card-row-label">上次同步</span>
+          <span class="pa-card-row-value" style="color:var(--green)">今天 06:08 ✓</span>
+        </div>
+        <div class="pa-card-tags">
+          <span class="pa-data-tag">交易流水</span>
+          <span class="pa-data-tag">电子回单</span>
+          <span class="pa-data-tag">账户余额</span>
+        </div>
+      </div>
+      <div class="pa-card-footer">
+        <span class="pa-next-sync">下次同步：明天 06:00</span>
+        <div class="pa-card-actions">
+          <button class="pa-action-btn">日志</button>
+          <button class="pa-action-btn">同步</button>
+          <button class="pa-action-btn">管理</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 国际银行（对公）— 已绑定 -->
+    <div class="pa-card">
+      <div class="pa-card-head">
+        <div class="pa-platform-icon intl">国</div>
+        <div class="pa-platform-name">国际银行 <span class="pa-account-count">1 个账户</span></div>
+        <span class="pa-card-status bound">已绑定</span>
+      </div>
+      <div class="pa-card-body">
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">类型</span>
+          <span class="pa-card-row-value">对公</span>
+        </div>
+        <div class="pa-account-list">
+          <span class="pa-account-chip">****2201</span>
+        </div>
+        <div class="pa-card-row" style="margin-top:4px">
+          <span class="pa-card-row-label">上次同步</span>
+          <span class="pa-card-row-value" style="color:var(--green)">今天 06:10 ✓</span>
+        </div>
+        <div class="pa-card-tags">
+          <span class="pa-data-tag">交易流水</span>
+          <span class="pa-data-tag">电子回单</span>
+          <span class="pa-data-tag">账户余额</span>
+        </div>
+      </div>
+      <div class="pa-card-footer">
+        <span class="pa-next-sync">下次同步：明天 06:00</span>
+        <div class="pa-card-actions">
+          <button class="pa-action-btn">日志</button>
+          <button class="pa-action-btn">同步</button>
+          <button class="pa-action-btn">管理</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 网商银行（对公）— 已绑定 -->
+    <div class="pa-card">
+      <div class="pa-card-head">
+        <div class="pa-platform-icon mybank">网</div>
+        <div class="pa-platform-name">网商银行 <span class="pa-account-count">1 个账户</span></div>
+        <span class="pa-card-status bound">已绑定</span>
+      </div>
+      <div class="pa-card-body">
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">类型</span>
+          <span class="pa-card-row-value">对公</span>
+        </div>
+        <div class="pa-account-list">
+          <span class="pa-account-chip">****9901</span>
+        </div>
+        <div class="pa-card-row" style="margin-top:4px">
+          <span class="pa-card-row-label">上次同步</span>
+          <span class="pa-card-row-value" style="color:var(--green)">今天 06:12 ✓</span>
+        </div>
+        <div class="pa-card-tags">
+          <span class="pa-data-tag">交易流水</span>
+          <span class="pa-data-tag">电子回单</span>
+          <span class="pa-data-tag">账户余额</span>
+        </div>
+      </div>
+      <div class="pa-card-footer">
+        <span class="pa-next-sync">下次同步：明天 06:00</span>
+        <div class="pa-card-actions">
+          <button class="pa-action-btn">日志</button>
+          <button class="pa-action-btn">同步</button>
+          <button class="pa-action-btn">管理</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== 个人银行账户 ===== -->
+  <div class="pa-section-divider">
+    <span class="pa-section-label">个人银行账户</span>
+  </div>
+  <div class="pa-grid">
+
+    <!-- 光大银行（个人）— 已绑定·多卡 -->
+    <div class="pa-card">
+      <div class="pa-card-head">
+        <div class="pa-platform-icon ceb">光</div>
+        <div class="pa-platform-name">光大银行 <span class="pa-account-count">3 张卡</span></div>
+        <span class="pa-card-status bound">已绑定</span>
+      </div>
+      <div class="pa-card-body">
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">类型</span>
+          <span class="pa-card-row-value">个人</span>
+        </div>
+        <div class="pa-account-list">
+          <span class="pa-account-chip">****1105</span>
+          <span class="pa-account-chip">****1106</span>
+          <span class="pa-account-chip">****1107</span>
+        </div>
+        <div class="pa-card-row" style="margin-top:4px">
+          <span class="pa-card-row-label">上次同步</span>
+          <span class="pa-card-row-value" style="color:var(--green)">今天 06:15 ✓</span>
+        </div>
+        <div class="pa-card-tags">
+          <span class="pa-data-tag">交易流水</span>
+          <span class="pa-data-tag">电子回单</span>
+          <span class="pa-data-tag">余额</span>
+        </div>
+      </div>
+      <div class="pa-card-footer">
+        <span class="pa-next-sync">下次同步：明天 06:00</span>
+        <div class="pa-card-actions">
+          <button class="pa-action-btn">日志</button>
+          <button class="pa-action-btn">同步</button>
+          <button class="pa-action-btn">+ 卡</button>
+          <button class="pa-action-btn">管理</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 招商银行（个人）— 已绑定 -->
+    <div class="pa-card">
+      <div class="pa-card-head">
+        <div class="pa-platform-icon cmb">招</div>
+        <div class="pa-platform-name">招商银行 <span class="pa-account-count">2 张卡</span></div>
+        <span class="pa-card-status bound">已绑定</span>
+      </div>
+      <div class="pa-card-body">
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">类型</span>
+          <span class="pa-card-row-value">个人</span>
+        </div>
+        <div class="pa-account-list">
+          <span class="pa-account-chip">****8862</span>
+          <span class="pa-account-chip">****8863</span>
+        </div>
+        <div class="pa-card-row" style="margin-top:4px">
+          <span class="pa-card-row-label">上次同步</span>
+          <span class="pa-card-row-value" style="color:var(--green)">今天 06:18 ✓</span>
+        </div>
+        <div class="pa-card-tags">
+          <span class="pa-data-tag">交易流水</span>
+          <span class="pa-data-tag">电子回单</span>
+          <span class="pa-data-tag">余额</span>
+        </div>
+      </div>
+      <div class="pa-card-footer">
+        <span class="pa-next-sync">下次同步：明天 06:00</span>
+        <div class="pa-card-actions">
+          <button class="pa-action-btn">日志</button>
+          <button class="pa-action-btn">同步</button>
+          <button class="pa-action-btn">+ 卡</button>
+          <button class="pa-action-btn">管理</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== 支付渠道 ===== -->
+  <div class="pa-section-divider">
+    <span class="pa-section-label">支付渠道</span>
+  </div>
+  <div class="pa-grid">
+
+    <!-- 微信商户号 — 已绑定 -->
+    <div class="pa-card">
+      <div class="pa-card-head">
+        <div class="pa-platform-icon wxpay">微</div>
+        <div class="pa-platform-name">微信商户号</div>
+        <span class="pa-card-status bound">已绑定</span>
+      </div>
+      <div class="pa-card-body">
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">商户号</span>
+          <span class="pa-card-row-value">时皙 ****2580</span>
+        </div>
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">上次同步</span>
+          <span class="pa-card-row-value" style="color:var(--green)">今天 06:20 ✓</span>
+        </div>
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">Cookie 有效期</span>
+          <span class="pa-card-row-value">剩余 26 天</span>
+        </div>
+        <div class="pa-card-tags">
+          <span class="pa-data-tag">交易明细</span>
+          <span class="pa-data-tag">结算账单</span>
+          <span class="pa-data-tag">账户余额</span>
+        </div>
+      </div>
+      <div class="pa-card-footer">
+        <span class="pa-next-sync">下次同步：明天 06:00</span>
+        <div class="pa-card-actions">
+          <button class="pa-action-btn">日志</button>
+          <button class="pa-action-btn">同步</button>
+          <button class="pa-action-btn">管理</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 支付宝商户号 — 已绑定 -->
+    <div class="pa-card">
+      <div class="pa-card-head">
+        <div class="pa-platform-icon alipay">支</div>
+        <div class="pa-platform-name">支付宝商户号</div>
+        <span class="pa-card-status bound">已绑定</span>
+      </div>
+      <div class="pa-card-body">
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">商户号</span>
+          <span class="pa-card-row-value">时皙 ****7766</span>
+        </div>
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">上次同步</span>
+          <span class="pa-card-row-value" style="color:var(--green)">今天 06:22 ✓</span>
+        </div>
+        <div class="pa-card-row">
+          <span class="pa-card-row-label">Cookie 有效期</span>
+          <span class="pa-card-row-value">剩余 30 天</span>
+        </div>
+        <div class="pa-card-tags">
+          <span class="pa-data-tag">交易明细</span>
+          <span class="pa-data-tag">结算账单</span>
+          <span class="pa-data-tag">账户余额</span>
+        </div>
+      </div>
+      <div class="pa-card-footer">
+        <span class="pa-next-sync">下次同步：明天 06:00</span>
+        <div class="pa-card-actions">
+          <button class="pa-action-btn">日志</button>
+          <button class="pa-action-btn">同步</button>
+          <button class="pa-action-btn">管理</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Sync logs (collapsible) -->
+  <div class="card">
+    <div class="pa-log-toggle" id="paLogToggle" onclick="togglePaLog()">
+      <span>最近同步记录</span>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <table class="pa-log-table" id="paLogTable">
+      <thead>
+        <tr><th>时间</th><th>平台</th><th>类型</th><th>状态</th><th>耗时</th><th>备注</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:12px">04-02 03:18</td>
+          <td>美团</td>
+          <td>结算单</td>
+          <td><span class="pa-log-status success">成功</span></td>
+          <td style="font-family:var(--font-mono)">38s</td>
+          <td style="color:var(--text-muted)">采集 2 条记录</td>
+        </tr>
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:12px">04-02 03:15</td>
+          <td>小红书</td>
+          <td>经营数据</td>
+          <td><span class="pa-log-status success">成功</span></td>
+          <td style="font-family:var(--font-mono)">28s</td>
+          <td style="color:var(--text-muted)">采集 1 条记录</td>
+        </tr>
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:12px">04-02 03:12</td>
+          <td>抖店</td>
+          <td>结算单</td>
+          <td><span class="pa-log-status success">成功</span></td>
+          <td style="font-family:var(--font-mono)">45s</td>
+          <td style="color:var(--text-muted)">采集 3 条记录</td>
+        </tr>
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:12px">04-02 03:10</td>
+          <td>抖店</td>
+          <td>经营概览</td>
+          <td><span class="pa-log-status success">成功</span></td>
+          <td style="font-family:var(--font-mono)">32s</td>
+          <td style="color:var(--text-muted)">GMV / UV / 转化率</td>
+        </tr>
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:12px">04-02 03:08</td>
+          <td>天猫</td>
+          <td>生意参谋</td>
+          <td><span class="pa-log-status success">成功</span></td>
+          <td style="font-family:var(--font-mono)">51s</td>
+          <td style="color:var(--text-muted)">采集 1 条记录</td>
+        </tr>
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:12px">04-01 03:20</td>
+          <td>千川</td>
+          <td>推广费用</td>
+          <td><span class="pa-log-status fail">失败</span></td>
+          <td style="font-family:var(--font-mono)">120s</td>
+          <td style="color:var(--red)">Cookie 即将过期，请续期</td>
+        </tr>
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:12px">04-01 03:15</td>
+          <td>美团</td>
+          <td>经营概览</td>
+          <td><span class="pa-log-status success">成功</span></td>
+          <td style="font-family:var(--font-mono)">35s</td>
+          <td style="color:var(--text-muted)">采集 1 条记录</td>
+        </tr>
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:12px">04-01 03:12</td>
+          <td>抖店</td>
+          <td>佣金明细</td>
+          <td><span class="pa-log-status success">成功</span></td>
+          <td style="font-family:var(--font-mono)">42s</td>
+          <td style="color:var(--text-muted)">采集 5 条记录</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Data flow explanation -->
+  <div class="card" style="margin-top:16px">
+    <div class="card-header">
+      <span class="card-title">数据流向</span>
+      <span class="card-subtitle">绑定后，各岗位自动获得对应数据</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;text-align:center">
+      <div style="padding:16px;border:1px solid var(--divider);border-radius:10px">
+        <div style="font-size:20px;margin-bottom:8px">&#128200;</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">财务 / 会计</div>
+        <div style="font-size:12px;color:var(--text-muted);line-height:1.5">结算单 · 佣金明细<br>应收款 · 平台扣款</div>
+      </div>
+      <div style="padding:16px;border:1px solid var(--divider);border-radius:10px">
+        <div style="font-size:20px;margin-bottom:8px">&#128176;</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">三单自动对账</div>
+        <div style="font-size:12px;color:var(--text-muted);line-height:1.5">银行流水 × 平台结算 × 订单<br>AI 交叉核验 · 差异标红</div>
+      </div>
+      <div style="padding:16px;border:1px solid var(--divider);border-radius:10px">
+        <div style="font-size:20px;margin-bottom:8px">&#128202;</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">运营</div>
+        <div style="font-size:12px;color:var(--text-muted);line-height:1.5">GMV · UV · 转化率<br>投放 ROI · 竞品监控</div>
+      </div>
+      <div style="padding:16px;border:1px solid var(--divider);border-radius:10px">
+        <div style="font-size:20px;margin-bottom:8px">&#127919;</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">超管看板</div>
+        <div style="font-size:12px;color:var(--text-muted);line-height:1.5">全渠道汇总 · AI 预警<br>经营全貌 · 周报/月报</div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<!-- Platform Auth Binding Modal -->
+<div class="pa-modal-overlay" id="paModal">
+  <div class="pa-modal">
+    <h3 id="paModalTitle">绑定抖店</h3>
+    <p>系统将打开平台登录页面，请使用店铺管理员账号登录。登录成功后，系统自动获取授权凭证。</p>
+    <div class="pa-modal-steps">
+      <div class="pa-modal-step">
+        <span class="pa-modal-step-num">1</span>
+        <span>点击"开始绑定"，系统打开平台后台登录页</span>
+      </div>
+      <div class="pa-modal-step">
+        <span class="pa-modal-step-num">2</span>
+        <span>在弹出窗口中完成登录（支持扫码/密码）</span>
+      </div>
+      <div class="pa-modal-step">
+        <span class="pa-modal-step-num">3</span>
+        <span>登录成功后自动获取凭证，卡片变为"已绑定"</span>
+      </div>
+    </div>
+    <div class="pa-modal-warning">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 9v2m0 4h.01M5.07 19h13.86c1.1 0 1.8-1.17 1.25-2.12L13.25 4.13a1.44 1.44 0 0 0-2.5 0L3.82 16.88C3.27 17.83 3.97 19 5.07 19z"/></svg>
+      <span>仅读取数据，绝不进行写操作。凭证加密存储在本地设备，不上传至服务器。</span>
+    </div>
+    <div class="pa-modal-btns">
+      <button class="btn" onclick="closePaModal()">取消</button>
+      <button class="btn primary" onclick="alert('正在打开平台登录页...');closePaModal()">开始绑定</button>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- ========== AI FLOAT BUTTON ========== -->
+<button class="ai-float-btn" id="aiFloatBtn" onclick="switchView('command')" title="打开作战指令台">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+</button>
+
+<!-- ========== FOOTER ========== -->
+<footer class="footer">
+  <span class="footer-dot"></span>AI 引擎运行中 · 系统正常 · v3.3
+</footer>
+
+<!-- ========== ONBOARDING MODAL ========== -->
+<div class="modal-overlay hidden" id="onboardingModal">
+  <div class="modal-box">
+    <h2>欢迎来到作战指挥台</h2>
+    <p>这是您的企业经营全景驾驶舱，AI 实时为您监控、分析、预警。</p>
+    <div class="modal-steps">
+      <div class="modal-step">
+        <span class="modal-step-num">1</span>
+        <span class="modal-step-text"><strong>AI 今日看板</strong> — 每日 08:00 自动生成经营简报，一眼掌握全局</span>
+      </div>
+      <div class="modal-step">
+        <span class="modal-step-num">2</span>
+        <span class="modal-step-text"><strong>作战指令台</strong> — 用自然语言下达指令，AI 自动执行分析和任务</span>
+      </div>
+      <div class="modal-step">
+        <span class="modal-step-num">3</span>
+        <span class="modal-step-text"><strong>角色视角切换</strong> — 左侧 Roles 区域可进入财务、客服、运营等专业视角</span>
+      </div>
+    </div>
+    <button class="modal-btn" onclick="closeOnboarding()">开始使用</button>
+  </div>
+</div>
+
+<script>
+// ===== View switching =====
+function switchView(viewName) {
+  document.querySelectorAll('.view-content').forEach(function(v) {
+    v.classList.remove('active');
+  });
+  var target = document.querySelector('.view-content[data-view="' + viewName + '"]');
+  if (target) target.classList.add('active');
+
+  document.querySelectorAll('.nav-item[data-view]').forEach(function(n) {
+    n.classList.remove('active');
+  });
+  var navItem = document.querySelector('.nav-item[data-view="' + viewName + '"]');
+  if (navItem) navItem.classList.add('active');
+
+  // Scroll main to top
+  document.querySelector('.main').scrollTop = 0;
+}
+
+// Sidebar nav click
+document.querySelectorAll('.nav-item[data-view]').forEach(function(item) {
+  item.addEventListener('click', function() {
+    switchView(item.getAttribute('data-view'));
+  });
+});
+
+// ===== Platform Auth =====
+function togglePaLog() {
+  var toggle = document.getElementById('paLogToggle');
+  var table = document.getElementById('paLogTable');
+  if (toggle && table) {
+    toggle.classList.toggle('open');
+    table.classList.toggle('open');
+  }
+}
+function openPaModal(platformName) {
+  var modal = document.getElementById('paModal');
+  var title = document.getElementById('paModalTitle');
+  if (title) title.textContent = '绑定' + platformName;
+  if (modal) modal.classList.add('open');
+}
+function closePaModal() {
+  var modal = document.getElementById('paModal');
+  if (modal) modal.classList.remove('open');
+}
+
+// ===== Role group toggle =====
+function toggleRole(id) {
+  var el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
+}
+
+// ===== Notification panel =====
+function toggleNotifPanel() {
+  var panel = document.getElementById('notifPanel');
+  panel.classList.toggle('open');
+}
+// Close notification panel when clicking outside
+document.addEventListener('click', function(e) {
+  var panel = document.getElementById('notifPanel');
+  var btn = document.querySelector('.notification-btn');
+  if (panel.classList.contains('open') && !panel.contains(e.target) && !btn.contains(e.target)) {
+    panel.classList.remove('open');
+  }
+});
+
+// ===== AI Briefing toggle =====
+function toggleBriefing() {
+  document.getElementById('aiBriefing').classList.toggle('open');
+}
+
+// ===== Command center =====
+(function() {
+  var textarea = document.getElementById('cmdInput');
+  var sendBtn = document.getElementById('cmdSendBtn');
+  if (textarea && sendBtn) {
+    textarea.addEventListener('input', function() {
+      sendBtn.classList.toggle('active', this.value.trim().length > 0);
+      // Auto-resize textarea
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+    });
+  }
+})();
+
+function fillCommand(text) {
+  var input = document.getElementById('cmdInput');
+  var sendBtn = document.getElementById('cmdSendBtn');
+  input.value = text;
+  input.focus();
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+  if (sendBtn) sendBtn.classList.toggle('active', text.trim().length > 0);
+}
+
+function sendCommand() {
+  var input = document.getElementById('cmdInput');
+  var text = input.value.trim();
+  if (!text) return;
+  simulateChat(text);
+}
+
+// Transition to conversation mode
+function simulateChat(text) {
+  var welcome = document.querySelector('.command-welcome');
+  var chips = document.querySelector('.command-chips');
+  var center = document.querySelector('.command-center');
+  var convo = document.getElementById('cmdConversation');
+  var input = document.getElementById('cmdInput');
+  var sendBtn = document.getElementById('cmdSendBtn');
+
+  // Hide welcome & chips, remove centering
+  if (welcome) welcome.style.display = 'none';
+  if (chips) chips.style.display = 'none';
+  center.style.justifyContent = 'flex-start';
+  center.style.paddingBottom = '0';
+  center.style.minHeight = 'auto';
+
+  // Clear input
+  input.value = '';
+  input.style.height = 'auto';
+  if (sendBtn) sendBtn.classList.remove('active');
+
+  // Show conversation
+  convo.style.display = 'block';
+
+  // Demo responses per chip
+  var responses = {
+    '天猫退货率趋势': '<div style="margin-bottom:8px;font-weight:500;color:var(--text-primary)">天猫旗舰店退货率趋势分析（近 4 周）</div>'
+      + '<table><thead><tr><th>周次</th><th>退货率</th><th>退货金额</th><th>环比</th></tr></thead>'
+      + '<tbody>'
+      + '<tr><td>第11周</td><td class="amount">3.2%</td><td class="amount">\u00A58,640</td><td style="color:var(--text-muted)">--</td></tr>'
+      + '<tr><td>第12周</td><td class="amount">3.8%</td><td class="amount">\u00A510,260</td><td style="color:var(--red)">\u2191 0.6%</td></tr>'
+      + '<tr><td>第13周</td><td class="amount">4.1%</td><td class="amount">\u00A511,070</td><td style="color:var(--red)">\u2191 0.3%</td></tr>'
+      + '<tr><td>第14周</td><td class="amount" style="color:var(--red);font-weight:700">4.5%</td><td class="amount">\u00A512,150</td><td style="color:var(--red)">\u2191 0.4%</td></tr>'
+      + '</tbody></table>'
+      + '<div style="margin-top:10px;padding:10px 12px;background:#FFF7E6;border-radius:8px;font-size:12px;color:var(--orange);line-height:1.6">'
+      + '<strong>\u26A0 分析结论：</strong>退货率连续 3 周上升，从 3.2% 升至 4.5%（+40.6%）。主因集中在\u201C物流慢\u201D（占 62%）和\u201C商品破损\u201D（占 23%）。若不干预，预计第 15 周将突破 5% 预警线。</div>'
+      + '<div class="cmd-ai-actions">'
+      + '<button class="cmd-ai-action-btn primary">优化仓储时效</button>'
+      + '<button class="cmd-ai-action-btn">派任务给客服跟进</button>'
+      + '<button class="cmd-ai-action-btn">导出详细报告</button></div>'
+  };
+
+  var aiContent = responses[text] || '<p>已收到指令「' + text + '」，AI 正在分析中...</p>'
+    + '<div style="margin-top:8px;padding:10px 12px;background:var(--input-bg);border-radius:8px;font-size:12px;color:var(--text-muted);line-height:1.6">'
+    + '正在调用 Master Agent 跨板块执行，预计 3-5 秒内返回结果。</div>';
+
+  // Append messages
+  convo.innerHTML += '<div class="cmd-msg user" style="animation:fadeInUp .3s ease"><div class="cmd-msg-bubble">' + text + '</div></div>';
+  setTimeout(function() {
+    convo.innerHTML += '<div class="cmd-msg ai" style="animation:fadeInUp .3s ease"><div class="cmd-msg-bubble">' + aiContent + '</div></div>';
+    // Scroll to bottom
+    document.querySelector('.main').scrollTop = document.querySelector('.main').scrollHeight;
+  }, 300);
+}
+
+// ===== Tab switching helpers =====
+function switchTimeTab(el) {
+  el.parentNode.querySelectorAll('.time-tab').forEach(function(t) { t.classList.remove('active'); });
+  el.classList.add('active');
+}
+
+function switchApprovalTab(el) {
+  el.parentNode.querySelectorAll('.approval-tab').forEach(function(t) { t.classList.remove('active'); });
+  el.classList.add('active');
+}
+
+function switchNotifTab(el) {
+  el.parentNode.querySelectorAll('.notif-tab').forEach(function(t) { t.classList.remove('active'); });
+  el.classList.add('active');
+}
+
+// ===== Mode toggle (simple/professional) =====
+var isSimpleMode = false;
+function toggleMode() {
+  isSimpleMode = !isSimpleMode;
+  var toggle = document.getElementById('modeToggle');
+  var labelSimple = document.getElementById('modeLabelSimple');
+  var labelPro = document.getElementById('modeLabelPro');
+  if (isSimpleMode) {
+    toggle.classList.add('simple');
+    labelSimple.classList.add('active');
+    labelPro.classList.remove('active');
+    document.body.classList.add('simple-mode');
+  } else {
+    toggle.classList.remove('simple');
+    labelSimple.classList.remove('active');
+    labelPro.classList.add('active');
+    document.body.classList.remove('simple-mode');
+  }
+}
+
+// ===== Alert expand/collapse =====
+function toggleAlert(el) {
+  el.classList.toggle('expanded');
+  var btn = el.querySelector('.alert-expand-btn');
+  if (btn) btn.textContent = el.classList.contains('expanded') ? '收起' : '展开';
+}
+
+// ===== AI float button visibility =====
+function updateFloatBtn() {
+  var btn = document.getElementById('aiFloatBtn');
+  var commandView = document.querySelector('.view-content[data-view="command"]');
+  if (btn) btn.style.display = (commandView && commandView.classList.contains('active')) ? 'none' : 'flex';
+}
+// Override switchView to update float btn
+var _origSwitchView = switchView;
+switchView = function(viewName) {
+  _origSwitchView(viewName);
+  updateFloatBtn();
+};
+updateFloatBtn();
+
+// ===== Onboarding =====
+function closeOnboarding() {
+  document.getElementById('onboardingModal').classList.add('hidden');
+  localStorage.setItem('shishi_onboarding_done', '1');
+}
+(function() {
+  if (!localStorage.getItem('shishi_onboarding_done')) {
+    document.getElementById('onboardingModal').classList.remove('hidden');
+  }
+})();
+
+// ===== Chat history click =====
+document.querySelectorAll('.chat-item').forEach(function(item) {
+  item.addEventListener('click', function() {
+    switchView('command');
+    var input = document.getElementById('cmdInput');
+    var title = item.querySelector('.chat-item-title');
+    if (input && title) { input.value = title.textContent.trim(); input.focus(); }
+  });
+});
+</script>
+
+</body>
+</html>

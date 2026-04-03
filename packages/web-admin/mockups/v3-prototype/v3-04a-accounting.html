@@ -1,0 +1,2385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>时皙 AI 工作站 - 会计工作台</title>
+<style>
+:root {
+  --text-primary: #1A1A1A;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --bg: #FFFFFF;
+  --sidebar-bg: #F9F9F9;
+  --sidebar-border: #F0F0F0;
+  --divider: #F0F0F0;
+  --input-border: #E8E8E8;
+  --input-bg: #F5F5F5;
+  --hover-bg: #F3F3F3;
+  --active-bg: #EFEFEF;
+  --accent: #1A1A1A;
+  --green: #00B42A;
+  --red: #E53835;
+  --orange: #FF7D00;
+  --blue: #4F6EF7;
+  --font: -apple-system, 'SF Pro Display', 'PingFang SC', 'Helvetica Neue', sans-serif;
+  --font-mono: 'SF Mono', 'Roboto Mono', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font);
+  color: var(--text-primary);
+  background: var(--bg);
+  overflow: hidden;
+  height: 100vh;
+  min-width: 1024px;
+}
+
+/* ========== Header ========== */
+.header {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 52px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--divider);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  z-index: 100;
+}
+.header-left {
+  display: flex; align-items: center; gap: 10px;
+}
+.logo {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: #FFFFFF; font-weight: 700; font-size: 16px;
+}
+.header-title {
+  font-size: 15px; font-weight: 600; color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+.header-back-cc {
+  margin-left: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.header-back-cc:hover { color: var(--text-primary); }
+.header-nav {
+  display: flex; align-items: center; gap: 4px;
+  margin-left: 24px;
+}
+.header-nav a {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+.header-nav a:hover { background: var(--hover-bg); color: var(--text-primary); }
+.header-nav a.active {
+  background: var(--active-bg);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.header-right {
+  display: flex; align-items: center; gap: 16px;
+}
+
+/* Mode Toggle */
+.mode-toggle {
+  display: flex; align-items: center; gap: 6px;
+}
+.mode-label {
+  font-size: 12px; color: var(--text-muted); font-weight: 500;
+  transition: color .15s;
+}
+.mode-label.active { color: var(--text-primary); font-weight: 600; }
+.toggle-switch {
+  width: 36px; height: 20px;
+  background: var(--accent);
+  border-radius: 10px;
+  position: relative;
+  cursor: pointer;
+  transition: background .2s;
+}
+.toggle-knob {
+  width: 16px; height: 16px;
+  background: #FFFFFF;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px; right: 2px;
+  transition: all .2s;
+}
+.toggle-switch.simple .toggle-knob {
+  right: auto; left: 2px;
+}
+.toggle-switch.simple {
+  background: var(--text-muted);
+}
+
+.notification-btn {
+  position: relative;
+  width: 36px; height: 36px;
+  border: none; background: none; cursor: pointer;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-secondary);
+  transition: background .15s;
+}
+.notification-btn:hover { background: var(--hover-bg); }
+.notification-dot {
+  position: absolute; top: 6px; right: 8px;
+  width: 7px; height: 7px;
+  background: var(--red);
+  border-radius: 50%;
+  border: 2px solid var(--bg);
+}
+.user-info {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 4px 8px 4px 4px;
+  border-radius: 8px;
+  transition: background .15s;
+}
+.user-info:hover { background: var(--hover-bg); }
+.user-avatar {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #FFFFFF; font-size: 13px; font-weight: 600;
+}
+.user-role-tag {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--input-bg);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* ========== Sidebar ========== */
+.sidebar {
+  position: fixed; top: 52px; left: 0; bottom: 32px;
+  width: 240px;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+  z-index: 50;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: #DDDDDD; border-radius: 2px; }
+.sidebar-section { padding: 8px 12px 4px; }
+.sidebar-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 8px 8px 4px;
+}
+.sidebar-divider {
+  height: 1px;
+  background: var(--divider);
+  margin: 4px 16px;
+}
+
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  margin: 1px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: all .15s;
+  position: relative;
+}
+.nav-item:hover { background: var(--hover-bg); color: var(--text-primary); }
+.nav-item.active {
+  background: var(--active-bg);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.nav-item.disabled {
+  color: var(--text-muted);
+  cursor: default;
+  opacity: 0.6;
+}
+.nav-item.disabled:hover {
+  background: transparent;
+  color: var(--text-muted);
+}
+.nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+.nav-badge {
+  margin-left: auto;
+  background: var(--red);
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+.new-tag {
+  font-size: 9px;
+  font-weight: 700;
+  color: #4F6EF7;
+  background: #EEF1FE;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 6px;
+}
+
+.chat-item {
+  display: flex; flex-direction: column;
+  padding: 8px 12px;
+  margin: 1px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.chat-item:hover { background: var(--hover-bg); }
+.chat-item.active { background: var(--active-bg); }
+.chat-item-title {
+  font-size: 13px; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chat-item-time {
+  font-size: 11px; color: var(--text-muted); margin-top: 2px;
+}
+
+.sidebar-bottom {
+  margin-top: auto;
+  border-top: 1px solid var(--divider);
+  padding: 8px 12px;
+}
+.sidebar-bottom .nav-item { margin: 0; }
+
+/* ========== Main Content ========== */
+.main {
+  position: fixed;
+  top: 52px; left: 240px; right: 0; bottom: 32px;
+  overflow-y: auto;
+  background: var(--input-bg);
+  padding: 20px 24px;
+}
+.main::-webkit-scrollbar { width: 6px; }
+.main::-webkit-scrollbar-thumb { background: #DDDDDD; border-radius: 3px; }
+
+/* View switching */
+.view-content { display: none; }
+.view-content.active { display: block; }
+
+/* KPI Cards */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.kpi-card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 18px 20px;
+  cursor: default;
+  transition: box-shadow .2s, transform .2s;
+}
+.kpi-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,.06);
+  transform: translateY(-2px);
+}
+.kpi-label {
+  font-size: 12px; color: var(--text-muted); margin-bottom: 8px;
+}
+.kpi-value {
+  font-size: 26px; font-weight: 700; color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+.kpi-change {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 12px; font-weight: 500; margin-top: 6px;
+}
+.kpi-change.up-green { color: var(--green); }
+.kpi-change.up-red { color: var(--red); }
+.kpi-change.neutral-orange { color: var(--orange); }
+.kpi-sub {
+  font-size: 11px; color: var(--text-muted); margin-top: 2px;
+}
+
+/* Content Grid */
+.content-grid {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 20px;
+}
+.card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--divider);
+}
+.card-title {
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+}
+.card-action {
+  font-size: 12px; color: var(--text-muted); cursor: pointer;
+  transition: color .15s;
+  background: none; border: none; font-family: var(--font);
+}
+.card-action:hover { color: var(--text-primary); }
+
+/* Todo List */
+.todo-list { padding: 8px 12px; }
+.todo-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--divider);
+  cursor: pointer;
+  transition: background .15s;
+}
+.todo-item:last-child { border-bottom: none; }
+.todo-item:hover { background: var(--hover-bg); border-radius: 6px; }
+.todo-check {
+  width: 18px; height: 18px;
+  border: 1.5px solid var(--input-border);
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all .15s;
+}
+.todo-check.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.todo-check.checked svg { display: block; }
+.todo-check svg { display: none; width: 12px; height: 12px; color: #FFFFFF; }
+.todo-content { flex: 1; }
+.todo-text {
+  font-size: 13px; color: var(--text-primary); line-height: 1.5;
+}
+.todo-item.done .todo-text {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+.todo-tag {
+  display: inline-block;
+  font-size: 10px; font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.todo-tag.urgent { background: #FEE2E2; color: var(--red); }
+
+/* Voucher Table */
+.voucher-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.voucher-table th {
+  text-align: left;
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  background: var(--input-bg);
+  border-bottom: 1px solid var(--divider);
+  white-space: nowrap;
+}
+.voucher-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--divider);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.voucher-table tr { transition: background .15s; cursor: pointer; }
+.voucher-table tbody tr:hover { background: var(--hover-bg); }
+.voucher-table .code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.voucher-table .amount {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  text-align: right;
+}
+.voucher-table .amount.negative { color: var(--red); }
+.status-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.status-tag.pending { background: #FFF7E6; color: var(--orange); }
+.status-tag.approved { background: #E8F3FF; color: var(--blue); }
+.status-tag.posted { background: #E8F7E8; color: var(--green); }
+.status-tag.draft { background: var(--input-bg); color: var(--text-muted); }
+.source-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.source-tag.ai { background: #EEF1FE; color: #4F6EF7; }
+.source-tag.manual { background: var(--input-bg); color: var(--text-muted); }
+
+/* Category tags */
+.cat-tag {
+  display: inline-block;
+  font-size: 11px; font-weight: 500;
+  padding: 2px 8px; border-radius: 4px;
+}
+.cat-tag.asset { background: #E8F3FF; color: #2B6CB0; }
+.cat-tag.liability { background: #FFF7E6; color: #C05621; }
+.cat-tag.equity { background: #F0E8FF; color: #6B46C1; }
+.cat-tag.income-expense { background: #E8F7E8; color: #276749; }
+
+/* Aging Table */
+.aging-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.aging-table th {
+  text-align: left;
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--input-bg);
+  border-bottom: 1px solid var(--divider);
+}
+.aging-table td {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--divider);
+  color: var(--text-secondary);
+}
+.aging-table .amount {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.aging-table .pct {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.aging-table tbody tr:hover { background: var(--hover-bg); cursor: pointer; }
+.aging-table tfoot td {
+  font-weight: 600;
+  color: var(--text-primary);
+  border-top: 2px solid var(--divider);
+}
+
+/* AI Chat Panel */
+.ai-panel {
+  display: flex; flex-direction: column;
+  height: 100%;
+  min-height: 480px;
+}
+.ai-messages {
+  flex: 1;
+  padding: 16px 20px;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.ai-messages::-webkit-scrollbar { width: 4px; }
+.ai-messages::-webkit-scrollbar-thumb { background: #DDDDDD; border-radius: 2px; }
+
+.msg {
+  max-width: 92%;
+  line-height: 1.6;
+}
+.msg.user {
+  align-self: flex-end;
+  background: var(--accent);
+  color: #FFFFFF;
+  padding: 10px 14px;
+  border-radius: 14px 14px 4px 14px;
+  font-size: 13px;
+}
+.msg.ai {
+  align-self: flex-start;
+  background: var(--input-bg);
+  padding: 12px 16px;
+  border-radius: 4px 14px 14px 14px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.msg.ai .msg-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.msg.ai ul {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+.msg.ai li { margin-bottom: 3px; }
+.msg.ai .msg-warning {
+  color: var(--orange);
+  font-weight: 500;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.ai-input-bar {
+  padding: 12px 16px;
+  border-top: 1px solid var(--divider);
+  display: flex; gap: 8px;
+}
+.ai-input {
+  flex: 1;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-family: var(--font);
+  background: var(--input-bg);
+  outline: none;
+  transition: border-color .15s;
+}
+.ai-input:focus { border-color: var(--accent); }
+.ai-send-btn {
+  width: 36px; height: 36px;
+  border: none;
+  background: var(--accent);
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #FFFFFF;
+  transition: opacity .15s;
+}
+.ai-send-btn:hover { opacity: .85; }
+
+/* ========== Footer ========== */
+.footer {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: 32px;
+  background: var(--bg);
+  border-top: 1px solid var(--divider);
+  display: flex; align-items: center;
+  padding: 0 20px;
+  font-size: 11px;
+  color: var(--text-muted);
+  gap: 24px;
+  z-index: 100;
+}
+.footer-dot {
+  width: 6px; height: 6px;
+  background: var(--green);
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+.footer-right {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* ========== Animations ========== */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.kpi-card { animation: fadeInUp .4s ease both; }
+.kpi-card:nth-child(2) { animation-delay: .05s; }
+.kpi-card:nth-child(3) { animation-delay: .1s; }
+.kpi-card:nth-child(4) { animation-delay: .15s; }
+.card { animation: fadeInUp .4s ease .2s both; }
+
+/* Period Selector */
+.period-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 10px 16px;
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+}
+.period-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.period-arrow {
+  width: 28px; height: 28px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+.period-arrow:hover { background: var(--hover-bg); border-color: var(--accent); color: var(--text-primary); }
+.period-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 120px;
+  text-align: center;
+}
+.period-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--input-bg);
+  border-radius: 6px;
+  padding: 2px;
+}
+.period-tab {
+  font-size: 12px;
+  padding: 4px 14px;
+  border: none;
+  background: transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.period-tab.active {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.period-tab:hover:not(.active) { color: var(--text-secondary); }
+
+/* Notification Panel */
+.notification-panel {
+  position: fixed;
+  top: 52px;
+  right: 16px;
+  width: 360px;
+  max-height: 480px;
+  background: #FFFFFF;
+  border: 1px solid #F0F0F0;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+  z-index: 300;
+  display: none;
+  overflow: hidden;
+}
+.notification-panel.open { display: flex; flex-direction: column; }
+.noti-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #F0F0F0;
+}
+.noti-header-title { font-size: 14px; font-weight: 600; color: #1A1A1A; }
+.noti-mark-read {
+  font-size: 12px; color: #999999; background: none; border: none;
+  cursor: pointer; font-family: inherit; transition: color 0.15s;
+}
+.noti-mark-read:hover { color: #1A1A1A; }
+.noti-list {
+  flex: 1; overflow-y: auto; max-height: 380px;
+}
+.noti-list::-webkit-scrollbar { width: 4px; }
+.noti-list::-webkit-scrollbar-thumb { background: #DDDDDD; border-radius: 2px; }
+.noti-item {
+  display: flex; gap: 10px; padding: 12px 16px;
+  border-bottom: 1px solid #F0F0F0;
+  cursor: pointer; transition: background 0.15s;
+}
+.noti-item:hover { background: #F9F9F9; }
+.noti-item:last-child { border-bottom: none; }
+.noti-item.unread { background: #FAFAFA; }
+.noti-item.unread .noti-title { font-weight: 600; }
+.noti-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 14px;
+}
+.noti-icon.warn { background: #FFF7E6; color: #FF7D00; }
+.noti-icon.danger { background: #FEF2F2; color: #E53835; }
+.noti-icon.info { background: #F0F5FF; color: #4F6EF7; }
+.noti-icon.success { background: #E8F7E8; color: #00B42A; }
+.noti-content { flex: 1; min-width: 0; }
+.noti-title {
+  font-size: 13px; color: #1A1A1A; line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.noti-time { font-size: 11px; color: #999999; margin-top: 2px; }
+.noti-footer {
+  padding: 10px 16px; border-top: 1px solid #F0F0F0; text-align: center;
+}
+.noti-footer a {
+  font-size: 12px; color: #999999; text-decoration: none; transition: color 0.15s;
+}
+.noti-footer a:hover { color: #1A1A1A; }
+
+/* ========== Toolbar ========== */
+.view-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+.view-toolbar-left {
+  display: flex; align-items: center; gap: 12px;
+}
+.view-toolbar-right {
+  display: flex; align-items: center; gap: 8px;
+}
+.toolbar-search {
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-family: var(--font);
+  background: var(--bg);
+  outline: none;
+  width: 240px;
+  transition: border-color .15s;
+}
+.toolbar-search:focus { border-color: var(--accent); }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all .15s;
+  border: 1px solid var(--input-border);
+  background: var(--bg);
+  color: var(--text-primary);
+}
+.btn:hover { background: var(--hover-bg); border-color: var(--accent); }
+.btn.primary {
+  background: var(--accent);
+  color: #FFFFFF;
+  border-color: var(--accent);
+}
+.btn.primary:hover { opacity: .85; }
+
+/* Tab bar */
+.tab-bar {
+  display: flex; gap: 0; margin-bottom: 16px;
+  border-bottom: 1px solid var(--divider);
+  background: var(--bg);
+  border-radius: 12px 12px 0 0;
+  padding: 0 16px;
+}
+.tab-item {
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all .15s;
+  font-family: var(--font);
+  background: none;
+  border-top: none; border-left: none; border-right: none;
+  position: relative;
+}
+.tab-item:hover { color: var(--text-primary); }
+.tab-item.active {
+  color: var(--text-primary);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+.tab-badge {
+  font-size: 10px;
+  background: var(--orange);
+  color: #FFFFFF;
+  padding: 0 5px;
+  border-radius: 8px;
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+/* Stats bar */
+.stats-bar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 10px 16px;
+  background: var(--input-bg);
+  border-radius: 8px;
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.stats-bar span { display: flex; align-items: center; gap: 4px; }
+.stats-bar .divider { color: var(--divider); }
+
+/* Tree indent for subjects */
+.tree-indent { padding-left: 24px; color: var(--text-secondary); }
+.tree-indent-2 { padding-left: 48px; color: var(--text-muted); }
+
+/* Recon flow */
+.recon-flow {
+  display: grid; grid-template-columns: 1fr auto 1fr auto 1fr;
+  gap: 0; align-items: center;
+  margin-bottom: 20px;
+}
+.recon-card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+}
+.recon-card-label {
+  font-size: 12px; color: var(--text-muted); margin-bottom: 8px;
+}
+.recon-card-value {
+  font-size: 24px; font-weight: 700;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.recon-card-sub {
+  font-size: 12px; margin-top: 6px;
+}
+.recon-arrow {
+  font-size: 24px; color: var(--text-muted); text-align: center;
+  padding: 0 8px;
+}
+
+/* Profit table (report) */
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.report-table th {
+  text-align: right;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--input-bg);
+  border-bottom: 1px solid var(--divider);
+}
+.report-table th:first-child { text-align: left; }
+.report-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--divider);
+  color: var(--text-secondary);
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.report-table td:first-child {
+  text-align: left;
+  font-family: var(--font);
+}
+.report-table tr.section-header td {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font);
+  background: var(--input-bg);
+}
+.report-table tr.sub-item td:first-child { padding-left: 32px; }
+.report-table tr.sub-sub-item td:first-child { padding-left: 52px; font-size: 12px; }
+.report-table tr.total-row td {
+  font-weight: 700;
+  color: var(--text-primary);
+  border-top: 2px solid var(--divider);
+}
+.report-table tbody tr:hover { background: var(--hover-bg); cursor: pointer; }
+.change-up { color: var(--green); }
+.change-down { color: var(--red); }
+
+/* Period-end workflow */
+.workflow-list { padding: 0; }
+.workflow-step {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--divider);
+  transition: background .15s;
+}
+.workflow-step:hover { background: var(--hover-bg); cursor: pointer; }
+.workflow-step:last-child { border-bottom: none; }
+.step-icon {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 600;
+  flex-shrink: 0;
+}
+.step-icon.done { background: #E8F7E8; color: var(--green); }
+.step-icon.warn { background: #FFF7E6; color: var(--orange); }
+.step-icon.pending { background: var(--input-bg); color: var(--text-muted); border: 1.5px solid var(--input-border); }
+.step-content { flex: 1; }
+.step-title { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.step-desc { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.step-status { font-size: 12px; font-weight: 500; }
+.step-status.done { color: var(--green); }
+.step-status.warn { color: var(--orange); }
+.step-status.pending { color: var(--text-muted); }
+
+/* Platform tabs */
+.platform-tabs {
+  display: flex; gap: 2px;
+  background: var(--input-bg);
+  border-radius: 8px;
+  padding: 3px;
+  margin-bottom: 16px;
+  width: fit-content;
+}
+.platform-tab {
+  padding: 6px 16px;
+  font-size: 13px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-family: inherit;
+  transition: all .15s;
+}
+.platform-tab.active {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+.platform-tab:hover:not(.active) { color: var(--text-secondary); }
+
+/* Tax calendar */
+.tax-calendar {
+  padding: 16px 20px;
+}
+.tax-event {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--divider);
+  font-size: 13px;
+}
+.tax-event:last-child { border-bottom: none; }
+.tax-date {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  min-width: 60px;
+}
+.tax-desc { flex: 1; color: var(--text-primary); }
+
+/* Big CTA button */
+.cta-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: opacity .15s;
+  margin-top: 16px;
+}
+.cta-btn:hover { opacity: .85; }
+
+/* Recon history */
+.recon-history {
+  display: flex; gap: 12px; padding: 16px 20px;
+  flex-wrap: wrap;
+}
+.recon-month {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text-secondary);
+}
+.recon-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+}
+.recon-dot.ok { background: var(--green); }
+.recon-dot.warn { background: var(--orange); }
+
+/* Welcome Modal */
+.welcome-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 500;
+  display: flex; align-items: center; justify-content: center;
+}
+.welcome-overlay.hidden { display: none; }
+.welcome-card {
+  background: var(--bg);
+  border-radius: 16px;
+  padding: 36px 40px;
+  max-width: 420px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+}
+.welcome-card h2 {
+  font-size: 20px; font-weight: 700; margin-bottom: 16px;
+  color: var(--text-primary);
+}
+.welcome-features {
+  text-align: left;
+  margin: 16px 0 24px;
+  font-size: 14px;
+  line-height: 2;
+  color: var(--text-secondary);
+}
+.welcome-features span { color: var(--green); margin-right: 6px; }
+.welcome-actions {
+  display: flex; gap: 10px; justify-content: center;
+}
+.welcome-actions button {
+  padding: 10px 24px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all .15s;
+}
+.welcome-actions .btn-start {
+  background: var(--accent); color: #FFFFFF; border: none;
+}
+.welcome-actions .btn-start:hover { opacity: .85; }
+.welcome-actions .btn-dismiss {
+  background: none; color: var(--text-muted); border: 1px solid var(--input-border);
+}
+.welcome-actions .btn-dismiss:hover { background: var(--hover-bg); }
+
+/* Channel table highlight */
+.rate-high { color: var(--green); font-weight: 600; }
+.rate-mid { color: var(--text-primary); }
+.rate-low { color: var(--orange); font-weight: 600; }
+
+/* Tooltip for disabled items */
+.nav-item.disabled[title] { position: relative; }
+</style>
+</head>
+<body>
+
+<!-- ========== WELCOME MODAL ========== -->
+<div class="welcome-overlay" id="welcomeModal">
+  <div class="welcome-card">
+    <h2>欢迎使用会计工作台</h2>
+    <div class="welcome-features">
+      <span>&#10003;</span>说一句话自动记账<br>
+      <span>&#10003;</span>一键生成财务报表<br>
+      <span>&#10003;</span>AI对平台回款自动对账<br>
+      <span>&#10003;</span>智能期末结转
+    </div>
+    <div class="welcome-actions">
+      <button class="btn-start" onclick="closeWelcome(false)">开始体验</button>
+      <button class="btn-dismiss" onclick="closeWelcome(true)">不再提示</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== HEADER ========== -->
+<header class="header">
+  <div class="header-left">
+    <div class="logo">S</div>
+    <span class="header-title">时皙 AI 工作站</span>
+    <a class="header-back-cc" href="v3-02-super-admin.html">返回指挥中心</a>
+    <!-- 模块切换导航已移除：岗位无权限跨模块 -->
+  </div>
+  <div class="header-right">
+    <div class="mode-toggle">
+      <span class="mode-label" id="modeLabelSimple">简</span>
+      <div class="toggle-switch" id="modeToggle" onclick="toggleMode()">
+        <div class="toggle-knob"></div>
+      </div>
+      <span class="mode-label active" id="modeLabelPro">专</span>
+    </div>
+    <button class="notification-btn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      </svg>
+      <span class="notification-dot"></span>
+    </button>
+    <div class="user-info">
+      <div class="user-avatar" onclick="if(confirm('确认退出登录？'))window.location.href='v3-01-login.html'" style="cursor:pointer" title="退出登录">李</div>
+      <span class="user-role-tag">会计</span>
+    </div>
+  </div>
+</header>
+
+<!-- ========== SIDEBAR ========== -->
+<nav class="sidebar">
+  <!-- 创始人·作战台入口（侧栏第一项语义，与工具中心一致）：仅 super_admin 可见 -->
+  <div class="sidebar-section" data-role-required="super_admin" style="display:none">
+    <a class="nav-item" href="v3-02-super-admin.html" style="text-decoration:none;color:inherit">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <span>AI 今日看板</span>
+      <span class="nav-badge">3</span>
+    </a>
+  </div>
+  <div class="sidebar-divider" data-role-required="super_admin" style="display:none"></div>
+  <div class="sidebar-section">
+    <div class="nav-item active" data-view="overview">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+        <rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+      <span>会计概览</span>
+    </div>
+    <div class="nav-item" data-view="chat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      <span>AI 对话</span>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">基础设置</div>
+    <div class="nav-item" data-view="subjects">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+      <span data-simple="账户科目">会计科目</span>
+      <span class="new-tag">NEW</span>
+    </div>
+    <div class="nav-item disabled" title="即将上线">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="12" y2="16"/></svg>
+      <span>凭证模板</span>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">日常核算</div>
+    <div class="nav-item" data-view="voucher">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      <span data-simple="记账中心">凭证中心</span>
+      <span class="nav-badge">5</span>
+    </div>
+    <div class="nav-item disabled" title="即将上线">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      <span>总账/明细账</span>
+    </div>
+    <div class="nav-item disabled" title="即将上线">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="17" y1="17" x2="7" y2="7"/><polyline points="7 17 7 7 17 7"/></svg>
+      <span data-simple="别人欠我的">应收账款</span>
+    </div>
+    <div class="nav-item disabled" title="即将上线">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="7" x2="17" y2="17"/><polyline points="17 7 17 17 7 17"/></svg>
+      <span data-simple="我欠别人的">应付账款</span>
+    </div>
+    <div class="nav-item" data-view="channel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+      <span>渠道核算</span>
+    </div>
+    <div class="nav-item" data-view="invoice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+      <span>发票管理</span>
+      <span class="new-tag">NEW</span>
+    </div>
+    <div class="nav-item" data-view="platform-recon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.828L3 3"/><path d="m21 3-8 8"/></svg>
+      <span>平台对账</span>
+      <span class="new-tag">NEW</span>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">期末与报表</div>
+    <div class="nav-item" data-view="period-end">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="10 14 12 16 16 12"/></svg>
+      <span data-simple="月末关账">期末处理</span>
+    </div>
+    <div class="nav-item" data-view="reports">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+      <span>报表中心</span>
+    </div>
+    <div class="nav-item" data-view="tax">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      <span>税务管理</span>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">对话记录</div>
+    <div class="chat-item active" data-chat="1">
+      <span class="chat-item-title">3月利润表环比分析</span>
+      <span class="chat-item-time">10分钟前</span>
+    </div>
+    <div class="chat-item" data-chat="2">
+      <span class="chat-item-title">应收账款账龄分析</span>
+      <span class="chat-item-time">2小时前</span>
+    </div>
+    <div class="chat-item" data-chat="3">
+      <span class="chat-item-title">Q1增值税纳税申报</span>
+      <span class="chat-item-time">3天前</span>
+    </div>
+  </div>
+
+  <div class="sidebar-bottom">
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      <span>设置</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ========== MAIN CONTENT ========== -->
+<main class="main">
+
+<!-- ==================== VIEW 1: OVERVIEW ==================== -->
+<section class="view-content active" data-view="overview">
+  <div class="period-bar">
+    <div class="period-nav">
+      <button class="period-arrow" onclick="switchPeriod(-1)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span class="period-label" id="periodLabel">2026年03月</span>
+      <button class="period-arrow" onclick="switchPeriod(1)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+    <div class="period-tabs">
+      <button class="period-tab active" onclick="setPeriodType(this)">月度</button>
+      <button class="period-tab" onclick="setPeriodType(this)">季度</button>
+      <button class="period-tab" onclick="setPeriodType(this)">年度</button>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+    <span style="font-size:12px;color:var(--text-secondary);border:1px solid var(--input-border);padding:4px 12px;border-radius:6px;cursor:pointer;background:var(--bg);user-select:none">全部渠道 &#9662;</span>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">营业收入（本期）</div>
+      <div class="kpi-value" data-target="448200" data-prefix="¥">¥0</div>
+      <div class="kpi-change up-green">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+        同比 +15.2%
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">营业成本（本期）</div>
+      <div class="kpi-value" data-target="217500" data-prefix="¥">¥0</div>
+      <div class="kpi-change up-red">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+        同比 +9.5%
+      </div>
+      <div class="kpi-sub">毛利率 51.5%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">净利润（本期）</div>
+      <div class="kpi-value" data-target="137428" data-prefix="¥">¥0</div>
+      <div class="kpi-change up-green">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+        环比 +27.8%
+      </div>
+      <div class="kpi-sub">净利率 30.7%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">应收账款余额</div>
+      <div class="kpi-value" data-target="89600" data-prefix="¥">¥0</div>
+      <div class="kpi-change neutral-orange">2笔逾期 | 账龄&gt;60天 ¥32,000</div>
+    </div>
+  </div>
+
+  <div class="content-grid">
+    <div class="left-col">
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <span class="card-title">今日待办</span>
+          <button class="card-action">查看全部 &rarr;</button>
+        </div>
+        <div class="todo-list">
+          <div class="todo-item" onclick="toggleTodo(this)">
+            <div class="todo-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="todo-content"><div class="todo-text">审核付款凭证 5 笔（应付账款-华美等）<span class="todo-tag urgent">紧急</span></div></div>
+          </div>
+          <div class="todo-item" onclick="toggleTodo(this)">
+            <div class="todo-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="todo-content"><div class="todo-text">确认收入：天猫平台3月回款 ¥28,600 入账核销</div></div>
+          </div>
+          <div class="todo-item" onclick="toggleTodo(this)">
+            <div class="todo-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="todo-content"><div class="todo-text">3月结转损益 &amp; 计提折旧（期末结账前置）<span class="todo-tag urgent">紧急</span></div></div>
+          </div>
+          <div class="todo-item" onclick="toggleTodo(this)">
+            <div class="todo-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="todo-content"><div class="todo-text">审批费用报销单 8 笔（管理费用-差旅/办公）</div></div>
+          </div>
+          <div class="todo-item done" onclick="toggleTodo(this)">
+            <div class="todo-check checked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="todo-content"><div class="todo-text">增值税进项税额认证（本期 ¥12,460）</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <span class="card-title">最近凭证</span>
+          <button class="card-action">新建凭证 +</button>
+        </div>
+        <table class="voucher-table">
+          <thead><tr><th>凭证字号</th><th>日期</th><th>摘要</th><th>渠道</th><th>科目</th><th>金额</th><th>制单人</th><th>来源</th><th>状态</th></tr></thead>
+          <tbody>
+            <tr><td class="code">付-031</td><td>03-31</td><td>付供应商货款-华美包材</td><td style="color:#999">-</td><td>应付账款-华美</td><td class="amount">¥45,000.00</td><td>李芳</td><td><span class="source-tag manual">手工</span></td><td><span class="status-tag pending">待审核</span></td></tr>
+            <tr><td class="code">收-018</td><td>03-31</td><td>收天猫3月货款结算</td><td><span style="font-size:12px;color:#666;background:#F5F5F5;padding:2px 8px;border-radius:4px">天猫</span></td><td>银行存款-招商</td><td class="amount">¥28,600.00</td><td>AI</td><td><span class="source-tag ai">&#10024; AI</span></td><td><span class="status-tag pending">待审核</span></td></tr>
+            <tr><td class="code">记-045</td><td>03-30</td><td>计提3月员工工资及社保</td><td style="color:#999">-</td><td>应付职工薪酬</td><td class="amount">¥86,400.00</td><td>李芳</td><td><span class="source-tag manual">手工</span></td><td><span class="status-tag posted">已记账</span></td></tr>
+            <tr><td class="code">记-044</td><td>03-30</td><td>办公用品采购入库</td><td style="color:#999">-</td><td>管理费用-办公费</td><td class="amount">¥2,340.00</td><td>张敏</td><td><span class="source-tag manual">手工</span></td><td><span class="status-tag approved">已审核</span></td></tr>
+            <tr><td class="code">转-012</td><td>03-29</td><td>抖音信息流广告投放</td><td><span style="font-size:12px;color:#666;background:#F5F5F5;padding:2px 8px;border-radius:4px">抖店</span></td><td>销售费用-推广</td><td class="amount">¥12,800.00</td><td>AI</td><td><span class="source-tag ai">&#10024; AI</span></td><td><span class="status-tag posted">已记账</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">应收账龄分析</span>
+          <button class="card-action">AI催收建议 &rarr;</button>
+        </div>
+        <table class="aging-table">
+          <thead><tr><th>账龄区间</th><th>金额</th><th>占比</th><th>客户数</th></tr></thead>
+          <tbody>
+            <tr><td>0-30天</td><td class="amount">¥42,600</td><td class="pct">47.5%</td><td>8</td></tr>
+            <tr><td>31-60天</td><td class="amount">¥15,000</td><td class="pct">16.7%</td><td>3</td></tr>
+            <tr><td style="color:var(--orange)">61-90天</td><td class="amount" style="color:var(--orange)">¥22,000</td><td class="pct" style="color:var(--orange)">24.6%</td><td style="color:var(--orange)">2</td></tr>
+            <tr><td style="color:var(--red)">91天以上</td><td class="amount" style="color:var(--red)">¥10,000</td><td class="pct" style="color:var(--red)">11.2%</td><td style="color:var(--red)">1</td></tr>
+          </tbody>
+          <tfoot><tr><td>合计</td><td class="amount">¥89,600</td><td class="pct">100%</td><td>14</td></tr></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="card ai-panel">
+      <div class="card-header">
+        <span class="card-title">AI 会计助手</span>
+        <button class="card-action">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        </button>
+      </div>
+      <div class="ai-messages" id="aiMessages-overview">
+        <div class="msg user">生成3月利润表，对比上期差异</div>
+        <div class="msg ai">
+          <div class="msg-title">2026年3月利润表摘要（与2月环比）</div>
+          <ul>
+            <li>营业收入 ¥448,200（+15.2%），天猫渠道占比 44%</li>
+            <li>营业成本 ¥217,500（+9.5%），毛利率 51.5%（上期 48.9%）</li>
+            <li>期间费用合计 ¥91,300，其中销售费用占比 85%</li>
+            <li>净利润 ¥137,428（+27.8%），净利率 30.7%</li>
+          </ul>
+          <div style="margin-top:8px"><strong>各渠道净利率：</strong></div>
+          <ul>
+            <li>小程序：44.4%（零扣点，净利最高）</li>
+            <li>天猫：41.9%（回款稳定）</li>
+            <li>小红书：24.6%（增长潜力大）</li>
+            <li>抖店：16.9%（达人佣金占比高）</li>
+            <li>美团：12.8%（扣点20%，建议评估）</li>
+          </ul>
+          <div class="msg-warning">&#9888; 异常项：抖店达人佣金 ¥18,600 占销售收入 11.9%，超行业均值(8%)。建议优化达人合作结构。</div>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" id="aiInput" type="text" placeholder="输入会计指令，如：生成科目余额表、核对往来账..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button class="ai-send-btn" onclick="sendMsg()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW 2: SUBJECTS ==================== -->
+<section class="view-content" data-view="subjects">
+  <div class="content-grid">
+    <div class="left-col">
+      <div class="view-toolbar">
+        <div class="view-toolbar-left">
+          <input class="toolbar-search" type="text" placeholder="搜索科目编码或名称...">
+        </div>
+        <div class="view-toolbar-right">
+          <button class="btn">&#10024; 导入标准模板</button>
+          <button class="btn primary">+ 新增科目</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <table class="voucher-table">
+          <thead><tr><th>科目编码</th><th>科目名称</th><th>类别</th><th>余额方向</th><th>辅助核算</th><th style="text-align:right">期初余额</th><th>启用</th></tr></thead>
+          <tbody>
+            <tr><td class="code">1001</td><td>库存现金</td><td><span class="cat-tag asset">资产</span></td><td>借方</td><td style="color:#999">-</td><td class="amount">¥5,200.00</td><td style="color:var(--green)">&#10003;</td></tr>
+            <tr><td class="code">1002</td><td>银行存款</td><td><span class="cat-tag asset">资产</span></td><td>借方</td><td>银行账户</td><td class="amount">¥2,510,300.00</td><td style="color:var(--green)">&#10003;</td></tr>
+            <tr><td class="code" style="padding-left:32px">1002.01</td><td style="padding-left:16px;color:var(--text-secondary)">招商银行·基本户</td><td><span class="cat-tag asset">资产</span></td><td>借方</td><td style="color:#999">-</td><td class="amount">¥1,890,200.00</td><td style="color:var(--green)">&#10003;</td></tr>
+            <tr><td class="code" style="padding-left:32px">1002.02</td><td style="padding-left:16px;color:var(--text-secondary)">工商银行·一般户</td><td><span class="cat-tag asset">资产</span></td><td>借方</td><td style="color:#999">-</td><td class="amount">¥620,100.00</td><td style="color:var(--green)">&#10003;</td></tr>
+            <tr><td class="code">1122</td><td>应收账款</td><td><span class="cat-tag asset">资产</span></td><td>借方</td><td>客商+渠道</td><td class="amount">¥89,600.00</td><td style="color:var(--green)">&#10003;</td></tr>
+            <tr><td class="code">1405</td><td>库存商品</td><td><span class="cat-tag asset">资产</span></td><td>借方</td><td>SKU</td><td class="amount">¥326,800.00</td><td style="color:var(--green)">&#10003;</td></tr>
+            <tr><td class="code">2202</td><td>应付账款</td><td><span class="cat-tag liability">负债</span></td><td>贷方</td><td>客商</td><td class="amount">¥168,500.00</td><td style="color:var(--green)">&#10003;</td></tr>
+            <tr><td class="code">2241</td><td>合同负债(预收)</td><td><span class="cat-tag liability">负债</span></td><td>贷方</td><td>渠道</td><td class="amount">¥42,000.00</td><td style="color:var(--green)">&#10003;</td></tr>
+            <tr><td class="code">5001</td><td>主营业务收入</td><td><span class="cat-tag income-expense">损益</span></td><td>贷方</td><td>渠道+SKU</td><td class="amount" style="color:#999">-</td><td style="color:var(--green)">&#10003;</td></tr>
+            <tr><td class="code">5401</td><td>主营业务成本</td><td><span class="cat-tag income-expense">损益</span></td><td>借方</td><td>渠道+SKU</td><td class="amount" style="color:#999">-</td><td style="color:var(--green)">&#10003;</td></tr>
+            <tr><td class="code">6601</td><td>销售费用</td><td><span class="cat-tag income-expense">损益</span></td><td>借方</td><td>渠道</td><td class="amount" style="color:#999">-</td><td style="color:var(--green)">&#10003;</td></tr>
+            <tr><td class="code" style="padding-left:32px">6601.01</td><td style="padding-left:16px;color:var(--text-secondary)">平台佣金</td><td><span class="cat-tag income-expense">损益</span></td><td>借方</td><td>渠道</td><td class="amount" style="color:#999">-</td><td style="color:var(--green)">&#10003;</td></tr>
+            <tr><td class="code" style="padding-left:32px">6601.02</td><td style="padding-left:16px;color:var(--text-secondary)">推广费</td><td><span class="cat-tag income-expense">损益</span></td><td>借方</td><td>渠道+活动</td><td class="amount" style="color:#999">-</td><td style="color:var(--green)">&#10003;</td></tr>
+            <tr><td class="code" style="padding-left:32px">6601.03</td><td style="padding-left:16px;color:var(--text-secondary)">达人佣金</td><td><span class="cat-tag income-expense">损益</span></td><td>借方</td><td>渠道+达人</td><td class="amount" style="color:#999">-</td><td style="color:var(--green)">&#10003;</td></tr>
+            <tr><td class="code" style="padding-left:32px">6601.04</td><td style="padding-left:16px;color:var(--text-secondary)">物流费</td><td><span class="cat-tag income-expense">损益</span></td><td>借方</td><td>快递公司</td><td class="amount" style="color:#999">-</td><td style="color:var(--green)">&#10003;</td></tr>
+            <tr><td class="code">6602</td><td>管理费用</td><td><span class="cat-tag income-expense">损益</span></td><td>借方</td><td style="color:#999">-</td><td class="amount" style="color:#999">-</td><td style="color:var(--green)">&#10003;</td></tr>
+          </tbody>
+        </table>
+        <div class="stats-bar">
+          <span>共 86 个科目</span>
+          <span class="divider">|</span>
+          <span>已启用 82 个</span>
+          <span class="divider">|</span>
+          <span>4类 5级</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card ai-panel">
+      <div class="card-header">
+        <span class="card-title">AI 会计助手</span>
+        <button class="card-action"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
+      </div>
+      <div class="ai-messages">
+        <div class="msg user">帮我设置电商行业标准科目</div>
+        <div class="msg ai">
+          <div class="msg-title">已为您加载电商行业标准科目模板（86个科目）</div>
+          <ul>
+            <li>资产类 28个（含银行存款明细、应收按渠道）</li>
+            <li>负债类 15个（含合同负债-预售款）</li>
+            <li>损益类 43个（含销售费用按渠道拆分：平台佣金/推广费/达人佣金/物流费）</li>
+          </ul>
+          <div style="margin-top:8px;color:var(--blue);font-weight:500">&#9889; 已自动开启渠道辅助核算。需要调整吗？</div>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" type="text" placeholder="如：新增一个【达人佣金】科目..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button class="ai-send-btn" onclick="sendMsg()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW 3: VOUCHER ==================== -->
+<section class="view-content" data-view="voucher">
+  <div class="content-grid">
+    <div class="left-col">
+      <div class="view-toolbar">
+        <div class="view-toolbar-left">
+          <div class="tab-bar" style="margin-bottom:0;border:none;background:transparent;padding:0;border-bottom:none">
+            <button class="tab-item active" onclick="switchVoucherTab(this)">全部</button>
+            <button class="tab-item" onclick="switchVoucherTab(this)">待审核 <span class="tab-badge">5</span></button>
+            <button class="tab-item" onclick="switchVoucherTab(this)">已审核</button>
+            <button class="tab-item" onclick="switchVoucherTab(this)">已记账</button>
+            <button class="tab-item" onclick="switchVoucherTab(this)">草稿</button>
+          </div>
+        </div>
+        <div class="view-toolbar-right">
+          <button class="btn">&#10024; AI批量生成</button>
+          <button class="btn primary">+ 新建凭证</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <table class="voucher-table">
+          <thead><tr><th>凭证字号</th><th>日期</th><th>摘要</th><th>渠道</th><th>借方科目</th><th>贷方科目</th><th style="text-align:right">金额</th><th>制单人</th><th>来源</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="code">付-031</td><td>03-31</td><td>付供应商货款-华美包材</td><td style="color:#999">-</td><td>应付账款-华美</td><td>银行存款-招商</td><td class="amount">¥45,000.00</td><td>李芳</td><td><span class="source-tag manual">手工</span></td><td><span class="status-tag pending">待审核</span></td>
+              <td><button class="btn" style="padding:3px 8px;font-size:11px">审核</button> <button class="btn" style="padding:3px 8px;font-size:11px">退回</button></td>
+            </tr>
+            <tr>
+              <td class="code">收-018</td><td>03-31</td><td>收天猫3月货款结算</td><td><span style="font-size:12px;color:#666;background:#F5F5F5;padding:2px 8px;border-radius:4px">天猫</span></td><td>银行存款-招商</td><td>应收账款-天猫</td><td class="amount">¥28,600.00</td><td>AI</td><td><span class="source-tag ai">&#10024; AI</span></td><td><span class="status-tag pending">待审核</span></td>
+              <td><button class="btn" style="padding:3px 8px;font-size:11px">审核</button> <button class="btn" style="padding:3px 8px;font-size:11px">退回</button></td>
+            </tr>
+            <tr>
+              <td class="code">记-045</td><td>03-30</td><td>计提3月员工工资及社保</td><td style="color:#999">-</td><td>应付职工薪酬</td><td>银行存款-招商</td><td class="amount">¥86,400.00</td><td>李芳</td><td><span class="source-tag manual">手工</span></td><td><span class="status-tag posted">已记账</span></td>
+              <td><button class="btn" style="padding:3px 8px;font-size:11px">查看</button></td>
+            </tr>
+            <tr>
+              <td class="code">记-044</td><td>03-30</td><td>办公用品采购入库</td><td style="color:#999">-</td><td>管理费用-办公</td><td>银行存款-招商</td><td class="amount">¥2,340.00</td><td>张敏</td><td><span class="source-tag manual">手工</span></td><td><span class="status-tag approved">已审核</span></td>
+              <td><button class="btn" style="padding:3px 8px;font-size:11px">记账</button> <button class="btn" style="padding:3px 8px;font-size:11px">反审</button></td>
+            </tr>
+            <tr>
+              <td class="code">转-012</td><td>03-29</td><td>抖音信息流广告投放</td><td><span style="font-size:12px;color:#666;background:#F5F5F5;padding:2px 8px;border-radius:4px">抖店</span></td><td>销售费用-推广</td><td>银行存款-招商</td><td class="amount">¥12,800.00</td><td>AI</td><td><span class="source-tag ai">&#10024; AI</span></td><td><span class="status-tag posted">已记账</span></td>
+              <td><button class="btn" style="padding:3px 8px;font-size:11px">查看</button></td>
+            </tr>
+            <tr>
+              <td class="code">红-003</td><td>03-28</td><td>红冲：天猫退货退款</td><td><span style="font-size:12px;color:#666;background:#F5F5F5;padding:2px 8px;border-radius:4px">天猫</span></td><td>主营业务收入</td><td>应收账款-天猫</td><td class="amount negative">¥-1,280.00</td><td>AI</td><td><span class="source-tag ai">&#10024; AI</span></td><td><span class="status-tag posted">已记账</span></td>
+              <td><button class="btn" style="padding:3px 8px;font-size:11px">查看</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="stats-bar">
+          <span>本月凭证 45 笔</span>
+          <span class="divider">|</span>
+          <span>AI生成 28 笔(62%)</span>
+          <span class="divider">|</span>
+          <span style="color:var(--green)">借贷平衡 &#10003;</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card ai-panel">
+      <div class="card-header">
+        <span class="card-title">AI 会计助手</span>
+        <button class="card-action"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
+      </div>
+      <div class="ai-messages">
+        <div class="msg user">把银行流水自动生成凭证</div>
+        <div class="msg ai">
+          <div class="msg-title">已识别招商银行3月流水 32 笔：</div>
+          <ul>
+            <li>&#10004; 自动匹配 28 笔（置信度&gt;90%）</li>
+            <li>&#9888;&#65039; 需人工确认 3 笔（置信度60-90%）</li>
+            <li>&#10060; 无法识别 1 笔</li>
+          </ul>
+          <div style="margin-top:8px">点击 <strong>[预览凭证]</strong> 查看，确认后批量入账。</div>
+          <div class="msg-warning">&#9888; 注意：有1笔 ¥85,000 超过大额阈值(¥50,000)，已标记为必须人工审核。</div>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" type="text" placeholder="如：生成3月底的计提凭证..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button class="ai-send-btn" onclick="sendMsg()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW 4: INVOICE ==================== -->
+<section class="view-content" data-view="invoice">
+  <div class="content-grid">
+    <div class="left-col">
+      <div class="view-toolbar">
+        <div class="view-toolbar-left">
+          <div class="tab-bar" style="margin-bottom:0;border:none;background:transparent;padding:0;border-bottom:none">
+            <button class="tab-item active" onclick="switchVoucherTab(this)">进项发票</button>
+            <button class="tab-item" onclick="switchVoucherTab(this)">销项发票</button>
+            <button class="tab-item" onclick="switchVoucherTab(this)">发票台账</button>
+          </div>
+        </div>
+        <div class="view-toolbar-right">
+          <button class="btn">&#128247; 拍照录入</button>
+          <button class="btn">上传Excel</button>
+          <button class="btn primary">&#10024; AI自动匹配</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <table class="voucher-table">
+          <thead><tr><th>发票代码</th><th>发票号码</th><th>开票日期</th><th>销方名称</th><th style="text-align:right">金额</th><th style="text-align:right">税额</th><th style="text-align:right">价税合计</th><th>认证状态</th><th>关联凭证</th></tr></thead>
+          <tbody>
+            <tr><td class="code">044001...</td><td class="code">12345678</td><td>03-28</td><td>华美包材有限公司</td><td class="amount">¥39,823.01</td><td class="amount">¥5,176.99</td><td class="amount">¥45,000.00</td><td><span class="status-tag posted">已认证 &#10003;</span></td><td class="code">付-031</td></tr>
+            <tr><td class="code">044001...</td><td class="code">12345679</td><td>03-25</td><td>顺丰速运</td><td class="amount">¥28,407.08</td><td class="amount">¥3,692.92</td><td class="amount">¥32,100.00</td><td><span class="status-tag pending">待认证</span></td><td style="color:#999">-</td></tr>
+            <tr><td class="code">044001...</td><td class="code">12345680</td><td>03-20</td><td>美达化工</td><td class="amount">¥75,221.24</td><td class="amount">¥9,778.76</td><td class="amount">¥85,000.00</td><td><span class="status-tag pending">待认证</span></td><td style="color:#999">-</td></tr>
+          </tbody>
+        </table>
+        <div class="stats-bar">
+          <span>本月进项 12 张</span>
+          <span class="divider">|</span>
+          <span>已认证 8 张</span>
+          <span class="divider">|</span>
+          <span>待认证 4 张</span>
+          <span class="divider">|</span>
+          <span>进项税额合计 <strong style="font-family:var(--font-mono)">¥18,648.67</strong></span>
+          <span class="divider">|</span>
+          <span style="color:var(--orange)">认证截止 2026-04-15</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card ai-panel">
+      <div class="card-header">
+        <span class="card-title">AI 会计助手</span>
+        <button class="card-action"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
+      </div>
+      <div class="ai-messages">
+        <div class="msg user">帮我查查还有哪些发票没认证</div>
+        <div class="msg ai">
+          <div class="msg-title">本月还有 4 张进项发票未认证</div>
+          <div style="margin-top:4px">合计税额 ¥18,648.67：</div>
+          <ul>
+            <li>顺丰速运 ¥3,692.92（物流费）</li>
+            <li>美达化工 ¥9,778.76（原料采购）</li>
+            <li>其他 2 张合计 ¥5,176.99</li>
+          </ul>
+          <div class="msg-warning">&#9888; 认证截止日为 4月15日，还有 14 天。建议本周内完成认证，否则影响本月增值税抵扣。</div>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" type="text" placeholder="如：匹配发票和凭证..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button class="ai-send-btn" onclick="sendMsg()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW 5: PLATFORM RECON ==================== -->
+<section class="view-content" data-view="platform-recon">
+  <div class="content-grid">
+    <div class="left-col">
+      <div class="view-toolbar">
+        <div class="view-toolbar-left">
+          <div class="platform-tabs" style="margin-bottom:0">
+            <button class="platform-tab active" onclick="switchPlatform(this)">天猫</button>
+            <button class="platform-tab" onclick="switchPlatform(this)">抖店</button>
+            <button class="platform-tab" onclick="switchPlatform(this)">小红书</button>
+            <button class="platform-tab" onclick="switchPlatform(this)">拼多多</button>
+            <button class="platform-tab" onclick="switchPlatform(this)">美团</button>
+          </div>
+        </div>
+        <div class="view-toolbar-right">
+          <span style="font-size:13px;color:var(--text-secondary)">2026年03月</span>
+        </div>
+      </div>
+
+      <div class="recon-flow">
+        <div class="recon-card">
+          <div class="recon-card-label">订单系统</div>
+          <div class="recon-card-value">¥198,600</div>
+        </div>
+        <div class="recon-arrow">&#10132;</div>
+        <div class="recon-card">
+          <div class="recon-card-label">平台结算单</div>
+          <div class="recon-card-value">¥189,340</div>
+          <div class="recon-card-sub" style="color:var(--orange)">差异 ¥9,260</div>
+        </div>
+        <div class="recon-arrow">&#10132;</div>
+        <div class="recon-card">
+          <div class="recon-card-label">银行到账</div>
+          <div class="recon-card-value">¥189,340</div>
+          <div class="recon-card-sub" style="color:var(--green)">已到账 &#10003;</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <span class="card-title">差异分解</span>
+          <span style="font-size:12px;color:var(--green);font-weight:500">差异已全部匹配 &#10003;</span>
+        </div>
+        <table class="voucher-table">
+          <thead><tr><th>差异项</th><th style="text-align:right">金额</th><th>说明</th><th>状态</th></tr></thead>
+          <tbody>
+            <tr><td>平台佣金(2%)</td><td class="amount">-¥3,972.00</td><td>天猫技术服务费</td><td><span class="status-tag posted">已确认</span></td></tr>
+            <tr><td>运费险理赔</td><td class="amount" style="color:var(--green)">+¥860.00</td><td>退货运费险赔付</td><td><span class="status-tag posted">已确认</span></td></tr>
+            <tr><td>退款扣回</td><td class="amount">-¥5,280.00</td><td>本月退款从结算款扣回</td><td><span class="status-tag posted">已确认</span></td></tr>
+            <tr><td>积分扣款</td><td class="amount">-¥868.00</td><td>天猫积分抵扣</td><td><span class="status-tag posted">已确认</span></td></tr>
+            <tr style="font-weight:600"><td>合计差异</td><td class="amount" style="font-weight:700">-¥9,260.00</td><td>差异已全部匹配 &#10003;</td><td><span class="status-tag posted">对平</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">对账历史</span>
+        </div>
+        <div class="recon-history">
+          <div class="recon-month"><span class="recon-dot ok"></span> 10月 对平</div>
+          <div class="recon-month"><span class="recon-dot ok"></span> 11月 对平</div>
+          <div class="recon-month"><span class="recon-dot ok"></span> 12月 对平</div>
+          <div class="recon-month"><span class="recon-dot ok"></span> 1月 对平</div>
+          <div class="recon-month"><span class="recon-dot warn"></span> 2月 差异¥320</div>
+          <div class="recon-month"><span class="recon-dot ok"></span> 3月 对平</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card ai-panel">
+      <div class="card-header">
+        <span class="card-title">AI 会计助手</span>
+        <button class="card-action"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
+      </div>
+      <div class="ai-messages">
+        <div class="msg user">帮我对一下3月天猫的回款</div>
+        <div class="msg ai">
+          <div class="msg-title">天猫3月对账完成：已对平 &#10003;</div>
+          <ul>
+            <li>订单系统销售额：¥198,600</li>
+            <li>平台结算金额：¥189,340</li>
+            <li>差异 ¥9,260 已全部找到原因：</li>
+          </ul>
+          <div style="padding-left:18px;font-size:12px;margin-top:4px">
+            · 佣金 ¥3,972（2%费率，正常）<br>
+            · 退款扣回 ¥5,280（12笔退货）<br>
+            · 积分 ¥868 + 运费险冲回 ¥860
+          </div>
+          <div style="margin-top:10px;padding:8px 12px;background:#F0F5FF;border-radius:8px;font-size:12px;color:var(--blue)">
+            &#128161; 发现：本月退款率 2.66%，较上月(1.8%)上升。建议关注退货原因分析。
+          </div>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" type="text" placeholder="如：对比抖店3月的回款..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button class="ai-send-btn" onclick="sendMsg()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW 6: CHANNEL ==================== -->
+<section class="view-content" data-view="channel">
+  <div class="content-grid">
+    <div class="left-col">
+      <div class="view-toolbar">
+        <div class="view-toolbar-left"><h3 style="font-size:16px;font-weight:600">渠道利润表 · 2026年3月</h3></div>
+        <div class="view-toolbar-right">
+          <button class="btn">导出Excel</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="overflow-x:auto">
+        <table class="voucher-table">
+          <thead><tr><th>渠道</th><th style="text-align:right">销售收入</th><th style="text-align:right">平台佣金</th><th style="text-align:right">推广费用</th><th style="text-align:right">达人佣金</th><th style="text-align:right">物流费</th><th style="text-align:right">商品成本</th><th style="text-align:right">毛利</th><th style="text-align:right">净利</th><th style="text-align:right">净利率</th></tr></thead>
+          <tbody>
+            <tr><td><strong>天猫</strong></td><td class="amount">¥198,600</td><td class="amount">¥3,972</td><td class="amount">¥8,200</td><td class="amount" style="color:#999">-</td><td class="amount">¥6,800</td><td class="amount">¥96,400</td><td class="amount">¥102,200</td><td class="amount">¥83,228</td><td class="amount rate-high">41.9%</td></tr>
+            <tr><td><strong>抖店</strong></td><td class="amount">¥156,200</td><td class="amount">¥7,810</td><td class="amount">¥22,400</td><td class="amount">¥18,600</td><td class="amount">¥5,200</td><td class="amount">¥75,800</td><td class="amount">¥80,400</td><td class="amount">¥26,390</td><td class="amount rate-mid">16.9%</td></tr>
+            <tr><td><strong>小红书</strong></td><td class="amount">¥48,600</td><td class="amount">¥2,430</td><td class="amount">¥3,800</td><td class="amount">¥5,200</td><td class="amount">¥1,600</td><td class="amount">¥23,600</td><td class="amount">¥25,000</td><td class="amount">¥11,970</td><td class="amount rate-mid">24.6%</td></tr>
+            <tr><td><strong>小程序</strong></td><td class="amount">¥32,000</td><td class="amount" style="color:#999">¥0</td><td class="amount">¥1,200</td><td class="amount" style="color:#999">-</td><td class="amount">¥1,100</td><td class="amount">¥15,500</td><td class="amount">¥16,500</td><td class="amount">¥14,200</td><td class="amount rate-high" style="color:var(--green);font-weight:700">44.4%</td></tr>
+            <tr><td><strong>美团</strong></td><td class="amount">¥12,800</td><td class="amount">¥2,560</td><td class="amount">¥1,600</td><td class="amount" style="color:#999">-</td><td class="amount">¥800</td><td class="amount">¥6,200</td><td class="amount">¥6,600</td><td class="amount">¥1,640</td><td class="amount rate-low" style="color:var(--red)">12.8%</td></tr>
+            <tr style="font-weight:700;background:var(--input-bg)"><td><strong>合计</strong></td><td class="amount" style="font-weight:700">¥448,200</td><td class="amount" style="font-weight:700">¥16,772</td><td class="amount" style="font-weight:700">¥37,200</td><td class="amount" style="font-weight:700">¥23,800</td><td class="amount" style="font-weight:700">¥15,500</td><td class="amount" style="font-weight:700">¥217,500</td><td class="amount" style="font-weight:700">¥230,700</td><td class="amount" style="font-weight:700">¥137,428</td><td class="amount" style="font-weight:700">30.7%</td></tr>
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card ai-panel">
+      <div class="card-header">
+        <span class="card-title">AI 会计助手</span>
+        <button class="card-action"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
+      </div>
+      <div class="ai-messages">
+        <div class="msg user">为什么抖店净利率这么低</div>
+        <div class="msg ai">
+          <div class="msg-title">抖店净利率分析（16.9%）</div>
+          <div style="margin-top:6px">主要拖累因素：</div>
+          <ul>
+            <li><strong>达人佣金 ¥18,600</strong>（占销售额 11.9%）— 这是最大差异项。天猫/小程序无此开支</li>
+            <li><strong>推广费 ¥22,400</strong>（占销售额 14.3%）— 信息流投放成本高</li>
+            <li>两项合计占销售额 26.2%，远超天猫(4.1%)和小程序(3.8%)</li>
+          </ul>
+          <div style="margin-top:10px;padding:8px 12px;background:#F0F5FF;border-radius:8px;font-size:12px;color:var(--blue)">
+            &#128161; 建议：<br>
+            1. 优化达人合作结构，增加自播占比（当前自播:达人=30:70）<br>
+            2. 测试自然流量内容策略，降低付费投放依赖<br>
+            3. 达人佣金从固定比例改为阶梯制
+          </div>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" type="text" placeholder="如：对比各渠道获客成本..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button class="ai-send-btn" onclick="sendMsg()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW 7: REPORTS ==================== -->
+<section class="view-content" data-view="reports">
+  <div class="content-grid">
+    <div class="left-col">
+      <div class="view-toolbar">
+        <div class="view-toolbar-left">
+          <div class="tab-bar" style="margin-bottom:0;border:none;background:transparent;padding:0;border-bottom:none">
+            <button class="tab-item active" onclick="switchVoucherTab(this)">利润表</button>
+            <button class="tab-item" onclick="switchVoucherTab(this)">资产负债表</button>
+            <button class="tab-item" onclick="switchVoucherTab(this)">现金流量表</button>
+          </div>
+        </div>
+        <div class="view-toolbar-right">
+          <button class="btn">导出PDF</button>
+          <button class="btn primary">发送给老板</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <table class="report-table">
+          <thead><tr><th style="text-align:left">项目</th><th>2026年3月</th><th>2026年2月</th><th>环比变化</th></tr></thead>
+          <tbody>
+            <tr class="section-header"><td>一、营业收入</td><td>¥448,200</td><td>¥389,100</td><td class="change-up">+15.2%</td></tr>
+            <tr class="sub-item"><td>减：营业成本</td><td>¥217,500</td><td>¥198,600</td><td class="change-up">+9.5%</td></tr>
+            <tr class="section-header"><td>二、营业毛利</td><td>¥230,700</td><td>¥190,500</td><td class="change-up">+21.1%</td></tr>
+            <tr class="sub-item"><td>毛利率</td><td style="font-family:var(--font)">51.5%</td><td style="font-family:var(--font)">48.9%</td><td class="change-up">+2.6pp</td></tr>
+            <tr class="sub-item"><td>减：销售费用</td><td>¥77,272</td><td>¥68,400</td><td class="change-up">+13.0%</td></tr>
+            <tr class="sub-sub-item"><td>其中：平台佣金</td><td>¥16,772</td><td>¥14,200</td><td></td></tr>
+            <tr class="sub-sub-item"><td>推广费</td><td>¥37,200</td><td>¥32,800</td><td></td></tr>
+            <tr class="sub-sub-item"><td>达人佣金</td><td>¥23,800</td><td>¥21,400</td><td></td></tr>
+            <tr class="sub-item"><td>减：管理费用</td><td>¥12,400</td><td>¥11,600</td><td class="change-up">+6.9%</td></tr>
+            <tr class="sub-item"><td>减：财务费用</td><td>¥1,628</td><td>¥1,400</td><td class="change-up">+16.3%</td></tr>
+            <tr class="section-header"><td>三、营业利润</td><td>¥139,400</td><td>¥109,100</td><td class="change-up">+27.8%</td></tr>
+            <tr class="sub-item"><td>加：营业外收入</td><td>¥800</td><td>¥500</td><td></td></tr>
+            <tr class="sub-item"><td>减：营业外支出</td><td>¥200</td><td>¥100</td><td></td></tr>
+            <tr class="section-header"><td>四、利润总额</td><td>¥140,000</td><td>¥109,500</td><td class="change-up">+27.9%</td></tr>
+            <tr class="sub-item"><td>减：所得税费用</td><td>¥2,572</td><td>¥2,000</td><td></td></tr>
+            <tr class="total-row"><td>五、净利润</td><td style="font-weight:700">¥137,428</td><td>¥107,500</td><td class="change-up" style="font-weight:700">+27.8%</td></tr>
+            <tr class="sub-item"><td>净利率</td><td style="font-family:var(--font);font-weight:600">30.7%</td><td style="font-family:var(--font)">27.6%</td><td class="change-up">+3.1pp</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card ai-panel">
+      <div class="card-header">
+        <span class="card-title">AI 会计助手</span>
+        <button class="card-action"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
+      </div>
+      <div class="ai-messages">
+        <div class="msg user">分析一下3月利润表的亮点和风险</div>
+        <div class="msg ai">
+          <div class="msg-title">3月利润表分析</div>
+          <div style="margin-top:6px"><strong style="color:var(--green)">&#9650; 亮点：</strong></div>
+          <ul>
+            <li>营收增长 15.2%，净利润增长 27.8% — 利润增速跑赢收入，说明经营效率在提升</li>
+            <li>毛利率 51.5%（+2.6pp），成本控制见效</li>
+            <li>净利率突破 30%，达到行业优秀水平</li>
+          </ul>
+          <div style="margin-top:8px"><strong style="color:var(--orange)">&#9660; 风险：</strong></div>
+          <ul>
+            <li>销售费用增速 13.0% 接近收入增速 15.2%，需警惕</li>
+            <li>达人佣金 ¥23,800 环比+11.2%，增长快于收入</li>
+            <li>财务费用增速 16.3% 超过收入增速，需关注贷款成本</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" type="text" placeholder="如：生成资产负债表..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button class="ai-send-btn" onclick="sendMsg()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW 8: TAX ==================== -->
+<section class="view-content" data-view="tax">
+  <div class="content-grid">
+    <div class="left-col">
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <span class="card-title">4月税务日历</span>
+        </div>
+        <div class="tax-calendar">
+          <div class="tax-event">
+            <div class="tax-date">4月1日</div>
+            <div class="tax-desc">Q1企业所得税预缴 <span style="font-size:11px;color:var(--text-muted);margin-left:6px">（已提醒）</span></div>
+          </div>
+          <div class="tax-event">
+            <div class="tax-date">4月15日</div>
+            <div class="tax-desc">3月增值税申报截止 <span style="font-size:11px;color:var(--orange);font-weight:500;margin-left:6px">&#9888; 还有14天</span></div>
+          </div>
+          <div class="tax-event">
+            <div class="tax-date">4月15日</div>
+            <div class="tax-desc">进项发票认证截止</div>
+          </div>
+          <div class="tax-event">
+            <div class="tax-date">4月20日</div>
+            <div class="tax-desc">个税代扣代缴</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <span class="card-title">3月增值税测算</span>
+        </div>
+        <div style="padding:20px">
+          <table class="voucher-table" style="max-width:480px">
+            <tbody>
+              <tr><td style="font-weight:500">销项税额</td><td class="amount">¥58,266.00</td><td style="font-size:11px;color:var(--text-muted)">按销售收入x13%简算</td></tr>
+              <tr><td style="font-weight:500">进项税额</td><td class="amount">¥38,648.67</td><td style="font-size:11px;color:var(--text-muted)">已认证+待认证</td></tr>
+              <tr style="font-weight:600;border-top:2px solid var(--divider)"><td style="font-weight:700">应纳增值税</td><td class="amount" style="font-weight:700;font-size:16px">¥19,617.33</td><td></td></tr>
+              <tr><td style="font-weight:500">税负率</td><td class="amount">4.38%</td><td style="font-size:11px;color:var(--green)">行业参考：3-5%，正常 &#10003;</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Q1企业所得税预缴</span>
+        </div>
+        <div style="padding:20px">
+          <table class="voucher-table" style="max-width:480px">
+            <tbody>
+              <tr><td style="font-weight:500">Q1利润总额</td><td class="amount">¥380,500</td></tr>
+              <tr><td style="font-weight:500">适用税率</td><td class="amount">5%</td><td style="font-size:11px;color:var(--text-muted)">小微企业优惠</td></tr>
+              <tr style="font-weight:600"><td style="font-weight:700">预缴税额</td><td class="amount" style="font-weight:700;font-size:16px">¥19,025.00</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card ai-panel">
+      <div class="card-header">
+        <span class="card-title">AI 会计助手</span>
+        <button class="card-action"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
+      </div>
+      <div class="ai-messages">
+        <div class="msg user">本月增值税预估多少</div>
+        <div class="msg ai">
+          <div class="msg-title">3月增值税测算</div>
+          <ul>
+            <li>销项税额 ¥58,266（营收 ¥448,200 x 13%）</li>
+            <li>进项税额 ¥38,648.67（已认证 ¥20,000 + 待认证 ¥18,648.67）</li>
+            <li><strong>应纳增值税 ¥19,617.33</strong></li>
+          </ul>
+          <div style="margin-top:8px;font-size:12px">
+            税负率 4.38%，处于行业正常区间(3-5%)。
+          </div>
+          <div class="msg-warning">&#9888; 还有 4 张进项发票未认证（税额 ¥18,648.67），认证后可降低应纳税额。建议在 4月15日前完成认证。</div>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" type="text" placeholder="如：测算Q1企业所得税..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button class="ai-send-btn" onclick="sendMsg()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW 9: PERIOD END ==================== -->
+<section class="view-content" data-view="period-end">
+  <div class="content-grid">
+    <div class="left-col">
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <span class="card-title">3月期末结账流程</span>
+          <span style="font-size:12px;color:var(--text-muted)">已完成 2/7 步</span>
+        </div>
+        <div class="workflow-list">
+          <div class="workflow-step">
+            <div class="step-icon warn">1</div>
+            <div class="step-content">
+              <div class="step-title">检查未审核凭证</div>
+              <div class="step-desc">5笔待审核凭证需要处理后才能继续</div>
+            </div>
+            <div class="step-status warn">&#9888; 需处理</div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-icon done">&#10003;</div>
+            <div class="step-content">
+              <div class="step-title">计提折旧</div>
+              <div class="step-desc">固定资产折旧 ¥1,200/月，已自动计提</div>
+            </div>
+            <div class="step-status done">&#10003; 已完成</div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-icon done">&#10003;</div>
+            <div class="step-content">
+              <div class="step-title">计提员工工资</div>
+              <div class="step-desc">3月工资及社保 ¥86,400，凭证已记账</div>
+            </div>
+            <div class="step-status done">&#10003; 已完成</div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-icon pending">4</div>
+            <div class="step-content">
+              <div class="step-title">结转损益</div>
+              <div class="step-desc">将损益类科目余额结转至本年利润</div>
+            </div>
+            <div class="step-status pending">&#9675; 未开始</div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-icon pending">5</div>
+            <div class="step-content">
+              <div class="step-title">期末试算平衡</div>
+              <div class="step-desc">验证全部科目借贷合计是否平衡</div>
+            </div>
+            <div class="step-status pending">&#9675; 未开始</div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-icon pending">6</div>
+            <div class="step-content">
+              <div class="step-title">生成财务报表</div>
+              <div class="step-desc">自动生成利润表、资产负债表、现金流量表</div>
+            </div>
+            <div class="step-status pending">&#9675; 未开始</div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-icon pending">7</div>
+            <div class="step-content">
+              <div class="step-title">结账锁定期间</div>
+              <div class="step-desc">锁定3月期间，防止误改已结账凭证</div>
+            </div>
+            <div class="step-status pending">&#9675; 未开始</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="cta-btn" onclick="alert('AI正在分析期末数据，请稍候...')">
+        &#129302; AI一键期末结转
+      </button>
+    </div>
+
+    <div class="card ai-panel">
+      <div class="card-header">
+        <span class="card-title">AI 会计助手</span>
+        <button class="card-action"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
+      </div>
+      <div class="ai-messages">
+        <div class="msg user">执行本月期末结转</div>
+        <div class="msg ai">
+          <div class="msg-title">3月期末结转检查</div>
+          <div style="margin-top:6px">当前进度：2/7 步已完成</div>
+          <ul>
+            <li style="color:var(--orange)">&#9888; Step 1 阻塞：还有 5 笔凭证待审核，需要先处理</li>
+            <li style="color:var(--green)">&#10003; Step 2 折旧已计提</li>
+            <li style="color:var(--green)">&#10003; Step 3 工资已计提</li>
+            <li>&#9675; Step 4-7 等待执行</li>
+          </ul>
+          <div style="margin-top:10px;padding:8px 12px;background:#FFF7E6;border-radius:8px;font-size:12px;color:var(--orange)">
+            &#9888; 请先审核 5 笔待审凭证（点击侧边栏"凭证中心"处理），完成后我将自动执行 Step 4-7。
+          </div>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" type="text" placeholder="如：跳过审核直接结转..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button class="ai-send-btn" onclick="sendMsg()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW: AI CHAT (standalone) ==================== -->
+<section class="view-content" data-view="chat">
+  <div style="max-width:720px;margin:0 auto">
+    <div class="card ai-panel" style="min-height:calc(100vh - 160px)">
+      <div class="card-header">
+        <span class="card-title">AI 会计对话</span>
+        <button class="card-action">新建对话 +</button>
+      </div>
+      <div class="ai-messages" id="aiMessages-chat" style="min-height:400px">
+        <div class="msg ai">
+          <div class="msg-title">你好，我是你的AI会计助手</div>
+          <div>你可以用自然语言问我任何会计问题，例如：</div>
+          <ul>
+            <li>"帮我记一笔：天猫回款 28,600 元"</li>
+            <li>"这个月利润怎么样？"</li>
+            <li>"帮我对账抖店3月的结算"</li>
+            <li>"还有哪些发票没认证？"</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" id="aiInputChat" type="text" placeholder="说一句话，我来帮你记账、对账、出报表..." onkeydown="if(event.key==='Enter')sendMsgChat()">
+        <button class="ai-send-btn" onclick="sendMsgChat()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ========== FOOTER ========== -->
+<footer class="footer">
+  <span><span class="footer-dot"></span>系统正常</span>
+  <span>AI引擎：通义千问</span>
+  <span id="footerSlogan">会计工作台 · 管账不管钱</span>
+  <span>当前期间：2026年第03期</span>
+  <span>已结账至：2026年第02期</span>
+  <span class="footer-right">v3.0.0</span>
+</footer>
+
+<!-- Notification Panel -->
+<div class="notification-panel" id="notificationPanel">
+  <div class="noti-header">
+    <span class="noti-header-title">通知中心</span>
+    <button class="noti-mark-read" onclick="document.querySelectorAll('.noti-item.unread').forEach(i=>i.classList.remove('unread'))">全部已读</button>
+  </div>
+  <div class="noti-list">
+    <div class="noti-item unread">
+      <div class="noti-icon warn">!</div>
+      <div class="noti-content">
+        <div class="noti-title">5笔凭证待审核，影响3月期末结账</div>
+        <div class="noti-time">10 分钟前 · 会计提醒</div>
+      </div>
+    </div>
+    <div class="noti-item unread">
+      <div class="noti-icon danger">!</div>
+      <div class="noti-content">
+        <div class="noti-title">4张进项发票未认证，截止日4月15日</div>
+        <div class="noti-time">25 分钟前 · 税务提醒</div>
+      </div>
+    </div>
+    <div class="noti-item unread">
+      <div class="noti-icon info">i</div>
+      <div class="noti-content">
+        <div class="noti-title">天猫3月对账单已自动生成并对平</div>
+        <div class="noti-time">1 小时前 · 系统公告</div>
+      </div>
+    </div>
+    <div class="noti-item">
+      <div class="noti-icon success">&#10003;</div>
+      <div class="noti-content">
+        <div class="noti-title">AI已自动匹配28笔银行流水生成凭证</div>
+        <div class="noti-time">2 小时前 · AI通知</div>
+      </div>
+    </div>
+    <div class="noti-item">
+      <div class="noti-icon warn">!</div>
+      <div class="noti-content">
+        <div class="noti-title">应收账款2笔逾期超60天，建议催收</div>
+        <div class="noti-time">3 小时前 · 风险预警</div>
+      </div>
+    </div>
+  </div>
+  <div class="noti-footer">
+    <a href="v3-mock-notice.html#notifications">查看全部通知 &rarr;</a>
+  </div>
+</div>
+
+<!-- ========== SCRIPTS ========== -->
+<script>
+// ===== Welcome Modal =====
+(function() {
+  var dismissed = localStorage.getItem('accounting_welcome_dismissed');
+  if (dismissed === 'true') {
+    document.getElementById('welcomeModal').classList.add('hidden');
+  }
+})();
+
+function closeWelcome(remember) {
+  document.getElementById('welcomeModal').classList.add('hidden');
+  if (remember) {
+    localStorage.setItem('accounting_welcome_dismissed', 'true');
+  }
+}
+
+// ===== Count-up animation =====
+function countUp(el, target, prefix, duration) {
+  var start = performance.now();
+  var fmt = function(n) { return prefix + n.toLocaleString('zh-CN'); };
+  var step = function(ts) {
+    var p = Math.min((ts - start) / duration, 1);
+    var ease = 1 - Math.pow(1 - p, 3);
+    el.textContent = fmt(Math.round(target * ease));
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+document.querySelectorAll('.kpi-value[data-target]').forEach(function(el, i) {
+  setTimeout(function() {
+    countUp(el, +el.dataset.target, el.dataset.prefix || '', 1200);
+  }, i * 80);
+});
+
+// ===== View switching =====
+function switchView(viewName) {
+  // Hide all views
+  document.querySelectorAll('.view-content').forEach(function(v) {
+    v.classList.remove('active');
+  });
+  // Show target view
+  var target = document.querySelector('.view-content[data-view="' + viewName + '"]');
+  if (target) target.classList.add('active');
+
+  // Update sidebar active state
+  document.querySelectorAll('.nav-item[data-view]').forEach(function(n) {
+    n.classList.remove('active');
+  });
+  var navItem = document.querySelector('.nav-item[data-view="' + viewName + '"]');
+  if (navItem) navItem.classList.add('active');
+}
+
+// Sidebar nav click
+document.querySelectorAll('.nav-item[data-view]').forEach(function(item) {
+  item.addEventListener('click', function() {
+    if (item.classList.contains('disabled')) return;
+    switchView(item.getAttribute('data-view'));
+  });
+});
+
+// Chat list
+document.querySelectorAll('.chat-item[data-chat]').forEach(function(item) {
+  item.addEventListener('click', function() {
+    document.querySelectorAll('.chat-item').forEach(function(n) { n.classList.remove('active'); });
+    item.classList.add('active');
+  });
+});
+
+// ===== Todo toggle =====
+function toggleTodo(el) {
+  el.classList.toggle('done');
+  var check = el.querySelector('.todo-check');
+  check.classList.toggle('checked');
+}
+
+// ===== AI send message =====
+function sendMsg() {
+  var input = document.getElementById('aiInput');
+  var text = input.value.trim();
+  if (!text) return;
+  // Find the active view's ai-messages
+  var activeView = document.querySelector('.view-content.active');
+  var container = activeView ? activeView.querySelector('.ai-messages') : document.getElementById('aiMessages-overview');
+  if (!container) return;
+  var msg = document.createElement('div');
+  msg.className = 'msg user';
+  msg.textContent = text;
+  msg.style.animation = 'fadeInUp .3s ease';
+  container.appendChild(msg);
+  input.value = '';
+  container.scrollTop = container.scrollHeight;
+
+  setTimeout(function() {
+    var ai = document.createElement('div');
+    ai.className = 'msg ai';
+    ai.style.animation = 'fadeInUp .3s ease';
+    ai.innerHTML = '<div style="color:var(--text-muted);font-size:12px">&#10024; 正在分析会计数据...</div>';
+    container.appendChild(ai);
+    container.scrollTop = container.scrollHeight;
+  }, 600);
+}
+
+function sendMsgChat() {
+  var input = document.getElementById('aiInputChat');
+  var text = input.value.trim();
+  if (!text) return;
+  var container = document.getElementById('aiMessages-chat');
+  var msg = document.createElement('div');
+  msg.className = 'msg user';
+  msg.textContent = text;
+  msg.style.animation = 'fadeInUp .3s ease';
+  container.appendChild(msg);
+  input.value = '';
+  container.scrollTop = container.scrollHeight;
+
+  setTimeout(function() {
+    var ai = document.createElement('div');
+    ai.className = 'msg ai';
+    ai.style.animation = 'fadeInUp .3s ease';
+    ai.innerHTML = '<div style="color:var(--text-muted);font-size:12px">&#10024; 正在分析会计数据...</div>';
+    container.appendChild(ai);
+    container.scrollTop = container.scrollHeight;
+  }, 600);
+}
+
+// ===== Period selector =====
+var currentYear = 2026, currentMonth = 3;
+function switchPeriod(dir) {
+  currentMonth += dir;
+  if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+  if (currentMonth < 1) { currentMonth = 12; currentYear--; }
+  document.getElementById('periodLabel').textContent = currentYear + '\u5e74' + String(currentMonth).padStart(2,'0') + '\u6708';
+}
+function setPeriodType(btn) {
+  document.querySelectorAll('.period-tab').forEach(function(t) { t.classList.remove('active'); });
+  btn.classList.add('active');
+}
+
+// ===== Tab switching (voucher tabs, report tabs, invoice tabs) =====
+function switchVoucherTab(btn) {
+  var parent = btn.parentElement;
+  parent.querySelectorAll('.tab-item').forEach(function(t) { t.classList.remove('active'); });
+  btn.classList.add('active');
+}
+
+// ===== Platform tab switching =====
+function switchPlatform(btn) {
+  btn.parentElement.querySelectorAll('.platform-tab').forEach(function(t) { t.classList.remove('active'); });
+  btn.classList.add('active');
+}
+
+// ===== Notification panel toggle =====
+(function() {
+  var notiBtn = document.querySelector('.notification-btn');
+  var notiPanel = document.getElementById('notificationPanel');
+  if (notiBtn && notiPanel) {
+    notiBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      notiPanel.classList.toggle('open');
+    });
+    document.addEventListener('click', function(e) {
+      if (!notiPanel.contains(e.target) && !notiBtn.contains(e.target)) {
+        notiPanel.classList.remove('open');
+      }
+    });
+  }
+})();
+
+// ===== Mode toggle (simple/professional) =====
+var isSimpleMode = false;
+
+function toggleMode() {
+  isSimpleMode = !isSimpleMode;
+  var toggle = document.getElementById('modeToggle');
+  var labelSimple = document.getElementById('modeLabelSimple');
+  var labelPro = document.getElementById('modeLabelPro');
+  var slogan = document.getElementById('footerSlogan');
+
+  if (isSimpleMode) {
+    toggle.classList.add('simple');
+    labelSimple.classList.add('active');
+    labelPro.classList.remove('active');
+    document.body.classList.add('simple-mode');
+    slogan.textContent = '\u4f1a\u8ba1\u5de5\u4f5c\u53f0 \u00b7 \u8bb0\u5f55\u6bcf\u4e00\u7b14\u6536\u652f';
+
+    // Switch text for simple mode
+    document.querySelectorAll('[data-simple]').forEach(function(el) {
+      if (!el.dataset.pro) el.dataset.pro = el.textContent;
+      el.textContent = el.dataset.simple;
+    });
+  } else {
+    toggle.classList.remove('simple');
+    labelSimple.classList.remove('active');
+    labelPro.classList.add('active');
+    document.body.classList.remove('simple-mode');
+    slogan.textContent = '\u4f1a\u8ba1\u5de5\u4f5c\u53f0 \u00b7 \u7ba1\u8d26\u4e0d\u7ba1\u94b1';
+
+    // Restore professional text
+    document.querySelectorAll('[data-simple]').forEach(function(el) {
+      if (el.dataset.pro) el.textContent = el.dataset.pro;
+    });
+  }
+}
+
+// ===== Disabled nav items tooltip =====
+document.querySelectorAll('.nav-item.disabled').forEach(function(item) {
+  item.addEventListener('click', function(e) {
+    e.stopPropagation();
+  });
+});
+</script>
+</body>
+</html>

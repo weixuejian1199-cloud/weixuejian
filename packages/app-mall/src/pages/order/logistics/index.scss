@@ -1,0 +1,172 @@
+@import '@/styles/variables.scss';
+
+.logistics {
+  min-height: 100vh;
+  background: $color-bg-page;
+  padding: $spacing-md $page-padding;
+
+  // ─── Express Info Card ────────────────────
+  &__express {
+    background: $color-bg-card;
+    border-radius: $radius-md;
+    padding: $spacing-base;
+    margin-bottom: $spacing-md;
+  }
+
+  // ─── Timeline ─────────────────────────────
+  &__timeline {
+    background: $color-bg-card;
+    border-radius: $radius-md;
+    padding: $spacing-base;
+  }
+}
+
+// ─── Express Rows ─────────────────────────────
+.express {
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $spacing-sm 0;
+
+    & + & {
+      border-top: 1px solid $color-bg-input;
+    }
+  }
+
+  &__label {
+    font-size: $font-size-sm;
+    color: $color-text-tertiary;
+  }
+
+  &__value {
+    font-size: $font-size-sm;
+    color: $color-text-primary;
+    font-weight: 500;
+
+    &--link {
+      color: $color-info;
+    }
+  }
+
+  &__copy-row {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+  }
+
+  &__copy-btn {
+    border: 1px solid $color-bg-divider;
+    border-radius: $radius-xs;
+    padding: 2px $spacing-sm;
+  }
+
+  &__copy-text {
+    font-size: $font-size-xs;
+    color: $color-text-tertiary;
+  }
+}
+
+// ─── Timeline Node ────────────────────────────
+.timeline-node {
+  display: flex;
+  gap: $spacing-base;
+  min-height: 80px;
+
+  &__left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 16px;
+    flex-shrink: 0;
+    padding-top: 4px;
+  }
+
+  &__dot {
+    width: 10px;
+    height: 10px;
+    border-radius: $radius-circle;
+    background: $color-bg-divider;
+    flex-shrink: 0;
+    position: relative;
+
+    &--active {
+      width: 12px;
+      height: 12px;
+      background: $color-success;
+    }
+  }
+
+  &__pulse {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 12px;
+    height: 12px;
+    border-radius: $radius-circle;
+    background: $color-success;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  &__line {
+    flex: 1;
+    width: 1px;
+    background: $color-bg-divider;
+    margin: $spacing-xs 0;
+
+    &--active {
+      background: $color-success;
+    }
+  }
+
+  &__content {
+    flex: 1;
+    padding-bottom: $spacing-base;
+  }
+
+  &__status {
+    font-size: $font-size-base;
+    color: $color-text-secondary;
+    font-weight: 600;
+    display: block;
+    margin-bottom: $spacing-xs;
+
+    &--active {
+      color: $color-success;
+    }
+  }
+
+  &__desc {
+    font-size: $font-size-sm;
+    color: $color-text-tertiary;
+    line-height: 1.5;
+    display: block;
+    margin-bottom: $spacing-xs;
+
+    &--active {
+      color: $color-text-primary;
+    }
+  }
+
+  &__time {
+    font-size: $font-size-xs;
+    color: $color-text-placeholder;
+  }
+}
+
+// ─── Pulse Animation ──────────────────────────
+@keyframes pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(2);
+    opacity: 0;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}

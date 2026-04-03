@@ -1,0 +1,349 @@
+@import '../../../styles/variables.scss';
+
+.checkin {
+  min-height: 100vh;
+  background: $color-bg-page;
+  padding-bottom: $spacing-xxl;
+
+  // Streak Header
+  &__streak {
+    margin: $spacing-sm $page-padding 0;
+    background: $color-bg-card;
+    border-radius: $radius-lg;
+    padding: $spacing-xl $spacing-lg;
+    text-align: center;
+  }
+
+  &__streak-label {
+    font-size: $font-size-sm;
+    color: $color-text-secondary;
+  }
+
+  &__streak-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    margin: $spacing-xs 0;
+  }
+
+  &__streak-number {
+    font-size: 48px;
+    font-weight: 700;
+    color: $color-text-primary;
+    font-family: $font-family-num;
+  }
+
+  &__streak-unit {
+    font-size: $font-size-lg;
+    color: $color-text-primary;
+    font-weight: 500;
+    margin-left: $spacing-xs;
+  }
+
+  &__streak-vip {
+    display: inline-block;
+    background: $color-gold-bg;
+    color: $color-gold;
+    font-size: $font-size-xs;
+    padding: 3px 10px;
+    border-radius: $radius-base;
+    margin-top: $spacing-sm;
+    font-weight: 500;
+  }
+
+  // Calendar
+  &__calendar {
+    margin: $spacing-md $page-padding 0;
+    background: $color-bg-card;
+    border-radius: $radius-lg;
+    padding: $spacing-lg;
+  }
+
+  &__calendar-title {
+    font-size: $font-size-base;
+    font-weight: 600;
+    color: $color-text-primary;
+    margin-bottom: $spacing-base;
+  }
+
+  &__calendar-labels {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    text-align: center;
+    margin-bottom: $spacing-sm;
+  }
+
+  &__calendar-label {
+    font-size: $font-size-xs;
+    color: $color-text-tertiary;
+  }
+
+  &__calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    text-align: center;
+  }
+
+  &__calendar-day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: $spacing-sm 0;
+    border-radius: $radius-md;
+
+    &--checked {
+      background: $color-bg-input;
+
+      .checkin__calendar-num,
+      .checkin__calendar-pts,
+      .checkin__calendar-check {
+        color: $color-success;
+      }
+    }
+
+    &--today {
+      background: $color-primary;
+
+      .checkin__calendar-num {
+        color: #fff;
+      }
+
+      .checkin__calendar-pts {
+        color: rgba(255, 255, 255, 0.7);
+      }
+    }
+
+    &--upcoming {
+      .checkin__calendar-num {
+        color: $color-text-primary;
+        font-family: $font-family-num;
+        font-size: $font-size-md;
+        font-weight: 600;
+      }
+
+      .checkin__calendar-pts {
+        color: $color-text-tertiary;
+      }
+    }
+
+    &--surprise {
+      background: $color-gold-bg;
+
+      .checkin__calendar-num {
+        color: $color-gold;
+      }
+
+      .checkin__calendar-pts {
+        color: $color-gold;
+      }
+    }
+  }
+
+  &__calendar-check {
+    font-size: 10px;
+    color: $color-success;
+  }
+
+  &__calendar-num {
+    font-size: $font-size-md;
+    font-weight: 600;
+    color: $color-text-primary;
+    font-family: $font-family-num;
+  }
+
+  &__calendar-pts {
+    font-size: 9px;
+    color: $color-text-tertiary;
+  }
+
+  // Sign Button
+  &__btn-wrap {
+    padding: $spacing-lg $page-padding 0;
+    text-align: center;
+  }
+
+  &__btn {
+    width: 100%;
+    height: 50px;
+    background: $color-primary;
+    border-radius: $radius-pill;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &--done {
+      background: $color-bg-input;
+    }
+  }
+
+  &__btn-text {
+    color: #fff;
+    font-size: $font-size-lg;
+    font-weight: 600;
+    letter-spacing: 1px;
+
+    .checkin__btn--done & {
+      color: $color-text-tertiary;
+    }
+  }
+
+  &__btn-hint {
+    font-size: $font-size-xs;
+    color: $color-text-tertiary;
+    margin-top: $spacing-sm;
+  }
+
+  // My Points
+  &__points {
+    margin: $spacing-lg $page-padding 0;
+    background: $color-bg-card;
+    border-radius: $radius-lg;
+    padding: 18px $spacing-lg;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__points-label {
+    font-size: $font-size-sm;
+    color: $color-text-secondary;
+  }
+
+  &__points-value {
+    font-size: $font-size-hero;
+    font-weight: 700;
+    color: $color-gold;
+    font-family: $font-family-num;
+    margin-top: 2px;
+  }
+
+  &__points-detail {
+    font-size: $font-size-sm;
+    color: $color-secondary;
+  }
+
+  // Tasks
+  &__tasks {
+    margin: $spacing-base $page-padding 0;
+  }
+
+  &__tasks-title {
+    font-size: $font-size-md;
+    font-weight: 600;
+    color: $color-text-primary;
+    margin-bottom: $spacing-md;
+  }
+
+  &__task {
+    background: $color-bg-card;
+    border-radius: $radius-md;
+    padding: $card-padding $spacing-base;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__task-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  &__task-icon {
+    font-size: 20px;
+  }
+
+  &__task-name {
+    font-size: $font-size-base;
+    color: $color-text-primary;
+    font-weight: 500;
+  }
+
+  &__task-desc {
+    font-size: $font-size-xs;
+    color: $color-text-tertiary;
+    margin-top: 2px;
+  }
+
+  &__task-right {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+  }
+
+  &__task-reward {
+    font-size: $font-size-sm;
+    color: $color-gold;
+    font-weight: 600;
+
+    &--done {
+      color: $color-success;
+    }
+  }
+
+  &__task-btn {
+    padding: 5px 14px;
+    border-radius: $radius-pill;
+    background: $color-primary;
+
+    &--done {
+      background: $color-bg-input;
+
+      .checkin__task-btn-text {
+        color: $color-text-tertiary;
+      }
+    }
+  }
+
+  &__task-btn-text {
+    font-size: $font-size-sm;
+    font-weight: 500;
+    color: #fff;
+  }
+
+  // Usage
+  &__usage {
+    margin: $spacing-base $page-padding 0;
+  }
+
+  &__usage-title {
+    font-size: $font-size-md;
+    font-weight: 600;
+    color: $color-text-primary;
+    margin-bottom: $spacing-md;
+  }
+
+  &__usage-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  &__usage-item {
+    background: $color-bg-card;
+    border-radius: $radius-md;
+    padding: $spacing-base;
+    text-align: center;
+  }
+
+  &__usage-icon {
+    font-size: 24px;
+    margin-bottom: 6px;
+  }
+
+  &__usage-label {
+    font-size: $font-size-sm;
+    color: $color-text-primary;
+    font-weight: 500;
+  }
+
+  &__usage-desc {
+    font-size: 10px;
+    color: $color-text-tertiary;
+    margin-top: 2px;
+  }
+}

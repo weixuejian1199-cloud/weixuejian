@@ -1,0 +1,49 @@
+@import '../../styles/variables.scss';
+
+.product-card {
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  overflow: hidden;
+  box-shadow: $shadow-card;
+
+  &__img {
+    width: 100%;
+    aspect-ratio: 1;
+    display: block;
+    background: #f0ebe3;
+  }
+
+  &__tags {
+    display: flex;
+    gap: 4px;
+    padding: 8px 10px 0;
+  }
+
+  &__info {
+    padding: 8px 10px 10px;
+  }
+
+  &__name {
+    font-size: $font-size-base;
+    color: $color-text-primary;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    height: 40px;
+  }
+
+  &__price-row {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin-top: 6px;
+  }
+
+  &__sold {
+    font-size: 10px;
+    color: $color-text-tertiary;
+    margin-top: 4px;
+  }
+}

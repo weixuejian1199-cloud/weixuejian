@@ -1,0 +1,175 @@
+@import '@/styles/variables.scss';
+
+.result {
+  min-height: 100vh;
+  background: $color-bg-page;
+
+  // ─── Header ───────────────────────────────
+  &__header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: $spacing-xxl $page-padding;
+    padding-top: 48px;
+    background: $color-bg-card;
+    border-radius: 0 0 $radius-lg $radius-lg;
+  }
+
+  &__icon {
+    width: 64px;
+    height: 64px;
+    border-radius: $radius-circle;
+    background: $color-success;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: $spacing-base;
+  }
+
+  &__checkmark {
+    color: #fff;
+    font-size: $font-size-hero;
+    font-weight: 700;
+  }
+
+  &__title {
+    font-size: $font-size-xxl;
+    font-weight: 600;
+    color: $color-text-primary;
+    margin-bottom: $spacing-sm;
+  }
+
+  &__amount {
+    font-size: $font-size-price-lg;
+    color: $color-price;
+    font-weight: 700;
+    font-family: $font-family-num;
+    margin-bottom: $spacing-sm;
+  }
+
+  &__yen {
+    font-size: $font-size-lg;
+  }
+
+  &__order-no {
+    font-size: $font-size-sm;
+    color: $color-text-tertiary;
+  }
+
+  // ─── Buttons ──────────────────────────────
+  &__buttons {
+    display: flex;
+    gap: $spacing-md;
+    padding: $spacing-xl $page-padding;
+    justify-content: center;
+  }
+
+  &__btn {
+    flex: 1;
+    height: 44px;
+    border-radius: $radius-pill;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &--primary {
+      background: $color-primary;
+    }
+
+    &--secondary {
+      background: $color-bg-card;
+      border: 1px solid $color-bg-divider;
+    }
+
+    &:active {
+      opacity: 0.85;
+    }
+  }
+
+  &__btn-text {
+    font-size: $font-size-md;
+    font-weight: 600;
+
+    &--primary {
+      color: #fff;
+    }
+
+    &--secondary {
+      color: $color-text-primary;
+    }
+  }
+
+  // ─── Recommends ───────────────────────────
+  &__recommends {
+    padding: 0 $page-padding;
+  }
+
+  &__section-title {
+    font-size: $font-size-lg;
+    font-weight: 600;
+    color: $color-text-primary;
+    margin-bottom: $spacing-base;
+    display: block;
+  }
+}
+
+// ─── Recommend List ───────────────────────────
+.recommend-list {
+  display: flex;
+  gap: $spacing-sm;
+  flex-wrap: wrap;
+}
+
+.recommend-card {
+  width: calc((100% - #{$spacing-sm}) / 2);
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  overflow: hidden;
+  padding-bottom: $spacing-md;
+
+  // 3-column on wider screens is not needed; keep 2-col for mini program
+
+  &__img {
+    width: 100%;
+    height: 160px;
+    background: $color-bg-input;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__name {
+    font-size: $font-size-sm;
+    color: $color-text-primary;
+    line-height: 1.4;
+    padding: $spacing-sm $spacing-sm 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  &__price-row {
+    display: flex;
+    align-items: baseline;
+    gap: $spacing-xs;
+    padding: $spacing-xs $spacing-sm 0;
+  }
+
+  &__price {
+    font-size: $font-size-price;
+    color: $color-price;
+    font-weight: 700;
+    font-family: $font-family-num;
+  }
+
+  &__yen {
+    font-size: $font-size-sm;
+  }
+
+  &__original {
+    font-size: $font-size-xs;
+    color: $color-strikethrough;
+    text-decoration: line-through;
+  }
+}

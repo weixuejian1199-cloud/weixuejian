@@ -1,0 +1,262 @@
+@import '../../styles/variables.scss';
+
+.recommend-page {
+  min-height: 100vh;
+  background: $color-bg-page;
+  padding-bottom: $spacing-xxl;
+}
+
+// Identity Card
+.identity-card {
+  margin: $spacing-sm $page-padding 0;
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+}
+
+.id-header {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+}
+
+.id-avatar-placeholder {
+  width: 48px;
+  height: 48px;
+  border-radius: $radius-circle;
+  background: $color-bg-divider;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.id-avatar-emoji {
+  font-size: $font-size-xxl;
+}
+
+.id-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: $radius-circle;
+}
+
+.id-info {
+  flex: 1;
+}
+
+.id-name-row {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.id-name {
+  font-size: $font-size-lg;
+  font-weight: 600;
+  color: $color-text-primary;
+}
+
+.id-badge {
+  background: $color-gold;
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: $radius-pill;
+  font-weight: 600;
+}
+
+.id-level {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  margin-top: 2px;
+}
+
+// Revenue Card
+.revenue-card {
+  margin: $spacing-md $page-padding 0;
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+}
+
+.rev-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $spacing-base;
+}
+
+.rev-title {
+  font-size: $font-size-md;
+  font-weight: 600;
+  color: $color-text-primary;
+}
+
+.rev-withdraw-btn {
+  background: $color-primary;
+  padding: 6px 16px;
+  border-radius: $radius-pill;
+}
+
+.rev-withdraw-text {
+  color: #fff;
+  font-size: $font-size-sm;
+  font-weight: 500;
+}
+
+.rev-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: $spacing-base 0;
+}
+
+.rev-item {
+  text-align: center;
+}
+
+.rev-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: $color-text-primary;
+  font-family: $font-family-num;
+
+  &--gold {
+    color: $color-gold;
+  }
+
+  &--muted {
+    color: $color-text-tertiary;
+  }
+}
+
+.rev-label {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-top: 2px;
+}
+
+.rev-divider {
+  grid-column: 1 / -1;
+  height: 1px;
+  background: $color-bg-divider;
+}
+
+// Data Card
+.data-card {
+  margin: $spacing-md $page-padding 0;
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+}
+
+.data-title {
+  font-size: $font-size-md;
+  font-weight: 600;
+  color: $color-text-primary;
+  margin-bottom: $spacing-base;
+}
+
+.data-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  text-align: center;
+}
+
+.data-value {
+  font-size: $font-size-price-lg;
+  font-weight: 700;
+  color: $color-text-primary;
+  font-family: $font-family-num;
+}
+
+.data-label {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-top: 2px;
+}
+
+// Function Grid
+.func-grid {
+  margin: $spacing-md $page-padding 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: $spacing-md;
+}
+
+.func-item {
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  padding: $spacing-base $spacing-sm;
+  text-align: center;
+}
+
+.func-icon {
+  font-size: $font-size-price-lg;
+  margin-bottom: 6px;
+}
+
+.func-label {
+  font-size: $font-size-sm;
+  color: $color-text-primary;
+  font-weight: 500;
+}
+
+// Commission Card
+.commission-card {
+  margin: $spacing-md $page-padding 0;
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+}
+
+.commission-title {
+  font-size: $font-size-md;
+  font-weight: 600;
+  color: $color-text-primary;
+  margin-bottom: $spacing-md;
+}
+
+.commission-rules {
+  font-size: 13px;
+  color: $color-text-primary;
+  line-height: 2;
+}
+
+.commission-row {
+  display: flex;
+  justify-content: space-between;
+  padding: $spacing-xs 0;
+
+  &--border {
+    border-bottom: 1px solid $color-bg-divider;
+  }
+}
+
+.commission-row-label {
+  color: $color-text-primary;
+
+  &--muted {
+    color: $color-text-secondary;
+  }
+}
+
+.commission-row-value {
+  font-weight: 600;
+}
+
+.commission-subtitle {
+  display: block;
+  padding: 10px 0 6px;
+  font-size: 13px;
+  color: $color-text-secondary;
+  font-weight: 500;
+}
+
+.commission-hint {
+  display: block;
+  margin-top: $spacing-md;
+  padding-top: $spacing-md;
+  border-top: 1px solid $color-bg-divider;
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+}

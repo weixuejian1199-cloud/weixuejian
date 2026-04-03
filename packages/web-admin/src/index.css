@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 20% 97%;
+    --foreground: 240 6% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 6% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 6% 12%;
+    --primary: 228 91% 64%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 40 14% 95%;
+    --secondary-foreground: 240 3% 30%;
+    --muted: 40 10% 93%;
+    --muted-foreground: 240 2% 55%;
+    --accent: 261 95% 68%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 144 100% 35%;
+    --warning: 30 100% 50%;
+    --border: 40 14% 91%;
+    --input: 40 14% 93%;
+    --ring: 228 91% 64%;
+    --radius: 0.5rem;
+    --sidebar-width: 280px;
+    --sidebar-collapsed-width: 64px;
+    --header-height: 56px;
+    --statusbar-height: 32px;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  .font-number {
+    font-family: 'DIN Alternate', 'Roboto Mono', monospace;
+  }
+
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(228 91% 64%), hsl(261 95% 68%));
+  }
+}

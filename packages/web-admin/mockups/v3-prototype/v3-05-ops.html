@@ -1,0 +1,2085 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>时皙 AI 工作站 - 运营工作台</title>
+<style>
+:root {
+  --text-primary: #1A1A1A;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --bg: #FFFFFF;
+  --sidebar-bg: #F9F9F9;
+  --sidebar-border: #F0F0F0;
+  --divider: #F0F0F0;
+  --input-border: #E8E8E8;
+  --input-bg: #F5F5F5;
+  --hover-bg: #F3F3F3;
+  --active-bg: #EFEFEF;
+  --accent: #1A1A1A;
+  --green: #00B42A;
+  --red: #E53835;
+  --orange: #FF7D00;
+  --blue: #4F6EF7;
+  --font: -apple-system, 'SF Pro Display', 'PingFang SC', 'Helvetica Neue', sans-serif;
+  --font-mono: 'SF Mono', 'Roboto Mono', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font);
+  color: var(--text-primary);
+  background: var(--bg);
+  overflow: hidden;
+  height: 100vh;
+  min-width: 1024px;
+}
+
+/* ========== Header ========== */
+.header {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 52px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--divider);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  z-index: 100;
+}
+.header-left {
+  display: flex; align-items: center; gap: 10px;
+}
+.logo {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: #FFFFFF; font-weight: 700; font-size: 16px;
+}
+.header-title {
+  font-size: 15px; font-weight: 600; color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+.header-back-cc {
+  margin-left: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.header-back-cc:hover { color: var(--text-primary); }
+
+.header-right {
+  display: flex; align-items: center; gap: 16px;
+}
+
+/* Mode Toggle */
+.mode-toggle {
+  display: flex; align-items: center; gap: 6px;
+}
+.mode-label {
+  font-size: 12px; color: var(--text-muted); font-weight: 500;
+  transition: color .15s;
+}
+.mode-label.active { color: var(--text-primary); font-weight: 600; }
+.toggle-switch {
+  width: 36px; height: 20px;
+  background: var(--accent);
+  border-radius: 10px;
+  position: relative;
+  cursor: pointer;
+  transition: background .2s;
+}
+.toggle-knob {
+  width: 16px; height: 16px;
+  background: #FFFFFF;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px; right: 2px;
+  transition: all .2s;
+}
+.toggle-switch.simple .toggle-knob {
+  right: auto; left: 2px;
+}
+.toggle-switch.simple {
+  background: var(--text-muted);
+}
+
+/* Time Range Selector */
+.time-range {
+  display: flex; align-items: center; gap: 2px;
+  background: var(--input-bg);
+  border-radius: 6px;
+  padding: 2px;
+}
+.time-btn {
+  font-size: 11px; padding: 4px 10px;
+  border: none; background: transparent;
+  border-radius: 4px; cursor: pointer;
+  color: var(--text-muted);
+  font-family: var(--font);
+  transition: all .15s;
+}
+.time-btn.active {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+
+.notification-btn {
+  position: relative;
+  width: 36px; height: 36px;
+  border: none; background: none; cursor: pointer;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-secondary);
+  transition: background .15s;
+}
+.notification-btn:hover { background: var(--hover-bg); }
+.notification-dot {
+  position: absolute; top: 6px; right: 8px;
+  width: 7px; height: 7px;
+  background: var(--red);
+  border-radius: 50%;
+  border: 2px solid var(--bg);
+}
+
+.user-info {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 4px 8px 4px 4px;
+  border-radius: 8px;
+  transition: background .15s;
+}
+.user-info:hover { background: var(--hover-bg); }
+.user-avatar {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #FFFFFF; font-size: 13px; font-weight: 600;
+}
+.user-role-tag {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--input-bg);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* ========== Sidebar ========== */
+.sidebar {
+  position: fixed; top: 52px; left: 0; bottom: 32px;
+  width: 240px;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+  z-index: 50;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: #DDDDDD; border-radius: 2px; }
+.sidebar-section { padding: 8px 12px 4px; }
+.sidebar-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 8px 8px 4px;
+}
+.sidebar-divider {
+  height: 1px;
+  background: var(--divider);
+  margin: 4px 16px;
+}
+
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  margin: 1px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: all .15s;
+  position: relative;
+}
+.nav-item:hover { background: var(--hover-bg); color: var(--text-primary); }
+.nav-item.active {
+  background: var(--active-bg);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+.nav-badge {
+  margin-left: auto;
+  background: var(--red);
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+.nav-badge.muted {
+  background: var(--divider);
+  color: var(--text-muted);
+}
+.new-tag {
+  font-size: 9px;
+  font-weight: 700;
+  color: #4F6EF7;
+  background: #EEF1FE;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 6px;
+}
+
+.chat-item {
+  display: flex; flex-direction: column;
+  padding: 8px 12px;
+  margin: 1px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.chat-item:hover { background: var(--hover-bg); }
+.chat-item.active { background: var(--active-bg); }
+.chat-item-title {
+  font-size: 13px; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chat-item-time {
+  font-size: 11px; color: var(--text-muted); margin-top: 2px;
+}
+
+.sidebar-bottom {
+  margin-top: auto;
+  border-top: 1px solid var(--divider);
+  padding: 8px 12px;
+}
+.sidebar-bottom .nav-item { margin: 0; }
+
+/* ========== Main Content ========== */
+.main {
+  position: fixed;
+  top: 52px; left: 240px; right: 0; bottom: 32px;
+  overflow-y: auto;
+  background: var(--input-bg);
+  padding: 20px 24px;
+}
+.main::-webkit-scrollbar { width: 6px; }
+.main::-webkit-scrollbar-thumb { background: #DDDDDD; border-radius: 3px; }
+
+/* View switching */
+.view-content { display: none; }
+.view-content.active { display: block; }
+
+/* ========== Channel Filter ========== */
+.channel-filter {
+  display: flex; align-items: center; gap: 0;
+  margin-bottom: 16px;
+}
+.channel-tab {
+  font-size: 13px; color: var(--text-muted);
+  background: none; border: none;
+  border-bottom: 2px solid transparent;
+  padding: 4px 14px; cursor: pointer;
+  font-family: var(--font);
+  transition: all .15s;
+}
+.channel-tab:hover { color: var(--text-secondary); }
+.channel-tab.active {
+  font-weight: 600; color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
+/* ========== KPI Cards ========== */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.kpi-card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 18px 20px;
+  cursor: pointer;
+  transition: box-shadow .2s, transform .2s;
+  animation: fadeInUp .4s ease both;
+}
+.kpi-card:nth-child(2) { animation-delay: .05s; }
+.kpi-card:nth-child(3) { animation-delay: .1s; }
+.kpi-card:nth-child(4) { animation-delay: .15s; }
+.kpi-card:nth-child(5) { animation-delay: .2s; }
+.kpi-card:nth-child(6) { animation-delay: .25s; }
+.kpi-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,.06);
+  transform: translateY(-2px);
+}
+.kpi-label {
+  font-size: 12px; color: var(--text-muted); margin-bottom: 8px;
+}
+.kpi-value {
+  font-size: 22px; font-weight: 700; color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+.kpi-change {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 12px; font-weight: 500; margin-top: 6px;
+}
+.kpi-change.up { color: var(--green); }
+.kpi-change.down { color: var(--red); }
+.kpi-sub {
+  font-size: 11px; color: var(--text-muted); margin-top: 2px;
+}
+
+/* ========== Content Grid ========== */
+.content-grid {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+.content-full {
+  margin-bottom: 20px;
+}
+.card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px 10px;
+  border-bottom: 1px solid var(--divider);
+}
+.card-title {
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+}
+.card-action {
+  font-size: 12px; color: var(--text-muted); cursor: pointer;
+  transition: color .15s;
+  background: none; border: none; font-family: var(--font);
+}
+.card-action:hover { color: var(--text-primary); }
+
+/* ========== Tables ========== */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.data-table th {
+  text-align: left;
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  background: var(--input-bg);
+  border-bottom: 1px solid var(--divider);
+  white-space: nowrap;
+}
+.data-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--divider);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.data-table tbody tr { transition: background .15s; cursor: pointer; }
+.data-table tbody tr:hover { background: var(--hover-bg); }
+.data-table .mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.data-table .text-right { text-align: right; }
+
+/* ========== Status Tags ========== */
+.status-tag {
+  display: inline-block;
+  font-size: 11px; font-weight: 500;
+  padding: 2px 8px; border-radius: 4px;
+}
+.status-tag.green { background: #E8F7E8; color: var(--green); }
+.status-tag.orange { background: #FFF7E6; color: var(--orange); }
+.status-tag.red { background: #FEF2F2; color: var(--red); }
+.status-tag.blue { background: #E8F3FF; color: var(--blue); }
+.status-tag.gray { background: var(--input-bg); color: var(--text-muted); }
+
+/* Lifecycle tags */
+.lifecycle-tag {
+  display: inline-block;
+  font-size: 10px; font-weight: 600;
+  padding: 2px 6px; border-radius: 3px;
+}
+.lifecycle-tag.new { background: #EEF1FE; color: #4F6EF7; }
+.lifecycle-tag.growth { background: #E8F7E8; color: var(--green); }
+.lifecycle-tag.mature { background: #FFF7E6; color: var(--orange); }
+.lifecycle-tag.decline { background: #FEF2F2; color: var(--red); }
+
+/* Role tags */
+.role-tag {
+  display: inline-block;
+  font-size: 10px; font-weight: 500;
+  padding: 1px 6px; border-radius: 3px;
+  background: var(--input-bg); color: var(--text-muted);
+}
+
+/* ========== Alert Cards ========== */
+.alert-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.alert-card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 14px 16px;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  transition: all .2s;
+}
+.alert-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.06);
+}
+.alert-card.warn { border-left-color: var(--orange); }
+.alert-card.danger { border-left-color: var(--red); }
+.alert-card.info { border-left-color: var(--blue); }
+.alert-type {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .5px; margin-bottom: 4px;
+}
+.alert-card.warn .alert-type { color: var(--orange); }
+.alert-card.danger .alert-type { color: var(--red); }
+.alert-card.info .alert-type { color: var(--blue); }
+.alert-msg {
+  font-size: 13px; color: var(--text-primary); line-height: 1.5;
+}
+.alert-action {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border: 1px solid var(--input-border);
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all .15s;
+  background: var(--bg);
+}
+.alert-action:hover {
+  background: var(--accent);
+  color: #FFFFFF;
+  border-color: var(--accent);
+}
+
+/* ========== Today Todos ========== */
+.todo-list { padding: 8px 12px; }
+.todo-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--divider);
+  cursor: pointer;
+  transition: background .15s;
+}
+.todo-item:last-child { border-bottom: none; }
+.todo-item:hover { background: var(--hover-bg); border-radius: 6px; }
+.todo-check {
+  width: 18px; height: 18px;
+  border: 1.5px solid var(--input-border);
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all .15s;
+}
+.todo-check.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.todo-check.checked svg { display: block; }
+.todo-check svg { display: none; width: 12px; height: 12px; color: #FFFFFF; }
+.todo-content { flex: 1; }
+.todo-text {
+  font-size: 13px; color: var(--text-primary); line-height: 1.5;
+}
+.todo-item.done .todo-text {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+.todo-tag {
+  display: inline-block;
+  font-size: 10px; font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.todo-tag.urgent { background: #FEE2E2; color: var(--red); }
+.todo-tag.normal { background: #FFF7E6; color: var(--orange); }
+
+/* ========== AI Chat Panel (embedded in each view) ========== */
+.ai-panel {
+  display: flex; flex-direction: column;
+  height: 100%;
+  min-height: 480px;
+}
+.ai-messages {
+  flex: 1;
+  padding: 16px 20px;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 16px;
+  max-height: 420px;
+}
+.ai-messages::-webkit-scrollbar { width: 4px; }
+.ai-messages::-webkit-scrollbar-thumb { background: #DDD; border-radius: 2px; }
+.msg {
+  max-width: 88%;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.msg.user {
+  align-self: flex-end;
+  background: var(--accent);
+  color: #FFFFFF;
+  border-radius: 14px 14px 4px 14px;
+}
+.msg.ai {
+  align-self: flex-start;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  border-radius: 4px 14px 14px 14px;
+}
+.msg .action-btn {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  padding: 5px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #FFFFFF;
+  transition: opacity .15s;
+  margin-right: 6px;
+}
+.msg .action-btn:hover { opacity: .85; }
+.msg .action-btn.secondary {
+  background: var(--bg);
+  color: var(--text-primary);
+  border-color: var(--input-border);
+}
+.msg .warn-line {
+  display: flex; align-items: flex-start; gap: 6px;
+  margin-top: 8px; padding: 8px 10px;
+  background: rgba(255,125,0,.08);
+  border-radius: 6px;
+  color: var(--orange); font-size: 12px; line-height: 1.5;
+}
+.ai-input-bar {
+  padding: 12px 16px;
+  border-top: 1px solid var(--divider);
+  display: flex; gap: 8px;
+}
+.ai-input {
+  flex: 1;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-family: var(--font);
+  background: var(--input-bg);
+  outline: none;
+  transition: border-color .15s;
+}
+.ai-input:focus { border-color: var(--accent); background: var(--bg); }
+.ai-input::placeholder { color: var(--text-muted); }
+.ai-send {
+  width: 36px; height: 36px;
+  border: none;
+  background: var(--accent);
+  color: #FFFFFF;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity .15s;
+}
+.ai-send:hover { opacity: .85; }
+
+/* ========== Calendar View ========== */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--divider);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.cal-header {
+  background: var(--input-bg);
+  padding: 8px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.cal-day {
+  background: var(--bg);
+  padding: 6px 8px;
+  min-height: 80px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.cal-day:hover { background: var(--hover-bg); }
+.cal-day .day-num {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.cal-day.today .day-num {
+  background: var(--accent);
+  color: #FFF;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px;
+}
+.cal-event {
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cal-event.promo { background: #FEF2F2; color: var(--red); }
+.cal-event.campaign { background: #EEF1FE; color: var(--blue); }
+.cal-event.launch { background: #E8F7E8; color: var(--green); }
+.cal-day.other-month { opacity: .4; }
+
+/* ========== Funnel ========== */
+.funnel-bar-wrap {
+  margin-bottom: 12px;
+}
+.funnel-label {
+  display: flex; justify-content: space-between;
+  font-size: 12px; margin-bottom: 4px;
+}
+.funnel-label span:first-child { color: var(--text-secondary); }
+.funnel-label span:last-child { font-family: var(--font-mono); color: var(--text-primary); font-weight: 500; }
+.funnel-bar {
+  height: 24px;
+  background: var(--input-bg);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.funnel-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 6px;
+  transition: width .8s ease;
+}
+.funnel-rate {
+  font-size: 11px; color: var(--text-muted); margin-top: 2px; text-align: right;
+}
+
+/* ========== Footer ========== */
+.footer {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 32px;
+  background: var(--bg);
+  border-top: 1px solid var(--divider);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  font-size: 11px;
+  color: var(--text-muted);
+  gap: 24px;
+}
+.footer .status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+/* ========== Onboarding Modal ========== */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 500;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+  background: var(--bg);
+  border-radius: 16px;
+  width: 520px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+}
+.modal-body {
+  padding: 32px;
+}
+.modal-step { display: none; }
+.modal-step.active { display: block; }
+.modal-title {
+  font-size: 20px; font-weight: 700; margin-bottom: 8px;
+}
+.modal-desc {
+  font-size: 14px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 20px;
+}
+.modal-features {
+  list-style: none;
+  margin-bottom: 24px;
+}
+.modal-features li {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--divider);
+  font-size: 13px; line-height: 1.5;
+}
+.modal-features li:last-child { border-bottom: none; }
+.feature-icon {
+  width: 32px; height: 32px;
+  background: var(--input-bg);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  font-size: 16px;
+}
+.modal-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 32px;
+  border-top: 1px solid var(--divider);
+}
+.modal-dots {
+  display: flex; gap: 6px;
+}
+.modal-dots .dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--divider);
+}
+.modal-dots .dot.active {
+  background: var(--accent);
+  width: 20px;
+  border-radius: 4px;
+}
+.modal-btn {
+  padding: 8px 24px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #FFFFFF;
+  font-family: var(--font);
+  transition: opacity .15s;
+}
+.modal-btn:hover { opacity: .85; }
+.modal-btn.skip {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: transparent;
+}
+
+/* ========== RFM Segments ========== */
+.rfm-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.rfm-card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+}
+.rfm-card .rfm-count {
+  font-size: 22px; font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+.rfm-card .rfm-label {
+  font-size: 12px; color: var(--text-muted); margin-top: 4px;
+}
+.rfm-card .rfm-pct {
+  font-size: 11px; color: var(--text-muted); margin-top: 2px;
+  font-family: var(--font-mono);
+}
+
+/* ========== Misc ========== */
+.section-title {
+  font-size: 15px; font-weight: 600; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.badge-count {
+  font-size: 11px; font-weight: 600;
+  background: var(--red); color: #FFF;
+  padding: 1px 7px; border-radius: 10px;
+}
+.empty-hint {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.btn-row {
+  display: flex; gap: 8px; margin-bottom: 16px;
+}
+.filter-btn {
+  font-size: 12px; padding: 5px 14px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all .15s;
+}
+.filter-btn:hover { border-color: var(--accent); color: var(--text-primary); }
+.filter-btn.active {
+  background: var(--accent);
+  color: #FFF;
+  border-color: var(--accent);
+}
+.search-box {
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: var(--bg);
+  height: 36px;
+}
+.search-box input {
+  border: none; outline: none;
+  font-size: 13px; font-family: var(--font);
+  flex: 1; background: transparent;
+}
+.search-box input::placeholder { color: var(--text-muted); }
+
+/* Progress bar */
+.progress-bar {
+  height: 6px; background: var(--input-bg);
+  border-radius: 3px; overflow: hidden;
+}
+.progress-fill {
+  height: 100%; border-radius: 3px;
+  background: var(--accent);
+}
+.progress-fill.warn { background: var(--orange); }
+.progress-fill.danger { background: var(--red); }
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>
+</head>
+<body>
+
+<!-- ========== HEADER ========== -->
+<header class="header">
+  <div class="header-left">
+    <div class="logo">S</div>
+    <span class="header-title">时皙 AI 工作站</span>
+    <a class="header-back-cc" href="v3-02-super-admin.html">返回指挥中心</a>
+  </div>
+  <div class="header-right">
+    <div class="time-range">
+      <button class="time-btn active" onclick="setTimeRange(this)">今日</button>
+      <button class="time-btn" onclick="setTimeRange(this)">昨日</button>
+      <button class="time-btn" onclick="setTimeRange(this)">近7天</button>
+      <button class="time-btn" onclick="setTimeRange(this)">近30天</button>
+    </div>
+    <div class="mode-toggle">
+      <span class="mode-label" id="labelSimple">小白</span>
+      <div class="toggle-switch" id="modeToggle" onclick="toggleMode()">
+        <div class="toggle-knob"></div>
+      </div>
+      <span class="mode-label active" id="labelPro">专业</span>
+    </div>
+    <button class="notification-btn" onclick="toggleNotifications()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="notification-dot"></span>
+    </button>
+    <div class="user-info">
+      <div class="user-avatar" onclick="if(confirm('确认退出登录？'))window.location.href='v3-01-login.html'" title="退出登录">王</div>
+      <span class="user-role-tag">运营</span>
+    </div>
+  </div>
+</header>
+
+<!-- ========== SIDEBAR ========== -->
+<nav class="sidebar">
+  <!-- 创始人·作战台入口（侧栏第一项语义，与工具中心一致）：仅 super_admin 可见 -->
+  <div class="sidebar-section" data-role-required="super_admin" style="display:none">
+    <a class="nav-item" href="v3-02-super-admin.html" style="text-decoration:none;color:inherit">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <span>AI 今日看板</span>
+      <span class="nav-badge">3</span>
+    </a>
+  </div>
+  <div class="sidebar-divider" data-role-required="super_admin" style="display:none"></div>
+
+  <div class="sidebar-section">
+    <div class="nav-item active" data-view="overview">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span>运营概览</span>
+    </div>
+    <div class="nav-item" data-view="chat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span>AI 对话</span>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">订单</div>
+    <div class="nav-item" data-view="orders">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      <span>订单管理</span>
+      <span class="nav-badge">17</span>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">商品</div>
+    <div class="nav-item" data-view="products">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+      <span>商品管理</span>
+      <span class="nav-badge muted">286</span>
+    </div>
+    <div class="nav-item" data-view="inventory">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>
+      <span data-simple="库存" data-pro="库存管理">库存管理</span>
+      <span class="nav-badge">3</span>
+    </div>
+    <div class="nav-item" data-view="reviews">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+      <span>评价管理</span>
+      <span class="nav-badge">8</span>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">营销</div>
+    <div class="nav-item" data-view="marketing">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>营销活动</span>
+      <span class="nav-badge">2</span>
+    </div>
+    <div class="nav-item" data-view="ads">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M16 8l-8 8"/><path d="M8.5 8H8v.5"/><path d="M16 15.5v.5h-.5"/></svg>
+      <span data-simple="广告投放" data-pro="投放管理">投放管理</span>
+      <span class="new-tag">NEW</span>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">数据</div>
+    <div class="nav-item" data-view="data">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>数据看板</span>
+    </div>
+    <div class="nav-item" data-view="customers">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span>客户分析</span>
+      <span class="new-tag">NEW</span>
+    </div>
+    <div class="nav-item" data-view="competitors">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span>竞品监控</span>
+      <span class="new-tag">NEW</span>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">对话记录</div>
+    <div class="chat-item active">
+      <span class="chat-item-title">清明活动方案 & 备货</span>
+      <span class="chat-item-time">30分钟前</span>
+    </div>
+    <div class="chat-item">
+      <span class="chat-item-title">抖店千川ROI优化建议</span>
+      <span class="chat-item-time">2小时前</span>
+    </div>
+    <div class="chat-item">
+      <span class="chat-item-title">花西子降价应对策略</span>
+      <span class="chat-item-time">昨天</span>
+    </div>
+    <div class="chat-item">
+      <span class="chat-item-title">眼霜差评集中分析</span>
+      <span class="chat-item-time">昨天</span>
+    </div>
+  </div>
+
+  <div class="sidebar-bottom">
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>设置</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ========== MAIN CONTENT ========== -->
+<main class="main">
+
+<!-- ==================== VIEW: OVERVIEW ==================== -->
+<section class="view-content active" data-view="overview">
+  <div class="channel-filter">
+    <button class="channel-tab active" onclick="setChannel(this)">全部</button>
+    <button class="channel-tab" onclick="setChannel(this)">抖店</button>
+    <button class="channel-tab" onclick="setChannel(this)">天猫</button>
+    <button class="channel-tab" onclick="setChannel(this)">小红书</button>
+    <button class="channel-tab" onclick="setChannel(this)">美团</button>
+    <button class="channel-tab" onclick="setChannel(this)">小程序</button>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label" data-simple="今日卖了多少钱">今日 GMV</div>
+      <div class="kpi-value">¥82,400</div>
+      <div class="kpi-change up">+12.3% <span data-simple="比昨天">较昨日</span></div>
+      <div class="kpi-sub">直播 ¥38,200 | 短视频 ¥24,800 | 自然 ¥19,400</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">今日订单</div>
+      <div class="kpi-value">312</div>
+      <div class="kpi-change up">+8.5% 较昨日</div>
+      <div class="kpi-sub">待发货 47 | 售后中 5</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label" data-simple="每100人有几个买">支付转化率</div>
+      <div class="kpi-value">3.8%</div>
+      <div class="kpi-change up">+0.3pp 较昨日</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label" data-simple="平均每人花多少">客单价</div>
+      <div class="kpi-value">¥264</div>
+      <div class="kpi-change down">-2.1% 较昨日</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label" data-simple="今天多少人来看">今日 UV</div>
+      <div class="kpi-value">8,630</div>
+      <div class="kpi-change up">+5.2% 较昨日</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label" data-simple="广告回本倍数">广告 ROAS</div>
+      <div class="kpi-value">3.2</div>
+      <div class="kpi-change up">+0.4 较昨日</div>
+      <div class="kpi-sub">千川 2.8 | 直通车 4.1 | 引力魔方 3.6</div>
+    </div>
+  </div>
+
+  <!-- Today Alerts -->
+  <div class="section-title">异常预警 <span class="badge-count">4</span></div>
+  <div class="alert-row">
+    <div class="alert-card danger">
+      <div class="alert-type">库存预警</div>
+      <div class="alert-msg">时皙水润面膜库存420件，按当前日销52件仅可售8天</div>
+      <span class="alert-action" onclick="switchView('chat')">AI 生成补货单</span>
+    </div>
+    <div class="alert-card warn">
+      <div class="alert-type">竞品异动</div>
+      <div class="alert-msg">花西子同款精华降价15%至¥169，低于我们¥198</div>
+      <span class="alert-action" onclick="switchView('competitors')">查看竞品详情</span>
+    </div>
+    <div class="alert-card warn">
+      <div class="alert-type">流量下滑</div>
+      <div class="alert-msg">天猫搜索UV较上周同期下降18%，核心词"补水面膜"排名从#3降至#8</div>
+      <span class="alert-action" onclick="switchView('ads')">优化投放策略</span>
+    </div>
+    <div class="alert-card info">
+      <div class="alert-type">差评预警</div>
+      <div class="alert-msg">眼霜近7天4条差评集中反馈"滋润度不够"，评分4.7→4.5</div>
+      <span class="alert-action" onclick="switchView('reviews')">查看差评详情</span>
+    </div>
+  </div>
+
+  <!-- Two columns: Todos + AI Panel -->
+  <div class="content-grid">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">今日待办 <span class="badge-count" style="margin-left:6px">6</span></span>
+        <button class="card-action">查看全部</button>
+      </div>
+      <div class="todo-list">
+        <div class="todo-item" onclick="toggleTodo(this)">
+          <div class="todo-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="todo-content"><span class="todo-text">处理 17 笔待发货订单 <span class="todo-tag urgent">紧急</span></span></div>
+        </div>
+        <div class="todo-item" onclick="toggleTodo(this)">
+          <div class="todo-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="todo-content"><span class="todo-text">审核 5 笔售后退款申请</span></div>
+        </div>
+        <div class="todo-item" onclick="toggleTodo(this)">
+          <div class="todo-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="todo-content"><span class="todo-text">回复 8 条新增差评 <span class="todo-tag normal">今日</span></span></div>
+        </div>
+        <div class="todo-item" onclick="toggleTodo(this)">
+          <div class="todo-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="todo-content"><span class="todo-text">确认 3 款上新商品的标题和主图</span></div>
+        </div>
+        <div class="todo-item" onclick="toggleTodo(this)">
+          <div class="todo-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="todo-content"><span class="todo-text">检查清明活动库存锁定状态</span></div>
+        </div>
+        <div class="todo-item done" onclick="toggleTodo(this)">
+          <div class="todo-check checked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="todo-content"><span class="todo-text">审批 2 条千川新计划</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card ai-panel">
+      <div class="card-header">
+        <span class="card-title">AI 运营助手</span>
+        <button class="card-action">展开对话</button>
+      </div>
+      <div class="ai-messages" id="aiMsg-overview">
+        <div class="msg ai">你好！我是你的AI运营助手。今日有 <strong>4 条异常预警</strong> 和 <strong>6 项待办</strong>。<br><br>最紧急的：水润面膜库存仅剩8天，建议立即补货。需要我生成补货建议单吗？</div>
+        <div class="msg user">帮我生成面膜补货单</div>
+        <div class="msg ai">已分析近30天销量趋势和清明活动预期增量：<br><br><strong>补货建议：</strong><br>- 时皙水润面膜：补货 <strong>1,200 件</strong><br>- 预计日销：52件/天（活动期间 ×1.5）<br>- 安全库存天数：30天<br>- 供应商：杭州美妆包材（上次交期5天）<br><br><span class="action-btn">确认生成采购单</span><span class="action-btn secondary">调整数量</span><div class="warn-line">&#9888;&#65039; 清明活动期间（4/3-4/7）预计面膜日销量翻倍，建议备货充裕</div></div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" placeholder="问我任何运营问题..." onkeydown="if(event.key==='Enter')sendMsg(this)">
+        <button class="ai-send" onclick="sendMsg(this.previousElementSibling)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Channel ROI Table -->
+  <div class="card content-full">
+    <div class="card-header">
+      <span class="card-title">渠道核心指标对比</span>
+      <button class="card-action">导出 Excel</button>
+    </div>
+    <table class="data-table">
+      <thead><tr>
+        <th>渠道</th><th class="text-right">GMV</th><th class="text-right">订单</th>
+        <th class="text-right" data-simple="转化" data-pro="转化率">转化率</th>
+        <th class="text-right" data-simple="客均" data-pro="客单价">客单价</th>
+        <th class="text-right">广告投入</th>
+        <th class="text-right" data-simple="回本倍数" data-pro="ROAS">ROAS</th>
+        <th class="text-right">趋势</th>
+      </tr></thead>
+      <tbody>
+        <tr><td><strong>抖店</strong></td><td class="mono text-right">¥36,200</td><td class="mono text-right">142</td><td class="mono text-right">2.9%</td><td class="mono text-right">¥255</td><td class="mono text-right">¥12,900</td><td class="mono text-right">2.8</td><td class="text-right"><span style="color:var(--green)">+15.2%</span></td></tr>
+        <tr><td><strong>天猫</strong></td><td class="mono text-right">¥28,600</td><td class="mono text-right">98</td><td class="mono text-right">4.2%</td><td class="mono text-right">¥292</td><td class="mono text-right">¥6,900</td><td class="mono text-right">4.1</td><td class="text-right"><span style="color:var(--red)">-3.1%</span></td></tr>
+        <tr><td><strong>小红书</strong></td><td class="mono text-right">¥8,400</td><td class="mono text-right">32</td><td class="mono text-right">3.6%</td><td class="mono text-right">¥263</td><td class="mono text-right">¥2,300</td><td class="mono text-right">3.7</td><td class="text-right"><span style="color:var(--green)">+22.8%</span></td></tr>
+        <tr><td><strong>美团</strong></td><td class="mono text-right">¥4,800</td><td class="mono text-right">22</td><td class="mono text-right">5.1%</td><td class="mono text-right">¥218</td><td class="mono text-right">¥1,600</td><td class="mono text-right">3.0</td><td class="text-right"><span style="color:var(--green)">+8.3%</span></td></tr>
+        <tr><td><strong>小程序</strong></td><td class="mono text-right">¥4,400</td><td class="mono text-right">18</td><td class="mono text-right">8.2%</td><td class="mono text-right">¥244</td><td class="mono text-right">¥120</td><td class="mono text-right">36.7</td><td class="text-right"><span style="color:var(--green)">+5.6%</span></td></tr>
+      </tbody>
+    </table>
+    <div style="padding:12px 20px;font-size:12px;color:var(--text-muted);line-height:1.6;border-top:1px solid var(--divider)">
+      <strong style="color:var(--text-primary)">AI 洞察：</strong>小红书增速最快(+22.8%)，种草转化效率高，建议增加笔记投放预算。天猫搜索UV下滑导致GMV环比降3.1%，需关注核心词排名。小程序ROAS 36.7倍，私域复购价值突出。
+    </div>
+  </div>
+
+  <!-- Hot Products -->
+  <div class="card content-full">
+    <div class="card-header">
+      <span class="card-title">热销 TOP5</span>
+      <button class="card-action" onclick="switchView('products')">查看全部商品</button>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>#</th><th>商品</th><th>生命周期</th><th>角色</th><th class="text-right">销量</th><th class="text-right">GMV</th><th class="text-right">库存</th><th class="text-right">转化率</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">1</td><td><strong>时皙水润面膜 5片装</strong></td><td><span class="lifecycle-tag mature">成熟</span></td><td><span class="role-tag">爆款</span></td><td class="mono text-right">52</td><td class="mono text-right">¥6,188</td><td class="mono text-right" style="color:var(--red)">420</td><td class="mono text-right">5.2%</td></tr>
+        <tr><td class="mono">2</td><td><strong>时皙玻尿酸精华液 30ml</strong></td><td><span class="lifecycle-tag growth">成长</span></td><td><span class="role-tag">利润款</span></td><td class="mono text-right">38</td><td class="mono text-right">¥7,524</td><td class="mono text-right">860</td><td class="mono text-right">4.8%</td></tr>
+        <tr><td class="mono">3</td><td><strong>时皙氨基酸洁面乳 120ml</strong></td><td><span class="lifecycle-tag mature">成熟</span></td><td><span class="role-tag">引流款</span></td><td class="mono text-right">45</td><td class="mono text-right">¥3,555</td><td class="mono text-right">1,240</td><td class="mono text-right">6.1%</td></tr>
+        <tr><td class="mono">4</td><td><strong>时皙烟酰胺亮肤套装</strong></td><td><span class="lifecycle-tag new">新品</span></td><td><span class="role-tag">形象款</span></td><td class="mono text-right">18</td><td class="mono text-right">¥7,092</td><td class="mono text-right">500</td><td class="mono text-right">3.2%</td></tr>
+        <tr><td class="mono">5</td><td><strong>时皙防晒霜 SPF50 60ml</strong></td><td><span class="lifecycle-tag growth">成长</span></td><td><span class="role-tag">爆款</span></td><td class="mono text-right">35</td><td class="mono text-right">¥4,865</td><td class="mono text-right">680</td><td class="mono text-right">4.5%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ==================== VIEW: AI CHAT ==================== -->
+<section class="view-content" data-view="chat">
+  <div class="card" style="height:calc(100vh - 130px)">
+    <div class="card-header">
+      <span class="card-title">AI 运营助手</span>
+      <span style="font-size:12px;color:var(--text-muted)">对话即操作 · 问我任何运营问题</span>
+    </div>
+    <div class="ai-messages" id="aiMsg-chat" style="max-height:calc(100vh - 260px)">
+      <div class="msg ai">你好！我是时皙AI运营助手，可以帮你：<br><br>
+        <strong>数据查询</strong> — "今天各渠道GMV" "上周退货率多少"<br>
+        <strong>活动策划</strong> — "帮我策划清明促销活动"<br>
+        <strong>商品分析</strong> — "哪些商品该淘汰" "给新品写个标题"<br>
+        <strong>投放优化</strong> — "千川ROI低于2的计划有哪些"<br>
+        <strong>竞品情报</strong> — "花西子最近有什么动作"<br>
+        <strong>客户运营</strong> — "哪些老客快流失了"<br><br>
+        直接问就行，我会帮你分析并给出可执行的建议。
+      </div>
+      <div class="msg user">帮我策划清明促销活动方案</div>
+      <div class="msg ai">
+        <strong>清明促销活动方案 (4/3-4/7)</strong><br><br>
+        <strong>1. 主推品：</strong><br>
+        - 时皙水润面膜 5片装 ¥119→¥99（转化率5.2%，降价后预估+40%）<br>
+        - 时皙防晒霜 SPF50 ¥139→¥119（春季防晒需求上升期）<br><br>
+        <strong>2. 活动机制：</strong><br>
+        - 满199减30（提升客单价至¥264以上）<br>
+        - 买面膜送洁面小样（推动连带）<br>
+        - 抖音直播间限时加赠（提升GPM）<br><br>
+        <strong>3. 渠道投放预算分配：</strong><br>
+        - 千川：¥8,000/天（重点投面膜+防晒素材）<br>
+        - 直通车：¥3,000/天（抢"清明护肤"关键词）<br>
+        - 小红书：¥2,000（种草笔记 ×10篇）<br><br>
+        <strong>4. 预估效果：</strong><br>
+        - 活动期间日GMV ¥95,000-¥110,000（+15-33%）<br>
+        - 预计新增客户 800+<br><br>
+        <span class="action-btn">确认创建活动</span><span class="action-btn secondary">调整方案</span>
+        <div class="warn-line">&#9888;&#65039; 面膜库存420件仅够8天，活动期间日销翻倍需补货1,200件。建议先确认补货再上线活动。</div>
+      </div>
+    </div>
+    <div class="ai-input-bar">
+      <input class="ai-input" placeholder="输入运营问题，AI帮你分析和执行..." onkeydown="if(event.key==='Enter')sendMsg(this)">
+      <button class="ai-send" onclick="sendMsg(this.previousElementSibling)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW: ORDERS ==================== -->
+<section class="view-content" data-view="orders">
+  <div class="section-title">订单管理 <span class="badge-count">17</span></div>
+  <div class="btn-row">
+    <button class="filter-btn active">全部 (312)</button>
+    <button class="filter-btn">待发货 (47)</button>
+    <button class="filter-btn">售后中 (5)</button>
+    <button class="filter-btn">已完成 (260)</button>
+    <div style="flex:1"></div>
+    <div class="search-box">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input placeholder="搜索订单号/商品/买家...">
+    </div>
+  </div>
+  <div class="content-grid">
+    <div class="card">
+      <table class="data-table">
+        <thead><tr><th>订单号</th><th>渠道</th><th>商品</th><th class="text-right">金额</th><th>状态</th><th>时间</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">DY240402001</td><td>抖店</td><td>水润面膜×3</td><td class="mono text-right">¥357</td><td><span class="status-tag orange">待发货</span></td><td class="mono">10:32</td></tr>
+          <tr><td class="mono">TM240402015</td><td>天猫</td><td>精华液×1+洁面×1</td><td class="mono text-right">¥277</td><td><span class="status-tag orange">待发货</span></td><td class="mono">10:28</td></tr>
+          <tr><td class="mono">XHS240402003</td><td>小红书</td><td>防晒霜×2</td><td class="mono text-right">¥278</td><td><span class="status-tag orange">待发货</span></td><td class="mono">10:15</td></tr>
+          <tr><td class="mono">DY240402008</td><td>抖店</td><td>烟酰胺套装×1</td><td class="mono text-right">¥394</td><td><span class="status-tag red">售后中</span></td><td class="mono">09:58</td></tr>
+          <tr><td class="mono">TM240401102</td><td>天猫</td><td>眼霜×1</td><td class="mono text-right">¥218</td><td><span class="status-tag red">退款中</span></td><td class="mono">昨日</td></tr>
+          <tr><td class="mono">DY240401089</td><td>抖店</td><td>面膜×5+洁面×2</td><td class="mono text-right">¥755</td><td><span class="status-tag green">已完成</span></td><td class="mono">昨日</td></tr>
+          <tr><td class="mono">MT240401045</td><td>美团</td><td>洁面乳×1</td><td class="mono text-right">¥79</td><td><span class="status-tag green">已完成</span></td><td class="mono">昨日</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card ai-panel">
+      <div class="card-header"><span class="card-title">AI 订单助手</span></div>
+      <div class="ai-messages" id="aiMsg-orders">
+        <div class="msg ai">当前有 <strong>47笔待发货</strong>、<strong>5笔售后</strong>。<br><br>建议优先处理：<br>1. 抖店订单DY240402008 售后申请——买家反馈"过敏"，建议同意退款并赠送试用装<br>2. 47笔待发货可批量打印快递单<br><br><span class="action-btn">批量打印快递单</span><span class="action-btn secondary">查看售后详情</span></div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" placeholder="如：帮我处理抖店售后..." onkeydown="if(event.key==='Enter')sendMsg(this)">
+        <button class="ai-send" onclick="sendMsg(this.previousElementSibling)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW: PRODUCTS ==================== -->
+<section class="view-content" data-view="products">
+  <div class="section-title">商品管理 <span style="font-size:13px;color:var(--text-muted);font-weight:400">286 个在售商品</span></div>
+  <div class="btn-row">
+    <button class="filter-btn active">全部 (286)</button>
+    <button class="filter-btn">新品 (12)</button>
+    <button class="filter-btn">成长 (45)</button>
+    <button class="filter-btn">成熟 (186)</button>
+    <button class="filter-btn">衰退 (43)</button>
+    <div style="flex:1"></div>
+    <div class="search-box">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input placeholder="搜索商品名/SKU...">
+    </div>
+  </div>
+
+  <div class="content-grid">
+    <div class="card">
+      <table class="data-table">
+        <thead><tr><th>商品</th><th>生命周期</th><th>角色</th><th>渠道</th><th class="text-right">月销</th><th class="text-right">毛利率</th><th class="text-right">库存</th><th>AI建议</th></tr></thead>
+        <tbody>
+          <tr><td><strong>水润面膜 5片装</strong></td><td><span class="lifecycle-tag mature">成熟</span></td><td><span class="role-tag">爆款</span></td><td>全渠道</td><td class="mono text-right">1,560</td><td class="mono text-right">62%</td><td class="mono text-right" style="color:var(--red)">420</td><td><span class="status-tag red">紧急补货</span></td></tr>
+          <tr><td><strong>玻尿酸精华液 30ml</strong></td><td><span class="lifecycle-tag growth">成长</span></td><td><span class="role-tag">利润款</span></td><td>天猫/抖店</td><td class="mono text-right">1,140</td><td class="mono text-right">71%</td><td class="mono text-right">860</td><td><span class="status-tag green">加大推广</span></td></tr>
+          <tr><td><strong>氨基酸洁面乳 120ml</strong></td><td><span class="lifecycle-tag mature">成熟</span></td><td><span class="role-tag">引流款</span></td><td>全渠道</td><td class="mono text-right">1,350</td><td class="mono text-right">45%</td><td class="mono text-right">1,240</td><td><span class="status-tag gray">维持</span></td></tr>
+          <tr><td><strong>烟酰胺亮肤套装</strong></td><td><span class="lifecycle-tag new">新品</span></td><td><span class="role-tag">形象款</span></td><td>天猫/小红书</td><td class="mono text-right">540</td><td class="mono text-right">68%</td><td class="mono text-right">500</td><td><span class="status-tag blue">重点培育</span></td></tr>
+          <tr><td><strong>防晒霜 SPF50 60ml</strong></td><td><span class="lifecycle-tag growth">成长</span></td><td><span class="role-tag">爆款</span></td><td>全渠道</td><td class="mono text-right">1,050</td><td class="mono text-right">58%</td><td class="mono text-right">680</td><td><span class="status-tag green">季节性加推</span></td></tr>
+          <tr><td><strong>美白淡斑精华 15ml</strong></td><td><span class="lifecycle-tag decline">衰退</span></td><td><span class="role-tag">利润款</span></td><td>天猫</td><td class="mono text-right">120</td><td class="mono text-right">73%</td><td class="mono text-right">340</td><td><span class="status-tag orange">考虑清仓</span></td></tr>
+          <tr><td><strong>卸妆水 300ml</strong></td><td><span class="lifecycle-tag decline">衰退</span></td><td><span class="role-tag">引流款</span></td><td>美团</td><td class="mono text-right">85</td><td class="mono text-right">38%</td><td class="mono text-right">620</td><td><span class="status-tag red">建议淘汰</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card ai-panel">
+      <div class="card-header"><span class="card-title">AI 商品助手</span></div>
+      <div class="ai-messages" id="aiMsg-products">
+        <div class="msg ai">商品矩阵分析：<br><br><strong>爆款(52款)</strong> 贡献58%GMV<br><strong>利润款(68款)</strong> 贡献25%利润<br><strong>引流款(98款)</strong> 带来42%新客<br><strong>形象款(12款)</strong> 提升品牌调性<br><br>建议关注：<br>- 美白淡斑精华、卸妆水等43款衰退商品占库存¥18万，建议清仓<br>- 防晒霜进入季节增长期，建议各渠道加大推广<br>- 烟酰胺套装新品表现超预期，建议投入更多千川素材</div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" placeholder="如：帮新品写个天猫标题..." onkeydown="if(event.key==='Enter')sendMsg(this)">
+        <button class="ai-send" onclick="sendMsg(this.previousElementSibling)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW: INVENTORY ==================== -->
+<section class="view-content" data-view="inventory">
+  <div class="section-title">库存管理 <span class="badge-count">3</span></div>
+
+  <div class="alert-row" style="grid-template-columns:repeat(3,1fr)">
+    <div class="alert-card danger">
+      <div class="alert-type">低于安全库存</div>
+      <div class="alert-msg">水润面膜 · 420件 · 可售8天</div>
+      <span class="alert-action">AI生成补货单</span>
+    </div>
+    <div class="alert-card warn">
+      <div class="alert-type">即将低于安全库存</div>
+      <div class="alert-msg">防晒霜 · 680件 · 可售19天</div>
+      <span class="alert-action">查看趋势</span>
+    </div>
+    <div class="alert-card warn">
+      <div class="alert-type">滞销预警</div>
+      <div class="alert-msg">卸妆水 · 620件 · 月销仅85件</div>
+      <span class="alert-action">AI清仓建议</span>
+    </div>
+  </div>
+
+  <div class="content-grid">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">库存明细</span>
+        <button class="card-action">导出</button>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>商品</th><th class="text-right">当前库存</th><th class="text-right">安全库存</th><th class="text-right">日均销量</th><th class="text-right">可售天数</th><th>状态</th></tr></thead>
+        <tbody>
+          <tr><td><strong>水润面膜 5片装</strong></td><td class="mono text-right">420</td><td class="mono text-right">800</td><td class="mono text-right">52</td><td class="mono text-right" style="color:var(--red)">8</td><td><span class="status-tag red">紧急</span></td></tr>
+          <tr><td><strong>防晒霜 SPF50</strong></td><td class="mono text-right">680</td><td class="mono text-right">600</td><td class="mono text-right">35</td><td class="mono text-right" style="color:var(--orange)">19</td><td><span class="status-tag orange">关注</span></td></tr>
+          <tr><td><strong>玻尿酸精华液</strong></td><td class="mono text-right">860</td><td class="mono text-right">500</td><td class="mono text-right">38</td><td class="mono text-right">23</td><td><span class="status-tag green">正常</span></td></tr>
+          <tr><td><strong>氨基酸洁面乳</strong></td><td class="mono text-right">1,240</td><td class="mono text-right">600</td><td class="mono text-right">45</td><td class="mono text-right">28</td><td><span class="status-tag green">正常</span></td></tr>
+          <tr><td><strong>烟酰胺套装</strong></td><td class="mono text-right">500</td><td class="mono text-right">300</td><td class="mono text-right">18</td><td class="mono text-right">28</td><td><span class="status-tag green">正常</span></td></tr>
+          <tr><td><strong>卸妆水 300ml</strong></td><td class="mono text-right" style="color:var(--orange)">620</td><td class="mono text-right">200</td><td class="mono text-right">3</td><td class="mono text-right">207</td><td><span class="status-tag orange">滞销</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card ai-panel">
+      <div class="card-header"><span class="card-title">AI 库存助手</span></div>
+      <div class="ai-messages" id="aiMsg-inventory">
+        <div class="msg ai">库存健康度：<strong style="color:var(--orange)">一般</strong><br><br>
+        - 1款紧急缺货（面膜）<br>- 1款即将缺货（防晒）<br>- 1款严重滞销（卸妆水）<br><br>
+        建议：<br>1. 面膜立即补货1,200件（含清明活动备量）<br>2. 防晒霜4月中旬前补货800件（进入旺季）<br>3. 卸妆水建议9折清仓或作为满赠赠品消化<br><br>
+        <span class="action-btn">一键生成补货计划</span></div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" placeholder="如：面膜补多少合适..." onkeydown="if(event.key==='Enter')sendMsg(this)">
+        <button class="ai-send" onclick="sendMsg(this.previousElementSibling)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW: MARKETING ==================== -->
+<section class="view-content" data-view="marketing">
+  <div class="section-title">营销活动 <span class="badge-count">2</span></div>
+
+  <div class="btn-row">
+    <button class="filter-btn active">全部</button>
+    <button class="filter-btn">进行中 (1)</button>
+    <button class="filter-btn">筹备中 (1)</button>
+    <button class="filter-btn">已结束 (8)</button>
+    <div style="flex:1"></div>
+    <button class="filter-btn" style="background:var(--accent);color:#FFF;border-color:var(--accent)">+ 创建活动</button>
+  </div>
+
+  <div class="content-grid">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">4月活动日历</span>
+        <button class="card-action">月视图</button>
+      </div>
+      <div style="padding:16px">
+        <div class="calendar-grid">
+          <div class="cal-header">一</div><div class="cal-header">二</div><div class="cal-header">三</div><div class="cal-header">四</div><div class="cal-header">五</div><div class="cal-header">六</div><div class="cal-header">日</div>
+          <div class="cal-day other-month"><span class="day-num">31</span></div>
+          <div class="cal-day"><span class="day-num">1</span></div>
+          <div class="cal-day today"><span class="day-num">2</span><div class="cal-event campaign">今日运营</div></div>
+          <div class="cal-day"><span class="day-num">3</span><div class="cal-event promo">清明活动开始</div></div>
+          <div class="cal-day"><span class="day-num">4</span><div class="cal-event promo">清明·大促</div></div>
+          <div class="cal-day"><span class="day-num">5</span><div class="cal-event promo">清明·大促</div></div>
+          <div class="cal-day"><span class="day-num">6</span></div>
+          <div class="cal-day"><span class="day-num">7</span><div class="cal-event promo">清明活动结束</div></div>
+          <div class="cal-day"><span class="day-num">8</span><div class="cal-event campaign">活动复盘</div></div>
+          <div class="cal-day"><span class="day-num">9</span></div>
+          <div class="cal-day"><span class="day-num">10</span></div>
+          <div class="cal-day"><span class="day-num">11</span></div>
+          <div class="cal-day"><span class="day-num">12</span></div>
+          <div class="cal-day"><span class="day-num">13</span></div>
+          <div class="cal-day"><span class="day-num">14</span></div>
+          <div class="cal-day"><span class="day-num">15</span><div class="cal-event launch">新品首发</div></div>
+          <div class="cal-day"><span class="day-num">16</span></div>
+          <div class="cal-day"><span class="day-num">17</span></div>
+          <div class="cal-day"><span class="day-num">18</span><div class="cal-event campaign">会员日</div></div>
+          <div class="cal-day"><span class="day-num">19</span></div>
+          <div class="cal-day"><span class="day-num">20</span></div>
+          <div class="cal-day"><span class="day-num">21</span></div>
+          <div class="cal-day"><span class="day-num">22</span></div>
+          <div class="cal-day"><span class="day-num">23</span></div>
+          <div class="cal-day"><span class="day-num">24</span></div>
+          <div class="cal-day"><span class="day-num">25</span></div>
+          <div class="cal-day"><span class="day-num">26</span></div>
+          <div class="cal-day"><span class="day-num">27</span></div>
+          <div class="cal-day"><span class="day-num">28</span></div>
+          <div class="cal-day"><span class="day-num">29</span></div>
+          <div class="cal-day"><span class="day-num">30</span></div>
+          <div class="cal-day other-month"><span class="day-num">1</span></div>
+          <div class="cal-day other-month"><span class="day-num">2</span></div>
+          <div class="cal-day other-month"><span class="day-num">3</span></div>
+          <div class="cal-day other-month"><span class="day-num">4</span></div>
+        </div>
+      </div>
+
+      <div style="padding:0 16px 16px">
+        <table class="data-table">
+          <thead><tr><th>活动</th><th>时间</th><th>渠道</th><th class="text-right">预算</th><th class="text-right">目标GMV</th><th>状态</th></tr></thead>
+          <tbody>
+            <tr><td><strong>清明护肤季</strong></td><td class="mono">4/3-4/7</td><td>全渠道</td><td class="mono text-right">¥65,000</td><td class="mono text-right">¥475,000</td><td><span class="status-tag orange">筹备中</span></td></tr>
+            <tr><td><strong>防晒季·早鸟价</strong></td><td class="mono">4/1-4/15</td><td>抖店/天猫</td><td class="mono text-right">¥30,000</td><td class="mono text-right">¥180,000</td><td><span class="status-tag green">进行中</span></td></tr>
+            <tr><td><strong>3月会员回馈</strong></td><td class="mono">3/25-3/31</td><td>小程序</td><td class="mono text-right">¥8,000</td><td class="mono text-right">¥52,000</td><td><span class="status-tag gray">已结束</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card ai-panel">
+      <div class="card-header"><span class="card-title">AI 营销助手</span></div>
+      <div class="ai-messages" id="aiMsg-marketing">
+        <div class="msg ai">4月有 <strong>3个活动节点</strong>：<br><br>
+        1. <strong>清明护肤季</strong>(4/3-7) — 筹备中，需确认库存和素材<br>
+        2. <strong>新品首发</strong>(4/15) — 烟酰胺套装全渠道上线<br>
+        3. <strong>会员日</strong>(4/18) — 老客复购专场<br><br>
+        历史数据显示，去年清明活动ROI 4.2，今年建议目标ROI 3.8（考虑竞争加剧）。<br><br>需要我帮你细化哪个活动方案？</div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" placeholder="如：清明活动的优惠券方案..." onkeydown="if(event.key==='Enter')sendMsg(this)">
+        <button class="ai-send" onclick="sendMsg(this.previousElementSibling)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW: ADS ==================== -->
+<section class="view-content" data-view="ads">
+  <div class="section-title">投放管理</div>
+  <div class="btn-row">
+    <button class="filter-btn active">全部平台</button>
+    <button class="filter-btn">千川</button>
+    <button class="filter-btn">直通车</button>
+    <button class="filter-btn">引力魔方</button>
+    <button class="filter-btn">小红书聚光</button>
+  </div>
+
+  <div class="kpi-row" style="grid-template-columns:repeat(5,1fr);margin-bottom:20px">
+    <div class="kpi-card">
+      <div class="kpi-label">今日总消耗</div>
+      <div class="kpi-value">¥23,820</div>
+      <div class="kpi-change down">-3.2% 较昨日</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label" data-simple="回本倍数" data-pro="综合ROAS">综合 ROAS</div>
+      <div class="kpi-value">3.2</div>
+      <div class="kpi-change up">+0.4 较昨日</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">点击率</div>
+      <div class="kpi-value">4.6%</div>
+      <div class="kpi-change up">+0.2pp</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label" data-simple="每次点击花多少" data-pro="CPC">CPC</div>
+      <div class="kpi-value">¥1.82</div>
+      <div class="kpi-change up" style="color:var(--green)">-¥0.08</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">投放中计划</div>
+      <div class="kpi-value">24</div>
+      <div class="kpi-sub">学习中 6 | 衰退 3</div>
+    </div>
+  </div>
+
+  <div class="content-grid">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">投放计划列表</span>
+        <button class="card-action">+ 新建计划</button>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>计划名称</th><th>平台</th><th>状态</th><th class="text-right">消耗</th><th class="text-right" data-simple="回本" data-pro="ROAS">ROAS</th><th class="text-right">点击率</th><th class="text-right">转化率</th></tr></thead>
+        <tbody>
+          <tr><td><strong>面膜-清明预热-女性25-35</strong></td><td>千川</td><td><span class="status-tag green">投放中</span></td><td class="mono text-right">¥4,200</td><td class="mono text-right" style="color:var(--green)">3.8</td><td class="mono text-right">5.2%</td><td class="mono text-right">3.1%</td></tr>
+          <tr><td><strong>防晒霜-户外场景-达人素材</strong></td><td>千川</td><td><span class="status-tag green">投放中</span></td><td class="mono text-right">¥3,600</td><td class="mono text-right" style="color:var(--green)">4.2</td><td class="mono text-right">6.1%</td><td class="mono text-right">2.8%</td></tr>
+          <tr><td><strong>精华液-成分党-搜索词</strong></td><td>直通车</td><td><span class="status-tag green">投放中</span></td><td class="mono text-right">¥2,800</td><td class="mono text-right" style="color:var(--green)">4.5</td><td class="mono text-right">3.8%</td><td class="mono text-right">4.2%</td></tr>
+          <tr><td><strong>洁面-引流-低价测试</strong></td><td>千川</td><td><span class="status-tag blue">学习中</span></td><td class="mono text-right">¥1,200</td><td class="mono text-right" style="color:var(--orange)">1.4</td><td class="mono text-right">3.2%</td><td class="mono text-right">1.5%</td></tr>
+          <tr><td><strong>套装-高客单-猜你喜欢</strong></td><td>引力魔方</td><td><span class="status-tag orange">衰退</span></td><td class="mono text-right">¥980</td><td class="mono text-right" style="color:var(--red)">0.8</td><td class="mono text-right">1.8%</td><td class="mono text-right">0.6%</td></tr>
+          <tr><td><strong>面膜-种草笔记-KOC</strong></td><td>小红书</td><td><span class="status-tag green">投放中</span></td><td class="mono text-right">¥2,300</td><td class="mono text-right" style="color:var(--green)">3.7</td><td class="mono text-right">7.2%</td><td class="mono text-right">2.4%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card ai-panel">
+      <div class="card-header"><span class="card-title">AI 投放助手</span></div>
+      <div class="ai-messages" id="aiMsg-ads">
+        <div class="msg ai">投放健康度：<strong style="color:var(--green)">良好</strong><br><br>
+        <strong>需要关注：</strong><br>
+        1. "套装-猜你喜欢" ROAS仅0.8，已亏损¥176，<strong>建议立即暂停</strong><br>
+        2. "洁面-引流"仍在学习期，ROAS 1.4，再观察24小时<br>
+        3. "防晒-达人素材"表现最好(ROAS 4.2)，建议追加预算至¥6,000/天<br><br>
+        <span class="action-btn">暂停亏损计划</span><span class="action-btn secondary">追加预算</span></div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" placeholder="如：ROAS低于2的计划有哪些..." onkeydown="if(event.key==='Enter')sendMsg(this)">
+        <button class="ai-send" onclick="sendMsg(this.previousElementSibling)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW: DATA ==================== -->
+<section class="view-content" data-view="data">
+  <div class="section-title">数据看板</div>
+
+  <!-- Funnel -->
+  <div class="content-grid">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title" data-simple="用户怎么一步步下单的" data-pro="转化漏斗分析">转化漏斗分析</span>
+        <button class="card-action">近7天</button>
+      </div>
+      <div style="padding:20px">
+        <div class="funnel-bar-wrap">
+          <div class="funnel-label"><span>曝光</span><span>186,400</span></div>
+          <div class="funnel-bar"><div class="funnel-fill" style="width:100%"></div></div>
+        </div>
+        <div class="funnel-bar-wrap">
+          <div class="funnel-label"><span>点击</span><span>28,600</span></div>
+          <div class="funnel-bar"><div class="funnel-fill" style="width:15.3%"></div></div>
+          <div class="funnel-rate">点击率 15.3%</div>
+        </div>
+        <div class="funnel-bar-wrap">
+          <div class="funnel-label"><span>加购</span><span>4,820</span></div>
+          <div class="funnel-bar"><div class="funnel-fill" style="width:2.6%"></div></div>
+          <div class="funnel-rate">加购率 16.9%</div>
+        </div>
+        <div class="funnel-bar-wrap">
+          <div class="funnel-label"><span>下单</span><span>2,184</span></div>
+          <div class="funnel-bar"><div class="funnel-fill" style="width:1.2%"></div></div>
+          <div class="funnel-rate">下单率 45.3%</div>
+        </div>
+        <div class="funnel-bar-wrap">
+          <div class="funnel-label"><span>支付</span><span>1,890</span></div>
+          <div class="funnel-bar"><div class="funnel-fill" style="width:1.01%"></div></div>
+          <div class="funnel-rate">支付率 86.5%</div>
+        </div>
+      </div>
+    </div>
+    <div class="card ai-panel">
+      <div class="card-header"><span class="card-title">AI 数据分析师</span></div>
+      <div class="ai-messages" id="aiMsg-data">
+        <div class="msg ai">数据洞察：<br><br>
+        <strong>漏斗瓶颈：</strong>加购→下单 转化率 45.3%，低于行业均值 52%。<br>
+        <strong>原因分析：</strong>客单价¥264偏高，满减门槛¥199可能导致凑单困难。<br>
+        <strong>建议：</strong>增加¥149档位满减或推出小规格试用装降低决策门槛。<br><br>
+        <strong>亮点：</strong>小红书点击率7.2%远超其他渠道(均值4.6%)，种草内容质量高。<br><br>
+        需要我深入分析哪个环节？</div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" placeholder="如：为什么转化率下降了..." onkeydown="if(event.key==='Enter')sendMsg(this)">
+        <button class="ai-send" onclick="sendMsg(this.previousElementSibling)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Channel trend table -->
+  <div class="card content-full">
+    <div class="card-header">
+      <span class="card-title">渠道趋势 · 近7天</span>
+      <button class="card-action">查看详细报表</button>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>渠道</th><th class="text-right">GMV</th><th class="text-right">环比</th><th class="text-right">UV</th><th class="text-right">转化率</th><th class="text-right">客单价</th><th class="text-right">新客占比</th><th class="text-right">退货率</th></tr></thead>
+      <tbody>
+        <tr><td><strong>抖店</strong></td><td class="mono text-right">¥253,400</td><td class="text-right"><span style="color:var(--green)">+15.2%</span></td><td class="mono text-right">42,800</td><td class="mono text-right">2.9%</td><td class="mono text-right">¥255</td><td class="mono text-right">68%</td><td class="mono text-right" style="color:var(--orange)">12.3%</td></tr>
+        <tr><td><strong>天猫</strong></td><td class="mono text-right">¥200,200</td><td class="text-right"><span style="color:var(--red)">-3.1%</span></td><td class="mono text-right">28,600</td><td class="mono text-right">4.2%</td><td class="mono text-right">¥292</td><td class="mono text-right">42%</td><td class="mono text-right">5.8%</td></tr>
+        <tr><td><strong>小红书</strong></td><td class="mono text-right">¥58,800</td><td class="text-right"><span style="color:var(--green)">+22.8%</span></td><td class="mono text-right">12,400</td><td class="mono text-right">3.6%</td><td class="mono text-right">¥263</td><td class="mono text-right">75%</td><td class="mono text-right">7.2%</td></tr>
+        <tr><td><strong>美团</strong></td><td class="mono text-right">¥33,600</td><td class="text-right"><span style="color:var(--green)">+8.3%</span></td><td class="mono text-right">8,200</td><td class="mono text-right">5.1%</td><td class="mono text-right">¥218</td><td class="mono text-right">55%</td><td class="mono text-right">3.2%</td></tr>
+        <tr><td><strong>小程序</strong></td><td class="mono text-right">¥30,800</td><td class="text-right"><span style="color:var(--green)">+5.6%</span></td><td class="mono text-right">3,800</td><td class="mono text-right">8.2%</td><td class="mono text-right">¥244</td><td class="mono text-right">15%</td><td class="mono text-right">2.1%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ==================== VIEW: REVIEWS ==================== -->
+<section class="view-content" data-view="reviews">
+  <div class="section-title">评价管理 <span class="badge-count">8</span></div>
+  <div class="btn-row">
+    <button class="filter-btn active">待回复 (8)</button>
+    <button class="filter-btn">差评 (12)</button>
+    <button class="filter-btn">中评 (28)</button>
+    <button class="filter-btn">好评 (2,460)</button>
+  </div>
+
+  <div class="content-grid">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">差评预警</span>
+        <span style="font-size:12px;color:var(--text-muted)">近7天差评集中在"眼霜滋润度"</span>
+      </div>
+      <div style="padding:12px 16px">
+        <div style="padding:12px 0;border-bottom:1px solid var(--divider)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:13px;font-weight:500">用户 小*花</span>
+            <span style="font-size:11px;color:var(--text-muted)">天猫 · 2小时前</span>
+          </div>
+          <div style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:8px">时皙保湿眼霜一点都不滋润，用了一周眼周还是很干，和宣传的完全不一样。差评！</div>
+          <div style="font-size:12px;color:var(--blue);background:#EEF1FE;padding:8px 12px;border-radius:6px;line-height:1.5">
+            <strong>AI建议回复：</strong>亲，非常抱歉给您带来了不好的体验。眼霜建议配合我们的精华液使用效果更佳，已为您安排精华液小样寄出。如需退换货请随时联系客服，祝您生活愉快~
+            <div style="margin-top:6px"><span class="action-btn" style="font-size:11px;padding:3px 10px">采纳并发送</span><span class="action-btn secondary" style="font-size:11px;padding:3px 10px">修改后发送</span></div>
+          </div>
+        </div>
+        <div style="padding:12px 0;border-bottom:1px solid var(--divider)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:13px;font-weight:500">用户 A**9</span>
+            <span style="font-size:11px;color:var(--text-muted)">抖店 · 5小时前</span>
+          </div>
+          <div style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:8px">面膜敷上有点刺痛，不知道是不是过敏，不敢再用了。</div>
+          <div style="font-size:12px;color:var(--blue);background:#EEF1FE;padding:8px 12px;border-radius:6px;line-height:1.5">
+            <strong>AI建议回复：</strong>亲，第一次使用时轻微刺痛可能是肌肤缺水的表现，但如果持续不适请立即停用。已为您申请全额退款，同时赠送一份温和系列试用装。您的肌肤健康最重要~
+            <div style="margin-top:6px"><span class="action-btn" style="font-size:11px;padding:3px 10px">采纳并发送</span><span class="action-btn secondary" style="font-size:11px;padding:3px 10px">修改后发送</span></div>
+          </div>
+        </div>
+        <div style="padding:12px 0">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:13px;font-weight:500">用户 嘟*嘟</span>
+            <span style="font-size:11px;color:var(--text-muted)">小红书 · 昨天</span>
+          </div>
+          <div style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:8px">防晒霜质地太油了，涂完脸上泛白严重，拔草了。</div>
+          <div style="font-size:12px;color:var(--blue);background:#EEF1FE;padding:8px 12px;border-radius:6px;line-height:1.5">
+            <strong>AI建议回复：</strong>感谢您的反馈！防晒霜建议少量多次涂抹，搭配妆前乳效果更自然。我们正在研发清爽版配方，后续会为您寄送新品试用~
+            <div style="margin-top:6px"><span class="action-btn" style="font-size:11px;padding:3px 10px">采纳并发送</span><span class="action-btn secondary" style="font-size:11px;padding:3px 10px">修改后发送</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card ai-panel">
+      <div class="card-header"><span class="card-title">AI 评价分析</span></div>
+      <div class="ai-messages" id="aiMsg-reviews">
+        <div class="msg ai">近7天评价概况：<br><br>
+        好评率 <strong>96.2%</strong>（行业均值94.8%）<br>
+        新增差评 <strong>8条</strong><br><br>
+        <strong>差评聚类分析：</strong><br>
+        1. 眼霜"滋润度不够" — 4条（50%）<br>
+        2. 面膜"轻微刺痛" — 2条（25%）<br>
+        3. 防晒"泛白/油腻" — 2条（25%）<br><br>
+        <strong>建议：</strong>眼霜差评集中，考虑优化配方或调整宣传话术，避免"深度滋润"等过度承诺。<br><br>
+        <span class="action-btn">批量回复全部差评</span></div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" placeholder="如：分析眼霜差评的共性..." onkeydown="if(event.key==='Enter')sendMsg(this)">
+        <button class="ai-send" onclick="sendMsg(this.previousElementSibling)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW: CUSTOMERS ==================== -->
+<section class="view-content" data-view="customers">
+  <div class="section-title">客户分析</div>
+
+  <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi-card">
+      <div class="kpi-label">累计客户</div>
+      <div class="kpi-value">14,680</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label" data-simple="多少人会回来买" data-pro="复购率">复购率</div>
+      <div class="kpi-value">32.4%</div>
+      <div class="kpi-change up">+2.1pp 较上月</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label" data-simple="平均多久买一次" data-pro="平均复购周期">平均复购周期</div>
+      <div class="kpi-value">42天</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label" data-simple="每个客户值多少钱" data-pro="客户LTV">客户 LTV</div>
+      <div class="kpi-value">¥486</div>
+    </div>
+  </div>
+
+  <div class="content-grid">
+    <div>
+      <div class="section-title" data-simple="客户分类" data-pro="RFM 客户分群">RFM 客户分群</div>
+      <div class="rfm-grid">
+        <div class="rfm-card" style="border-left:3px solid var(--green)">
+          <div class="rfm-count">2,340</div>
+          <div class="rfm-label">重要价值客户</div>
+          <div class="rfm-pct">16.0%</div>
+        </div>
+        <div class="rfm-card" style="border-left:3px solid var(--blue)">
+          <div class="rfm-count">3,860</div>
+          <div class="rfm-label">重要发展客户</div>
+          <div class="rfm-pct">26.3%</div>
+        </div>
+        <div class="rfm-card" style="border-left:3px solid var(--orange)">
+          <div class="rfm-count">4,120</div>
+          <div class="rfm-label">重要保持客户</div>
+          <div class="rfm-pct">28.1%</div>
+        </div>
+        <div class="rfm-card" style="border-left:3px solid var(--red)">
+          <div class="rfm-count">4,360</div>
+          <div class="rfm-label">重要挽留客户</div>
+          <div class="rfm-pct">29.6%</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title" data-simple="快要流失的客户" data-pro="流失预警客户">流失预警客户</span>
+          <button class="card-action">导出名单</button>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>客户</th><th>渠道</th><th class="text-right">累计消费</th><th class="text-right">上次购买</th><th>常购商品</th><th>建议</th></tr></thead>
+          <tbody>
+            <tr><td>王*丽</td><td>天猫</td><td class="mono text-right">¥1,860</td><td class="mono text-right">68天前</td><td>面膜+精华</td><td><span class="status-tag red">发优惠券</span></td></tr>
+            <tr><td>李*</td><td>抖店</td><td class="mono text-right">¥920</td><td class="mono text-right">55天前</td><td>洁面+面膜</td><td><span class="status-tag orange">短信提醒</span></td></tr>
+            <tr><td>陈*琪</td><td>小程序</td><td class="mono text-right">¥2,480</td><td class="mono text-right">72天前</td><td>套装</td><td><span class="status-tag red">专属折扣</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card ai-panel">
+      <div class="card-header"><span class="card-title">AI 客户助手</span></div>
+      <div class="ai-messages" id="aiMsg-customers">
+        <div class="msg ai">客户健康度：<strong style="color:var(--orange)">需关注</strong><br><br>
+        <strong>152位客户</strong>面膜即将用完（上次购买30-45天），复购率可达48%。<br>
+        <strong>86位客户</strong>超过60天未回购，有流失风险。<br><br>
+        建议：<br>1. 给152位面膜到期客户推送复购提醒+满199减30券<br>2. 给86位流失风险客户发送专属8折优惠券<br>3. 陈*琪(LTV ¥2,480)建议客服1v1回访<br><br>
+        <span class="action-btn">批量发送复购提醒</span><span class="action-btn secondary">导出客户名单</span></div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" placeholder="如：哪些老客快流失了..." onkeydown="if(event.key==='Enter')sendMsg(this)">
+        <button class="ai-send" onclick="sendMsg(this.previousElementSibling)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW: COMPETITORS ==================== -->
+<section class="view-content" data-view="competitors">
+  <div class="section-title">竞品监控</div>
+
+  <div class="alert-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+    <div class="alert-card danger">
+      <div class="alert-type">价格异动</div>
+      <div class="alert-msg">花西子同款精华降价15%至¥169</div>
+      <span class="alert-action">AI分析影响</span>
+    </div>
+    <div class="alert-card warn">
+      <div class="alert-type">新品上市</div>
+      <div class="alert-msg">珀莱雅上线"双抗精华3.0"，主打抗氧化</div>
+      <span class="alert-action">查看详情</span>
+    </div>
+    <div class="alert-card info">
+      <div class="alert-type">营销动作</div>
+      <div class="alert-msg">薇诺娜天猫旗舰店开启"清明敏感修护季"</div>
+      <span class="alert-action">查看活动</span>
+    </div>
+  </div>
+
+  <div class="content-grid">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">竞品价格追踪</span>
+        <button class="card-action">+ 添加竞品</button>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>竞品</th><th>对标商品</th><th class="text-right">竞品价</th><th class="text-right">我们价</th><th class="text-right">价差</th><th class="text-right">竞品月销</th><th>趋势</th></tr></thead>
+        <tbody>
+          <tr><td><strong>花西子</strong></td><td>玉养精华液 30ml</td><td class="mono text-right" style="color:var(--red)">¥169</td><td class="mono text-right">¥198</td><td class="mono text-right" style="color:var(--red)">-¥29</td><td class="mono text-right">8,200</td><td><span style="color:var(--green)">+32%</span></td></tr>
+          <tr><td><strong>珀莱雅</strong></td><td>双抗精华3.0 30ml</td><td class="mono text-right">¥249</td><td class="mono text-right">¥198</td><td class="mono text-right" style="color:var(--green)">+¥51</td><td class="mono text-right">12,400</td><td><span style="color:var(--green)">+18%</span></td></tr>
+          <tr><td><strong>薇诺娜</strong></td><td>舒敏面膜 5片</td><td class="mono text-right">¥128</td><td class="mono text-right">¥119</td><td class="mono text-right" style="color:var(--green)">+¥9</td><td class="mono text-right">15,800</td><td><span style="color:var(--orange)">-2%</span></td></tr>
+          <tr><td><strong>HBN</strong></td><td>视黄醇面霜 50g</td><td class="mono text-right">¥239</td><td class="mono text-right">—</td><td class="mono text-right">—</td><td class="mono text-right">6,300</td><td><span style="color:var(--green)">+45%</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card ai-panel">
+      <div class="card-header"><span class="card-title">AI 竞品分析</span></div>
+      <div class="ai-messages" id="aiMsg-competitors">
+        <div class="msg ai"><strong>花西子精华降价影响分析：</strong><br><br>
+        花西子精华¥169 vs 我们¥198，价差¥29(15%)。<br><br>
+        <strong>预估影响：</strong><br>
+        - 天猫搜索分流：精华液搜索排名可能下降2-3位<br>
+        - 预计分流GMV：¥3,000-5,000/天<br><br>
+        <strong>应对建议：</strong><br>
+        1. <strong>不建议跟价</strong>——我们精华毛利率71%，降至¥169仍有利润但品牌形象受损<br>
+        2. 建议增加赠品（送面膜小样，实际成本¥8）<br>
+        3. 主打"玻尿酸+烟酰胺双效"差异化，加强成分科普内容<br>
+        4. 千川定向花西子粉丝人群包，截流转化<br><br>
+        <span class="action-btn">创建截流计划</span><span class="action-btn secondary">查看更多分析</span></div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" placeholder="如：珀莱雅新品对我们有什么影响..." onkeydown="if(event.key==='Enter')sendMsg(this)">
+        <button class="ai-send" onclick="sendMsg(this.previousElementSibling)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ========== FOOTER ========== -->
+<footer class="footer">
+  <span class="status-dot"></span>
+  <span>系统正常运行</span>
+  <span style="color:var(--divider)">|</span>
+  <span>数据更新：2 分钟前</span>
+  <span style="color:var(--divider)">|</span>
+  <span>AI 对话引擎：百炼 Qwen3-Max</span>
+  <span style="flex:1"></span>
+  <span>时皙 AI 工作站 v3.3</span>
+</footer>
+
+<!-- ========== ONBOARDING MODAL ========== -->
+<div class="modal-overlay" id="onboarding">
+  <div class="modal">
+    <div class="modal-body">
+      <div class="modal-step active" data-step="1">
+        <div class="modal-title">欢迎使用运营工作台</div>
+        <div class="modal-desc">时皙AI工作站帮你用对话完成所有运营操作。3步快速上手：</div>
+        <ul class="modal-features">
+          <li><div class="feature-icon">1</div><div><strong>概览看全局</strong><br>打开就看到今日数据、待办任务、异常预警，一目了然</div></li>
+          <li><div class="feature-icon">2</div><div><strong>AI帮你干活</strong><br>问AI"帮我策划活动""分析差评""生成补货单"，它会给出方案和操作按钮</div></li>
+          <li><div class="feature-icon">3</div><div><strong>多平台统一</strong><br>抖店、天猫、小红书、美团、小程序——所有数据都在这里</div></li>
+        </ul>
+      </div>
+      <div class="modal-step" data-step="2">
+        <div class="modal-title">认识你的AI运营助手</div>
+        <div class="modal-desc">每个页面右侧都有AI助手，它能帮你：</div>
+        <ul class="modal-features">
+          <li><div class="feature-icon">Q</div><div><strong>查数据</strong><br>"今天各渠道GMV多少" "上周退货率是多少"</div></li>
+          <li><div class="feature-icon">P</div><div><strong>做方案</strong><br>"帮我策划清明促销" "给新品写个标题"</div></li>
+          <li><div class="feature-icon">A</div><div><strong>给建议</strong><br>"哪些商品该淘汰" "千川预算怎么分配"</div></li>
+          <li><div class="feature-icon">D</div><div><strong>执行操作</strong><br>AI建议后点"确认"按钮即可执行，省去手动操作</div></li>
+        </ul>
+      </div>
+      <div class="modal-step" data-step="3">
+        <div class="modal-title">小白模式 & 专业模式</div>
+        <div class="modal-desc">右上角可随时切换模式：</div>
+        <ul class="modal-features">
+          <li><div class="feature-icon">S</div><div><strong>小白模式</strong><br>专业术语会被翻译成通俗语言。ROAS→"广告回本倍数"，UV→"访客数"</div></li>
+          <li><div class="feature-icon">P</div><div><strong>专业模式</strong><br>显示完整的专业指标和术语，适合有经验的运营人员</div></li>
+        </ul>
+        <div style="margin-top:16px;padding:12px 16px;background:var(--input-bg);border-radius:8px;font-size:13px;color:var(--text-secondary);line-height:1.6">
+          提示：你可以随时在右上角切换模式，不用担心选错。
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <div class="modal-dots" id="modalDots">
+        <div class="dot active"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+      <div>
+        <button class="modal-btn skip" onclick="closeOnboarding()">跳过</button>
+        <button class="modal-btn" id="modalNext" onclick="nextStep()">下一步</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SCRIPTS ========== -->
+<script>
+// ===== View switching =====
+function switchView(viewName) {
+  document.querySelectorAll('.view-content').forEach(function(v) { v.classList.remove('active'); });
+  var target = document.querySelector('.view-content[data-view="' + viewName + '"]');
+  if (target) target.classList.add('active');
+  document.querySelectorAll('.nav-item[data-view]').forEach(function(n) { n.classList.remove('active'); });
+  var navItem = document.querySelector('.nav-item[data-view="' + viewName + '"]');
+  if (navItem) navItem.classList.add('active');
+}
+
+document.querySelectorAll('.nav-item[data-view]').forEach(function(item) {
+  item.addEventListener('click', function() {
+    switchView(item.getAttribute('data-view'));
+  });
+});
+
+// ===== Channel filter =====
+function setChannel(btn) {
+  btn.parentElement.querySelectorAll('.channel-tab').forEach(function(t) { t.classList.remove('active'); });
+  btn.classList.add('active');
+}
+
+// ===== Time range =====
+function setTimeRange(btn) {
+  btn.parentElement.querySelectorAll('.time-btn').forEach(function(t) { t.classList.remove('active'); });
+  btn.classList.add('active');
+}
+
+// ===== Mode toggle =====
+var isSimpleMode = false;
+function toggleMode() {
+  isSimpleMode = !isSimpleMode;
+  var toggle = document.getElementById('modeToggle');
+  var labelSimple = document.getElementById('labelSimple');
+  var labelPro = document.getElementById('labelPro');
+  if (isSimpleMode) {
+    toggle.classList.add('simple');
+    labelSimple.classList.add('active');
+    labelPro.classList.remove('active');
+  } else {
+    toggle.classList.remove('simple');
+    labelSimple.classList.remove('active');
+    labelPro.classList.add('active');
+  }
+  // Apply simple/pro labels
+  document.querySelectorAll('[data-simple]').forEach(function(el) {
+    if (isSimpleMode) {
+      if (!el._originalText) el._originalText = el.textContent;
+      el.textContent = el.getAttribute('data-simple');
+    } else {
+      if (el._originalText) el.textContent = el._originalText;
+      else if (el.getAttribute('data-pro')) el.textContent = el.getAttribute('data-pro');
+    }
+  });
+}
+
+// ===== Todo toggle =====
+function toggleTodo(el) {
+  el.classList.toggle('done');
+  var check = el.querySelector('.todo-check');
+  check.classList.toggle('checked');
+}
+
+// ===== AI send message =====
+function sendMsg(inputEl) {
+  var text = inputEl.value.trim();
+  if (!text) return;
+  var container = inputEl.closest('.card, section').querySelector('.ai-messages');
+  if (!container) return;
+  var msg = document.createElement('div');
+  msg.className = 'msg user';
+  msg.textContent = text;
+  msg.style.animation = 'fadeInUp .3s ease';
+  container.appendChild(msg);
+  inputEl.value = '';
+  container.scrollTop = container.scrollHeight;
+  // Simulate AI response
+  setTimeout(function() {
+    var aiMsg = document.createElement('div');
+    aiMsg.className = 'msg ai';
+    aiMsg.style.animation = 'fadeInUp .3s ease';
+    aiMsg.textContent = '正在分析数据，请稍候...';
+    container.appendChild(aiMsg);
+    container.scrollTop = container.scrollHeight;
+  }, 600);
+}
+
+// ===== Onboarding modal =====
+var currentStep = 1;
+var totalSteps = 3;
+
+function nextStep() {
+  if (currentStep >= totalSteps) {
+    closeOnboarding();
+    return;
+  }
+  document.querySelector('.modal-step[data-step="' + currentStep + '"]').classList.remove('active');
+  currentStep++;
+  document.querySelector('.modal-step[data-step="' + currentStep + '"]').classList.add('active');
+  updateDots();
+  if (currentStep === totalSteps) {
+    document.getElementById('modalNext').textContent = '开始使用';
+  }
+}
+
+function updateDots() {
+  var dots = document.querySelectorAll('#modalDots .dot');
+  dots.forEach(function(d, i) {
+    d.classList.toggle('active', i === currentStep - 1);
+  });
+}
+
+function closeOnboarding() {
+  document.getElementById('onboarding').classList.add('hidden');
+  localStorage.setItem('ops_onboarded', '1');
+}
+
+// Auto-show onboarding
+if (localStorage.getItem('ops_onboarded')) {
+  document.getElementById('onboarding').classList.add('hidden');
+}
+
+// ===== Notification panel (placeholder) =====
+function toggleNotifications() {
+  alert('通知面板：4条异常预警、2条售后升级、1条系统更新');
+}
+
+// ===== Filter buttons =====
+document.querySelectorAll('.btn-row').forEach(function(row) {
+  row.querySelectorAll('.filter-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (btn.textContent.startsWith('+') || btn.textContent === '导出') return;
+      row.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+    });
+  });
+});
+</script>
+
+</body>
+</html>

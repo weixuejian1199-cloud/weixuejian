@@ -1,0 +1,1589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI小皙管理 - 时皙 AI 工作站</title>
+<style>
+  :root {
+    --text-primary: #1A1A1A;
+    --text-secondary: #666666;
+    --text-muted: #999999;
+    --bg: #FFFFFF;
+    --sidebar-bg: #F9F9F9;
+    --sidebar-border: #F0F0F0;
+    --divider: #F0F0F0;
+    --input-border: #E8E8E8;
+    --input-bg: #F5F5F5;
+    --hover-bg: #F3F3F3;
+    --accent: #1A1A1A;
+    --green: #00B42A;
+    --red: #E53835;
+    --orange: #FF7D00;
+    --font: -apple-system, 'SF Pro Display', 'PingFang SC', 'Helvetica Neue', sans-serif;
+    --font-mono: 'SF Mono', 'Roboto Mono', monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--font); color: var(--text-primary); background: var(--bg); height: 100vh; display: flex; flex-direction: column; overflow: hidden; min-width: 1024px; }
+
+  /* ===== Global Header 52px ===== */
+  .header { position: fixed; top: 0; left: 0; right: 0; height: 52px; background: var(--bg); border-bottom: 1px solid var(--divider); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; z-index: 100; }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .logo { width: 32px; height: 32px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 16px; }
+  .header-title { font-size: 15px; font-weight: 600; }
+  .header-back-cc { margin-left: 16px; font-size: 13px; font-weight: 500; color: var(--text-secondary); text-decoration: none; white-space: nowrap; }
+  .header-back-cc:hover { color: var(--text-primary); }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .notification-btn { position: relative; width: 36px; height: 36px; border-radius: 8px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .notification-btn:hover { background: var(--hover-bg); }
+  .notification-dot { position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; background: var(--red); border-radius: 50%; }
+  .user-area { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 8px; cursor: pointer; }
+  .user-area:hover { background: var(--hover-bg); }
+  .user-avatar-h { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; }
+  .user-role-tag { font-size: 11px; color: var(--text-muted); background: var(--input-bg); padding: 2px 8px; border-radius: 4px; }
+
+  /* Mode toggle */
+  .mode-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer; user-select: none; }
+  .mode-toggle .toggle-track { width: 36px; height: 20px; border-radius: 10px; background: var(--input-border); position: relative; transition: background 0.2s; }
+  .mode-toggle .toggle-track.active { background: var(--accent); }
+  .mode-toggle .toggle-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; position: absolute; top: 2px; left: 2px; transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+  .mode-toggle .toggle-track.active .toggle-thumb { left: 18px; }
+
+  /* ===== Layout ===== */
+  .layout { display: flex; flex: 1; overflow: hidden; margin-top: 52px; }
+
+  /* ===== Sidebar ===== */
+  .sidebar {
+    width: 240px; min-width: 240px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--divider);
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+    padding: 12px 0;
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+  .sidebar-section { padding: 0 12px; margin-bottom: 4px; }
+  .sidebar-label { font-size: 11px; font-weight: 600; color: var(--text-muted); padding: 8px 8px 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .sidebar-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; margin: 1px 0;
+    border-radius: 8px; cursor: pointer;
+    font-size: 14px; color: var(--text-secondary);
+    position: relative; transition: all 0.15s;
+  }
+  .sidebar-item:hover { background: #F0F0F0; color: var(--text-primary); }
+  .sidebar-item.active {
+    background: #FFF; color: var(--text-primary); font-weight: 500;
+    border-left: 2px solid var(--accent);
+    margin-left: -2px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .sidebar-item svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-muted); }
+  .sidebar-item.active svg { color: var(--text-primary); }
+  .sidebar-badge {
+    margin-left: auto; font-size: 11px; font-weight: 600;
+    background: var(--accent); color: #fff;
+    padding: 1px 7px; border-radius: 10px; min-width: 20px; text-align: center;
+  }
+  .sidebar-badge.orange { background: var(--orange); }
+  .sidebar-badge.red { background: var(--red); }
+  .sidebar-divider { height: 1px; background: var(--divider); margin: 8px 16px; }
+
+  .sidebar-chat-item {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 8px 12px; margin: 1px 0;
+    border-radius: 8px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .sidebar-chat-item:hover { background: #F0F0F0; }
+  .sidebar-chat-item .chat-title { font-size: 13px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sidebar-chat-item .chat-time { font-size: 11px; color: var(--text-muted); }
+  .sidebar-item.hidden-in-simple { display: flex; }
+  body.simple-mode .sidebar-item.hidden-in-simple { display: none; }
+
+  /* ===== Main ===== */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Unified top bar: AI小皙 + stats + user controls in one 44px row */
+  .top-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--divider);
+    height: 44px; min-height: 44px;
+    background: var(--bg);
+  }
+  .top-left { display: flex; align-items: center; gap: 8px; }
+  .bot-icon {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: var(--accent); display: flex; align-items: center; justify-content: center;
+  }
+  .bot-icon svg { width: 16px; height: 16px; }
+  .top-name { font-size: 14px; font-weight: 600; }
+  .status-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; color: var(--green);
+    background: rgba(0,180,42,0.06);
+    padding: 2px 8px; border-radius: 10px;
+  }
+  .status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); }
+  .top-center { display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center; }
+  .top-center .sb-item { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+  .top-center .sb-val { font-weight: 700; color: var(--text-primary); font-family: var(--font-mono); }
+  .top-center .sb-up { color: var(--green); font-size: 10px; }
+  .top-center .sb-sep { color: var(--divider); margin: 0 2px; }
+  .top-right { display: flex; align-items: center; gap: 10px; }
+  .top-right .mode-toggle { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-secondary); cursor: pointer; user-select: none; }
+  .top-right .toggle-track { width: 32px; height: 18px; border-radius: 9px; background: var(--input-border); position: relative; transition: background 0.2s; }
+  .top-right .toggle-track.active { background: var(--accent); }
+  .top-right .toggle-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; position: absolute; top: 2px; left: 2px; transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+  .top-right .toggle-track.active .toggle-thumb { left: 16px; }
+  .top-right .bell { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; }
+  .top-right .bell:hover { background: var(--input-bg); }
+  .top-right .bell .dot { position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; background: var(--red); border-radius: 50%; }
+  .top-right .avatar { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; cursor: pointer; }
+  .top-right .role-tag { font-size: 10px; color: var(--text-muted); background: var(--input-bg); padding: 1px 6px; border-radius: 3px; }
+
+  /* ===== View Panels ===== */
+  .view-panel { display: none; flex: 1; overflow-y: auto; flex-direction: column; }
+  .view-panel.active { display: flex; }
+  .view-panel::-webkit-scrollbar { width: 6px; }
+  .view-panel::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+
+  /* ===== Stats Cards ===== */
+  .stats-grid {
+    display: grid; gap: 12px; padding: 16px 24px;
+    grid-template-columns: repeat(4, 1fr);
+  }
+  /* Compact inline stats bar for chat view — no big cards blocking conversation */
+  .stats-bar {
+    display: flex; align-items: center; gap: 6px; padding: 8px 24px;
+    border-bottom: 1px solid var(--divider); flex-wrap: wrap;
+    background: var(--sidebar-bg);
+  }
+  .stats-bar .sb-item {
+    display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-secondary);
+    padding: 3px 10px; border-radius: 6px; background: var(--bg); border: 1px solid var(--divider);
+    white-space: nowrap;
+  }
+  .stats-bar .sb-val { font-weight: 700; color: var(--text-primary); font-family: var(--font-mono); }
+  .stats-bar .sb-up { color: var(--green); font-size: 10px; }
+  .stats-bar .sb-down { color: var(--red); font-size: 10px; }
+  .stat-card {
+    background: var(--sidebar-bg); border: 1px solid var(--divider);
+    border-radius: 10px; padding: 14px 16px;
+  }
+  .stat-card .label { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+  .stat-card .value { font-size: 22px; font-weight: 700; font-family: var(--font-mono); }
+  .stat-card .change { font-size: 11px; margin-top: 4px; }
+  .stat-card .change.up { color: var(--green); }
+  .stat-card .change.down { color: var(--red); }
+  .stat-card .change.neutral { color: var(--text-muted); }
+
+  /* ===== Chat area (View 1) ===== */
+  .chat-area {
+    flex: 1; overflow-y: auto; padding: 24px 40px;
+    display: flex; flex-direction: column; gap: 8px;
+    max-width: 820px; margin: 0 auto; width: 100%;
+  }
+  .chat-area::-webkit-scrollbar { width: 6px; }
+  .chat-area::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+
+  .system-msg { text-align: center; font-size: 12px; color: var(--text-muted); padding: 8px 0; }
+
+  .msg { display: flex; gap: 10px; padding: 0; width: 100%; }
+  .msg.user { flex-direction: row-reverse; }
+
+  .msg-avatar {
+    width: 28px; height: 28px; min-width: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 2px;
+  }
+  .msg.bot .msg-avatar { background: #333; }
+  .msg.bot .msg-avatar svg { width: 16px; height: 16px; }
+  .msg.user .msg-avatar { display: none; }
+
+  .msg-bubble {
+    padding: 12px 16px;
+    border-radius: 14px;
+    font-size: 14px; line-height: 1.65;
+    max-width: 85%;
+  }
+  .msg.user .msg-bubble {
+    background: var(--accent); color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .msg.bot .msg-bubble {
+    background: var(--input-bg);
+    color: var(--text-primary);
+    border-bottom-left-radius: 4px;
+  }
+
+  .msg-bubble blockquote {
+    margin: 8px 0;
+    padding: 8px 14px;
+    border-left: 3px solid #ccc;
+    background: rgba(0,0,0,0.03);
+    border-radius: 0 6px 6px 0;
+    font-size: 13px; color: var(--text-secondary);
+  }
+  .msg.bot .msg-bubble blockquote { background: rgba(255,255,255,0.7); }
+
+  .msg-bubble ul, .msg-bubble ol { margin: 6px 0 6px 18px; }
+  .msg-bubble li { margin: 3px 0; }
+
+  .msg-bubble .data-table {
+    width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px;
+  }
+  .msg-bubble .data-table th {
+    text-align: left; padding: 8px 12px;
+    border-bottom: 2px solid var(--divider);
+    font-weight: 600; color: var(--text-secondary); font-size: 12px;
+  }
+  .msg-bubble .data-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--divider);
+  }
+  .msg-bubble .data-table tr:hover td { background: rgba(0,0,0,0.02); }
+
+  .msg-bubble .suggest { margin-top: 10px; }
+  .msg-bubble .suggest span {
+    display: inline-block; margin: 3px 4px 3px 0;
+    padding: 4px 12px; border-radius: 14px;
+    background: rgba(0,0,0,0.05); font-size: 12px;
+    color: var(--text-secondary); cursor: pointer;
+    transition: all 0.15s;
+  }
+  .msg-bubble .suggest span:hover { background: rgba(0,0,0,0.1); color: var(--text-primary); }
+
+  .msg-bubble .change-record {
+    margin: 8px 0; padding: 8px 14px;
+    background: rgba(0,0,0,0.03); border-radius: 8px;
+    font-size: 13px; color: var(--text-secondary); line-height: 1.8;
+  }
+  .msg.bot .msg-bubble .change-record { background: rgba(255,255,255,0.7); }
+
+  .msg-bubble .tip {
+    margin-top: 10px; padding: 8px 14px;
+    background: rgba(0,0,0,0.03); border-radius: 8px;
+    font-size: 13px; color: var(--text-secondary);
+  }
+  .msg.bot .msg-bubble .tip { background: rgba(255,255,255,0.7); }
+
+  .source-tag {
+    display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 4px; margin-left: 4px; font-weight: 500; vertical-align: middle;
+  }
+  .source-tag.kb { background: rgba(0,180,42,0.1); color: var(--green); }
+  .source-tag.tool { background: rgba(26,26,26,0.08); color: var(--text-secondary); }
+  .source-tag.ai { background: rgba(255,125,0,0.1); color: var(--orange); }
+
+  /* Input area */
+  .input-area {
+    padding: 12px 24px 16px;
+    border-top: 1px solid var(--divider);
+  }
+  .input-wrap {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 22px;
+    padding: 6px 6px 6px 14px;
+    transition: border-color 0.2s;
+  }
+  .input-wrap:focus-within { border-color: #bbb; }
+  .input-wrap input {
+    flex: 1; border: none; outline: none; background: transparent;
+    font-size: 14px; font-family: var(--font); color: var(--text-primary);
+    padding: 6px 0;
+  }
+  .input-wrap input::placeholder { color: var(--text-muted); }
+  .btn-attach, .btn-send {
+    width: 34px; height: 34px; min-width: 34px;
+    border-radius: 50%; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .btn-attach { background: transparent; }
+  .btn-attach:hover { background: #e8e8e8; }
+  .btn-attach svg { width: 18px; height: 18px; color: var(--text-muted); }
+  .btn-send { background: var(--accent); }
+  .btn-send:hover { opacity: 0.85; }
+  .btn-send svg { width: 16px; height: 16px; }
+
+  /* ===== View 2: Knowledge Base ===== */
+  .kb-layout { display: flex; flex: 1; overflow: hidden; }
+  .kb-tree { width: 220px; min-width: 220px; border-right: 1px solid var(--divider); padding: 16px; overflow-y: auto; }
+  .kb-tree::-webkit-scrollbar { width: 4px; }
+  .kb-tree::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+  .kb-tree-title { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+  .kb-cat { padding: 7px 10px; font-size: 13px; color: var(--text-secondary); border-radius: 6px; cursor: pointer; margin-bottom: 2px; display: flex; align-items: center; gap: 8px; transition: all 0.15s; }
+  .kb-cat:hover { background: var(--input-bg); color: var(--text-primary); }
+  .kb-cat.active { background: var(--accent); color: #fff; }
+  .kb-cat .count { margin-left: auto; font-size: 11px; font-family: var(--font-mono); }
+  .kb-cat.active .count { color: rgba(255,255,255,0.7); }
+  .kb-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .kb-toolbar { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-bottom: 1px solid var(--divider); }
+  .kb-toolbar .search-box { flex: 1; padding: 7px 12px; border: 1px solid var(--input-border); border-radius: 8px; font-size: 13px; outline: none; font-family: var(--font); background: var(--input-bg); }
+  .kb-toolbar .search-box:focus { border-color: #bbb; }
+  .kb-btn { padding: 7px 14px; border-radius: 8px; border: 1px solid var(--input-border); background: var(--bg); font-size: 13px; cursor: pointer; font-family: var(--font); transition: all 0.15s; }
+  .kb-btn:hover { border-color: var(--accent); }
+  .kb-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .kb-btn.primary:hover { opacity: 0.85; }
+
+  .kb-table-wrap { flex: 1; overflow-y: auto; padding: 0 20px 16px; }
+  .kb-table-wrap::-webkit-scrollbar { width: 6px; }
+  .kb-table-wrap::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+  .kb-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .kb-table th { text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--divider); font-weight: 600; color: var(--text-muted); font-size: 12px; position: sticky; top: 0; background: var(--bg); }
+  .kb-table td { padding: 10px 12px; border-bottom: 1px solid var(--divider); }
+  .kb-table tr:hover td { background: rgba(0,0,0,0.015); }
+  .kb-table .mono { font-family: var(--font-mono); }
+  .kb-status { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+  .kb-status.active { background: rgba(0,180,42,0.08); color: var(--green); }
+  .kb-status.draft { background: rgba(255,125,0,0.08); color: var(--orange); }
+  .kb-status.disabled { background: var(--input-bg); color: var(--text-muted); }
+
+  .kb-gap { margin: 0 20px 16px; padding: 16px; border: 1px dashed var(--input-border); border-radius: 10px; }
+  .kb-gap-title { font-size: 13px; font-weight: 600; margin-bottom: 10px; color: var(--red); display: flex; align-items: center; gap: 6px; }
+  .kb-gap-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--divider); font-size: 13px; }
+  .kb-gap-item:last-child { border-bottom: none; }
+  .kb-gap-item .q { color: var(--text-primary); flex: 1; }
+  .kb-gap-item .freq { font-family: var(--font-mono); color: var(--text-muted); font-size: 12px; margin: 0 16px; }
+  .kb-gap-item .add-btn { font-size: 12px; color: var(--accent); cursor: pointer; text-decoration: underline; }
+
+  /* ===== View 3: Rules ===== */
+  .rules-content { padding: 24px; overflow-y: auto; flex: 1; }
+  .rules-content::-webkit-scrollbar { width: 6px; }
+  .rules-content::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+  .rules-section { margin-bottom: 32px; }
+  .rules-section-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .rules-section-title .section-badge { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 4px; background: var(--input-bg); color: var(--text-muted); }
+
+  /* Flow rules */
+  .flow-rules { display: flex; flex-direction: column; gap: 0; position: relative; }
+  .flow-rule { display: flex; align-items: stretch; gap: 16px; position: relative; }
+  .flow-line { width: 32px; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+  .flow-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); box-shadow: 0 0 0 2px var(--accent); flex-shrink: 0; margin-top: 16px; }
+  .flow-connector { width: 2px; flex: 1; background: var(--divider); }
+  .flow-rule:last-child .flow-connector { display: none; }
+  .flow-card {
+    flex: 1; padding: 14px 18px; margin-bottom: 8px;
+    background: var(--sidebar-bg); border: 1px solid var(--divider);
+    border-radius: 10px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .flow-card .rule-label { font-size: 12px; color: var(--text-muted); }
+  .flow-card .rule-text { font-size: 14px; font-weight: 500; margin-top: 4px; }
+  .flow-card .rule-action { font-size: 13px; padding: 4px 12px; border-radius: 6px; white-space: nowrap; }
+  .flow-card .rule-action.guide { background: rgba(0,180,42,0.08); color: var(--green); }
+  .flow-card .rule-action.warn { background: rgba(255,125,0,0.08); color: var(--orange); }
+  .flow-card .rule-action.block { background: rgba(229,56,53,0.08); color: var(--red); }
+  .flow-card .rule-action.escalate { background: rgba(26,26,26,0.06); color: var(--text-secondary); }
+
+  /* Emotion panel */
+  .emotion-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .emotion-card { background: var(--sidebar-bg); border: 1px solid var(--divider); border-radius: 10px; padding: 16px; }
+  .emotion-card-title { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+  .word-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .word-tag { padding: 4px 10px; border-radius: 14px; font-size: 12px; background: var(--input-bg); color: var(--text-secondary); }
+  .word-tag.negative { background: rgba(229,56,53,0.06); color: var(--red); }
+  .word-tag.escalate { background: rgba(255,125,0,0.06); color: var(--orange); }
+
+  .slider-group { margin-top: 12px; }
+  .slider-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+  .slider-track { width: 100%; height: 6px; background: var(--divider); border-radius: 3px; position: relative; }
+  .slider-fill { height: 100%; border-radius: 3px; background: var(--accent); }
+  .slider-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); box-shadow: 0 1px 3px rgba(0,0,0,0.2); position: absolute; top: -4px; cursor: pointer; }
+
+  /* Gate switches */
+  .gate-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .gate-card { background: var(--sidebar-bg); border: 1px solid var(--divider); border-radius: 10px; padding: 16px; }
+  .gate-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .gate-title { font-size: 13px; font-weight: 600; }
+  .gate-switch { width: 40px; height: 22px; border-radius: 11px; background: var(--green); position: relative; cursor: pointer; }
+  .gate-switch.off { background: var(--input-border); }
+  .gate-switch-dot { width: 18px; height: 18px; border-radius: 50%; background: #fff; position: absolute; top: 2px; right: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.15); transition: all 0.2s; }
+  .gate-switch.off .gate-switch-dot { right: auto; left: 2px; }
+  .gate-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+  .gate-threshold { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .gate-threshold label { color: var(--text-muted); }
+  .gate-threshold .val { font-family: var(--font-mono); font-weight: 600; padding: 3px 8px; background: var(--input-bg); border-radius: 4px; }
+
+  /* Progress bar */
+  .phase-progress { background: var(--sidebar-bg); border: 1px solid var(--divider); border-radius: 10px; padding: 20px; }
+  .phase-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .phase-title { font-size: 14px; font-weight: 600; }
+  .phase-pct { font-family: var(--font-mono); font-size: 18px; font-weight: 700; }
+  .phase-bar { height: 8px; background: var(--divider); border-radius: 4px; margin-bottom: 16px; overflow: hidden; }
+  .phase-bar-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.3s; }
+  .phase-conditions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .phase-cond { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 6px 0; }
+  .phase-cond .check { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+  .phase-cond .check.done { background: var(--green); color: #fff; }
+  .phase-cond .check.pending { background: var(--input-bg); color: var(--text-muted); border: 1px solid var(--input-border); }
+
+  /* ===== View 4: Analytics ===== */
+  .analytics-content { padding: 24px; overflow-y: auto; flex: 1; }
+  .analytics-content::-webkit-scrollbar { width: 6px; }
+  .analytics-content::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+  .analytics-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .time-filter { display: flex; gap: 4px; }
+  .time-btn { padding: 5px 14px; border-radius: 6px; border: 1px solid var(--input-border); background: var(--bg); font-size: 12px; cursor: pointer; font-family: var(--font); transition: all 0.15s; }
+  .time-btn:hover { border-color: var(--accent); }
+  .time-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .chart-card { background: var(--sidebar-bg); border: 1px solid var(--divider); border-radius: 10px; padding: 20px; }
+  .chart-title { font-size: 13px; font-weight: 600; margin-bottom: 16px; }
+
+  /* CSS line chart */
+  .line-chart { height: 160px; display: flex; align-items: flex-end; gap: 0; padding: 0 0 24px 40px; position: relative; }
+  .line-chart-y { position: absolute; left: 0; top: 0; bottom: 24px; width: 36px; display: flex; flex-direction: column; justify-content: space-between; }
+  .line-chart-y span { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); text-align: right; }
+  .line-chart-bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; position: relative; }
+  .line-chart-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); position: relative; z-index: 2; }
+  .line-chart-bar .bar-line { width: 2px; background: var(--accent); position: absolute; bottom: 0; }
+  .line-chart-bar .x-label { position: absolute; bottom: -20px; font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); }
+  .line-chart-grid { position: absolute; left: 40px; right: 0; top: 0; bottom: 24px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+  .line-chart-grid .grid-line { height: 1px; background: var(--divider); }
+
+  /* Distribution list */
+  .dist-list { }
+  .dist-item { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
+  .dist-item .d-label { font-size: 13px; width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dist-item .d-bar { flex: 1; height: 6px; background: var(--divider); border-radius: 3px; overflow: hidden; }
+  .dist-item .d-bar-fill { height: 100%; border-radius: 3px; background: var(--accent); }
+  .dist-item .d-val { font-size: 12px; font-family: var(--font-mono); color: var(--text-muted); width: 40px; text-align: right; }
+
+  /* Histogram */
+  .histogram { height: 140px; display: flex; align-items: flex-end; gap: 4px; padding: 0 0 24px 0; position: relative; }
+  .hist-bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; position: relative; }
+  .hist-bar .bar { width: 80%; border-radius: 3px 3px 0 0; background: var(--accent); transition: height 0.3s; }
+  .hist-bar .bar-label { position: absolute; bottom: -20px; font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); white-space: nowrap; }
+  .hist-bar .bar-val { font-size: 10px; font-family: var(--font-mono); color: var(--text-secondary); margin-bottom: 4px; }
+
+  .insight-card {
+    background: var(--sidebar-bg); border: 1px solid var(--divider); border-radius: 10px; padding: 16px 20px;
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .insight-icon { width: 32px; height: 32px; border-radius: 8px; background: rgba(255,125,0,0.08); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .insight-text { font-size: 13px; line-height: 1.6; }
+  .insight-text strong { font-weight: 600; }
+
+  /* ===== View 5: Training ===== */
+  .training-content { padding: 24px; overflow-y: auto; flex: 1; }
+  .training-content::-webkit-scrollbar { width: 6px; }
+  .training-content::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+  .training-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .training-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .training-table th { text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--divider); font-weight: 600; color: var(--text-muted); font-size: 12px; }
+  .training-table td { padding: 10px 12px; border-bottom: 1px solid var(--divider); vertical-align: top; }
+  .training-table tr:hover td { background: rgba(0,0,0,0.015); }
+  .learn-status { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+  .learn-status.learned { background: rgba(0,180,42,0.08); color: var(--green); }
+  .learn-status.pending { background: rgba(255,125,0,0.08); color: var(--orange); }
+  .learn-status.ignored { background: var(--input-bg); color: var(--text-muted); }
+
+  /* ===== AI Float Button ===== */
+  .ai-float-btn {
+    position: fixed; bottom: 52px; right: 24px; width: 48px; height: 48px;
+    border-radius: 50%; background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 50; transition: all 0.2s;
+  }
+  .ai-float-btn:hover { transform: scale(1.08); box-shadow: 0 6px 16px rgba(0,0,0,0.2); }
+  .ai-float-btn svg { width: 22px; height: 22px; }
+
+  .ai-float-panel {
+    position: fixed; bottom: 108px; right: 24px; width: 380px; height: 420px;
+    background: var(--bg); border: 1px solid var(--divider); border-radius: 14px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12); z-index: 50;
+    display: none; flex-direction: column; overflow: hidden;
+  }
+  .ai-float-panel.open { display: flex; }
+  .ai-float-panel .fp-header { padding: 14px 16px; border-bottom: 1px solid var(--divider); display: flex; align-items: center; justify-content: space-between; }
+  .ai-float-panel .fp-title { font-size: 14px; font-weight: 600; }
+  .ai-float-panel .fp-close { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .ai-float-panel .fp-close:hover { background: var(--input-bg); }
+  .ai-float-panel .fp-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .ai-float-panel .fp-body::-webkit-scrollbar { width: 4px; }
+  .ai-float-panel .fp-body::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+  .ai-float-panel .fp-input { padding: 12px; border-top: 1px solid var(--divider); }
+  .ai-float-panel .fp-input-wrap { display: flex; gap: 8px; }
+  .ai-float-panel .fp-input input { flex: 1; padding: 8px 12px; border: 1px solid var(--input-border); border-radius: 18px; font-size: 13px; outline: none; font-family: var(--font); background: var(--input-bg); }
+  .ai-float-panel .fp-input input:focus { border-color: #bbb; }
+  .ai-float-panel .fp-send { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .fp-msg { font-size: 13px; line-height: 1.5; padding: 8px 12px; border-radius: 10px; max-width: 90%; }
+  .fp-msg.bot { background: var(--input-bg); align-self: flex-start; }
+  .fp-msg.user { background: var(--accent); color: #fff; align-self: flex-end; }
+
+  /* ===== Onboarding Modal ===== */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 100; display: flex; align-items: center; justify-content: center; }
+  .modal-overlay.hidden { display: none; }
+  .modal-box { background: var(--bg); border-radius: 16px; padding: 32px; max-width: 480px; width: 90%; box-shadow: 0 16px 48px rgba(0,0,0,0.15); }
+  .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .modal-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 20px; }
+  .modal-features { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px; }
+  .modal-feature { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 8px 12px; background: var(--sidebar-bg); border-radius: 8px; }
+  .modal-feature .mf-icon { width: 28px; height: 28px; border-radius: 6px; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal-btn { padding: 8px 20px; border-radius: 8px; font-size: 14px; font-family: var(--font); cursor: pointer; border: 1px solid var(--input-border); background: var(--bg); transition: all 0.15s; }
+  .modal-btn:hover { border-color: var(--accent); }
+  .modal-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .modal-btn.primary:hover { opacity: 0.85; }
+</style>
+</head>
+<body>
+
+<!-- ===== Onboarding Modal ===== -->
+<div class="modal-overlay" id="onboardingModal">
+  <div class="modal-box">
+    <div class="modal-title">欢迎使用 AI小皙管理中心</div>
+    <div class="modal-desc">这里可以管理你的AI客服机器人小皙。你可以通过对话方式配置机器人，也可以直接操作各个功能面板。</div>
+    <div class="modal-features">
+      <div class="modal-feature">
+        <div class="mf-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        对话管理
+      </div>
+      <div class="modal-feature">
+        <div class="mf-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        </div>
+        知识库管理
+      </div>
+      <div class="modal-feature">
+        <div class="mf-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </div>
+        规则配置
+      </div>
+      <div class="modal-feature">
+        <div class="mf-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        数据分析
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn" onclick="document.getElementById('onboardingModal').classList.add('hidden')">跳过</button>
+      <button class="modal-btn primary" onclick="document.getElementById('onboardingModal').classList.add('hidden')">开始使用</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Global Header ===== -->
+<header class="header">
+  <div class="header-left">
+    <div class="logo">S</div>
+    <span class="header-title">时皙 AI 工作站</span>
+    <a class="header-back-cc" href="v3-02-super-admin.html">返回指挥中心</a>
+    <!-- 模块切换导航已移除：岗位无权限跨模块 -->
+  </div>
+  <div class="header-right">
+    <div class="mode-toggle" id="modeToggle" onclick="toggleMode()">
+      <span id="modeLabel">专业模式</span>
+      <div class="toggle-track active" id="toggleTrack"><div class="toggle-thumb"></div></div>
+    </div>
+    <button class="notification-btn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="notification-dot"></span>
+    </button>
+    <div class="user-area" onclick="if(confirm('确认退出登录？'))window.location.href='v3-01-login.html'" title="退出登录">
+      <div class="user-avatar-h">张</div>
+      <span class="user-role-tag">客服</span>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- ===== Sidebar ===== -->
+  <aside class="sidebar">
+    <!-- 创始人·作战台入口（侧栏第一项语义，与工具中心一致）：仅 super_admin 可见 -->
+    <div class="sidebar-section" data-role-required="super_admin" style="display:none">
+      <a class="sidebar-item" href="v3-02-super-admin.html" style="text-decoration:none;color:inherit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        AI 今日看板
+        <span class="sidebar-badge red">3</span>
+      </a>
+    </div>
+    <div class="sidebar-divider" data-role-required="super_admin" style="display:none"></div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">AI小皙</div>
+      <div class="sidebar-item active" data-view="chat" onclick="switchView('chat', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        对话管理
+        <span class="sidebar-badge">3</span>
+      </div>
+      <div class="sidebar-item" data-view="knowledge" onclick="switchView('knowledge', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        知识库管理
+      </div>
+      <div class="sidebar-item hidden-in-simple" data-view="rules" onclick="switchView('rules', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        规则配置
+      </div>
+      <div class="sidebar-item" data-view="analytics" onclick="switchView('analytics', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        数据分析
+      </div>
+      <div class="sidebar-item hidden-in-simple" data-view="training" onclick="switchView('training', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        训练记录
+        <span class="sidebar-badge orange">5</span>
+      </div>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Chats</div>
+      <div class="sidebar-chat-item" style="background:#FFF;" onclick="chatClick(this)">
+        <span class="chat-title">修改小皙欢迎语</span>
+        <span class="chat-time">20分钟前</span>
+      </div>
+      <div class="sidebar-chat-item" onclick="chatClick(this)">
+        <span class="chat-title">配置退货规则</span>
+        <span class="chat-time">昨天</span>
+      </div>
+      <div class="sidebar-chat-item" onclick="chatClick(this)">
+        <span class="chat-title">查看小皙对话记录</span>
+        <span class="chat-time">3天前</span>
+      </div>
+      <div class="sidebar-chat-item" onclick="chatClick(this)">
+        <span class="chat-title">过敏投诉处理方案</span>
+        <span class="chat-time">3天前</span>
+      </div>
+      <div class="sidebar-chat-item" onclick="chatClick(this)">
+        <span class="chat-title">成分咨询话术优化</span>
+        <span class="chat-time">上周</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== Main ===== -->
+  <main class="main">
+    <!-- Unified top bar: AI小皙 + stats + controls — single 44px row -->
+    <div class="top-bar">
+      <div class="top-left">
+        <div class="bot-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M8 8h0"/><path d="M16 8h0"/><rect x="7" y="14" width="10" height="7" rx="2"/><path d="M9 14v-1"/><path d="M15 14v-1"/></svg>
+        </div>
+        <span class="top-name">AI小皙</span>
+        <span class="status-tag"><span class="status-dot"></span>运行中</span>
+      </div>
+      <div class="top-center">
+        <span class="sb-item">对话 <span class="sb-val">128</span> <span class="sb-up">↑12%</span></span>
+        <span class="sb-sep">·</span>
+        <span class="sb-item">解决率 <span class="sb-val">94.5%</span></span>
+        <span class="sb-sep">·</span>
+        <span class="sb-item">转人工 <span class="sb-val">5.5%</span></span>
+        <span class="sb-sep">·</span>
+        <span class="sb-item">响应 <span class="sb-val">0.8s</span></span>
+        <span class="sb-sep">·</span>
+        <span class="sb-item">好评 <span class="sb-val">96.2%</span></span>
+        <span class="sb-sep">·</span>
+        <span class="sb-item">覆盖 <span class="sb-val">87.3%</span></span>
+        <span class="sb-sep">·</span>
+        <span class="sb-item">活跃 <span class="sb-val">6</span></span>
+      </div>
+      <!-- 用户控件已上移至全局 header -->
+    </div>
+
+    <!-- ===== View 1: Chat Management ===== -->
+    <div class="view-panel active" id="view-chat">
+
+      <!-- Chat area -->
+      <div class="chat-area" id="chatArea">
+        <div class="system-msg">AI小皙管理助手 -- 通过对话配置和管理你的AI客服</div>
+
+        <!-- Conversation 1: skincare ingredient query -->
+        <div class="msg user">
+          <div class="msg-bubble">查看今天护肤品成分咨询的数据</div>
+        </div>
+        <div class="msg bot">
+          <div class="msg-avatar"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M8 8h0"/><path d="M16 8h0"/><rect x="7" y="14" width="10" height="7" rx="2"/><path d="M9 14v-1"/><path d="M15 14v-1"/></svg></div>
+          <div class="msg-bubble">
+            今日成分咨询数据如下 <span class="source-tag tool">工具返回</span>
+            <table class="data-table">
+              <thead><tr><th>成分类型</th><th>咨询量</th><th>AI解决</th><th>满意度</th></tr></thead>
+              <tbody>
+                <tr><td>烟酰胺功效</td><td style="font-family:var(--font-mono)">23</td><td style="font-family:var(--font-mono)">22</td><td style="font-family:var(--font-mono);color:var(--green)">97%</td></tr>
+                <tr><td>玻尿酸浓度</td><td style="font-family:var(--font-mono)">18</td><td style="font-family:var(--font-mono)">17</td><td style="font-family:var(--font-mono);color:var(--green)">95%</td></tr>
+                <tr><td>视黄醇使用方法</td><td style="font-family:var(--font-mono)">15</td><td style="font-family:var(--font-mono)">14</td><td style="font-family:var(--font-mono);color:var(--green)">93%</td></tr>
+                <tr><td>孕期安全成分</td><td style="font-family:var(--font-mono)">12</td><td style="font-family:var(--font-mono)">10</td><td style="font-family:var(--font-mono);color:var(--orange)">83%</td></tr>
+                <tr><td>过敏原查询</td><td style="font-family:var(--font-mono)">8</td><td style="font-family:var(--font-mono)">6</td><td style="font-family:var(--font-mono);color:var(--orange)">75%</td></tr>
+              </tbody>
+            </table>
+            <div class="tip">「孕期安全成分」和「过敏原查询」的AI解决率偏低，建议补充知识库中的成分禁忌数据。</div>
+            <div class="suggest">
+              <span onclick="sendSuggest(this)">补充孕期禁用成分清单</span>
+              <span onclick="sendSuggest(this)">查看过敏原咨询详情</span>
+              <span onclick="sendSuggest(this)">导出成分咨询报告</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Conversation 2: return rule modification -->
+        <div class="msg user">
+          <div class="msg-bubble">修改退货自动审批规则，7天内无理由退要改成15天</div>
+        </div>
+        <div class="msg bot">
+          <div class="msg-avatar"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M8 8h0"/><path d="M16 8h0"/><rect x="7" y="14" width="10" height="7" rx="2"/><path d="M9 14v-1"/><path d="M15 14v-1"/></svg></div>
+          <div class="msg-bubble">
+            收到，我来修改退货审批规则 <span class="source-tag ai">AI生成</span>
+            <div class="change-record">
+              变更预览：<br>
+              规则2: 收货后退货窗口<br>
+              当前值: <strong style="text-decoration:line-through;color:var(--red)">7天</strong> -> 新值: <strong style="color:var(--green)">15天</strong><br>
+              影响范围: 所有未完成订单<br>
+              预估影响: 日均退货量可能增加 ~8%
+            </div>
+            <br>此变更需要<strong>主管审批</strong>后生效（涉及退货政策核心参数）。确认提交审批吗？
+            <div class="suggest">
+              <span onclick="sendSuggest(this)">确认提交审批</span>
+              <span onclick="sendSuggest(this)">查看当前所有退货规则</span>
+              <span onclick="sendSuggest(this)">取消修改</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Conversation 3: allergy complaints -->
+        <div class="msg user">
+          <div class="msg-bubble">最近有没有过敏投诉？处理情况怎么样？</div>
+        </div>
+        <div class="msg bot">
+          <div class="msg-avatar"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M8 8h0"/><path d="M16 8h0"/><rect x="7" y="14" width="10" height="7" rx="2"/><path d="M9 14v-1"/><path d="M15 14v-1"/></svg></div>
+          <div class="msg-bubble">
+            本周过敏相关投诉汇总 <span class="source-tag kb">知识库</span><span class="source-tag tool">工具返回</span>
+            <table class="data-table">
+              <thead><tr><th>客户</th><th>商品</th><th>症状</th><th>处理</th><th>状态</th></tr></thead>
+              <tbody>
+                <tr><td>王**</td><td>水光精华液</td><td>面部泛红</td><td>全额退款+赠品补偿</td><td style="color:var(--green)">已关闭</td></tr>
+                <tr><td>李**</td><td>烟酰胺面霜</td><td>轻微刺痛</td><td>退货处理中</td><td style="color:var(--orange)">处理中</td></tr>
+                <tr><td>陈**</td><td>视黄醇精华</td><td>局部脱皮</td><td>AI建议停用+转人工</td><td style="color:var(--orange)">跟进中</td></tr>
+              </tbody>
+            </table>
+            <div class="tip">本周共3例过敏投诉（较上周持平）。视黄醇精华的投诉已是第2次，建议在商品页增加「首次使用建议局部测试」的提醒。所有过敏投诉均触发了自动升级到人工客服的规则。</div>
+            <div class="suggest">
+              <span onclick="sendSuggest(this)">查看过敏投诉趋势</span>
+              <span onclick="sendSuggest(this)">修改过敏自动升级阈值</span>
+              <span onclick="sendSuggest(this)">添加视黄醇使用提醒</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Conversation 4: emotion detection config -->
+        <div class="msg user">
+          <div class="msg-bubble">小皙的情绪检测灵敏度怎么调？最近有客户说态度不好但小皙没识别出来</div>
+        </div>
+        <div class="msg bot">
+          <div class="msg-avatar"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M8 8h0"/><path d="M16 8h0"/><rect x="7" y="14" width="10" height="7" rx="2"/><path d="M9 14v-1"/><path d="M15 14v-1"/></svg></div>
+          <div class="msg-bubble">
+            当前情绪检测配置如下 <span class="source-tag tool">工具返回</span>
+            <ul>
+              <li>灵敏度: <strong>中等</strong>（阈值 0.65）</li>
+              <li>负面词表: 已配置 48 个关键词</li>
+              <li>情绪升级触发: 连续2条负面消息</li>
+              <li>本周漏检: <strong style="color:var(--red)">3次</strong>（客户表达不满但未触发升级）</li>
+            </ul>
+            漏检案例分析：
+            <ul>
+              <li>「你们这个质量也太差了吧」-- 未命中（缺少「质量差」词条）</li>
+              <li>「算了算了不想说了」-- 未命中（消极放弃型情绪，词表缺失）</li>
+              <li>「我要投诉！」-- 已命中但连续判定未达标</li>
+            </ul>
+            <br>建议将灵敏度调高到<strong>高</strong>（阈值 0.50），并补充 12 个消极放弃型词条。需要我调整吗？
+            <div class="suggest">
+              <span onclick="sendSuggest(this)">调高灵敏度到 0.50</span>
+              <span onclick="sendSuggest(this)">补充消极放弃型词条</span>
+              <span onclick="sendSuggest(this)">查看情绪检测详细报告</span>
+              <span onclick="sendSuggest(this)">去规则配置面板调整</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input area -->
+      <div class="input-area">
+        <div class="input-wrap">
+          <button class="btn-attach" title="上传知识库文档">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <input type="text" id="msgInput" placeholder="管理小皙..." autocomplete="off">
+          <button class="btn-send" id="btnSend" title="发送">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== View 2: Knowledge Base ===== -->
+    <div class="view-panel" id="view-knowledge">
+      <div class="stats-grid" style="grid-template-columns: repeat(4,1fr);">
+        <div class="stat-card">
+          <div class="label">总条目数</div>
+          <div class="value">342</div>
+          <div class="change neutral">6个品类</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">本周命中率</div>
+          <div class="value">87.3%</div>
+          <div class="change up">+2.1%</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">待补充问题</div>
+          <div class="value">18</div>
+          <div class="change down">+5 本周新增</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">知识覆盖率</div>
+          <div class="value">87.3%</div>
+          <div class="change neutral">目标 95%</div>
+        </div>
+      </div>
+      <div class="kb-layout">
+        <div class="kb-tree">
+          <div class="kb-tree-title">分类目录</div>
+          <div class="kb-cat active" onclick="kbCatClick(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            全部
+            <span class="count">342</span>
+          </div>
+          <div class="kb-cat" onclick="kbCatClick(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 16l3-8 3 8c-1.773.642-4.227.642-6 0z"/><path d="M2 16l3-8 3 8c-1.773.642-4.227.642-6 0z"/><line x1="7" y1="21" x2="7" y2="8"/><line x1="17" y1="21" x2="17" y2="8"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+            退换货政策
+            <span class="count">56</span>
+          </div>
+          <div class="kb-cat" onclick="kbCatClick(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            商品FAQ
+            <span class="count">89</span>
+          </div>
+          <div class="kb-cat" onclick="kbCatClick(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            成分数据库
+            <span class="count">78</span>
+          </div>
+          <div class="kb-cat" onclick="kbCatClick(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            使用说明
+            <span class="count">45</span>
+          </div>
+          <div class="kb-cat" onclick="kbCatClick(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            投诉话术
+            <span class="count">38</span>
+          </div>
+          <div class="kb-cat" onclick="kbCatClick(this)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            物流说明
+            <span class="count">36</span>
+          </div>
+        </div>
+        <div class="kb-content">
+          <div class="kb-toolbar">
+            <input type="text" class="search-box" placeholder="搜索知识条目...">
+            <button class="kb-btn">批量导入</button>
+            <button class="kb-btn primary">添加知识</button>
+          </div>
+          <div class="kb-table-wrap">
+            <table class="kb-table">
+              <thead>
+                <tr><th>标题</th><th>品类</th><th>命中次数</th><th>准确率</th><th>更新时间</th><th>状态</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>烟酰胺功效说明与适用肤质</td><td>成分数据库</td><td class="mono">1,247</td><td class="mono" style="color:var(--green)">96.8%</td><td class="mono">03-31</td><td><span class="kb-status active">启用</span></td></tr>
+                <tr><td>玻尿酸浓度选择指南</td><td>成分数据库</td><td class="mono">986</td><td class="mono" style="color:var(--green)">94.2%</td><td class="mono">03-30</td><td><span class="kb-status active">启用</span></td></tr>
+                <tr><td>7天无理由退货流程</td><td>退换货政策</td><td class="mono">834</td><td class="mono" style="color:var(--green)">98.1%</td><td class="mono">03-29</td><td><span class="kb-status active">启用</span></td></tr>
+                <tr><td>孕妇可用产品清单</td><td>成分数据库</td><td class="mono">623</td><td class="mono" style="color:var(--orange)">78.5%</td><td class="mono">03-25</td><td><span class="kb-status draft">待完善</span></td></tr>
+                <tr><td>过敏原成分对照表</td><td>成分数据库</td><td class="mono">512</td><td class="mono" style="color:var(--orange)">72.3%</td><td class="mono">03-20</td><td><span class="kb-status draft">待完善</span></td></tr>
+                <tr><td>视黄醇使用注意事项</td><td>使用说明</td><td class="mono">478</td><td class="mono" style="color:var(--green)">91.6%</td><td class="mono">03-28</td><td><span class="kb-status active">启用</span></td></tr>
+                <tr><td>退货运费承担规则</td><td>退换货政策</td><td class="mono">445</td><td class="mono" style="color:var(--green)">95.3%</td><td class="mono">03-27</td><td><span class="kb-status active">启用</span></td></tr>
+                <tr><td>面膜使用频率建议</td><td>使用说明</td><td class="mono">398</td><td class="mono" style="color:var(--green)">93.7%</td><td class="mono">03-26</td><td><span class="kb-status active">启用</span></td></tr>
+                <tr><td>投诉安抚标准话术</td><td>投诉话术</td><td class="mono">356</td><td class="mono" style="color:var(--green)">89.4%</td><td class="mono">03-24</td><td><span class="kb-status active">启用</span></td></tr>
+                <tr><td>顺丰/圆通时效说明</td><td>物流说明</td><td class="mono">312</td><td class="mono" style="color:var(--green)">97.2%</td><td class="mono">03-22</td><td><span class="kb-status active">启用</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="kb-gap">
+            <div class="kb-gap-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              知识缺口（AI回答不上的问题）
+            </div>
+            <div class="kb-gap-item">
+              <span class="q">「虾青素和视黄醇可以一起用吗？」</span>
+              <span class="freq">被问 23 次</span>
+              <span class="add-btn">添加知识</span>
+            </div>
+            <div class="kb-gap-item">
+              <span class="q">「敏感肌可以用水杨酸吗？浓度多少安全？」</span>
+              <span class="freq">被问 19 次</span>
+              <span class="add-btn">添加知识</span>
+            </div>
+            <div class="kb-gap-item">
+              <span class="q">「哺乳期能用含A醇的产品吗？」</span>
+              <span class="freq">被问 15 次</span>
+              <span class="add-btn">添加知识</span>
+            </div>
+            <div class="kb-gap-item">
+              <span class="q">「面霜和精华液的使用顺序是什么？」</span>
+              <span class="freq">被问 12 次</span>
+              <span class="add-btn">添加知识</span>
+            </div>
+            <div class="kb-gap-item">
+              <span class="q">「你们的防腐剂是什么？对皮肤有刺激吗？」</span>
+              <span class="freq">被问 9 次</span>
+              <span class="add-btn">添加知识</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== View 3: Rules Configuration ===== -->
+    <div class="view-panel" id="view-rules">
+      <div class="rules-content">
+        <!-- Return Rules Flow -->
+        <div class="rules-section">
+          <div class="rules-section-title">
+            退货判断规则流程
+            <span class="section-badge">5 条规则</span>
+          </div>
+          <div class="flow-rules">
+            <div class="flow-rule">
+              <div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+              <div class="flow-card">
+                <div>
+                  <div class="rule-label">规则 1</div>
+                  <div class="rule-text">未收货 -> 引导取消订单</div>
+                </div>
+                <div class="rule-action guide">引导取消</div>
+              </div>
+            </div>
+            <div class="flow-rule">
+              <div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+              <div class="flow-card">
+                <div>
+                  <div class="rule-label">规则 2</div>
+                  <div class="rule-text">收货 > 7天 -> 不建议退货</div>
+                </div>
+                <div class="rule-action warn">不建议</div>
+              </div>
+            </div>
+            <div class="flow-rule">
+              <div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+              <div class="flow-card">
+                <div>
+                  <div class="rule-label">规则 3</div>
+                  <div class="rule-text">食品类已拆封 -> 不可退货</div>
+                </div>
+                <div class="rule-action block">不可退</div>
+              </div>
+            </div>
+            <div class="flow-rule">
+              <div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+              <div class="flow-card">
+                <div>
+                  <div class="rule-label">规则 4</div>
+                  <div class="rule-text">30天内退货 >= 3次 -> 欺诈升级人工</div>
+                </div>
+                <div class="rule-action block">欺诈升级</div>
+              </div>
+            </div>
+            <div class="flow-rule">
+              <div class="flow-line"><div class="flow-dot"></div><div class="flow-connector"></div></div>
+              <div class="flow-card">
+                <div>
+                  <div class="rule-label">规则 5</div>
+                  <div class="rule-text">金额 > 500元 -> 升级人工审核</div>
+                </div>
+                <div class="rule-action escalate">升级人工</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Emotion Detection -->
+        <div class="rules-section">
+          <div class="rules-section-title">
+            情绪识别配置
+            <span class="section-badge">灵敏度: 中</span>
+          </div>
+          <div class="emotion-panel">
+            <div class="emotion-card">
+              <div class="emotion-card-title">负面情绪词表（48个）</div>
+              <div class="word-tags">
+                <span class="word-tag negative">投诉</span>
+                <span class="word-tag negative">骗子</span>
+                <span class="word-tag negative">垃圾</span>
+                <span class="word-tag negative">太差了</span>
+                <span class="word-tag negative">退钱</span>
+                <span class="word-tag negative">假货</span>
+                <span class="word-tag negative">不满意</span>
+                <span class="word-tag negative">差评</span>
+                <span class="word-tag escalate">12315</span>
+                <span class="word-tag escalate">工商</span>
+                <span class="word-tag escalate">律师</span>
+                <span class="word-tag escalate">曝光</span>
+              </div>
+              <div style="margin-top:10px;font-size:11px;color:var(--text-muted)">红色 = 负面词 | 橙色 = 升级触发词</div>
+            </div>
+            <div class="emotion-card">
+              <div class="emotion-card-title">灵敏度调节</div>
+              <div class="slider-group">
+                <div class="slider-label">
+                  <span>低（0.80）</span>
+                  <span>当前: 0.65</span>
+                  <span>高（0.40）</span>
+                </div>
+                <div class="slider-track">
+                  <div class="slider-fill" style="width:55%;"></div>
+                  <div class="slider-thumb" style="left:calc(55% - 7px);"></div>
+                </div>
+              </div>
+              <div class="slider-group" style="margin-top:16px;">
+                <div class="slider-label">
+                  <span>连续消息触发</span>
+                  <span>当前: 2条</span>
+                </div>
+                <div class="slider-track">
+                  <div class="slider-fill" style="width:33%;"></div>
+                  <div class="slider-thumb" style="left:calc(33% - 7px);"></div>
+                </div>
+              </div>
+              <div style="margin-top:14px;font-size:12px;color:var(--text-muted);">本周漏检 3 次 | 误报 1 次</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Risk Gates -->
+        <div class="rules-section">
+          <div class="rules-section-title">
+            风险闸门开关
+            <span class="section-badge">3 个闸门</span>
+          </div>
+          <div class="gate-grid">
+            <div class="gate-card">
+              <div class="gate-header">
+                <div class="gate-title">退款人审</div>
+                <div class="gate-switch"><div class="gate-switch-dot"></div></div>
+              </div>
+              <div class="gate-desc">所有退款操作需人工最终确认</div>
+              <div class="gate-threshold">
+                <label>阈值:</label>
+                <span class="val">200元</span>
+                <span style="font-size:11px;color:var(--text-muted)">以上需审批</span>
+              </div>
+            </div>
+            <div class="gate-card">
+              <div class="gate-header">
+                <div class="gate-title">情绪升级</div>
+                <div class="gate-switch"><div class="gate-switch-dot"></div></div>
+              </div>
+              <div class="gate-desc">检测到强烈负面情绪自动转人工</div>
+              <div class="gate-threshold">
+                <label>灵敏度:</label>
+                <span class="val">0.65</span>
+                <span style="font-size:11px;color:var(--text-muted)">负面阈值</span>
+              </div>
+            </div>
+            <div class="gate-card">
+              <div class="gate-header">
+                <div class="gate-title">欺诈检测</div>
+                <div class="gate-switch"><div class="gate-switch-dot"></div></div>
+              </div>
+              <div class="gate-desc">高频退货/异常行为自动标记</div>
+              <div class="gate-threshold">
+                <label>触发:</label>
+                <span class="val">3次/30天</span>
+                <span style="font-size:11px;color:var(--text-muted)">退货频率</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase Progress -->
+        <div class="rules-section">
+          <div class="rules-section-title">
+            放权进度
+            <span class="section-badge">Phase 1 -> Phase 2</span>
+          </div>
+          <div class="phase-progress">
+            <div class="phase-header">
+              <div class="phase-title">Phase 2 解锁条件达成情况</div>
+              <div class="phase-pct">62.5%</div>
+            </div>
+            <div class="phase-bar">
+              <div class="phase-bar-fill" style="width:62.5%;"></div>
+            </div>
+            <div class="phase-conditions">
+              <div class="phase-cond">
+                <div class="check done">&#10003;</div>
+                AI解决率 > 90%（当前 94.5%）
+              </div>
+              <div class="phase-cond">
+                <div class="check done">&#10003;</div>
+                好评率 > 95%（当前 96.2%）
+              </div>
+              <div class="phase-cond">
+                <div class="check done">&#10003;</div>
+                连续7天零重大投诉
+              </div>
+              <div class="phase-cond">
+                <div class="check done">&#10003;</div>
+                知识库覆盖率 > 85%（当前 87.3%）
+              </div>
+              <div class="phase-cond">
+                <div class="check done">&#10003;</div>
+                情绪识别准确率 > 90%
+              </div>
+              <div class="phase-cond">
+                <div class="check pending">-</div>
+                退款自主审批测试通过
+              </div>
+              <div class="phase-cond">
+                <div class="check pending">-</div>
+                人工拒绝率 < 5%（当前 8.2%）
+              </div>
+              <div class="phase-cond">
+                <div class="check pending">-</div>
+                主管审批放权确认
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== View 4: Analytics ===== -->
+    <div class="view-panel" id="view-analytics">
+      <div class="analytics-content">
+        <div class="analytics-header">
+          <div style="font-size:15px;font-weight:600;">数据分析看板</div>
+          <div class="time-filter">
+            <button class="time-btn active">今日</button>
+            <button class="time-btn" onclick="this.parentElement.querySelector('.active').classList.remove('active');this.classList.add('active')">本周</button>
+            <button class="time-btn" onclick="this.parentElement.querySelector('.active').classList.remove('active');this.classList.add('active')">本月</button>
+          </div>
+        </div>
+
+        <div class="charts-grid">
+          <!-- Chart 1: Resolution Rate Trend -->
+          <div class="chart-card">
+            <div class="chart-title">AI解决率趋势（近7天）</div>
+            <div class="line-chart">
+              <div class="line-chart-y">
+                <span>100%</span>
+                <span>95%</span>
+                <span>90%</span>
+                <span>85%</span>
+                <span>80%</span>
+              </div>
+              <div class="line-chart-grid">
+                <div class="grid-line"></div>
+                <div class="grid-line"></div>
+                <div class="grid-line"></div>
+                <div class="grid-line"></div>
+                <div class="grid-line"></div>
+              </div>
+              <div class="line-chart-bar"><div class="bar-line" style="height:55%"></div><div class="dot" style="position:absolute;bottom:55%"></div><span class="x-label">3/26</span></div>
+              <div class="line-chart-bar"><div class="bar-line" style="height:60%"></div><div class="dot" style="position:absolute;bottom:60%"></div><span class="x-label">3/27</span></div>
+              <div class="line-chart-bar"><div class="bar-line" style="height:50%"></div><div class="dot" style="position:absolute;bottom:50%"></div><span class="x-label">3/28</span></div>
+              <div class="line-chart-bar"><div class="bar-line" style="height:65%"></div><div class="dot" style="position:absolute;bottom:65%"></div><span class="x-label">3/29</span></div>
+              <div class="line-chart-bar"><div class="bar-line" style="height:70%"></div><div class="dot" style="position:absolute;bottom:70%"></div><span class="x-label">3/30</span></div>
+              <div class="line-chart-bar"><div class="bar-line" style="height:60%"></div><div class="dot" style="position:absolute;bottom:60%"></div><span class="x-label">3/31</span></div>
+              <div class="line-chart-bar"><div class="bar-line" style="height:72%"></div><div class="dot" style="position:absolute;bottom:72%"></div><span class="x-label">4/01</span></div>
+            </div>
+            <div style="text-align:center;margin-top:8px;font-size:12px;color:var(--text-muted);">91.0% -> 91.5% -> 90.0% -> 92.5% -> 93.5% -> 93.0% -> 94.5%</div>
+          </div>
+
+          <!-- Chart 2: Escalation Reasons -->
+          <div class="chart-card">
+            <div class="chart-title">转人工原因分布</div>
+            <div class="dist-list">
+              <div class="dist-item">
+                <span class="d-label">客户主动要求</span>
+                <div class="d-bar"><div class="d-bar-fill" style="width:35%"></div></div>
+                <span class="d-val">35%</span>
+              </div>
+              <div class="dist-item">
+                <span class="d-label">复杂售后问题</span>
+                <div class="d-bar"><div class="d-bar-fill" style="width:22%"></div></div>
+                <span class="d-val">22%</span>
+              </div>
+              <div class="dist-item">
+                <span class="d-label">AI置信度不足</span>
+                <div class="d-bar"><div class="d-bar-fill" style="width:18%"></div></div>
+                <span class="d-val">18%</span>
+              </div>
+              <div class="dist-item">
+                <span class="d-label">情绪检测升级</span>
+                <div class="d-bar"><div class="d-bar-fill" style="width:13%"></div></div>
+                <span class="d-val">13%</span>
+              </div>
+              <div class="dist-item">
+                <span class="d-label">金额超限</span>
+                <div class="d-bar"><div class="d-bar-fill" style="width:8%"></div></div>
+                <span class="d-val">8%</span>
+              </div>
+              <div class="dist-item">
+                <span class="d-label">欺诈风控</span>
+                <div class="d-bar"><div class="d-bar-fill" style="width:4%"></div></div>
+                <span class="d-val">4%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chart 3: Knowledge Hit -->
+          <div class="chart-card">
+            <div class="chart-title">知识库命中 TOP5 / MISS TOP5</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              <div>
+                <div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:8px;">命中 TOP5</div>
+                <div class="dist-list">
+                  <div class="dist-item"><span class="d-label" style="width:120px;font-size:12px;">退货流程</span><div class="d-bar"><div class="d-bar-fill" style="width:95%;background:var(--green)"></div></div><span class="d-val">98%</span></div>
+                  <div class="dist-item"><span class="d-label" style="width:120px;font-size:12px;">物流时效</span><div class="d-bar"><div class="d-bar-fill" style="width:92%;background:var(--green)"></div></div><span class="d-val">97%</span></div>
+                  <div class="dist-item"><span class="d-label" style="width:120px;font-size:12px;">烟酰胺功效</span><div class="d-bar"><div class="d-bar-fill" style="width:90%;background:var(--green)"></div></div><span class="d-val">96%</span></div>
+                  <div class="dist-item"><span class="d-label" style="width:120px;font-size:12px;">退货运费</span><div class="d-bar"><div class="d-bar-fill" style="width:88%;background:var(--green)"></div></div><span class="d-val">95%</span></div>
+                  <div class="dist-item"><span class="d-label" style="width:120px;font-size:12px;">玻尿酸浓度</span><div class="d-bar"><div class="d-bar-fill" style="width:85%;background:var(--green)"></div></div><span class="d-val">94%</span></div>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:8px;">MISS TOP5</div>
+                <div class="dist-list">
+                  <div class="dist-item"><span class="d-label" style="width:120px;font-size:12px;">成分搭配禁忌</span><div class="d-bar"><div class="d-bar-fill" style="width:70%;background:var(--red)"></div></div><span class="d-val">45%</span></div>
+                  <div class="dist-item"><span class="d-label" style="width:120px;font-size:12px;">孕期用品</span><div class="d-bar"><div class="d-bar-fill" style="width:60%;background:var(--red)"></div></div><span class="d-val">52%</span></div>
+                  <div class="dist-item"><span class="d-label" style="width:120px;font-size:12px;">过敏原查询</span><div class="d-bar"><div class="d-bar-fill" style="width:55%;background:var(--red)"></div></div><span class="d-val">58%</span></div>
+                  <div class="dist-item"><span class="d-label" style="width:120px;font-size:12px;">退货政策</span><div class="d-bar"><div class="d-bar-fill" style="width:48%;background:var(--red)"></div></div><span class="d-val">68%</span></div>
+                  <div class="dist-item"><span class="d-label" style="width:120px;font-size:12px;">敏感肌成分</span><div class="d-bar"><div class="d-bar-fill" style="width:45%;background:var(--red)"></div></div><span class="d-val">71%</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chart 4: Confidence Distribution -->
+          <div class="chart-card">
+            <div class="chart-title">AI置信度分布</div>
+            <div class="histogram">
+              <div class="hist-bar"><div class="bar-val">2%</div><div class="bar" style="height:8px;background:var(--red)"></div><span class="bar-label">0-0.3</span></div>
+              <div class="hist-bar"><div class="bar-val">5%</div><div class="bar" style="height:20px;background:var(--red)"></div><span class="bar-label">0.3-0.5</span></div>
+              <div class="hist-bar"><div class="bar-val">8%</div><div class="bar" style="height:32px;background:var(--orange)"></div><span class="bar-label">0.5-0.6</span></div>
+              <div class="hist-bar"><div class="bar-val">12%</div><div class="bar" style="height:48px;background:var(--orange)"></div><span class="bar-label">0.6-0.7</span></div>
+              <div class="hist-bar"><div class="bar-val">18%</div><div class="bar" style="height:72px;"></div><span class="bar-label">0.7-0.8</span></div>
+              <div class="hist-bar"><div class="bar-val">28%</div><div class="bar" style="height:110px;"></div><span class="bar-label">0.8-0.9</span></div>
+              <div class="hist-bar"><div class="bar-val">27%</div><div class="bar" style="height:108px;"></div><span class="bar-label">0.9-1.0</span></div>
+            </div>
+            <div style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:4px;">73% 的回答置信度在 0.7 以上</div>
+          </div>
+        </div>
+
+        <!-- Insight Card -->
+        <div class="insight-card">
+          <div class="insight-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><circle cx="12" cy="12" r="10"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div class="insight-text">
+            <strong>关键洞察：</strong>退货政策类问题命中率仅 68%，低于目标 85%。成分搭配禁忌类问题命中率仅 45%，是最大知识缺口。建议优先补充「成分搭配禁忌」和「孕期/哺乳期安全成分」两个知识模块，预计可将整体知识覆盖率从 87.3% 提升至 92%+。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== View 5: Training Records ===== -->
+    <div class="view-panel" id="view-training">
+      <div class="training-content">
+        <div class="stats-grid" style="grid-template-columns: repeat(4,1fr); padding: 0; margin-bottom: 20px;">
+          <div class="stat-card">
+            <div class="label">本周人工拒绝</div>
+            <div class="value">12</div>
+            <div class="change down">+3 vs 上周</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">最常拒绝类型</div>
+            <div class="value" style="font-size:16px;font-family:var(--font);">退货判断</div>
+            <div class="change neutral">占比 42%</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">学习后改善率</div>
+            <div class="value">76%</div>
+            <div class="change up">+8%</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">待学习案例</div>
+            <div class="value">5</div>
+            <div class="change neutral">需处理</div>
+          </div>
+        </div>
+
+        <div class="training-header">
+          <div style="font-size:15px;font-weight:600;">人工拒绝案例列表</div>
+          <div style="display:flex;gap:8px;">
+            <button class="kb-btn" style="font-size:12px;padding:6px 12px;">筛选待学习</button>
+            <button class="kb-btn primary" style="font-size:12px;padding:6px 12px;">重新训练</button>
+          </div>
+        </div>
+
+        <table class="training-table">
+          <thead>
+            <tr><th>时间</th><th>客户</th><th style="width:25%">AI建议</th><th style="width:25%">人工操作</th><th>拒绝原因</th><th>学习状态</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="mono" style="font-size:12px;white-space:nowrap;">04-01 14:23</td>
+              <td>赵**</td>
+              <td>建议拒绝退货（收货超7天）</td>
+              <td style="color:var(--green)">同意退货，延长至15天</td>
+              <td>近期促销活动承诺了15天退换</td>
+              <td><span class="learn-status pending">待学习</span></td>
+            </tr>
+            <tr>
+              <td class="mono" style="font-size:12px;white-space:nowrap;">04-01 11:05</td>
+              <td>钱**</td>
+              <td>AI回复:「该产品适合所有肤质」</td>
+              <td style="color:var(--red)">修正为「不适合敏感肌」</td>
+              <td>知识库信息过时，产品配方已更新</td>
+              <td><span class="learn-status pending">待学习</span></td>
+            </tr>
+            <tr>
+              <td class="mono" style="font-size:12px;white-space:nowrap;">04-01 09:32</td>
+              <td>孙**</td>
+              <td>建议补发一瓶（价值89元）</td>
+              <td style="color:var(--orange)">仅补发小样+优惠券</td>
+              <td>补偿力度过大，超出标准</td>
+              <td><span class="learn-status pending">待学习</span></td>
+            </tr>
+            <tr>
+              <td class="mono" style="font-size:12px;white-space:nowrap;">03-31 16:48</td>
+              <td>周**</td>
+              <td>建议转人工（置信度0.42）</td>
+              <td style="color:var(--green)">人工确认AI判断正确</td>
+              <td>实际可以AI处理，过于保守</td>
+              <td><span class="learn-status learned">已学习</span></td>
+            </tr>
+            <tr>
+              <td class="mono" style="font-size:12px;white-space:nowrap;">03-31 14:12</td>
+              <td>吴**</td>
+              <td>回复:「不支持退货」</td>
+              <td style="color:var(--green)">同意退货退款</td>
+              <td>客户提供了过敏就医证明</td>
+              <td><span class="learn-status learned">已学习</span></td>
+            </tr>
+            <tr>
+              <td class="mono" style="font-size:12px;white-space:nowrap;">03-31 10:55</td>
+              <td>郑**</td>
+              <td>安抚话术+退10元优惠券</td>
+              <td style="color:var(--red)">全额退款+道歉信</td>
+              <td>客户是VIP，AI未识别会员等级</td>
+              <td><span class="learn-status pending">待学习</span></td>
+            </tr>
+            <tr>
+              <td class="mono" style="font-size:12px;white-space:nowrap;">03-30 15:30</td>
+              <td>王**</td>
+              <td>建议等待物流更新</td>
+              <td style="color:var(--green)">主动联系快递公司催件</td>
+              <td>物流已超时3天，需主动干预</td>
+              <td><span class="learn-status learned">已学习</span></td>
+            </tr>
+            <tr>
+              <td class="mono" style="font-size:12px;white-space:nowrap;">03-30 11:20</td>
+              <td>冯**</td>
+              <td>回复成分安全性说明</td>
+              <td style="color:var(--text-muted)">操作员标记为无需学习</td>
+              <td>客户其实在问价格不是成分</td>
+              <td><span class="learn-status ignored">已忽略</span></td>
+            </tr>
+            <tr>
+              <td class="mono" style="font-size:12px;white-space:nowrap;">03-29 17:05</td>
+              <td>陈**</td>
+              <td>推荐替代产品A</td>
+              <td style="color:var(--orange)">推荐替代产品B</td>
+              <td>产品A已下架，库存系统未同步</td>
+              <td><span class="learn-status pending">待学习</span></td>
+            </tr>
+            <tr>
+              <td class="mono" style="font-size:12px;white-space:nowrap;">03-29 09:40</td>
+              <td>褚**</td>
+              <td>转人工（情绪检测触发）</td>
+              <td style="color:var(--green)">人工确认需要介入</td>
+              <td>判断正确，无需调整</td>
+              <td><span class="learn-status learned">已学习</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- AI Float Button -->
+<div class="ai-float-btn" id="aiFloatBtn" onclick="toggleFloatPanel()">
+  <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M8 8h0"/><path d="M16 8h0"/><rect x="7" y="14" width="10" height="7" rx="2"/><path d="M9 14v-1"/><path d="M15 14v-1"/></svg>
+</div>
+
+<!-- AI Float Panel -->
+<div class="ai-float-panel" id="aiFloatPanel">
+  <div class="fp-header">
+    <div class="fp-title">AI小皙助手</div>
+    <div class="fp-close" onclick="toggleFloatPanel()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </div>
+  </div>
+  <div class="fp-body" id="fpBody">
+    <div class="fp-msg bot">你好！我是AI小皙助手。你可以用对话方式操作当前页面的功能，比如：<br><br>- 「添加一条知识」<br>- 「调高情绪灵敏度」<br>- 「查看今天的数据」</div>
+  </div>
+  <div class="fp-input">
+    <div class="fp-input-wrap">
+      <input type="text" id="fpInput" placeholder="问小皙..." onkeydown="if(event.key==='Enter'&&!event.isComposing){event.preventDefault();sendFloatMsg();}">
+      <button class="fp-send" onclick="sendFloatMsg()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Footer removed — info merged into unified top bar -->
+
+<script>
+  // Scroll chat to bottom
+  const chatArea = document.getElementById('chatArea');
+  chatArea.scrollTop = chatArea.scrollHeight;
+
+  // View switching
+  function switchView(viewName, el) {
+    // Update sidebar
+    document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+    // Update view panels
+    document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+    const panel = document.getElementById('view-' + viewName);
+    if (panel) panel.classList.add('active');
+    // Update title
+    const titles = { chat: '对话管理', knowledge: '知识库管理', rules: '规则配置', analytics: '数据分析', training: '训练记录' };
+    document.getElementById('viewTitle').textContent = titles[viewName] || '';
+  }
+
+  // Chat list click
+  function chatClick(el) {
+    document.querySelectorAll('.sidebar-chat-item').forEach(i => i.style.background = '');
+    el.style.background = '#FFF';
+  }
+
+  // KB category click
+  function kbCatClick(el) {
+    document.querySelectorAll('.kb-cat').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  // Send message in main chat
+  function sendMessage(text) {
+    if (!text.trim()) return;
+    const div = document.createElement('div');
+    div.className = 'msg user';
+    div.innerHTML = '<div class="msg-bubble">' + escapeHtml(text) + '</div>';
+    chatArea.appendChild(div);
+    chatArea.scrollTop = chatArea.scrollHeight;
+
+    setTimeout(() => {
+      const bot = document.createElement('div');
+      bot.className = 'msg bot';
+      bot.innerHTML = `
+        <div class="msg-avatar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M8 8h0"/><path d="M16 8h0"/><rect x="7" y="14" width="10" height="7" rx="2"/><path d="M9 14v-1"/><path d="M15 14v-1"/></svg>
+        </div>
+        <div class="msg-bubble">收到，我来处理「${escapeHtml(text)}」这个需求... <span class="source-tag ai">AI生成</span></div>
+      `;
+      chatArea.appendChild(bot);
+      chatArea.scrollTop = chatArea.scrollHeight;
+    }, 600);
+  }
+
+  function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  // Input handling
+  const input = document.getElementById('msgInput');
+  const btnSend = document.getElementById('btnSend');
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.isComposing) {
+      e.preventDefault();
+      sendMessage(input.value);
+      input.value = '';
+    }
+  });
+
+  btnSend.addEventListener('click', () => {
+    sendMessage(input.value);
+    input.value = '';
+  });
+
+  // Suggest click
+  function sendSuggest(el) {
+    sendMessage(el.textContent);
+  }
+
+  // Mode toggle
+  let proMode = false;
+  function toggleMode() {
+    proMode = !proMode;
+    const track = document.getElementById('toggleTrack');
+    const label = document.getElementById('modeLabel');
+    if (proMode) {
+      track.classList.add('active');
+      label.textContent = '专业模式';
+      document.body.classList.remove('simple-mode');
+    } else {
+      track.classList.remove('active');
+      label.textContent = '小白模式';
+      document.body.classList.add('simple-mode');
+    }
+  }
+  // Start in pro mode by default (show all)
+  proMode = true;
+  document.getElementById('toggleTrack').classList.add('active');
+  document.getElementById('modeLabel').textContent = '专业模式';
+
+  // Float panel toggle
+  function toggleFloatPanel() {
+    const panel = document.getElementById('aiFloatPanel');
+    panel.classList.toggle('open');
+  }
+
+  // Float panel send
+  function sendFloatMsg() {
+    const input = document.getElementById('fpInput');
+    const text = input.value.trim();
+    if (!text) return;
+    const body = document.getElementById('fpBody');
+    const userMsg = document.createElement('div');
+    userMsg.className = 'fp-msg user';
+    userMsg.textContent = text;
+    body.appendChild(userMsg);
+    input.value = '';
+    body.scrollTop = body.scrollHeight;
+
+    setTimeout(() => {
+      const botMsg = document.createElement('div');
+      botMsg.className = 'fp-msg bot';
+      botMsg.textContent = '收到，正在处理「' + text + '」...';
+      body.appendChild(botMsg);
+      body.scrollTop = body.scrollHeight;
+    }, 500);
+  }
+
+  // Time filter buttons
+  document.querySelectorAll('.time-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      this.parentElement.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>

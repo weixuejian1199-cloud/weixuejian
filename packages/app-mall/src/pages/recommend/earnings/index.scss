@@ -1,0 +1,170 @@
+@import '../../../styles/variables.scss';
+
+.earnings-page {
+  min-height: 100vh;
+  background: $color-bg-page;
+  display: flex;
+  flex-direction: column;
+}
+
+// Summary Card
+.summary-card {
+  margin: $spacing-sm $page-padding 0;
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: $spacing-base;
+  text-align: center;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.summary-value {
+  font-size: $font-size-xxl;
+  font-weight: 700;
+  color: $color-text-primary;
+  font-family: $font-family-num;
+
+  &--gold {
+    color: $color-gold;
+  }
+
+  &--muted {
+    color: $color-text-tertiary;
+  }
+}
+
+.summary-label {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-top: 2px;
+}
+
+// Tabs
+.tabs-bar {
+  display: flex;
+  margin: $spacing-base $page-padding 0;
+  background: $color-bg-card;
+  border-radius: $radius-base;
+  padding: $spacing-xs;
+}
+
+.tab-item {
+  flex: 1;
+  text-align: center;
+  padding: $spacing-sm 0;
+  position: relative;
+}
+
+.tab-text {
+  font-size: $font-size-base;
+  color: $color-text-tertiary;
+  font-weight: 500;
+}
+
+.tab-item--active {
+  .tab-text {
+    color: $color-text-primary;
+    font-weight: 600;
+  }
+}
+
+.tab-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 2px;
+  background: $color-gold;
+  border-radius: 1px;
+}
+
+// Earnings List
+.earnings-list {
+  flex: 1;
+  margin-top: $spacing-md;
+  padding: 0 $page-padding;
+}
+
+.date-group {
+  margin-bottom: $spacing-base;
+}
+
+.date-label {
+  display: block;
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  margin-bottom: $spacing-sm;
+  font-weight: 500;
+}
+
+.earning-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: $color-bg-card;
+  border-radius: $radius-base;
+  padding: $spacing-md $spacing-base;
+  margin-bottom: $spacing-sm;
+}
+
+.earning-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.earning-title {
+  display: block;
+  font-size: $font-size-base;
+  font-weight: 600;
+  color: $color-text-primary;
+  margin-bottom: 2px;
+}
+
+.earning-desc {
+  display: block;
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.earning-amount {
+  font-size: $font-size-lg;
+  font-weight: 700;
+  font-family: $font-family-num;
+  margin-left: $spacing-md;
+  flex-shrink: 0;
+
+  &--positive {
+    color: $color-gold;
+  }
+
+  &--negative {
+    color: $color-text-secondary;
+  }
+}
+
+// Empty
+.empty-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 0;
+}
+
+.empty-text {
+  font-size: $font-size-base;
+  color: $color-text-tertiary;
+}

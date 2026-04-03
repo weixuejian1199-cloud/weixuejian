@@ -1,0 +1,376 @@
+@import '@/styles/variables.scss';
+
+.confirm {
+  min-height: 100vh;
+  background: $color-bg-page;
+  padding-bottom: 120px;
+
+  &__content {
+    padding: 0 $page-padding;
+    padding-top: $spacing-md;
+  }
+
+  // ─── Address Card ─────────────────────────
+  &__address {
+    background: $color-bg-card;
+    border-radius: $radius-md;
+    padding: $spacing-base;
+    margin-bottom: $spacing-sm;
+    position: relative;
+    overflow: hidden;
+  }
+
+  // ─── Section Card ─────────────────────────
+  &__section {
+    background: $color-bg-card;
+    border-radius: $radius-md;
+    padding: $spacing-base;
+    margin-bottom: $spacing-sm;
+  }
+
+  // ─── Remark ───────────────────────────────
+  &__remark {
+    width: 100%;
+    font-size: $font-size-sm;
+    color: $color-text-primary;
+    font-family: $font-family;
+    background: transparent;
+    padding: $spacing-xs 0;
+  }
+
+  // ─── Commission Bar ───────────────────────
+  &__commission {
+    background: #FFFBF0;
+    border-radius: $radius-md;
+    padding: $spacing-md $spacing-base;
+    margin-bottom: $spacing-sm;
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+  }
+
+  // ─── Submit Bar ───────────────────────────
+  &__submit-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 110px;
+    background: $color-bg-card;
+    border-top: 1px solid $color-bg-divider;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: $spacing-md $page-padding;
+    padding-bottom: 34px;
+    z-index: 50;
+  }
+}
+
+// ─── Address ──────────────────────────────────
+.address {
+  &__top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  &__info {
+    flex: 1;
+  }
+
+  &__name {
+    font-size: $font-size-lg;
+    font-weight: 600;
+    color: $color-text-primary;
+    display: flex;
+    align-items: center;
+    gap: $spacing-md;
+  }
+
+  &__phone {
+    font-size: $font-size-base;
+    color: $color-text-secondary;
+    font-weight: 400;
+  }
+
+  &__tag {
+    font-size: $font-size-xs;
+    color: $color-gold;
+    border: 1px solid $color-gold;
+    border-radius: $radius-xs;
+    padding: 1px 5px;
+  }
+
+  &__detail {
+    font-size: 13px;
+    color: $color-text-secondary;
+    line-height: 1.5;
+    margin-top: $spacing-sm;
+  }
+
+  &__arrow {
+    color: $color-text-placeholder;
+    font-size: $font-size-lg;
+    margin-top: $spacing-sm;
+    flex-shrink: 0;
+    margin-left: $spacing-sm;
+  }
+
+  &__zigzag {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: repeating-linear-gradient(
+      90deg,
+      $color-danger 0px, $color-danger 8px,
+      $color-gold 8px, $color-gold 16px,
+      $color-success 16px, $color-success 24px,
+      $color-info 24px, $color-info 32px
+    );
+  }
+}
+
+// ─── Section Title ────────────────────────────
+.section {
+  &__title {
+    font-size: $font-size-base;
+    font-weight: 600;
+    color: $color-text-primary;
+    margin-bottom: $spacing-base;
+
+    &--sm {
+      margin-bottom: $spacing-sm;
+    }
+  }
+}
+
+// ─── Product Item ─────────────────────────────
+.product-item {
+  display: flex;
+  gap: $spacing-md;
+  padding: $spacing-sm 0;
+
+  & + & {
+    border-top: 1px solid $color-bg-input;
+  }
+
+  &__img {
+    width: 80px;
+    height: 80px;
+    border-radius: $radius-base;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    &--warm { background: #F5EDE3; }
+    &--cool { background: #EBF0E8; }
+  }
+
+  &__placeholder {
+    font-size: $font-size-xs;
+    color: $color-text-tertiary;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  &__info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  &__name {
+    font-size: $font-size-base;
+    color: $color-text-primary;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  &__spec {
+    font-size: $font-size-xs;
+    color: $color-text-tertiary;
+    margin-top: $spacing-xs;
+    background: $color-bg-input;
+    padding: 2px $spacing-sm;
+    border-radius: $radius-xs;
+    display: inline-block;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: $spacing-sm;
+  }
+
+  &__price {
+    font-size: $font-size-lg;
+    color: $color-price;
+    font-weight: 700;
+    font-family: $font-family-num;
+  }
+
+  &__yen {
+    font-size: $font-size-sm;
+  }
+
+  &__qty {
+    font-size: 13px;
+    color: $color-text-tertiary;
+  }
+}
+
+// ─── Price Row ────────────────────────────────
+.price-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-sm 0;
+
+  & + & {
+    border-top: 1px solid $color-bg-input;
+  }
+
+  &__label {
+    font-size: $font-size-base;
+    color: $color-text-secondary;
+    display: flex;
+    align-items: center;
+  }
+
+  &__points-text {
+    font-size: $font-size-sm;
+    color: $color-text-tertiary;
+  }
+
+  &__value {
+    font-family: $font-family-num;
+    font-weight: 500;
+    font-size: $font-size-base;
+    color: $color-text-primary;
+
+    &--free {
+      color: $color-success;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    &--coupon {
+      color: $color-danger;
+    }
+  }
+
+  &__points {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+  }
+}
+
+// ─── Toggle ───────────────────────────────────
+.toggle {
+  width: 40px;
+  height: 22px;
+  background: #E0DED8;
+  border-radius: 11px;
+  position: relative;
+  transition: background 0.2s;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    background: #fff;
+    border-radius: 9px;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  }
+
+  &--on {
+    background: $color-gold;
+
+    &::after {
+      transform: translateX(18px);
+    }
+  }
+}
+
+// ─── Commission ───────────────────────────────
+.commission {
+  &__icon {
+    font-size: $font-size-lg;
+  }
+
+  &__text {
+    font-size: $font-size-sm;
+    color: $color-gold;
+  }
+}
+
+// ─── Submit Bar ───────────────────────────────
+.submit-bar {
+  &__left {
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__total {
+    display: flex;
+    align-items: baseline;
+    gap: $spacing-xs;
+  }
+
+  &__label {
+    font-size: 13px;
+    color: $color-text-secondary;
+  }
+
+  &__amount {
+    font-size: 22px;
+    color: $color-price;
+    font-weight: 700;
+    font-family: $font-family-num;
+  }
+
+  &__yen {
+    font-size: $font-size-base;
+  }
+
+  &__saved {
+    font-size: $font-size-xs;
+    color: $color-danger;
+    margin-top: 2px;
+  }
+
+  &__btn {
+    background: $color-primary;
+    border-radius: $radius-pill;
+    padding: $spacing-md $spacing-xxl;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:active {
+      opacity: 0.85;
+    }
+  }
+
+  &__btn-text {
+    color: #fff;
+    font-size: $font-size-md;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+}

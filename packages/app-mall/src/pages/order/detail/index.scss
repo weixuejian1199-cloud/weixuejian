@@ -1,0 +1,298 @@
+@import '@/styles/variables.scss';
+
+.detail {
+  min-height: 100vh;
+  background: $color-bg-page;
+  padding-bottom: 100px;
+
+  // ─── Status ───────────────────────────────
+  &__status {
+    padding: $spacing-xl $page-padding;
+    padding-top: $spacing-xxl;
+
+    &--pending_pay {
+      background: linear-gradient(135deg, #E85D3A 0%, #F0926E 100%);
+    }
+
+    &--pending_ship {
+      background: linear-gradient(135deg, $color-gold 0%, $color-gold-light 100%);
+    }
+
+    &--pending_receive {
+      background: linear-gradient(135deg, $color-info 0%, #7EB5E5 100%);
+    }
+
+    &--pending_review {
+      background: linear-gradient(135deg, $color-success 0%, #7ECDA0 100%);
+    }
+
+    &--completed {
+      background: linear-gradient(135deg, $color-secondary 0%, #9B8C7D 100%);
+    }
+  }
+
+  &__status-text {
+    font-size: $font-size-xxl;
+    font-weight: 600;
+    color: #fff;
+    display: block;
+    margin-bottom: $spacing-xs;
+  }
+
+  &__status-desc {
+    font-size: $font-size-sm;
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  // ─── Content ──────────────────────────────
+  &__content {
+    padding: $spacing-md $page-padding;
+    margin-top: -$spacing-md;
+  }
+
+  // ─── Section ──────────────────────────────
+  &__section {
+    background: $color-bg-card;
+    border-radius: $radius-md;
+    padding: $spacing-base;
+    margin-bottom: $spacing-sm;
+  }
+
+  &__section-title {
+    font-size: $font-size-base;
+    font-weight: 600;
+    color: $color-text-primary;
+    margin-bottom: $spacing-md;
+    display: block;
+  }
+
+  // ─── Address ──────────────────────────────
+  &__address {
+    display: flex;
+    gap: $spacing-md;
+  }
+
+  &__address-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  &__address-info {
+    flex: 1;
+  }
+
+  &__address-name {
+    font-size: $font-size-lg;
+    font-weight: 600;
+    color: $color-text-primary;
+    display: flex;
+    align-items: center;
+    gap: $spacing-md;
+  }
+
+  &__address-phone {
+    font-size: $font-size-base;
+    color: $color-text-secondary;
+    font-weight: 400;
+  }
+
+  &__address-detail {
+    font-size: 13px;
+    color: $color-text-secondary;
+    line-height: 1.5;
+    margin-top: $spacing-xs;
+  }
+
+  // ─── Action Bar ───────────────────────────
+  &__action-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 100px;
+    background: $color-bg-card;
+    border-top: 1px solid $color-bg-divider;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    padding: $spacing-md $page-padding;
+    padding-bottom: 34px;
+    gap: $spacing-sm;
+    z-index: 50;
+  }
+
+  &__action-btn {
+    padding: $spacing-sm $spacing-lg;
+    border-radius: $radius-pill;
+    border: 1px solid $color-bg-divider;
+    background: $color-bg-card;
+
+    &--primary {
+      background: $color-primary;
+      border-color: $color-primary;
+    }
+
+    &:active {
+      opacity: 0.85;
+    }
+  }
+
+  &__action-btn-text {
+    font-size: $font-size-base;
+    color: $color-text-secondary;
+
+    &--primary {
+      color: #fff;
+    }
+  }
+}
+
+// ─── Product Item (shared) ────────────────────
+.product-item {
+  display: flex;
+  gap: $spacing-md;
+  padding: $spacing-sm 0;
+
+  & + & {
+    border-top: 1px solid $color-bg-input;
+  }
+
+  &__img {
+    width: 80px;
+    height: 80px;
+    border-radius: $radius-base;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    &--warm { background: #F5EDE3; }
+    &--cool { background: #EBF0E8; }
+  }
+
+  &__placeholder {
+    font-size: $font-size-xs;
+    color: $color-text-tertiary;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  &__info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  &__name {
+    font-size: $font-size-base;
+    color: $color-text-primary;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  &__spec {
+    font-size: $font-size-xs;
+    color: $color-text-tertiary;
+    margin-top: $spacing-xs;
+    background: $color-bg-input;
+    padding: 2px $spacing-sm;
+    border-radius: $radius-xs;
+    display: inline-block;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: $spacing-sm;
+  }
+
+  &__price {
+    font-size: $font-size-lg;
+    color: $color-price;
+    font-weight: 700;
+    font-family: $font-family-num;
+  }
+
+  &__yen {
+    font-size: $font-size-sm;
+  }
+
+  &__qty {
+    font-size: 13px;
+    color: $color-text-tertiary;
+  }
+}
+
+// ─── Price Row ────────────────────────────────
+.price-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-sm 0;
+
+  & + & {
+    border-top: 1px solid $color-bg-input;
+  }
+
+  &--total {
+    border-top: 1px solid $color-bg-divider;
+    margin-top: $spacing-xs;
+    padding-top: $spacing-md;
+  }
+
+  &__label {
+    font-size: $font-size-base;
+    color: $color-text-secondary;
+  }
+
+  &__value {
+    font-family: $font-family-num;
+    font-weight: 500;
+    font-size: $font-size-base;
+    color: $color-text-primary;
+
+    &--free {
+      color: $color-success;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    &--coupon {
+      color: $color-danger;
+    }
+
+    &--total {
+      font-size: $font-size-price;
+      color: $color-price;
+      font-weight: 700;
+    }
+  }
+}
+
+// ─── Info Row ─────────────────────────────────
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: $spacing-sm 0;
+
+  & + & {
+    border-top: 1px solid $color-bg-input;
+  }
+
+  &__label {
+    font-size: $font-size-sm;
+    color: $color-text-tertiary;
+  }
+
+  &__value {
+    font-size: $font-size-sm;
+    color: $color-text-primary;
+  }
+}

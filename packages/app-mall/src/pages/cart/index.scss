@@ -1,0 +1,346 @@
+@import '../../styles/variables.scss';
+
+.cart-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: $color-bg-page;
+}
+
+.cart-scroll {
+  flex: 1;
+  overflow: hidden;
+}
+
+// Promo banner
+.cart-promo {
+  margin: $spacing-sm $page-padding;
+  padding: 10px $card-padding;
+  background: #FFF9F5;
+  border-radius: $radius-base;
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.promo-icon {
+  font-size: $font-size-base;
+}
+
+.promo-text {
+  font-size: $font-size-sm;
+  color: $color-danger;
+  flex: 1;
+}
+
+.promo-action {
+  font-size: $font-size-sm;
+  color: $color-danger;
+  font-weight: 500;
+}
+
+// Cart list
+.cart-list {
+  padding: 0 $page-padding;
+}
+
+.cart-item {
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  padding: $card-padding;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: $spacing-md;
+}
+
+// Checkbox
+.cart-checkbox {
+  width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  border: 2px solid #DDD;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 20px;
+  box-sizing: border-box;
+
+  &.checked {
+    background: $color-primary;
+    border-color: $color-primary;
+
+    &::after {
+      content: '';
+      width: 8px;
+      height: 5px;
+      border-left: 2px solid $color-bg-card;
+      border-bottom: 2px solid $color-bg-card;
+      transform: rotate(-45deg);
+      margin-top: -2px;
+    }
+  }
+}
+
+// Cart image
+.cart-img {
+  width: 80px;
+  height: 80px;
+  border-radius: $radius-base;
+  background: #F0EBE3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+
+  &.warm { background: #F5EDE3; }
+  &.cool { background: #EBF0E8; }
+  &.rose { background: #F5ECEF; }
+
+  &__pic {
+    width: 100%;
+    height: 100%;
+  }
+
+  &__placeholder {
+    font-size: 10px;
+    color: $color-text-tertiary;
+    text-align: center;
+  }
+}
+
+// Cart details
+.cart-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.cart-name {
+  font-size: $font-size-base;
+  color: $color-text-primary;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cart-spec {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-top: $spacing-xs;
+  background: $color-bg-input;
+  padding: 2px $spacing-sm;
+  border-radius: $radius-xs;
+  display: inline-block;
+}
+
+.cart-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.cart-price {
+  font-size: $font-size-lg;
+  color: $color-price;
+  font-weight: 700;
+  font-family: $font-family-num;
+
+  .yen {
+    font-size: $font-size-sm;
+  }
+}
+
+// Quantity control
+.qty-control {
+  display: flex;
+  align-items: center;
+}
+
+.qty-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  border: 1px solid $color-bg-divider;
+  background: $color-bg-page;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &__text {
+    font-size: $font-size-lg;
+    color: $color-text-secondary;
+    line-height: 1;
+  }
+
+  &.disabled {
+    .qty-btn__text {
+      color: $color-text-placeholder;
+    }
+  }
+}
+
+.qty-value {
+  width: 36px;
+  text-align: center;
+  font-size: $font-size-base;
+  color: $color-text-primary;
+  font-weight: 600;
+  font-family: $font-family-num;
+}
+
+// Empty state
+.cart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+
+  &__text {
+    font-size: $font-size-lg;
+    color: $color-text-secondary;
+  }
+
+  &__sub {
+    font-size: $font-size-sm;
+    color: $color-text-tertiary;
+    margin-top: $spacing-sm;
+  }
+}
+
+// Like section
+.like-section {
+  margin-top: 10px;
+}
+
+.like-header {
+  padding: $page-padding $page-padding 10px;
+  font-size: $font-size-base;
+  font-weight: 600;
+  color: $color-text-primary;
+}
+
+.like-scroll {
+  white-space: nowrap;
+  padding: 0 $page-padding $page-padding;
+}
+
+.like-card {
+  display: inline-block;
+  width: 120px;
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  overflow: hidden;
+  margin-right: 10px;
+  vertical-align: top;
+}
+
+.like-img {
+  width: 120px;
+  height: 120px;
+  background: #F0EBE3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &__placeholder {
+    font-size: 10px;
+    color: $color-text-tertiary;
+    text-align: center;
+  }
+}
+
+.like-info {
+  padding: $spacing-sm;
+}
+
+.like-name {
+  font-size: $font-size-xs;
+  color: $color-text-primary;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+}
+
+.like-price {
+  font-size: $font-size-sm + 1px;
+  color: $color-price;
+  font-weight: 700;
+  margin-top: $spacing-xs;
+  font-family: $font-family-num;
+}
+
+// Bottom checkout bar (sticky)
+.checkout-bar {
+  flex-shrink: 0;
+  height: 56px;
+  background: $color-bg-card;
+  border-top: 1px solid $color-bg-divider;
+  display: flex;
+  align-items: center;
+  padding: 0 $page-padding;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.select-all {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.checkout-checkbox {
+  margin-top: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+}
+
+.select-all-text {
+  font-size: $font-size-sm + 1px;
+  color: $color-text-primary;
+}
+
+.checkout-total {
+  flex: 1;
+  text-align: right;
+  padding-right: $spacing-md;
+}
+
+.total-label {
+  font-size: $font-size-sm + 1px;
+  color: $color-text-secondary;
+}
+
+.total-price {
+  font-size: $font-size-xxl;
+  color: $color-price;
+  font-weight: 700;
+  font-family: $font-family-num;
+
+  .yen {
+    font-size: $font-size-sm + 1px;
+  }
+}
+
+.checkout-btn {
+  background: $color-primary;
+  border-radius: $radius-pill;
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &__text {
+    color: $color-bg-card;
+    font-size: $font-size-base;
+    font-weight: 600;
+  }
+}

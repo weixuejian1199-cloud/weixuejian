@@ -1,0 +1,486 @@
+@import '../../styles/variables.scss';
+
+.product-detail {
+  min-height: 100vh;
+  background: $color-bg-page;
+  padding-bottom: 100px;
+
+  // ── Gallery ──
+  .gallery {
+    width: 100%;
+    height: 375px;
+    position: relative;
+    background: #F0EBE3;
+
+    &__swiper {
+      width: 100%;
+      height: 100%;
+    }
+
+    &__slide {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    &__image {
+      width: 100%;
+      height: 100%;
+    }
+
+    &__placeholder {
+      font-size: $font-size-base;
+      color: $color-text-tertiary;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    &__nav {
+      position: absolute;
+      top: 50px;
+      left: $page-padding;
+      right: $page-padding;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+
+    &__actions {
+      display: flex;
+      gap: $spacing-sm;
+    }
+
+    &__nav-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: $radius-circle;
+      background: rgba(255, 255, 255, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    &__dots {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 5px;
+      z-index: 10;
+    }
+
+    &__dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(0, 0, 0, 0.15);
+      transition: all 0.3s;
+
+      &--active {
+        width: 16px;
+        background: $color-primary;
+      }
+    }
+
+    &__video-badge {
+      position: absolute;
+      bottom: 12px;
+      right: $page-padding;
+      background: rgba(0, 0, 0, 0.5);
+      color: #fff;
+      font-size: 10px;
+      padding: $spacing-xs $spacing-sm;
+      border-radius: $radius-xs;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      z-index: 10;
+    }
+  }
+
+  // ── Price Section ──
+  .price-section {
+    padding: $spacing-base $spacing-base $spacing-md;
+    background: $color-bg-card;
+
+    .price-row {
+      display: flex;
+      align-items: baseline;
+      gap: $spacing-sm;
+    }
+
+    .current-price {
+      font-size: $font-size-hero;
+      font-weight: 700;
+      color: $color-price;
+      font-family: $font-family-num;
+
+      .yen {
+        font-size: $font-size-lg;
+      }
+    }
+
+    .original-price {
+      font-size: $font-size-base;
+      color: $color-strikethrough;
+      text-decoration: line-through;
+      font-family: $font-family-num;
+    }
+
+    .discount-tag {
+      background: #FFF5F0;
+      color: $color-promo;
+      font-size: $font-size-xs;
+      padding: 2px 6px;
+      border-radius: $radius-xs;
+      font-weight: 500;
+    }
+
+    .product-title {
+      font-size: $font-size-lg;
+      color: $color-text-primary;
+      font-weight: 600;
+      line-height: 1.5;
+      margin-top: 10px;
+    }
+
+    .product-subtitle {
+      font-size: 13px;
+      color: $color-text-secondary;
+      margin-top: $spacing-xs;
+    }
+
+    .sold-info {
+      font-size: $font-size-sm;
+      color: $color-text-tertiary;
+      margin-top: 6px;
+    }
+  }
+
+  // ── Promo Section ──
+  .promo-section {
+    margin: 10px $page-padding;
+    background: $color-bg-card;
+    border-radius: $radius-md;
+    overflow: hidden;
+
+    .promo-item {
+      padding: $spacing-md $spacing-base;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid $color-bg-divider;
+
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+
+    .promo-tag {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: $radius-xs;
+      font-weight: 600;
+      flex-shrink: 0;
+
+      &--coupon {
+        background: #FFF5F0;
+        color: $color-promo;
+      }
+
+      &--group {
+        background: #F0F5FF;
+        color: $color-info;
+      }
+
+      &--points {
+        background: #F5F0FF;
+        color: $color-vic;
+      }
+    }
+
+    .promo-text {
+      font-size: 13px;
+      color: $color-text-primary;
+      flex: 1;
+    }
+
+    .promo-arrow {
+      font-size: $font-size-sm;
+      color: $color-text-placeholder;
+    }
+  }
+
+  // ── Spec Section ──
+  .spec-section {
+    margin: 10px $page-padding;
+    background: $color-bg-card;
+    border-radius: $radius-md;
+    padding: $card-padding $spacing-base;
+
+    .spec-label {
+      font-size: 13px;
+      color: $color-text-secondary;
+      margin-bottom: 10px;
+    }
+
+    .spec-options {
+      display: flex;
+      gap: $spacing-sm;
+      flex-wrap: wrap;
+    }
+
+    .spec-chip {
+      padding: 6px $spacing-base;
+      border-radius: $radius-pill;
+      font-size: 13px;
+      color: $color-text-primary;
+      background: $color-bg-input;
+      transition: all 0.2s;
+
+      &--selected {
+        background: $color-primary;
+        color: #fff;
+      }
+    }
+  }
+
+  // ── Selling Points ──
+  .points-section {
+    margin: 10px $page-padding;
+    background: $color-bg-card;
+    border-radius: $radius-md;
+    padding: $spacing-base;
+
+    .points-title {
+      font-size: $font-size-base;
+      font-weight: 600;
+      color: $color-text-primary;
+      margin-bottom: $spacing-md;
+    }
+
+    .point-item {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+      align-items: flex-start;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+
+    .point-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 3px;
+      background: $color-gold;
+      margin-top: 6px;
+      flex-shrink: 0;
+    }
+
+    .point-text {
+      font-size: 13px;
+      color: #333;
+      line-height: 1.5;
+
+      .bold {
+        font-weight: 600;
+      }
+    }
+  }
+
+  // ── Detail Tabs ──
+  .detail-tabs {
+    margin: 10px $page-padding;
+    background: $color-bg-card;
+    border-radius: $radius-md;
+    overflow: hidden;
+
+    .tab-row {
+      display: flex;
+    }
+
+    .tab-item {
+      flex: 1;
+      text-align: center;
+      padding: 14px 0;
+      font-size: 13px;
+      color: $color-text-secondary;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+
+      &--active {
+        color: $color-text-primary;
+        font-weight: 600;
+        border-bottom-color: $color-primary;
+      }
+    }
+
+    .tab-content {
+      padding: $spacing-base;
+    }
+
+    // Ingredients
+    .ingredient-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid $color-bg-divider;
+
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+
+    .ing-name {
+      font-size: 13px;
+      color: $color-text-primary;
+    }
+
+    .ing-role {
+      font-size: $font-size-sm;
+      color: $color-text-tertiary;
+    }
+
+    // Trial report
+    .trial-item {
+      padding: 10px 0;
+      border-bottom: 1px solid $color-bg-divider;
+
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+
+    .trial-user {
+      font-size: 13px;
+      font-weight: 600;
+      color: $color-text-primary;
+    }
+
+    .trial-tag {
+      font-size: $font-size-xs;
+      color: $color-gold;
+      margin-left: $spacing-sm;
+    }
+
+    .trial-text {
+      font-size: 13px;
+      color: $color-text-secondary;
+      margin-top: $spacing-xs;
+      line-height: 1.5;
+    }
+
+    // Reviews
+    .review-item {
+      padding: 10px 0;
+      border-bottom: 1px solid $color-bg-divider;
+
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+
+    .review-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .review-user {
+      font-size: 13px;
+      font-weight: 600;
+      color: $color-text-primary;
+    }
+
+    .review-stars {
+      font-size: $font-size-sm;
+      color: $color-gold;
+    }
+
+    .review-text {
+      font-size: 13px;
+      color: $color-text-secondary;
+      margin-top: $spacing-xs;
+      line-height: 1.5;
+    }
+
+    // Brand story
+    .story-text {
+      font-size: 13px;
+      color: $color-text-secondary;
+      line-height: 1.8;
+    }
+  }
+
+  // ── Bottom Bar ──
+  .bottom-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background: $color-bg-card;
+    border-top: 1px solid $color-bg-divider;
+    display: flex;
+    align-items: center;
+    padding: 0 $page-padding;
+    padding-bottom: env(safe-area-inset-bottom);
+    gap: 10px;
+    z-index: 50;
+
+    .icon-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      min-width: 44px;
+
+      .icon-btn__icon {
+        width: 22px;
+        height: 22px;
+        font-size: 22px;
+        color: $color-text-secondary;
+        text-align: center;
+        line-height: 22px;
+      }
+
+      .icon-btn__text {
+        font-size: 10px;
+        color: $color-text-secondary;
+      }
+    }
+
+    .btn-add-cart {
+      flex: 1;
+      height: 44px;
+      background: $color-bg-input;
+      color: $color-secondary;
+      border: none;
+      border-radius: $radius-pill;
+      font-size: $font-size-base;
+      font-weight: 600;
+      line-height: 44px;
+      text-align: center;
+    }
+
+    .btn-buy {
+      flex: 1;
+      height: 44px;
+      background: $color-primary;
+      color: #fff;
+      border: none;
+      border-radius: $radius-pill;
+      font-size: $font-size-base;
+      font-weight: 600;
+      line-height: 44px;
+      text-align: center;
+    }
+  }
+}

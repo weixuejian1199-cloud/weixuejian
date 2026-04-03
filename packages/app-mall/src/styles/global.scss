@@ -1,0 +1,150 @@
+@import './variables.scss';
+
+page {
+  background-color: $color-bg-page;
+  font-family: $font-family;
+  color: $color-text-primary;
+  font-size: $font-size-base;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+// Utility classes
+.text-gold { color: $color-gold; }
+.text-danger { color: $color-danger; }
+.text-success { color: $color-success; }
+.text-secondary { color: $color-text-secondary; }
+.text-tertiary { color: $color-text-tertiary; }
+.font-num { font-family: $font-family-num; }
+.font-bold { font-weight: 600; }
+
+// Price
+.price {
+  color: $color-price;
+  font-family: $font-family-num;
+  font-weight: 700;
+
+  &--sm { font-size: $font-size-base; }
+  &--md { font-size: $font-size-price; }
+  &--lg { font-size: $font-size-price-lg; }
+
+  .yen { font-size: 0.7em; }
+}
+
+.price-original {
+  color: $color-strikethrough;
+  font-family: $font-family-num;
+  text-decoration: line-through;
+  font-size: $font-size-sm;
+}
+
+// Card
+.card {
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  box-shadow: $shadow-card;
+  margin: 0 $page-padding $spacing-md;
+  padding: $card-padding;
+}
+
+// Badge
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 8px;
+  color: #fff;
+
+  &--gold { background: $color-gold; }
+  &--danger { background: $color-danger; }
+  &--success { background: $color-success; }
+  &--vip { background: $color-gold; }
+  &--vic { background: $color-vic; }
+}
+
+// Tag
+.tag {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: $radius-xs;
+  font-weight: 500;
+
+  &--quality { background: $color-gold-bg; color: $color-gold; }
+  &--promo { background: #FFF5F0; color: $color-danger; }
+  &--new { background: #F0FFF4; color: $color-success; }
+}
+
+// Section header
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-xl $page-padding $spacing-md;
+
+  &__title {
+    font-size: $font-size-lg;
+    font-weight: 600;
+    color: $color-text-primary;
+  }
+
+  &__more {
+    font-size: $font-size-sm;
+    color: $color-text-tertiary;
+  }
+}
+
+// Button
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: $radius-pill;
+  font-weight: 600;
+  cursor: pointer;
+
+  &--primary {
+    background: $color-primary;
+    color: #fff;
+  }
+
+  &--secondary {
+    background: $color-bg-input;
+    color: $color-secondary;
+  }
+
+  &--gold {
+    background: $color-gold;
+    color: #fff;
+  }
+
+  &--sm {
+    padding: 5px 14px;
+    font-size: $font-size-sm;
+  }
+
+  &--md {
+    padding: 8px 20px;
+    font-size: $font-size-base;
+  }
+
+  &--lg {
+    width: 100%;
+    height: 50px;
+    font-size: $font-size-lg;
+  }
+
+  &--disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+}
+
+// Scrollbar hide (H5)
+::-webkit-scrollbar {
+  display: none;
+}

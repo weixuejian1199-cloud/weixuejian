@@ -1,0 +1,2523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工具中心 - 时皙 AI 工作站</title>
+<style>
+:root {
+  --text-primary: #1A1A1A;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --bg: #FFFFFF;
+  --sidebar-bg: #F9F9F9;
+  --sidebar-border: #F0F0F0;
+  --divider: #F0F0F0;
+  --input-border: #E8E8E8;
+  --input-bg: #F5F5F5;
+  --hover-bg: #F3F3F3;
+  --active-bg: #EFEFEF;
+  --accent: #1A1A1A;
+  --green: #00B42A;
+  --red: #E53835;
+  --orange: #FF7D00;
+  --blue: #4F6EF7;
+  --font: -apple-system, 'SF Pro Display', 'PingFang SC', 'Helvetica Neue', sans-serif;
+  --font-mono: 'SF Mono', 'Roboto Mono', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font);
+  color: var(--text-primary);
+  background: var(--bg);
+  overflow: hidden;
+  height: 100vh;
+  min-width: 1024px;
+}
+
+/* ========== Animations ========== */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeInUp .35s ease-out both; }
+
+@keyframes placeholderCycle {
+  0%, 18% { opacity: 1; }
+  20%, 100% { opacity: 0; }
+}
+
+/* ========== Header ========== */
+.header {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 52px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--divider);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  z-index: 100;
+}
+.header-left {
+  display: flex; align-items: center; gap: 10px;
+}
+.logo {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: #FFFFFF; font-weight: 700; font-size: 16px;
+}
+.header-title {
+  font-size: 15px; font-weight: 600; color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+.header-right {
+  display: flex; align-items: center; gap: 16px;
+}
+.mode-toggle {
+  display: flex; align-items: center; gap: 6px;
+}
+.mode-label {
+  font-size: 12px; color: var(--text-muted); font-weight: 500;
+  transition: color .15s;
+}
+.mode-label.active { color: var(--text-primary); font-weight: 600; }
+.toggle-switch {
+  width: 36px; height: 20px;
+  background: var(--accent);
+  border-radius: 10px;
+  position: relative;
+  cursor: pointer;
+  transition: background .2s;
+}
+.toggle-knob {
+  width: 16px; height: 16px;
+  background: #FFFFFF;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px; right: 2px;
+  transition: all .2s;
+}
+.toggle-switch.simple .toggle-knob { right: auto; left: 2px; }
+.toggle-switch.simple { background: var(--text-muted); }
+
+.notification-btn {
+  position: relative;
+  width: 36px; height: 36px;
+  border: none; background: none; cursor: pointer;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-secondary);
+  transition: background .15s;
+}
+.notification-btn:hover { background: var(--hover-bg); }
+.notification-dot {
+  position: absolute; top: 6px; right: 8px;
+  width: 7px; height: 7px;
+  background: var(--red);
+  border-radius: 50%;
+  border: 2px solid var(--bg);
+}
+.user-info {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 4px 8px 4px 4px;
+  border-radius: 8px;
+  transition: background .15s;
+}
+.user-info:hover { background: var(--hover-bg); }
+.user-avatar {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #FFFFFF; font-size: 13px; font-weight: 600;
+}
+.user-role-tag {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--input-bg);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* ========== Notification Panel ========== */
+.notification-panel {
+  display: none;
+  position: fixed; top: 52px; right: 20px;
+  width: 320px;
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.1);
+  z-index: 200;
+  overflow: hidden;
+}
+.notification-panel.show { display: block; }
+.notification-panel-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--divider);
+  font-size: 14px; font-weight: 600;
+}
+.notification-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--divider);
+  font-size: 13px; color: var(--text-secondary);
+  cursor: pointer;
+  transition: background .15s;
+}
+.notification-item:hover { background: var(--hover-bg); }
+.notification-item:last-child { border-bottom: none; }
+.notification-item strong { color: var(--text-primary); }
+.notification-time { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+/* ========== Sidebar ========== */
+.sidebar {
+  position: fixed; top: 52px; left: 0; bottom: 32px;
+  width: 240px;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+  z-index: 50;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: #DDDDDD; border-radius: 2px; }
+.sidebar-section { padding: 8px 12px 4px; }
+.sidebar-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 8px 8px 4px;
+}
+.sidebar-divider {
+  height: 1px;
+  background: var(--divider);
+  margin: 4px 16px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  margin: 1px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: all .15s;
+  text-decoration: none;
+  position: relative;
+}
+.nav-item:hover { background: var(--hover-bg); color: var(--text-primary); }
+.nav-item.active {
+  background: var(--active-bg);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+.nav-badge {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--divider);
+  padding: 1px 7px;
+  border-radius: 10px;
+}
+.nav-badge.red {
+  background: var(--red);
+  color: #fff;
+}
+
+.chat-item {
+  display: flex; flex-direction: column;
+  padding: 8px 12px;
+  margin: 1px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.chat-item:hover { background: var(--hover-bg); }
+.chat-item-title {
+  font-size: 13px; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chat-item-time {
+  font-size: 11px; color: var(--text-muted); margin-top: 2px;
+}
+
+/* ========== Main Content ========== */
+.main {
+  position: fixed;
+  top: 52px; left: 240px; right: 0; bottom: 32px;
+  overflow-y: auto;
+  background: var(--input-bg);
+  padding: 20px 24px;
+}
+.main::-webkit-scrollbar { width: 6px; }
+.main::-webkit-scrollbar-thumb { background: #DDDDDD; border-radius: 3px; }
+
+/* View switching */
+.view-content { display: none; }
+.view-content.active { display: block; }
+
+/* ========== Footer ========== */
+.footer {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: 32px;
+  background: var(--bg);
+  border-top: 1px solid var(--divider);
+  display: flex; align-items: center;
+  padding: 0 20px;
+  font-size: 11px;
+  color: var(--text-muted);
+  gap: 24px;
+  z-index: 100;
+}
+.footer-dot {
+  width: 6px; height: 6px;
+  background: var(--green);
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+.footer-right {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* ========== Search Bar ========== */
+.search-bar {
+  position: relative;
+  max-width: 640px;
+  margin: 0 auto 20px;
+}
+.search-bar input {
+  width: 100%;
+  height: 48px;
+  border: 1px solid var(--input-border);
+  border-radius: 24px;
+  padding: 0 48px 0 20px;
+  font-size: 15px;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+.search-bar input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(26,26,26,.06);
+}
+.search-bar input::placeholder { color: var(--text-muted); }
+.search-icon {
+  position: absolute; right: 16px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}
+
+/* Placeholder animation container */
+.search-placeholder-anim {
+  position: absolute;
+  left: 20px; top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 15px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.search-placeholder-anim span {
+  display: block;
+  position: absolute;
+  left: 0; top: 0;
+  opacity: 0;
+  animation: placeholderCycle 15s infinite;
+}
+.search-placeholder-anim span:nth-child(1) { animation-delay: 0s; }
+.search-placeholder-anim span:nth-child(2) { animation-delay: 3s; }
+.search-placeholder-anim span:nth-child(3) { animation-delay: 6s; }
+.search-placeholder-anim span:nth-child(4) { animation-delay: 9s; }
+.search-placeholder-anim span:nth-child(5) { animation-delay: 12s; }
+
+/* ========== Scene Tabs ========== */
+.scene-tabs {
+  display: flex; gap: 8px;
+  margin-bottom: 20px;
+  justify-content: center;
+}
+.scene-tab {
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  cursor: pointer;
+  transition: all .15s;
+}
+.scene-tab:hover { background: var(--hover-bg); }
+.scene-tab.active {
+  background: var(--accent);
+  color: #FFFFFF;
+  border-color: var(--accent);
+}
+.scene-tab .tab-count {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  opacity: .7;
+  margin-left: 4px;
+}
+
+/* ========== Recommend Cards ========== */
+.recommend-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.recommend-card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex; align-items: center; gap: 12px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.recommend-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,.05);
+  transform: translateY(-2px);
+}
+.recommend-label {
+  font-size: 11px; color: var(--text-muted); margin-bottom: 2px;
+}
+.recommend-reason {
+  font-size: 10px; color: var(--blue); margin-top: 3px;
+  font-weight: 500;
+}
+.recommend-name {
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+}
+.recommend-icon {
+  width: 36px; height: 36px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ========== Tool Card Grid ========== */
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.tool-card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 20px;
+  cursor: default;
+  transition: all .25s cubic-bezier(.4,0,.2,1);
+  animation: fadeInUp .35s ease-out both;
+  position: relative;
+  overflow: hidden;
+}
+.tool-card:hover {
+  box-shadow: 0 8px 24px rgba(0,0,0,.08);
+  transform: translateY(-4px);
+}
+.tool-card-header {
+  display: flex; align-items: flex-start; gap: 14px;
+  margin-bottom: 12px;
+}
+.tool-icon {
+  width: 48px; height: 48px;
+  background: var(--accent);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.tool-icon svg { width: 24px; height: 24px; }
+.tool-name {
+  font-size: 15px; font-weight: 600; color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.tool-desc {
+  font-size: 12px; color: var(--text-secondary);
+  line-height: 1.5;
+}
+.tool-meta {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 12px;
+}
+.tool-stat {
+  font-size: 12px; color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.tool-stat svg {
+  width: 12px; height: 12px;
+  vertical-align: -1px;
+  margin-right: 2px;
+}
+.tool-footer {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.tool-tag {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--input-bg);
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+.tool-use-btn {
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--accent);
+  background: var(--bg);
+  color: var(--accent);
+  cursor: pointer;
+  transition: all .2s;
+}
+.tool-use-btn:hover {
+  background: var(--accent);
+  color: #FFFFFF;
+}
+
+/* Tool Badge */
+.tool-badge {
+  position: absolute;
+  top: 12px; right: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: .3px;
+}
+.tool-badge.hot {
+  background: var(--red);
+  color: #FFFFFF;
+}
+.tool-badge.new {
+  background: var(--green);
+  color: #FFFFFF;
+}
+.tool-badge.beta {
+  background: var(--orange);
+  color: #FFFFFF;
+}
+
+/* ========== View 2: My Toolbox ========== */
+.section-title {
+  font-size: 20px; font-weight: 700; color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.section-subtitle {
+  font-size: 13px; color: var(--text-muted);
+  margin-bottom: 20px;
+}
+.toolbox-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.toolbox-card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex; gap: 16px;
+  transition: all .25s cubic-bezier(.4,0,.2,1);
+  animation: fadeInUp .35s ease-out both;
+}
+.toolbox-card:hover {
+  box-shadow: 0 8px 24px rgba(0,0,0,.08);
+  transform: translateY(-4px);
+}
+.toolbox-card-body { flex: 1; }
+.toolbox-card-name {
+  font-size: 15px; font-weight: 600; margin-bottom: 4px;
+  display: flex; align-items: center; gap: 8px;
+}
+.toolbox-card-desc {
+  font-size: 12px; color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+.star-btn {
+  color: var(--orange);
+  font-size: 14px;
+  cursor: pointer;
+}
+.mini-chart {
+  display: flex; align-items: flex-end; gap: 3px;
+  height: 24px;
+  margin-bottom: 12px;
+}
+.mini-bar {
+  width: 8px;
+  background: var(--accent);
+  border-radius: 2px;
+  opacity: .25;
+  transition: opacity .2s;
+}
+.mini-bar.high { opacity: .7; }
+.mini-bar.max { opacity: 1; }
+.quick-start-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12px; font-weight: 600;
+  background: var(--accent);
+  color: #FFFFFF;
+  border: none;
+  cursor: pointer;
+  transition: opacity .2s;
+}
+.quick-start-btn:hover { opacity: .85; }
+
+.usage-summary {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex; align-items: center; gap: 24px;
+}
+.usage-summary-stat {
+  font-size: 14px; color: var(--text-primary);
+}
+.usage-summary-stat strong {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ========== View 3: Tool Detail ========== */
+.tool-detail-header {
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 24px;
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 20px;
+}
+.tool-detail-info { flex: 1; }
+.tool-detail-name {
+  font-size: 20px; font-weight: 700; margin-bottom: 4px;
+}
+.tool-detail-desc {
+  font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;
+}
+.tool-detail-stats {
+  display: flex; align-items: center; gap: 16px;
+}
+.tool-detail-stat {
+  font-size: 13px; color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.star-toggle {
+  padding: 8px 16px;
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  background: var(--bg);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all .2s;
+}
+.star-toggle:hover { background: var(--hover-bg); }
+
+.tool-detail-layout {
+  display: grid;
+  grid-template-columns: 7fr 3fr;
+  gap: 20px;
+}
+.chat-panel {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  display: flex; flex-direction: column;
+  min-height: 500px;
+}
+.chat-messages {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+.chat-msg-user {
+  display: flex; justify-content: flex-end;
+  margin-bottom: 16px;
+}
+.chat-msg-user .chat-bubble {
+  background: var(--accent);
+  color: #FFFFFF;
+  padding: 10px 16px;
+  border-radius: 12px 12px 2px 12px;
+  font-size: 13px; max-width: 80%;
+  line-height: 1.6;
+}
+.chat-msg-ai {
+  margin-bottom: 16px;
+}
+.chat-bubble-ai {
+  background: var(--input-bg);
+  padding: 16px;
+  border-radius: 2px 12px 12px 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  max-width: 95%;
+}
+.chat-bubble-ai p { margin-bottom: 10px; }
+.chat-bubble-ai p:last-child { margin-bottom: 0; }
+.chat-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 12px;
+}
+.chat-table th {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 2px solid var(--divider);
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 11px;
+}
+.chat-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--divider);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.chat-conclusion {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.chat-actions {
+  display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;
+}
+.chat-action-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--input-border);
+  background: var(--bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all .2s;
+  display: flex; align-items: center; gap: 5px;
+}
+.chat-action-btn:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+.chat-action-btn svg { width: 14px; height: 14px; }
+.chat-input-bar {
+  padding: 16px;
+  border-top: 1px solid var(--divider);
+  display: flex; gap: 10px;
+}
+.chat-input-bar input {
+  flex: 1;
+  height: 40px;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-family: var(--font);
+  outline: none;
+  background: var(--input-bg);
+  transition: border-color .2s;
+}
+.chat-input-bar input:focus { border-color: var(--accent); }
+.chat-send-btn {
+  width: 40px; height: 40px;
+  border: none;
+  background: var(--accent);
+  color: #FFFFFF;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity .2s;
+}
+.chat-send-btn:hover { opacity: .85; }
+
+.detail-sidebar {
+  display: flex; flex-direction: column; gap: 16px;
+}
+.detail-card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 18px;
+}
+.detail-card-title {
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+  margin-bottom: 12px;
+}
+.detail-item {
+  font-size: 12px; color: var(--text-secondary);
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+.detail-item:last-child { margin-bottom: 0; }
+.detail-item strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.history-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--divider);
+  font-size: 12px; color: var(--text-secondary);
+  display: flex; justify-content: space-between;
+}
+.history-item:last-child { border-bottom: none; }
+.related-tool {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0;
+  cursor: pointer;
+  transition: opacity .2s;
+}
+.related-tool:hover { opacity: .7; }
+.related-tool-icon {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.related-tool-icon svg { width: 16px; height: 16px; }
+.related-tool-name { font-size: 12px; font-weight: 600; }
+.related-tool-desc { font-size: 11px; color: var(--text-muted); }
+.capability-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.capability-dot {
+  width: 6px; height: 6px;
+  background: var(--green);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ========== View 4: Workflow ========== */
+.workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.workflow-card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 24px;
+  transition: all .25s cubic-bezier(.4,0,.2,1);
+  animation: fadeInUp .35s ease-out both;
+}
+.workflow-card:hover {
+  box-shadow: 0 8px 24px rgba(0,0,0,.08);
+  transform: translateY(-4px);
+}
+.workflow-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.workflow-name {
+  font-size: 16px; font-weight: 700;
+}
+.workflow-status {
+  font-size: 11px; font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.workflow-status.success {
+  color: var(--green);
+  background: #E8F5E9;
+}
+.workflow-status.idle {
+  color: var(--text-muted);
+  background: var(--input-bg);
+}
+.workflow-flow {
+  display: flex; align-items: center; gap: 0;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.workflow-step {
+  background: var(--accent);
+  color: #FFFFFF;
+  font-size: 11px; font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  position: relative;
+  display: flex; align-items: center; gap: 6px;
+}
+.workflow-step-num {
+  width: 18px; height: 18px;
+  background: rgba(255,255,255,.25);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.workflow-arrow-css {
+  display: flex; align-items: center;
+  width: 28px; height: 20px;
+  position: relative;
+  flex-shrink: 0;
+}
+.workflow-arrow-css::before {
+  content: '';
+  display: block;
+  width: 18px; height: 2px;
+  background: var(--text-muted);
+  position: absolute;
+  left: 2px; top: 50%;
+  transform: translateY(-50%);
+}
+.workflow-arrow-css::after {
+  content: '';
+  display: block;
+  width: 0; height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 6px solid var(--text-muted);
+  position: absolute;
+  right: 4px; top: 50%;
+  transform: translateY(-50%);
+}
+.workflow-footer {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.workflow-meta {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.workflow-uses {
+  font-size: 12px; color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.workflow-last-run {
+  font-size: 11px; color: var(--text-muted);
+}
+.workflow-start-btn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 13px; font-weight: 600;
+  background: var(--accent);
+  color: #FFFFFF;
+  border: none;
+  cursor: pointer;
+  transition: opacity .2s;
+}
+.workflow-start-btn:hover { opacity: .85; }
+
+.ai-recommend-banner {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 18px 24px;
+  margin-bottom: 20px;
+  display: flex; align-items: center; gap: 12px;
+  font-size: 13px; color: var(--text-secondary);
+}
+.ai-recommend-banner svg {
+  width: 20px; height: 20px;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+/* AI Workflow Composer */
+.ai-composer-section {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.ai-composer-title {
+  font-size: 15px; font-weight: 600; margin-bottom: 4px;
+}
+.ai-composer-desc {
+  font-size: 12px; color: var(--text-muted); margin-bottom: 14px;
+}
+.ai-composer-input-row {
+  display: flex; gap: 10px;
+}
+.ai-composer-input {
+  flex: 1;
+  height: 40px;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-family: var(--font);
+  outline: none;
+  background: var(--input-bg);
+  transition: border-color .2s;
+}
+.ai-composer-input:focus { border-color: var(--accent); }
+.ai-composer-btn {
+  padding: 8px 20px;
+  border-radius: 10px;
+  font-size: 13px; font-weight: 600;
+  background: var(--accent);
+  color: #FFFFFF;
+  border: none;
+  cursor: pointer;
+  transition: opacity .2s;
+  white-space: nowrap;
+}
+.ai-composer-btn:hover { opacity: .85; }
+.ai-composer-examples {
+  display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;
+}
+.ai-composer-example {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--input-bg);
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.ai-composer-example:hover {
+  color: var(--text-primary);
+  background: var(--hover-bg);
+}
+
+.create-workflow-btn {
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px;
+  border: 2px dashed var(--input-border);
+  border-radius: 12px;
+  background: none;
+  font-size: 14px; font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all .2s;
+}
+.create-workflow-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ========== View 5: Admin ========== */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.kpi-card {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 20px;
+  transition: box-shadow .25s, transform .25s;
+}
+.kpi-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,.06);
+  transform: translateY(-2px);
+}
+.kpi-label {
+  font-size: 12px; color: var(--text-muted); margin-bottom: 8px;
+}
+.kpi-value {
+  font-size: 28px; font-weight: 700;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.kpi-trend {
+  font-size: 11px; margin-top: 6px;
+  font-family: var(--font-mono);
+}
+.kpi-trend.up { color: var(--green); }
+.kpi-trend.down { color: var(--red); }
+
+.admin-section {
+  background: var(--bg);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.admin-section-title {
+  font-size: 15px; font-weight: 600; margin-bottom: 16px;
+}
+
+/* Admin tool table */
+.admin-tool-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.admin-tool-table th {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 2px solid var(--divider);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.admin-tool-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--divider);
+  color: var(--text-secondary);
+  transition: background .15s;
+}
+.admin-tool-table tr:hover td {
+  background: var(--hover-bg);
+}
+.admin-tool-table td:first-child {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.admin-tool-table .mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.status-badge {
+  display: inline-block;
+  font-size: 11px; font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.status-badge.on {
+  color: var(--green);
+  background: #E8F5E9;
+}
+.status-badge.off {
+  color: var(--text-muted);
+  background: var(--input-bg);
+}
+.admin-action-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  background: var(--bg);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all .15s;
+  color: var(--text-secondary);
+}
+.admin-action-btn:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.bar-chart-item {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 10px;
+}
+.bar-chart-item:last-child { margin-bottom: 0; }
+.bar-label {
+  width: 90px; font-size: 12px; color: var(--text-secondary);
+  text-align: right; flex-shrink: 0;
+}
+.bar-track {
+  flex: 1; height: 20px;
+  background: var(--input-bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width .6s ease-out;
+}
+.bar-value {
+  width: 48px; font-size: 12px; color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.role-dist {
+  display: flex; gap: 16px;
+  flex-wrap: wrap;
+}
+.role-dist-item {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--text-secondary);
+}
+.role-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.role-pct {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.agent-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.agent-card {
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex; align-items: center; gap: 12px;
+  transition: background .15s;
+}
+.agent-card:hover { background: var(--hover-bg); }
+.agent-status {
+  font-size: 11px; font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.agent-status.running {
+  color: var(--green);
+  background: #E8F5E9;
+}
+.agent-status.stopped {
+  color: var(--text-muted);
+  background: var(--input-bg);
+}
+.agent-card-body { flex: 1; }
+.agent-card-name {
+  font-size: 13px; font-weight: 600; margin-bottom: 4px;
+}
+.agent-roles {
+  display: flex; gap: 4px; flex-wrap: wrap;
+}
+.agent-role-tag {
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--input-bg);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.agent-config-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  background: var(--bg);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all .15s;
+  color: var(--text-secondary);
+}
+.agent-config-btn:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+/* Global Settings */
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.settings-item {
+  padding: 16px;
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+}
+.settings-item-label {
+  font-size: 12px; color: var(--text-muted); margin-bottom: 8px;
+}
+.settings-item-value {
+  font-size: 15px; font-weight: 600;
+  font-family: var(--font-mono);
+  margin-bottom: 8px;
+}
+.settings-item-desc {
+  font-size: 11px; color: var(--text-muted); line-height: 1.5;
+}
+.settings-select {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+}
+
+/* Permission Matrix */
+.perm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.perm-table th {
+  padding: 10px 8px;
+  text-align: center;
+  font-weight: 600;
+  border-bottom: 2px solid var(--divider);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.perm-table th:first-child {
+  text-align: left;
+  color: var(--text-primary);
+}
+.perm-table td {
+  padding: 8px;
+  text-align: center;
+  border-bottom: 1px solid var(--divider);
+  color: var(--text-secondary);
+  transition: background .15s;
+}
+.perm-table tr:hover td { background: var(--hover-bg); }
+.perm-table td:first-child {
+  text-align: left;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.perm-check { color: var(--green); font-weight: 700; }
+.perm-dash { color: var(--text-muted); }
+
+/* ========== Config Modal ========== */
+.modal-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.3);
+  z-index: 300;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.show {
+  display: flex;
+}
+.modal {
+  background: var(--bg);
+  border-radius: 16px;
+  width: 420px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 16px 48px rgba(0,0,0,.15);
+  animation: fadeInUp .25s ease-out;
+}
+.modal-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--divider);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.modal-title { font-size: 16px; font-weight: 700; }
+.modal-close {
+  width: 32px; height: 32px;
+  border: none; background: none;
+  cursor: pointer; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted);
+  transition: background .15s;
+}
+.modal-close:hover { background: var(--hover-bg); }
+.modal-body { padding: 20px 24px; }
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--divider);
+  display: flex; justify-content: flex-end; gap: 10px;
+}
+.modal-btn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+  border: 1px solid var(--divider);
+  background: var(--bg);
+  color: var(--text-secondary);
+}
+.modal-btn:hover { background: var(--hover-bg); }
+.modal-btn-primary {
+  background: var(--accent);
+  color: #FFFFFF;
+  border-color: var(--accent);
+}
+.modal-btn-primary:hover { opacity: .85; }
+.checkbox-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+.checkbox-item input[type="checkbox"] {
+  width: 16px; height: 16px;
+  accent-color: var(--accent);
+}
+
+/* ========== Onboarding Modal ========== */
+.onboarding-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.4);
+  z-index: 400;
+  align-items: center;
+  justify-content: center;
+}
+.onboarding-overlay.show { display: flex; }
+.onboarding-modal {
+  background: var(--bg);
+  border-radius: 16px;
+  width: 480px;
+  padding: 32px;
+  text-align: center;
+  box-shadow: 0 16px 48px rgba(0,0,0,.15);
+  animation: fadeInUp .3s ease-out;
+}
+.onboarding-icon {
+  width: 64px; height: 64px;
+  background: var(--accent);
+  border-radius: 16px;
+  margin: 0 auto 20px;
+  display: flex; align-items: center; justify-content: center;
+}
+.onboarding-title {
+  font-size: 20px; font-weight: 700; margin-bottom: 10px;
+}
+.onboarding-desc {
+  font-size: 14px; color: var(--text-secondary);
+  line-height: 1.7; margin-bottom: 24px;
+}
+.onboarding-steps {
+  display: flex; gap: 24px;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+.onboarding-step {
+  text-align: center;
+}
+.onboarding-step-num {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--input-bg);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700;
+  margin: 0 auto 8px;
+}
+.onboarding-step-text {
+  font-size: 12px; color: var(--text-muted);
+}
+.onboarding-btn {
+  padding: 10px 32px;
+  border-radius: 10px;
+  font-size: 14px; font-weight: 600;
+  background: var(--accent);
+  color: #FFFFFF;
+  border: none;
+  cursor: pointer;
+  transition: opacity .2s;
+}
+.onboarding-btn:hover { opacity: .85; }
+
+/* ========== AI Float Bubble ========== */
+.ai-float-btn {
+  position: fixed;
+  right: 28px; bottom: 52px;
+  width: 48px; height: 48px;
+  background: var(--accent);
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 16px rgba(0,0,0,.2);
+  z-index: 90;
+  transition: transform .2s, box-shadow .2s;
+}
+.ai-float-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 24px rgba(0,0,0,.25);
+}
+.ai-float-btn svg { width: 22px; height: 22px; }
+
+/* ========== Role Section Toggle ========== */
+.role-section { margin-bottom: 8px; }
+.role-section-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 12px; font-weight: 600;
+  color: var(--text-muted);
+  transition: color .15s;
+}
+.role-section-header:hover { color: var(--text-primary); }
+.role-section-header svg {
+  width: 14px; height: 14px;
+  transition: transform .2s;
+}
+.role-section-header.collapsed svg { transform: rotate(-90deg); }
+.role-section-body { display: block; }
+.role-section-header.collapsed + .role-section-body { display: none; }
+
+/* ========== Global transition for all buttons ========== */
+button, .tool-use-btn, .quick-start-btn, .workflow-start-btn, .agent-config-btn, .admin-action-btn, .modal-btn {
+  transition: all .2s ease;
+}
+</style>
+</head>
+<body>
+
+<!-- ========== HEADER ========== -->
+<header class="header">
+  <div class="header-left">
+    <div class="logo">S</div>
+    <span class="header-title">时皙 AI 工作站</span>
+  </div>
+  <div class="header-right">
+    <div class="mode-toggle">
+      <span class="mode-label">简洁</span>
+      <div class="toggle-switch" id="modeToggle" onclick="toggleMode()">
+        <div class="toggle-knob"></div>
+      </div>
+      <span class="mode-label active">专业</span>
+    </div>
+    <button class="notification-btn" onclick="toggleNotification()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="notification-dot"></span>
+    </button>
+    <div class="user-info">
+      <div class="user-avatar">魏</div>
+      <div>
+        <div style="font-size:13px;font-weight:600;">魏总</div>
+        <span class="user-role-tag">超级管理员</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Notification Panel -->
+<div class="notification-panel" id="notifPanel">
+  <div class="notification-panel-header">通知</div>
+  <div class="notification-item"><strong>选品助手</strong> 分析完成：已生成3个高潜力品类推荐<div class="notification-time">5分钟前</div></div>
+  <div class="notification-item"><strong>库存预警</strong> 触发：氨基酸洁面乳库存低于安全线<div class="notification-time">23分钟前</div></div>
+  <div class="notification-item"><strong>周报生成器</strong> 本周经营周报已生成<div class="notification-time">2小时前</div></div>
+</div>
+
+<!-- ========== SIDEBAR ========== -->
+<aside class="sidebar">
+  <div class="sidebar-section">
+    <a class="nav-item" href="v3-02-super-admin.html" style="text-decoration:none;color:inherit">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <span>AI 今日看板</span>
+      <span class="nav-badge red">3</span>
+    </a>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">工具中心</div>
+    <div class="nav-item active" data-view="plaza">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span>工具广场</span>
+    </div>
+    <div class="nav-item" data-view="toolbox">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-4l-2-3H10L8 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+      <span>我的工具箱</span>
+    </div>
+    <div class="nav-item" data-view="tool-detail">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      <span>工具使用</span>
+    </div>
+    <div class="nav-item" data-view="workflow">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+      <span>工作流编排</span>
+    </div>
+    <div class="nav-item" data-view="admin">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>管理后台</span>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">快捷入口</div>
+    <div class="nav-item" onclick="alert('系统设置开发中')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+      <span>系统设置</span>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-title">CHATS</div>
+    <div class="chat-item">
+      <div class="chat-item-title">护肤品选品分析</div>
+      <div class="chat-item-time">今天 14:32</div>
+    </div>
+    <div class="chat-item">
+      <div class="chat-item-title">Q2 促销方案生成</div>
+      <div class="chat-item-time">昨天 16:05</div>
+    </div>
+    <div class="chat-item">
+      <div class="chat-item-title">供应商价格对比</div>
+      <div class="chat-item-time">3月31日</div>
+    </div>
+  </div>
+</aside>
+
+<!-- ========== MAIN CONTENT ========== -->
+<main class="main">
+
+<!-- ==================== VIEW 1: PLAZA ==================== -->
+<section class="view-content active" data-view="plaza">
+  <!-- Search with animated placeholder -->
+  <div class="search-bar fade-in">
+    <input type="text" id="searchInput" placeholder="" oninput="filterTools()" onfocus="this.parentElement.querySelector('.search-placeholder-anim').style.display='none'" onblur="if(!this.value)this.parentElement.querySelector('.search-placeholder-anim').style.display='block'">
+    <div class="search-placeholder-anim" id="searchPlaceholder">
+      <span>帮我分析竞品定价...</span>
+      <span>生成商品文案...</span>
+      <span>本月利润是多少...</span>
+      <span>哪些SKU需要补货...</span>
+      <span>写一份周报...</span>
+    </div>
+    <span class="search-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </span>
+  </div>
+
+  <!-- Scene Tabs with counts -->
+  <div class="scene-tabs fade-in" style="animation-delay:.05s">
+    <div class="scene-tab active" data-scene="all" onclick="filterScene('all')">全部<span class="tab-count">12</span></div>
+    <div class="scene-tab" data-scene="选品" onclick="filterScene('选品')">选品<span class="tab-count">2</span></div>
+    <div class="scene-tab" data-scene="内容" onclick="filterScene('内容')">内容<span class="tab-count">3</span></div>
+    <div class="scene-tab" data-scene="数据" onclick="filterScene('数据')">数据<span class="tab-count">4</span></div>
+    <div class="scene-tab" data-scene="财务" onclick="filterScene('财务')">财务<span class="tab-count">1</span></div>
+    <div class="scene-tab" data-scene="客服" onclick="filterScene('客服')">客服<span class="tab-count">1</span></div>
+  </div>
+
+  <!-- Recommend with reasons -->
+  <div class="recommend-row fade-in" style="animation-delay:.1s">
+    <div class="recommend-card" onclick="openTool('标题优化器')">
+      <div class="recommend-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      </div>
+      <div>
+        <div class="recommend-label">热门 TOP1</div>
+        <div class="recommend-name">标题优化器</div>
+        <div class="recommend-reason">全站使用量最高</div>
+      </div>
+    </div>
+    <div class="recommend-card" onclick="openTool('利润计算器')">
+      <div class="recommend-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div>
+        <div class="recommend-label">最近使用</div>
+        <div class="recommend-name">利润计算器</div>
+        <div class="recommend-reason">你今天用过 3 次</div>
+      </div>
+    </div>
+    <div class="recommend-card" onclick="openTool('竞品雷达')">
+      <div class="recommend-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </div>
+      <div>
+        <div class="recommend-label">最适合你的角色</div>
+        <div class="recommend-name">竞品雷达</div>
+        <div class="recommend-reason">管理者必备决策工具</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tool Grid -->
+  <div class="tool-grid" id="toolGrid">
+
+    <div class="tool-card" data-scene="选品" data-name="选品助手" style="animation-delay:.12s">
+      <span class="tool-badge hot">热门</span>
+      <div class="tool-card-header">
+        <div class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></div>
+        <div><div class="tool-name">选品助手</div><div class="tool-desc">AI分析市场数据推荐高潜力产品</div></div>
+      </div>
+      <div class="tool-meta">
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> 2.1k次使用</span>
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> 4.9分</span>
+      </div>
+      <div class="tool-footer">
+        <span class="tool-tag">选品</span>
+        <button class="tool-use-btn" onclick="openTool('选品助手')">立即使用</button>
+      </div>
+    </div>
+
+    <div class="tool-card" data-scene="内容" data-name="标题优化器" style="animation-delay:.15s">
+      <span class="tool-badge hot">热门</span>
+      <div class="tool-card-header">
+        <div class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
+        <div><div class="tool-name">标题优化器</div><div class="tool-desc">生成高点击率商品标题</div></div>
+      </div>
+      <div class="tool-meta">
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> 3.8k次使用</span>
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> 4.8分</span>
+      </div>
+      <div class="tool-footer">
+        <span class="tool-tag">内容</span>
+        <button class="tool-use-btn" onclick="openTool('标题优化器')">立即使用</button>
+      </div>
+    </div>
+
+    <div class="tool-card" data-scene="数据" data-name="竞品雷达" style="animation-delay:.18s">
+      <div class="tool-card-header">
+        <div class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+        <div><div class="tool-name">竞品雷达</div><div class="tool-desc">实时监控竞品价格活动评价</div></div>
+      </div>
+      <div class="tool-meta">
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> 1.5k次使用</span>
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> 4.7分</span>
+      </div>
+      <div class="tool-footer">
+        <span class="tool-tag">数据</span>
+        <button class="tool-use-btn" onclick="openTool('竞品雷达')">立即使用</button>
+      </div>
+    </div>
+
+    <div class="tool-card" data-scene="财务" data-name="利润计算器" style="animation-delay:.21s">
+      <div class="tool-card-header">
+        <div class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        <div><div class="tool-name">利润计算器</div><div class="tool-desc">SKU级精准利润核算</div></div>
+      </div>
+      <div class="tool-meta">
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> 1.8k次使用</span>
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> 4.8分</span>
+      </div>
+      <div class="tool-footer">
+        <span class="tool-tag">财务</span>
+        <button class="tool-use-btn" onclick="openTool('利润计算器')">立即使用</button>
+      </div>
+    </div>
+
+    <div class="tool-card" data-scene="客服" data-name="AI小酮" style="animation-delay:.24s">
+      <span class="tool-badge hot">热门</span>
+      <div class="tool-card-header">
+        <div class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <div><div class="tool-name">AI小酮</div><div class="tool-desc">自动接待客户咨询+退货审核</div></div>
+      </div>
+      <div class="tool-meta">
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> 8.2k次使用</span>
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> 4.6分</span>
+      </div>
+      <div class="tool-footer">
+        <span class="tool-tag">客服</span>
+        <button class="tool-use-btn" onclick="openTool('AI小酮')">立即使用</button>
+      </div>
+    </div>
+
+    <div class="tool-card" data-scene="数据" data-name="评价分析师" style="animation-delay:.27s">
+      <div class="tool-card-header">
+        <div class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></div>
+        <div><div class="tool-name">评价分析师</div><div class="tool-desc">分析差评趋势挖掘改进点</div></div>
+      </div>
+      <div class="tool-meta">
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> 960次使用</span>
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> 4.7分</span>
+      </div>
+      <div class="tool-footer">
+        <span class="tool-tag">数据</span>
+        <button class="tool-use-btn" onclick="openTool('评价分析师')">立即使用</button>
+      </div>
+    </div>
+
+    <div class="tool-card" data-scene="内容" data-name="主图灵感" style="animation-delay:.3s">
+      <span class="tool-badge new">新上线</span>
+      <div class="tool-card-header">
+        <div class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
+        <div><div class="tool-name">主图灵感</div><div class="tool-desc">生成商品主图创意方案</div></div>
+      </div>
+      <div class="tool-meta">
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> 1.1k次使用</span>
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> 4.5分</span>
+      </div>
+      <div class="tool-footer">
+        <span class="tool-tag">内容</span>
+        <button class="tool-use-btn" onclick="openTool('主图灵感')">立即使用</button>
+      </div>
+    </div>
+
+    <div class="tool-card" data-scene="数据" data-name="库存预警" style="animation-delay:.33s">
+      <div class="tool-card-header">
+        <div class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+        <div><div class="tool-name">库存预警</div><div class="tool-desc">智能补货建议+安全库存计算</div></div>
+      </div>
+      <div class="tool-meta">
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> 2.4k次使用</span>
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> 4.8分</span>
+      </div>
+      <div class="tool-footer">
+        <span class="tool-tag">数据</span>
+        <button class="tool-use-btn" onclick="openTool('库存预警')">立即使用</button>
+      </div>
+    </div>
+
+    <div class="tool-card" data-scene="选品" data-name="活动策划师" style="animation-delay:.36s">
+      <span class="tool-badge beta">Beta</span>
+      <div class="tool-card-header">
+        <div class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+        <div><div class="tool-name">活动策划师</div><div class="tool-desc">生成促销方案预估ROI</div></div>
+      </div>
+      <div class="tool-meta">
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> 780次使用</span>
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> 4.6分</span>
+      </div>
+      <div class="tool-footer">
+        <span class="tool-tag">选品</span>
+        <button class="tool-use-btn" onclick="openTool('活动策划师')">立即使用</button>
+      </div>
+    </div>
+
+    <div class="tool-card" data-scene="内容" data-name="详情页生成器" style="animation-delay:.39s">
+      <div class="tool-card-header">
+        <div class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
+        <div><div class="tool-name">详情页生成器</div><div class="tool-desc">撰写商品详情页文案</div></div>
+      </div>
+      <div class="tool-meta">
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> 1.3k次使用</span>
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> 4.7分</span>
+      </div>
+      <div class="tool-footer">
+        <span class="tool-tag">内容</span>
+        <button class="tool-use-btn" onclick="openTool('详情页生成器')">立即使用</button>
+      </div>
+    </div>
+
+    <div class="tool-card" data-scene="数据" data-name="供应商评估" style="animation-delay:.42s">
+      <span class="tool-badge beta">Beta</span>
+      <div class="tool-card-header">
+        <div class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg></div>
+        <div><div class="tool-name">供应商评估</div><div class="tool-desc">多维度供应商打分对比</div></div>
+      </div>
+      <div class="tool-meta">
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> 540次使用</span>
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> 4.5分</span>
+      </div>
+      <div class="tool-footer">
+        <span class="tool-tag">数据</span>
+        <button class="tool-use-btn" onclick="openTool('供应商评估')">立即使用</button>
+      </div>
+    </div>
+
+    <div class="tool-card" data-scene="数据" data-name="周报生成器" style="animation-delay:.45s">
+      <span class="tool-badge hot">热门</span>
+      <div class="tool-card-header">
+        <div class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+        <div><div class="tool-name">周报生成器</div><div class="tool-desc">一键生成本周经营周报</div></div>
+      </div>
+      <div class="tool-meta">
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg> 2.8k次使用</span>
+        <span class="tool-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> 4.9分</span>
+      </div>
+      <div class="tool-footer">
+        <span class="tool-tag">数据</span>
+        <button class="tool-use-btn" onclick="openTool('周报生成器')">立即使用</button>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== VIEW 2: TOOLBOX ==================== -->
+<section class="view-content" data-view="toolbox">
+  <div class="section-title fade-in">我的工具箱</div>
+  <div class="section-subtitle fade-in" style="animation-delay:.05s">收藏和常用的工具</div>
+
+  <div class="toolbox-grid">
+    <div class="toolbox-card fade-in" style="animation-delay:.1s">
+      <div class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
+      <div class="toolbox-card-body">
+        <div class="toolbox-card-name">标题优化器 <span class="star-btn">&#9733;</span></div>
+        <div class="toolbox-card-desc">生成高点击率商品标题</div>
+        <div class="mini-chart">
+          <div class="mini-bar" style="height:8px"></div>
+          <div class="mini-bar high" style="height:14px"></div>
+          <div class="mini-bar max" style="height:22px"></div>
+          <div class="mini-bar high" style="height:16px"></div>
+          <div class="mini-bar" style="height:10px"></div>
+        </div>
+        <button class="quick-start-btn" onclick="openTool('标题优化器')">快速启动</button>
+      </div>
+    </div>
+
+    <div class="toolbox-card fade-in" style="animation-delay:.14s">
+      <div class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+      <div class="toolbox-card-body">
+        <div class="toolbox-card-name">利润计算器 <span class="star-btn">&#9733;</span></div>
+        <div class="toolbox-card-desc">SKU级精准利润核算</div>
+        <div class="mini-chart">
+          <div class="mini-bar high" style="height:12px"></div>
+          <div class="mini-bar" style="height:6px"></div>
+          <div class="mini-bar high" style="height:18px"></div>
+          <div class="mini-bar max" style="height:24px"></div>
+          <div class="mini-bar high" style="height:14px"></div>
+        </div>
+        <button class="quick-start-btn" onclick="openTool('利润计算器')">快速启动</button>
+      </div>
+    </div>
+
+    <div class="toolbox-card fade-in" style="animation-delay:.18s">
+      <div class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></div>
+      <div class="toolbox-card-body">
+        <div class="toolbox-card-name">选品助手 <span class="star-btn">&#9733;</span></div>
+        <div class="toolbox-card-desc">AI分析市场数据推荐高潜力产品</div>
+        <div class="mini-chart">
+          <div class="mini-bar max" style="height:20px"></div>
+          <div class="mini-bar high" style="height:16px"></div>
+          <div class="mini-bar" style="height:8px"></div>
+          <div class="mini-bar high" style="height:14px"></div>
+          <div class="mini-bar high" style="height:18px"></div>
+        </div>
+        <button class="quick-start-btn" onclick="openTool('选品助手')">快速启动</button>
+      </div>
+    </div>
+
+    <div class="toolbox-card fade-in" style="animation-delay:.22s">
+      <div class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+      <div class="toolbox-card-body">
+        <div class="toolbox-card-name">竞品雷达 <span class="star-btn">&#9733;</span></div>
+        <div class="toolbox-card-desc">实时监控竞品价格活动评价</div>
+        <div class="mini-chart">
+          <div class="mini-bar" style="height:6px"></div>
+          <div class="mini-bar high" style="height:12px"></div>
+          <div class="mini-bar high" style="height:16px"></div>
+          <div class="mini-bar max" style="height:22px"></div>
+          <div class="mini-bar high" style="height:18px"></div>
+        </div>
+        <button class="quick-start-btn" onclick="openTool('竞品雷达')">快速启动</button>
+      </div>
+    </div>
+
+    <div class="toolbox-card fade-in" style="animation-delay:.26s">
+      <div class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+      <div class="toolbox-card-body">
+        <div class="toolbox-card-name">周报生成器 <span class="star-btn">&#9733;</span></div>
+        <div class="toolbox-card-desc">一键生成本周经营周报</div>
+        <div class="mini-chart">
+          <div class="mini-bar high" style="height:14px"></div>
+          <div class="mini-bar max" style="height:24px"></div>
+          <div class="mini-bar high" style="height:18px"></div>
+          <div class="mini-bar" style="height:8px"></div>
+          <div class="mini-bar high" style="height:12px"></div>
+        </div>
+        <button class="quick-start-btn" onclick="openTool('周报生成器')">快速启动</button>
+      </div>
+    </div>
+
+    <div class="toolbox-card fade-in" style="animation-delay:.3s">
+      <div class="tool-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+      <div class="toolbox-card-body">
+        <div class="toolbox-card-name">库存预警 <span class="star-btn">&#9733;</span></div>
+        <div class="toolbox-card-desc">智能补货建议+安全库存计算</div>
+        <div class="mini-chart">
+          <div class="mini-bar high" style="height:16px"></div>
+          <div class="mini-bar high" style="height:12px"></div>
+          <div class="mini-bar max" style="height:20px"></div>
+          <div class="mini-bar" style="height:6px"></div>
+          <div class="mini-bar high" style="height:14px"></div>
+        </div>
+        <button class="quick-start-btn" onclick="openTool('库存预警')">快速启动</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="usage-summary fade-in" style="animation-delay:.35s">
+    <div class="usage-summary-stat">本周使用 <strong>23</strong> 次工具</div>
+    <div style="width:1px;height:24px;background:var(--divider)"></div>
+    <div class="usage-summary-stat">最常用: <strong>标题优化器</strong> (8次)</div>
+  </div>
+</section>
+
+<!-- ==================== VIEW 3: TOOL DETAIL ==================== -->
+<section class="view-content" data-view="tool-detail">
+  <div class="tool-detail-header fade-in">
+    <div class="tool-icon" style="width:56px;height:56px;border-radius:14px">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+    </div>
+    <div class="tool-detail-info">
+      <div class="tool-detail-name">选品助手</div>
+      <div class="tool-detail-desc">AI分析市场数据，推荐高潜力产品方向</div>
+      <div class="tool-detail-stats">
+        <span class="tool-detail-stat">2.1k 次使用</span>
+        <span class="tool-detail-stat">4.9 分</span>
+        <span class="tool-detail-stat">成功率 98.2%</span>
+      </div>
+    </div>
+    <button class="star-toggle" onclick="this.textContent=this.textContent.includes('收藏')?'已收藏 &#9733;':'收藏 &#9734;'">收藏 &#9734;</button>
+  </div>
+
+  <div class="tool-detail-layout">
+    <!-- Left: Chat Panel -->
+    <div class="chat-panel fade-in" style="animation-delay:.1s">
+      <div class="chat-messages">
+        <div class="chat-msg-user">
+          <div class="chat-bubble">帮我分析护肤品中适合新店铺做的入门款，重点看竞争度和复购率</div>
+        </div>
+        <div class="chat-msg-ai">
+          <div class="chat-bubble-ai">
+            <p>根据近90天市场数据分析，以下5个品类最适合新店铺切入：</p>
+            <table class="chat-table">
+              <thead><tr><th>品类</th><th>市场规模</th><th>竞争度</th><th>建议价格区间</th><th>复购率</th><th>推荐理由</th></tr></thead>
+              <tbody>
+                <tr><td>氨基酸洁面</td><td style="font-family:var(--font-mono)">&#165;82亿</td><td>中等</td><td style="font-family:var(--font-mono)">&#165;39-69</td><td style="font-family:var(--font-mono)">42%</td><td>高复购+低客诉</td></tr>
+                <tr><td>烟酰胺精华</td><td style="font-family:var(--font-mono)">&#165;156亿</td><td>较高</td><td style="font-family:var(--font-mono)">&#165;59-99</td><td style="font-family:var(--font-mono)">28%</td><td>功效明确+搜索量大</td></tr>
+                <tr><td>积雪草面膜</td><td style="font-family:var(--font-mono)">&#165;45亿</td><td>低</td><td style="font-family:var(--font-mono)">&#165;29-49</td><td style="font-family:var(--font-mono)">35%</td><td>原料成本低+复购率高</td></tr>
+                <tr><td>防晒霜SPF50</td><td style="font-family:var(--font-mono)">&#165;210亿</td><td>高</td><td style="font-family:var(--font-mono)">&#165;49-89</td><td style="font-family:var(--font-mono)">22%</td><td>季节品+决策快</td></tr>
+                <tr><td>卸妆膏</td><td style="font-family:var(--font-mono)">&#165;38亿</td><td>低</td><td style="font-family:var(--font-mono)">&#165;35-59</td><td style="font-family:var(--font-mono)">38%</td><td>黏性高+差异化空间大</td></tr>
+              </tbody>
+            </table>
+            <p style="font-size:12px;color:var(--text-muted);margin:8px 0 4px">[ 趋势图：氨基酸洁面搜索量近30天上升 18%，积雪草面膜上升 25% ]</p>
+            <div class="chat-conclusion">建议从氨基酸洁面切入，竞争度适中且复购率最高（42%），配合时皙品牌的天然成分定位，可快速建立口碑。第二步拓展到积雪草面膜，利用低竞争窗口期抢占市场。预计首月GMV可达 &#165;8-12万。</div>
+            <div class="chat-actions">
+              <button class="chat-action-btn" onclick="alert('导出PDF中...')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                导出报告
+              </button>
+              <button class="chat-action-btn" onclick="alert('发送到飞书中...')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                发飞书
+              </button>
+              <button class="chat-action-btn" onclick="alert('已转给采购组...')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                转给采购
+              </button>
+              <button class="chat-action-btn" onclick="alert('继续深入分析...')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                深入分析
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="chat-msg-user">
+          <div class="chat-bubble">氨基酸洁面的TOP5竞品分别是谁？价格和销量如何？</div>
+        </div>
+        <div class="chat-msg-ai">
+          <div class="chat-bubble-ai">
+            <p>氨基酸洁面 TOP5 竞品分析如下：</p>
+            <table class="chat-table">
+              <thead><tr><th>排名</th><th>品牌/产品</th><th>价格</th><th>月销量</th><th>评分</th></tr></thead>
+              <tbody>
+                <tr><td style="font-family:var(--font-mono)">1</td><td>芙丽芳丝 净润洁面</td><td style="font-family:var(--font-mono)">&#165;59</td><td style="font-family:var(--font-mono)">12.3万+</td><td style="font-family:var(--font-mono)">4.9</td></tr>
+                <tr><td style="font-family:var(--font-mono)">2</td><td>珂润 润浸洁面</td><td style="font-family:var(--font-mono)">&#165;68</td><td style="font-family:var(--font-mono)">8.7万+</td><td style="font-family:var(--font-mono)">4.8</td></tr>
+                <tr><td style="font-family:var(--font-mono)">3</td><td>旁氏 氨基酸洁面</td><td style="font-family:var(--font-mono)">&#165;39</td><td style="font-family:var(--font-mono)">6.5万+</td><td style="font-family:var(--font-mono)">4.7</td></tr>
+                <tr><td style="font-family:var(--font-mono)">4</td><td>EltaMD 氨基酸泡沫</td><td style="font-family:var(--font-mono)">&#165;89</td><td style="font-family:var(--font-mono)">3.2万+</td><td style="font-family:var(--font-mono)">4.8</td></tr>
+                <tr><td style="font-family:var(--font-mono)">5</td><td>至本 舒颜洁面</td><td style="font-family:var(--font-mono)">&#165;49</td><td style="font-family:var(--font-mono)">5.1万+</td><td style="font-family:var(--font-mono)">4.9</td></tr>
+              </tbody>
+            </table>
+            <div class="chat-conclusion">时皙建议定价 &#165;45-55 区间，卡位旁氏和至本之间。差异化方向：强调「无皂基+天然植萃」，包装设计走高级简约路线，利用品牌故事打动 25-35 岁女性用户。</div>
+          </div>
+        </div>
+      </div>
+      <div class="chat-input-bar">
+        <input type="text" placeholder="描述你想选的品类或产品方向...">
+        <button class="chat-send-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Right: Detail Sidebar -->
+    <div class="detail-sidebar">
+      <div class="detail-card fade-in" style="animation-delay:.15s">
+        <div class="detail-card-title">能力清单</div>
+        <div class="capability-item"><span class="capability-dot"></span> 市场规模分析</div>
+        <div class="capability-item"><span class="capability-dot"></span> 竞争度评估</div>
+        <div class="capability-item"><span class="capability-dot"></span> 价格区间建议</div>
+        <div class="capability-item"><span class="capability-dot"></span> 竞品TOP排名</div>
+        <div class="capability-item"><span class="capability-dot"></span> 复购率预测</div>
+        <div class="capability-item"><span class="capability-dot"></span> 差异化策略推荐</div>
+        <div class="capability-item"><span class="capability-dot"></span> 趋势数据可视化</div>
+      </div>
+      <div class="detail-card fade-in" style="animation-delay:.18s">
+        <div class="detail-card-title">工具说明</div>
+        <div class="detail-item"><strong>输入：</strong>品类方向、目标价格区间、目标人群</div>
+        <div class="detail-item"><strong>输出：</strong>市场分析报告、品类推荐排名、竞争力评估</div>
+        <div class="detail-item"><strong>适用场景：</strong>新品开发选品、季度品类规划、市场机会挖掘</div>
+      </div>
+      <div class="detail-card fade-in" style="animation-delay:.22s">
+        <div class="detail-card-title">使用历史</div>
+        <div class="history-item"><span>护肤品入门款分析</span><span style="font-family:var(--font-mono);font-size:11px">今天 14:32</span></div>
+        <div class="history-item"><span>夏季防晒选品</span><span style="font-family:var(--font-mono);font-size:11px">昨天 10:15</span></div>
+        <div class="history-item"><span>身体乳品类调研</span><span style="font-family:var(--font-mono);font-size:11px">3月30日</span></div>
+        <div class="history-item"><span>面膜市场分析</span><span style="font-family:var(--font-mono);font-size:11px">3月28日</span></div>
+        <div class="history-item"><span>清洁类产品对比</span><span style="font-family:var(--font-mono);font-size:11px">3月25日</span></div>
+      </div>
+      <div class="detail-card fade-in" style="animation-delay:.25s">
+        <div class="detail-card-title">相关工具推荐</div>
+        <div class="related-tool" onclick="openTool('竞品雷达')">
+          <div class="related-tool-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+          <div><div class="related-tool-name">竞品雷达</div><div class="related-tool-desc">监控竞品动态</div></div>
+        </div>
+        <div class="related-tool" onclick="openTool('利润计算器')">
+          <div class="related-tool-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+          <div><div class="related-tool-name">利润计算器</div><div class="related-tool-desc">验证选品利润空间</div></div>
+        </div>
+        <div class="related-tool" onclick="openTool('标题优化器')">
+          <div class="related-tool-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
+          <div><div class="related-tool-name">标题优化器</div><div class="related-tool-desc">优化商品标题</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== VIEW 4: WORKFLOW ==================== -->
+<section class="view-content" data-view="workflow">
+  <div class="section-title fade-in">工作流编排</div>
+  <div class="section-subtitle fade-in" style="animation-delay:.05s">将多个工具串联成自动化流程</div>
+
+  <div class="workflow-grid">
+    <div class="workflow-card fade-in" style="animation-delay:.1s">
+      <div class="workflow-card-head">
+        <div class="workflow-name">新品上架一条龙</div>
+        <span class="workflow-status success">上次成功</span>
+      </div>
+      <div class="workflow-flow">
+        <span class="workflow-step"><span class="workflow-step-num">1</span>选品助手</span>
+        <span class="workflow-arrow-css"></span>
+        <span class="workflow-step"><span class="workflow-step-num">2</span>利润计算器</span>
+        <span class="workflow-arrow-css"></span>
+        <span class="workflow-step"><span class="workflow-step-num">3</span>标题优化器</span>
+        <span class="workflow-arrow-css"></span>
+        <span class="workflow-step"><span class="workflow-step-num">4</span>详情页生成器</span>
+      </div>
+      <div class="workflow-footer">
+        <div class="workflow-meta">
+          <span class="workflow-uses">已使用 320 次</span>
+          <span class="workflow-last-run">上次运行：今天 11:20</span>
+        </div>
+        <button class="workflow-start-btn">启动</button>
+      </div>
+    </div>
+
+    <div class="workflow-card fade-in" style="animation-delay:.15s">
+      <div class="workflow-card-head">
+        <div class="workflow-name">竞品分析套餐</div>
+        <span class="workflow-status success">上次成功</span>
+      </div>
+      <div class="workflow-flow">
+        <span class="workflow-step"><span class="workflow-step-num">1</span>竞品雷达</span>
+        <span class="workflow-arrow-css"></span>
+        <span class="workflow-step"><span class="workflow-step-num">2</span>评价分析师</span>
+        <span class="workflow-arrow-css"></span>
+        <span class="workflow-step"><span class="workflow-step-num">3</span>活动策划师</span>
+      </div>
+      <div class="workflow-footer">
+        <div class="workflow-meta">
+          <span class="workflow-uses">已使用 180 次</span>
+          <span class="workflow-last-run">上次运行：昨天 15:40</span>
+        </div>
+        <button class="workflow-start-btn">启动</button>
+      </div>
+    </div>
+
+    <div class="workflow-card fade-in" style="animation-delay:.2s">
+      <div class="workflow-card-head">
+        <div class="workflow-name">日常运营套餐</div>
+        <span class="workflow-status success">上次成功</span>
+      </div>
+      <div class="workflow-flow">
+        <span class="workflow-step"><span class="workflow-step-num">1</span>库存预警</span>
+        <span class="workflow-arrow-css"></span>
+        <span class="workflow-step"><span class="workflow-step-num">2</span>评价分析师</span>
+        <span class="workflow-arrow-css"></span>
+        <span class="workflow-step"><span class="workflow-step-num">3</span>周报生成器</span>
+      </div>
+      <div class="workflow-footer">
+        <div class="workflow-meta">
+          <span class="workflow-uses">已使用 260 次</span>
+          <span class="workflow-last-run">上次运行：今天 09:00</span>
+        </div>
+        <button class="workflow-start-btn">启动</button>
+      </div>
+    </div>
+
+    <div class="workflow-card fade-in" style="animation-delay:.25s">
+      <div class="workflow-card-head">
+        <div class="workflow-name">客诉处理流程</div>
+        <span class="workflow-status idle">待运行</span>
+      </div>
+      <div class="workflow-flow">
+        <span class="workflow-step"><span class="workflow-step-num">1</span>评价分析师</span>
+        <span class="workflow-arrow-css"></span>
+        <span class="workflow-step"><span class="workflow-step-num">2</span>AI小酮</span>
+        <span class="workflow-arrow-css"></span>
+        <span class="workflow-step"><span class="workflow-step-num">3</span>周报生成器</span>
+      </div>
+      <div class="workflow-footer">
+        <div class="workflow-meta">
+          <span class="workflow-uses">已使用 95 次</span>
+          <span class="workflow-last-run">上次运行：3月30日</span>
+        </div>
+        <button class="workflow-start-btn">启动</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Composer -->
+  <div class="ai-composer-section fade-in" style="animation-delay:.3s">
+    <div class="ai-composer-title">AI 编排助手</div>
+    <div class="ai-composer-desc">用自然语言描述你想要的工作流，AI 自动帮你编排</div>
+    <div class="ai-composer-input-row">
+      <input class="ai-composer-input" type="text" placeholder="例如：每周自动分析竞品价格变化并生成报告发飞书...">
+      <button class="ai-composer-btn">AI 编排</button>
+    </div>
+    <div class="ai-composer-examples">
+      <span class="ai-composer-example">新品从选品到上架全自动</span>
+      <span class="ai-composer-example">每天早上发库存预警到飞书</span>
+      <span class="ai-composer-example">客户差评自动分析并通知客服</span>
+      <span class="ai-composer-example">月底自动生成经营月报</span>
+    </div>
+  </div>
+
+  <div class="ai-recommend-banner fade-in" style="animation-delay:.35s">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    根据你最近频繁使用选品助手和标题优化器，推荐尝试「新品上架一条龙」工作流，可节省约 65% 操作时间。
+  </div>
+
+  <button class="create-workflow-btn fade-in" style="animation-delay:.4s">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    手动创建自定义工作流
+  </button>
+</section>
+
+<!-- ==================== VIEW 5: ADMIN ==================== -->
+<section class="view-content" data-view="admin">
+  <div class="section-title fade-in">管理后台</div>
+  <div class="section-subtitle fade-in" style="animation-delay:.05s">工具使用统计与权限管理</div>
+
+  <!-- KPI -->
+  <div class="kpi-row fade-in" style="animation-delay:.1s">
+    <div class="kpi-card">
+      <div class="kpi-label">本月总调用次数</div>
+      <div class="kpi-value">28.6k</div>
+      <div class="kpi-trend up">+12.3% vs 上月</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">活跃工具数</div>
+      <div class="kpi-value">10<span style="font-size:16px;color:var(--text-muted);font-weight:400">/12</span></div>
+      <div class="kpi-trend up">+2 vs 上月</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Token 消耗</div>
+      <div class="kpi-value">1.2M</div>
+      <div class="kpi-trend down">-8.5% 优化有效</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">平均成功率</div>
+      <div class="kpi-value">97.8<span style="font-size:16px;color:var(--text-muted);font-weight:400">%</span></div>
+      <div class="kpi-trend up">+1.2% vs 上月</div>
+    </div>
+  </div>
+
+  <!-- Tool List Table -->
+  <div class="admin-section fade-in" style="animation-delay:.15s">
+    <div class="admin-section-title">工具列表</div>
+    <div style="overflow-x:auto">
+      <table class="admin-tool-table">
+        <thead>
+          <tr><th>工具名称</th><th>状态</th><th>本月调用</th><th>成功率</th><th>配置角色</th><th>操作</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>AI小酮</td><td><span class="status-badge on">运行中</span></td><td class="mono">8,241</td><td class="mono">96.8%</td><td>客服 / 超管</td><td><button class="admin-action-btn" onclick="openConfigModal('AI小酮')">配置</button></td></tr>
+          <tr><td>标题优化器</td><td><span class="status-badge on">运行中</span></td><td class="mono">3,812</td><td class="mono">99.1%</td><td>运营 / 超管</td><td><button class="admin-action-btn" onclick="openConfigModal('标题优化器')">配置</button></td></tr>
+          <tr><td>周报生成器</td><td><span class="status-badge on">运行中</span></td><td class="mono">2,803</td><td class="mono">98.5%</td><td>运营 / 财务 / 超管</td><td><button class="admin-action-btn" onclick="openConfigModal('周报生成器')">配置</button></td></tr>
+          <tr><td>库存预警</td><td><span class="status-badge on">运行中</span></td><td class="mono">2,415</td><td class="mono">97.2%</td><td>运营 / 财务 / 采购 / 超管</td><td><button class="admin-action-btn" onclick="openConfigModal('库存预警')">配置</button></td></tr>
+          <tr><td>选品助手</td><td><span class="status-badge on">运行中</span></td><td class="mono">2,108</td><td class="mono">98.9%</td><td>运营 / 超管</td><td><button class="admin-action-btn" onclick="openConfigModal('选品助手')">配置</button></td></tr>
+          <tr><td>利润计算器</td><td><span class="status-badge on">运行中</span></td><td class="mono">1,824</td><td class="mono">99.5%</td><td>财务 / 超管</td><td><button class="admin-action-btn" onclick="openConfigModal('利润计算器')">配置</button></td></tr>
+          <tr><td>竞品雷达</td><td><span class="status-badge on">运行中</span></td><td class="mono">1,536</td><td class="mono">97.8%</td><td>运营 / 采购 / 超管</td><td><button class="admin-action-btn" onclick="openConfigModal('竞品雷达')">配置</button></td></tr>
+          <tr><td>详情页生成器</td><td><span class="status-badge on">运行中</span></td><td class="mono">1,302</td><td class="mono">98.0%</td><td>运营 / 超管</td><td><button class="admin-action-btn" onclick="openConfigModal('详情页生成器')">配置</button></td></tr>
+          <tr><td>主图灵感</td><td><span class="status-badge on">运行中</span></td><td class="mono">1,105</td><td class="mono">95.3%</td><td>运营 / 超管</td><td><button class="admin-action-btn" onclick="openConfigModal('主图灵感')">配置</button></td></tr>
+          <tr><td>评价分析师</td><td><span class="status-badge on">运行中</span></td><td class="mono">962</td><td class="mono">97.6%</td><td>运营 / 客服 / 超管</td><td><button class="admin-action-btn" onclick="openConfigModal('评价分析师')">配置</button></td></tr>
+          <tr><td>活动策划师</td><td><span class="status-badge on">运行中</span></td><td class="mono">780</td><td class="mono">96.1%</td><td>运营 / 超管</td><td><button class="admin-action-btn" onclick="openConfigModal('活动策划师')">配置</button></td></tr>
+          <tr><td>供应商评估</td><td><span class="status-badge off">已停用</span></td><td class="mono">542</td><td class="mono">94.2%</td><td>采购</td><td><button class="admin-action-btn" onclick="openConfigModal('供应商评估')">配置</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Bar Chart -->
+  <div class="admin-section fade-in" style="animation-delay:.2s">
+    <div class="admin-section-title">工具使用量排行</div>
+    <div class="bar-chart-item"><span class="bar-label">AI小酮</span><div class="bar-track"><div class="bar-fill" style="width:100%"></div></div><span class="bar-value">8.2k</span></div>
+    <div class="bar-chart-item"><span class="bar-label">标题优化器</span><div class="bar-track"><div class="bar-fill" style="width:46.5%"></div></div><span class="bar-value">3.8k</span></div>
+    <div class="bar-chart-item"><span class="bar-label">周报生成器</span><div class="bar-track"><div class="bar-fill" style="width:34.1%"></div></div><span class="bar-value">2.8k</span></div>
+    <div class="bar-chart-item"><span class="bar-label">库存预警</span><div class="bar-track"><div class="bar-fill" style="width:29.3%"></div></div><span class="bar-value">2.4k</span></div>
+    <div class="bar-chart-item"><span class="bar-label">选品助手</span><div class="bar-track"><div class="bar-fill" style="width:25.6%"></div></div><span class="bar-value">2.1k</span></div>
+  </div>
+
+  <!-- Role Distribution -->
+  <div class="admin-section fade-in" style="animation-delay:.25s">
+    <div class="admin-section-title">按角色使用分布</div>
+    <div class="role-dist">
+      <div class="role-dist-item"><div class="role-dot" style="background:#1A1A1A"></div><span>运营</span><span class="role-pct">48%</span></div>
+      <div class="role-dist-item"><div class="role-dot" style="background:#666666"></div><span>财务</span><span class="role-pct">22%</span></div>
+      <div class="role-dist-item"><div class="role-dot" style="background:#999999"></div><span>客服</span><span class="role-pct">18%</span></div>
+      <div class="role-dist-item"><div class="role-dot" style="background:#CCCCCC"></div><span>采购</span><span class="role-pct">8%</span></div>
+      <div class="role-dist-item"><div class="role-dot" style="background:#E8E8E8"></div><span>超管</span><span class="role-pct">4%</span></div>
+    </div>
+  </div>
+
+  <!-- Global Settings -->
+  <div class="admin-section fade-in" style="animation-delay:.3s">
+    <div class="admin-section-title">全局设置</div>
+    <div class="settings-grid">
+      <div class="settings-item">
+        <div class="settings-item-label">月度 Token 配额</div>
+        <div class="settings-item-value">5,000,000</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px">已使用 <span style="font-family:var(--font-mono);font-weight:600;color:var(--text-primary)">1,203,847</span> (24.1%)</div>
+        <div style="height:6px;background:var(--input-bg);border-radius:3px;overflow:hidden"><div style="height:100%;width:24.1%;background:var(--accent);border-radius:3px"></div></div>
+      </div>
+      <div class="settings-item">
+        <div class="settings-item-label">新工具审批</div>
+        <select class="settings-select">
+          <option selected>需要管理员审批</option>
+          <option>自动启用</option>
+          <option>禁止新增</option>
+        </select>
+        <div class="settings-item-desc" style="margin-top:8px">新上线的工具需经管理员审批后才对用户可见</div>
+      </div>
+      <div class="settings-item">
+        <div class="settings-item-label">AI 风控级别</div>
+        <select class="settings-select">
+          <option>宽松 - 允许大部分操作</option>
+          <option selected>标准 - 敏感操作需确认</option>
+          <option>严格 - 所有操作需审批</option>
+        </select>
+        <div class="settings-item-desc" style="margin-top:8px">控制AI工具执行高风险操作时的审批级别</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Permission Matrix -->
+  <div class="admin-section fade-in" style="animation-delay:.35s">
+    <div class="admin-section-title">权限矩阵</div>
+    <div style="overflow-x:auto">
+      <table class="perm-table">
+        <thead>
+          <tr><th>工具</th><th>超管</th><th>运营</th><th>财务</th><th>客服</th><th>采购</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>选品助手</td><td class="perm-check">&#10003;</td><td class="perm-check">&#10003;</td><td class="perm-dash">&mdash;</td><td class="perm-dash">&mdash;</td><td class="perm-dash">&mdash;</td></tr>
+          <tr><td>标题优化器</td><td class="perm-check">&#10003;</td><td class="perm-check">&#10003;</td><td class="perm-dash">&mdash;</td><td class="perm-dash">&mdash;</td><td class="perm-dash">&mdash;</td></tr>
+          <tr><td>竞品雷达</td><td class="perm-check">&#10003;</td><td class="perm-check">&#10003;</td><td class="perm-dash">&mdash;</td><td class="perm-dash">&mdash;</td><td class="perm-check">&#10003;</td></tr>
+          <tr><td>利润计算器</td><td class="perm-check">&#10003;</td><td class="perm-dash">&mdash;</td><td class="perm-check">&#10003;</td><td class="perm-dash">&mdash;</td><td class="perm-dash">&mdash;</td></tr>
+          <tr><td>AI小酮</td><td class="perm-check">&#10003;</td><td class="perm-dash">&mdash;</td><td class="perm-dash">&mdash;</td><td class="perm-check">&#10003;</td><td class="perm-dash">&mdash;</td></tr>
+          <tr><td>评价分析师</td><td class="perm-check">&#10003;</td><td class="perm-check">&#10003;</td><td class="perm-dash">&mdash;</td><td class="perm-check">&#10003;</td><td class="perm-dash">&mdash;</td></tr>
+          <tr><td>主图灵感</td><td class="perm-check">&#10003;</td><td class="perm-check">&#10003;</td><td class="perm-dash">&mdash;</td><td class="perm-dash">&mdash;</td><td class="perm-dash">&mdash;</td></tr>
+          <tr><td>库存预警</td><td class="perm-check">&#10003;</td><td class="perm-check">&#10003;</td><td class="perm-check">&#10003;</td><td class="perm-dash">&mdash;</td><td class="perm-check">&#10003;</td></tr>
+          <tr><td>活动策划师</td><td class="perm-check">&#10003;</td><td class="perm-check">&#10003;</td><td class="perm-dash">&mdash;</td><td class="perm-dash">&mdash;</td><td class="perm-dash">&mdash;</td></tr>
+          <tr><td>详情页生成器</td><td class="perm-check">&#10003;</td><td class="perm-check">&#10003;</td><td class="perm-dash">&mdash;</td><td class="perm-dash">&mdash;</td><td class="perm-dash">&mdash;</td></tr>
+          <tr><td>供应商评估</td><td class="perm-check">&#10003;</td><td class="perm-dash">&mdash;</td><td class="perm-dash">&mdash;</td><td class="perm-dash">&mdash;</td><td class="perm-check">&#10003;</td></tr>
+          <tr><td>周报生成器</td><td class="perm-check">&#10003;</td><td class="perm-check">&#10003;</td><td class="perm-check">&#10003;</td><td class="perm-dash">&mdash;</td><td class="perm-dash">&mdash;</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ========== Config Modal ========== -->
+<div class="modal-overlay" id="configModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="configModalTitle">配置工具</span>
+      <button class="modal-close" onclick="closeConfigModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">选择可使用该工具的角色：</div>
+      <label class="checkbox-item"><input type="checkbox" checked> 超级管理员</label>
+      <label class="checkbox-item"><input type="checkbox" id="roleOps"> 运营</label>
+      <label class="checkbox-item"><input type="checkbox" id="roleFin"> 财务</label>
+      <label class="checkbox-item"><input type="checkbox" id="roleCS"> 客服</label>
+      <label class="checkbox-item"><input type="checkbox" id="rolePurchase"> 采购</label>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn" onclick="closeConfigModal()">取消</button>
+      <button class="modal-btn modal-btn-primary" onclick="closeConfigModal()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== Onboarding Modal ========== -->
+<div class="onboarding-overlay" id="onboardingModal">
+  <div class="onboarding-modal">
+    <div class="onboarding-icon">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    </div>
+    <div class="onboarding-title">欢迎来到工具中心</div>
+    <div class="onboarding-desc">这里是你的 AI 武器库。12 款智能工具覆盖选品、内容、数据、财务、客服全场景，还能将工具串联成自动化工作流。</div>
+    <div class="onboarding-steps">
+      <div class="onboarding-step">
+        <div class="onboarding-step-num">1</div>
+        <div class="onboarding-step-text">浏览工具广场</div>
+      </div>
+      <div class="onboarding-step">
+        <div class="onboarding-step-num">2</div>
+        <div class="onboarding-step-text">收藏常用工具</div>
+      </div>
+      <div class="onboarding-step">
+        <div class="onboarding-step-num">3</div>
+        <div class="onboarding-step-text">编排工作流</div>
+      </div>
+    </div>
+    <button class="onboarding-btn" onclick="closeOnboarding()">开始探索</button>
+  </div>
+</div>
+
+<!-- ========== AI Float Bubble ========== -->
+<button class="ai-float-btn" onclick="switchView('tool-detail')" title="AI 对话">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+</button>
+
+<!-- ========== Footer ========== -->
+<footer class="footer">
+  <span><span class="footer-dot"></span>系统正常</span>
+  <span>AI引擎：通义千问</span>
+  <span>工具中心</span>
+  <span class="footer-right">v3.3</span>
+</footer>
+
+<script>
+// ===== View Switching =====
+function switchView(viewName) {
+  document.querySelectorAll('.view-content').forEach(function(v) {
+    v.classList.remove('active');
+  });
+  var target = document.querySelector('.view-content[data-view="' + viewName + '"]');
+  if (target) target.classList.add('active');
+
+  document.querySelectorAll('.nav-item[data-view]').forEach(function(n) {
+    n.classList.remove('active');
+  });
+  var navItem = document.querySelector('.nav-item[data-view="' + viewName + '"]');
+  if (navItem) navItem.classList.add('active');
+}
+
+// Sidebar nav click
+document.querySelectorAll('.nav-item[data-view]').forEach(function(item) {
+  item.addEventListener('click', function() {
+    switchView(item.getAttribute('data-view'));
+  });
+});
+
+// ===== Tool Search Filter =====
+function filterTools() {
+  var query = document.getElementById('searchInput').value.toLowerCase();
+  // Hide placeholder when typing
+  var placeholder = document.getElementById('searchPlaceholder');
+  if (placeholder) placeholder.style.display = query ? 'none' : 'block';
+
+  document.querySelectorAll('#toolGrid .tool-card').forEach(function(card) {
+    var name = card.getAttribute('data-name').toLowerCase();
+    var desc = card.querySelector('.tool-desc').textContent.toLowerCase();
+    var sceneMatch = currentScene === 'all' || card.getAttribute('data-scene') === currentScene;
+    var textMatch = name.includes(query) || desc.includes(query);
+    card.style.display = (sceneMatch && textMatch) ? '' : 'none';
+  });
+}
+
+// ===== Scene Tabs Filter =====
+var currentScene = 'all';
+function filterScene(scene) {
+  currentScene = scene;
+  document.querySelectorAll('.scene-tab').forEach(function(tab) {
+    tab.classList.toggle('active', tab.getAttribute('data-scene') === scene);
+  });
+  filterTools();
+}
+
+// ===== Open Tool (switch to detail view) =====
+function openTool(toolName) {
+  switchView('tool-detail');
+}
+
+// ===== Mode Toggle =====
+function toggleMode() {
+  var sw = document.getElementById('modeToggle');
+  sw.classList.toggle('simple');
+  var labels = sw.parentElement.querySelectorAll('.mode-label');
+  if (sw.classList.contains('simple')) {
+    labels[0].classList.add('active');
+    labels[1].classList.remove('active');
+  } else {
+    labels[0].classList.remove('active');
+    labels[1].classList.add('active');
+  }
+}
+
+// ===== Notification Panel =====
+function toggleNotification() {
+  document.getElementById('notifPanel').classList.toggle('show');
+}
+document.addEventListener('click', function(e) {
+  var panel = document.getElementById('notifPanel');
+  var btn = document.querySelector('.notification-btn');
+  if (!panel.contains(e.target) && !btn.contains(e.target)) {
+    panel.classList.remove('show');
+  }
+});
+
+// ===== Config Modal =====
+function openConfigModal(toolName) {
+  document.getElementById('configModalTitle').textContent = '配置 - ' + toolName;
+  document.getElementById('configModal').classList.add('show');
+}
+function closeConfigModal() {
+  document.getElementById('configModal').classList.remove('show');
+}
+
+// ===== Onboarding =====
+function closeOnboarding() {
+  document.getElementById('onboardingModal').classList.remove('show');
+  localStorage.setItem('toolcenter_onboarded', '1');
+}
+// Show onboarding on first visit
+if (!localStorage.getItem('toolcenter_onboarded')) {
+  setTimeout(function() {
+    document.getElementById('onboardingModal').classList.add('show');
+  }, 500);
+}
+
+// ===== Role Section Toggle =====
+document.querySelectorAll('.role-section-header').forEach(function(header) {
+  header.addEventListener('click', function() {
+    header.classList.toggle('collapsed');
+  });
+});
+
+// ===== AI Composer Example Click =====
+document.querySelectorAll('.ai-composer-example').forEach(function(ex) {
+  ex.addEventListener('click', function() {
+    var input = document.querySelector('.ai-composer-input');
+    if (input) input.value = ex.textContent;
+  });
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,133 @@
+@import '../../../styles/variables.scss';
+
+.points {
+  min-height: 100vh;
+  background: $color-bg-page;
+  padding-bottom: $spacing-xxl;
+
+  // Summary
+  &__summary {
+    margin: $spacing-sm $page-padding 0;
+    background: $color-bg-card;
+    border-radius: $radius-lg;
+    padding: $spacing-xl $spacing-lg;
+    text-align: center;
+  }
+
+  &__summary-label {
+    font-size: $font-size-sm;
+    color: $color-text-secondary;
+  }
+
+  &__summary-value {
+    display: block;
+    font-size: 40px;
+    font-weight: 700;
+    color: $color-gold;
+    font-family: $font-family-num;
+    margin: $spacing-xs 0;
+  }
+
+  &__summary-expire {
+    font-size: $font-size-xs;
+    color: $color-danger;
+    background: rgba($color-danger, 0.08);
+    padding: 3px 10px;
+    border-radius: $radius-pill;
+  }
+
+  // Tabs
+  &__tabs {
+    display: flex;
+    margin: $spacing-base $page-padding 0;
+    background: $color-bg-card;
+    border-radius: $radius-md;
+    padding: $spacing-xs;
+  }
+
+  &__tab {
+    flex: 1;
+    text-align: center;
+    padding: $spacing-sm 0;
+    border-radius: $radius-sm;
+    transition: all 0.2s;
+
+    &--active {
+      background: $color-primary;
+
+      .points__tab-text {
+        color: #fff;
+        font-weight: 600;
+      }
+    }
+  }
+
+  &__tab-text {
+    font-size: $font-size-base;
+    color: $color-text-secondary;
+  }
+
+  // List
+  &__list {
+    margin-top: $spacing-base;
+    padding: 0 $page-padding;
+  }
+
+  &__group {
+    margin-bottom: $spacing-base;
+  }
+
+  &__group-date {
+    font-size: $font-size-sm;
+    color: $color-text-tertiary;
+    margin-bottom: $spacing-sm;
+    display: block;
+  }
+
+  &__record {
+    background: $color-bg-card;
+    border-radius: $radius-md;
+    padding: $card-padding $spacing-base;
+    margin-bottom: $spacing-sm;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__record-title {
+    font-size: $font-size-base;
+    color: $color-text-primary;
+    font-weight: 500;
+  }
+
+  &__record-desc {
+    font-size: $font-size-xs;
+    color: $color-text-tertiary;
+    margin-top: 2px;
+  }
+
+  &__record-right {
+    text-align: right;
+  }
+
+  &__record-amount {
+    font-size: $font-size-lg;
+    font-weight: 600;
+    font-family: $font-family-num;
+
+    &--income {
+      color: $color-success;
+    }
+
+    &--expense {
+      color: $color-danger;
+    }
+  }
+
+  &__record-time {
+    font-size: $font-size-xs;
+    color: $color-text-tertiary;
+    margin-top: 2px;
+    display: block;
+  }
+}

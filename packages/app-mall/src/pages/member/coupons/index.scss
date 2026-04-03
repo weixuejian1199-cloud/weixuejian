@@ -1,0 +1,238 @@
+@import '../../../styles/variables.scss';
+
+.coupons {
+  min-height: 100vh;
+  background: $color-bg-page;
+  padding-bottom: 80px;
+
+  // Tabs
+  &__tabs {
+    display: flex;
+    background: $color-bg-card;
+    padding: 0 $page-padding;
+    border-bottom: 1px solid $color-bg-divider;
+  }
+
+  &__tab {
+    flex: 1;
+    text-align: center;
+    padding: $spacing-md 0;
+    position: relative;
+
+    &--active {
+      .coupons__tab-text {
+        color: $color-text-primary;
+        font-weight: 600;
+      }
+    }
+  }
+
+  &__tab-text {
+    font-size: $font-size-base;
+    color: $color-text-secondary;
+  }
+
+  &__tab-line {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 24px;
+    height: 2px;
+    background: $color-gold;
+    border-radius: 1px;
+  }
+
+  // List
+  &__list {
+    padding: $spacing-base $page-padding 0;
+  }
+
+  &__empty {
+    padding: 60px 0;
+    text-align: center;
+  }
+
+  &__empty-text {
+    font-size: $font-size-base;
+    color: $color-text-tertiary;
+  }
+
+  // Card
+  &__card {
+    display: flex;
+    align-items: stretch;
+    background: $color-bg-card;
+    border-radius: $radius-md;
+    margin-bottom: $spacing-md;
+    overflow: hidden;
+    box-shadow: $shadow-card;
+
+    &--disabled {
+      opacity: 0.55;
+
+      .coupons__card-left {
+        background: #e8e8e8;
+      }
+    }
+  }
+
+  &__card-left {
+    width: 110px;
+    background: linear-gradient(135deg, $color-gold, $color-gold-light);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: $spacing-base $spacing-sm;
+    flex-shrink: 0;
+  }
+
+  &__card-amount-row {
+    display: flex;
+    align-items: baseline;
+  }
+
+  &__card-symbol {
+    font-size: $font-size-lg;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  &__card-amount {
+    font-size: 32px;
+    font-weight: 700;
+    color: #fff;
+    font-family: $font-family-num;
+  }
+
+  &__card-threshold {
+    font-size: $font-size-xs;
+    color: rgba(255, 255, 255, 0.85);
+    margin-top: $spacing-xs;
+  }
+
+  // Cutout
+  &__card-cutout {
+    width: 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__card-cutout-top,
+  &__card-cutout-bottom {
+    width: 12px;
+    height: 12px;
+    background: $color-bg-page;
+    border-radius: $radius-circle;
+    position: absolute;
+    left: -6px;
+  }
+
+  &__card-cutout-top {
+    top: -6px;
+  }
+
+  &__card-cutout-bottom {
+    bottom: -6px;
+  }
+
+  &__card-cutout-line {
+    position: absolute;
+    top: 12px;
+    bottom: 12px;
+    left: -1px;
+    width: 0;
+    border-left: 2px dashed $color-bg-divider;
+  }
+
+  // Right
+  &__card-right {
+    flex: 1;
+    padding: $spacing-md $spacing-base $spacing-md $spacing-base;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  &__card-scope {
+    font-size: $font-size-base;
+    color: $color-text-primary;
+    font-weight: 500;
+  }
+
+  &__card-expire {
+    font-size: $font-size-xs;
+    color: $color-text-tertiary;
+    margin-top: $spacing-xs;
+  }
+
+  &__card-btn {
+    align-self: flex-end;
+    margin-top: $spacing-sm;
+    padding: 4px 14px;
+    background: $color-primary;
+    border-radius: $radius-pill;
+  }
+
+  &__card-btn-text {
+    font-size: $font-size-sm;
+    color: #fff;
+    font-weight: 500;
+  }
+
+  &__card-status {
+    align-self: flex-end;
+    margin-top: $spacing-sm;
+    font-size: $font-size-sm;
+    color: $color-text-tertiary;
+  }
+
+  // Redeem
+  &__redeem {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: $color-bg-card;
+    padding: $spacing-md $page-padding;
+    padding-bottom: calc($spacing-md + env(safe-area-inset-bottom));
+    box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.04);
+  }
+
+  &__redeem-inner {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+  }
+
+  &__redeem-input {
+    flex: 1;
+    height: 40px;
+    background: $color-bg-input;
+    border-radius: $radius-base;
+    padding: 0 $spacing-md;
+    font-size: $font-size-base;
+    color: $color-text-primary;
+  }
+
+  &__redeem-btn {
+    height: 40px;
+    padding: 0 $spacing-lg;
+    background: $color-gold;
+    border-radius: $radius-base;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  &__redeem-btn-text {
+    font-size: $font-size-base;
+    color: #fff;
+    font-weight: 500;
+  }
+}

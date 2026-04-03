@@ -1,0 +1,240 @@
+@import '../../../styles/variables.scss';
+
+.withdraw-page {
+  min-height: 100vh;
+  background: $color-bg-page;
+  padding-bottom: 60px;
+}
+
+// Balance Card
+.balance-card {
+  margin: $spacing-sm $page-padding 0;
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-xl $spacing-lg;
+  text-align: center;
+}
+
+.balance-label {
+  display: block;
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  margin-bottom: $spacing-sm;
+}
+
+.balance-value {
+  display: block;
+  font-size: 36px;
+  font-weight: 700;
+  color: $color-gold;
+  font-family: $font-family-num;
+}
+
+// Amount Input
+.input-card {
+  margin: $spacing-md $page-padding 0;
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+}
+
+.input-title {
+  display: block;
+  font-size: $font-size-md;
+  font-weight: 600;
+  color: $color-text-primary;
+  margin-bottom: $spacing-md;
+}
+
+.amount-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid $color-bg-divider;
+  padding-bottom: $spacing-md;
+}
+
+.amount-prefix {
+  font-size: $font-size-price-lg;
+  font-weight: 700;
+  color: $color-text-primary;
+  font-family: $font-family-num;
+  margin-right: $spacing-sm;
+}
+
+.amount-input {
+  flex: 1;
+  font-size: $font-size-price;
+  font-weight: 600;
+  font-family: $font-family-num;
+  color: $color-text-primary;
+}
+
+.amount-all {
+  font-size: $font-size-sm;
+  color: $color-gold;
+  font-weight: 500;
+  flex-shrink: 0;
+  margin-left: $spacing-md;
+}
+
+.amount-error {
+  display: block;
+  font-size: $font-size-xs;
+  color: $color-danger;
+  margin-top: $spacing-sm;
+}
+
+// Payment Method
+.method-card {
+  margin: $spacing-md $page-padding 0;
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+}
+
+.method-title {
+  display: block;
+  font-size: $font-size-md;
+  font-weight: 600;
+  color: $color-text-primary;
+  margin-bottom: $spacing-md;
+}
+
+.method-row {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+}
+
+.method-icon {
+  font-size: $font-size-xxl;
+}
+
+.method-name {
+  flex: 1;
+  font-size: $font-size-base;
+  color: $color-text-primary;
+}
+
+.method-check {
+  font-size: $font-size-lg;
+}
+
+// Fee Card
+.fee-card {
+  margin: $spacing-md $page-padding 0;
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+}
+
+.fee-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: $spacing-sm 0;
+}
+
+.fee-label {
+  font-size: $font-size-base;
+  color: $color-text-secondary;
+}
+
+.fee-value {
+  font-size: $font-size-base;
+  font-weight: 600;
+  color: $color-text-primary;
+  font-family: $font-family-num;
+
+  &--gold {
+    color: $color-gold;
+    font-size: $font-size-lg;
+  }
+}
+
+.fee-divider {
+  height: 1px;
+  background: $color-bg-divider;
+  margin: $spacing-xs 0;
+}
+
+// Verify Card
+.verify-card {
+  margin: $spacing-md $page-padding 0;
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+}
+
+.verify-title {
+  display: block;
+  font-size: $font-size-md;
+  font-weight: 600;
+  color: $color-text-primary;
+  margin-bottom: $spacing-md;
+}
+
+.verify-row {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+}
+
+.verify-input {
+  flex: 1;
+  height: 44px;
+  background: $color-bg-input;
+  border-radius: $radius-base;
+  padding: 0 $spacing-base;
+  font-size: $font-size-base;
+}
+
+.verify-btn {
+  height: 44px;
+  padding: 0 $spacing-base;
+  background: $color-primary;
+  border-radius: $radius-base;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  &--disabled {
+    background: $color-text-placeholder;
+  }
+}
+
+.verify-btn-text {
+  color: #fff;
+  font-size: $font-size-sm;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.verify-hint {
+  display: block;
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-top: $spacing-sm;
+}
+
+// Submit Button
+.submit-btn {
+  margin: $spacing-xl $page-padding 0;
+  height: 48px;
+  border-radius: $radius-pill;
+  background: $color-text-placeholder;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &--active {
+    background: $color-primary;
+  }
+}
+
+.submit-btn-text {
+  color: #fff;
+  font-size: $font-size-lg;
+  font-weight: 600;
+}
