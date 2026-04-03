@@ -1,7 +1,7 @@
 {
   "projectName": "企业AI工作站",
   "version": "3.3.0",
-  "lastUpdated": "2026-03-31",
+  "lastUpdated": "2026-04-03",
   "projectBrief": {
     "_instruction": "新对话必读。读完这一段就能理解项目全貌，不需要打开其他文档。",
     "identity": "创始人同时拥有三个品牌：时皙（生活品牌，主品牌）、AIBIAINI（生酮营养品）、卢司令（社群电商，2026年关停）。企业AI工作站以时皙为主题。",
@@ -222,7 +222,7 @@
   },
   "missingRoles": {
     "_note": "v2.6审计后更新的缺失岗位。DocSync已在v2.6审计中实际运作，建议Phase 1b正式化",
-    "docSyncAgent": "文档一致性守护Agent — 每次提交自动检查brain.json任务状态/错误码/部署描述与代码的一致性（v2.6审计发现文档严重滞后，5个任务状态+16个错误码+部署描述全部过时）",
+    "docSyncAgent": "DocSync Agent — 已在 v3.1 正式化(docs/04)，每次 AC 完成自动检查 brain.json 状态/错误码/部署描述与代码一致性",
     "securityAgent": "安全合规Agent — 密钥轮换/数据加密/审计/PIPL合规（v2.6审计发现HS256降级漏洞、限流key失效）",
     "sreAgent": "SRE Agent — 监控告警/容量规划/性能优化/CI-CD（v2.6审计发现无GitHub Actions pipeline）",
     "customerSuccessAgent": "客户成功Agent — SLA追踪/用户反馈/续约"
@@ -240,25 +240,29 @@
           "id": "BL-020",
           "title": "数据安全与PIPL合规策略",
           "priority": "P0",
-          "dependency": "无"
+          "dependency": "无",
+          "status": "done"
         },
         {
           "id": "BL-025",
           "title": "1688 Adapter实现",
           "priority": "P0",
-          "dependency": "BL-024 Spike"
+          "dependency": "BL-024 Spike",
+          "status": "pending"
         },
         {
           "id": "BL-018",
           "title": "ztdy-open写操作API开放",
           "priority": "P1",
-          "dependency": "第三方配合"
+          "dependency": "第三方配合",
+          "status": "blocked"
         },
         {
           "id": "BL-021",
           "title": "AI幻觉防护增强",
           "priority": "P1",
-          "dependency": "无"
+          "dependency": "无",
+          "status": "done"
         }
       ]
     },
@@ -270,25 +274,29 @@
           "id": "BL-028",
           "title": "订单路由引擎（多源智能分单）",
           "priority": "P0",
-          "dependency": "BL-025"
+          "dependency": "BL-025",
+          "status": "pending"
         },
         {
           "id": "BL-026",
           "title": "AI选品Agent",
           "priority": "P0",
-          "dependency": "BL-025"
+          "dependency": "BL-025",
+          "status": "pending"
         },
         {
           "id": "BL-027",
           "title": "商品风格统一模块",
           "priority": "P1",
-          "dependency": "BL-026"
+          "dependency": "BL-026",
+          "status": "pending"
         },
         {
           "id": "BL-023",
           "title": "操作确认记录+AI决策回放",
           "priority": "P1",
-          "dependency": "无"
+          "dependency": "无",
+          "status": "done"
         }
       ]
     },
@@ -300,31 +308,35 @@
           "id": "BL-005",
           "title": "ACI客服Phase 2半自动",
           "priority": "P0",
-          "dependency": "Phase 1 ACI陪练数据"
+          "dependency": "Phase 1 ACI陪练数据",
+          "status": "pending"
         },
         {
           "id": "BL-002",
           "title": "电商数据分析引擎",
           "priority": "P1",
-          "dependency": "无"
+          "dependency": "无",
+          "status": "pending"
         },
         {
           "id": "BL-022",
           "title": "AI成本监控仪表盘",
           "priority": "P1",
-          "dependency": "无"
+          "dependency": "无",
+          "status": "done"
         },
         {
           "id": "BL-012",
           "title": "轻量审批流引擎",
           "priority": "P2",
-          "dependency": "无"
+          "dependency": "无",
+          "status": "pending"
         }
       ]
     },
     "supplyChainStatus": {
       "1688": "诚信通已申请(2026-03-31)，等审核5-7工作日",
-      "aikucun": "商务对接中，已联系负责人，有折扣优势，技术方案待确认",
+      "aikucun": "ADR-031 已确认封闭生态不可行，已从方案中移除。创始人打通新渠道（1+N 策略），具体供应商待确认",
       "ztdy": "写操作API创始人在落实中",
       "strategyUpdate": "ADR-031原评估爱库存封闭生态不可行，创始人打通新渠道，供应链可能从1+1升级为1+N"
     }
@@ -996,7 +1008,7 @@
     ],
     "totalEstimatedDays": "30-35个工作日（含Critic双重审查5天 + 工作量重估 + 多租户简化节省1天）",
     "criticalPath": "001(✅) → 002/005/006(✅) → 010/011(✅安全基线) → 009(✅MallAdapter) → SPIKE-001/002(下一步) → P1b-006(飞书) → P1b-001 → P1b-002 → P1b-003(6天最重) → P1b-004 → P1b-005 → P1b-007/008",
-    "phase1aDeliverable": "可运行的后端+Docker环境+安全中间件套件(fail-secure)+错误码注册表(38码)+Schema 21表+175测试全绿+6个ztdy API已接通+健康检查可访问+百炼tool_call已验证+Bridge API原型已验证（目标4月20日）",
+    "phase1aDeliverable": "可运行的后端+Docker环境+安全中间件套件(fail-secure)+错误码注册表(58码)+Schema 23表+748测试全绿+6个ztdy API已接通+健康检查可访问+百炼tool_call已验证+Bridge API原型已验证（目标4月20日）",
     "phase1bDeliverable": "飞书号1→Claude Code可对话（最先交付）；飞书号2→AI对话引擎→查ztdy真实数据→飞书回复；ACI退货审核判断可工作+判断记录可回放（目标6月6日）",
     "v23ChangeLog": "9人团队全面审查v2.3：(1)双飞书Wave9→Wave4（验证通道先行）(2)多租户Phase1简化（硬编码默认租户，节省1天）(3)新增SPIKE-001/002在Phase1a验证技术风险(4)删除供应商对账(BL-002/BL-011)(5)新增AiJudgmentRecord表(6)AI幻觉防护写入AI对话引擎(7)直达模式跳过Master Agent(8)E2E冒烟测试(9)MallAdapter按数据类型差异化缓存TTL(10)ACI标注数据集30-50个case"
   },
@@ -2299,6 +2311,18 @@
         "新增PIT-016(ztdy未通端点)/PIT-017(大数据量聚合)",
         "Deadline从4月25日调整为5月2日（新增AI+客服工作量）"
       ]
+    },
+    {
+      "version": "3.3.1",
+      "date": "2026-04-03",
+      "author": "DocSync Agent",
+      "changes": [
+        "testBaseline 748→845（同步实际测试数）",
+        "phase2Roadmap BL 任务补 status 字段（BL-020/021/022/023→done，BL-018→blocked，其余→pending）",
+        "supplyChainStatus.aikucun 与 ADR-031 对齐（删除矛盾描述）",
+        "missingRoles.docSyncAgent 更新为已正式化",
+        "lastUpdated 更新至 2026-04-03"
+      ]
     }
   ],
   "sessionProtocol": {
@@ -2444,5 +2468,5 @@
     ],
     "note": "v2.3九人团队全面审查完成。方案理解10/10。所有评分维度均有改善路径。下一步：Wave 2 三路并行（Schema精简版/健康检查/Docker）+ Wave 3.5两个技术Spike。Phase 1b第一个任务改为双飞书对接（验证通道先行）。"
   },
-  "testBaseline": 748
+  "testBaseline": 845
 }

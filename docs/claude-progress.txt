@@ -1,347 +1,92 @@
 # 进度接力
 
 ## 最后更新
-- 时间：2026-03-31 23:30
-- Agent：CTO Agent
-- 任务：BL-022 AI成本监控与预算控制仪表盘
+- 时间：2026-04-03 09:00
+- Agent：DocSync Agent（文档一致性审查）
+- 任务：brain.json 对齐 + progress.txt 归档压缩 + 牵牛花 RPA 状态补录
 
-## BL-022 AI成本监控仪表盘 ✅ 完成 (692→748测试)
-- **Schema**: AiUsageRecord模型(每次AI调用一条) + Tenant新增4预算字段(日限额/月预算/告警阈值/降级阈值)
-- **核心服务**: cost-service.ts
-  - calculateCost: token→CNY定价(qwen-turbo/plus/max, 未知模型按最贵fail-secure)
-  - checkQuota: 预飞检查(日token/月token/月预算三重拦截 + 90%降级 + 80%告警 + DB异常=封锁)
-  - recordUsage: 每次AI调用写入AiUsageRecord
-  - getUsageSummary/getUsageBreakdown/getDailyTrend/getMonthlyReport: 仪表盘聚合查询
-- **Orchestrator集成**: chat-orchestrator.ts插入预飞检查+用量记录(~20行)
-  - 自动模型降级链: qwen-max→qwen-plus→qwen-turbo
-  - effectiveModel传递到chatStream/chatCompletion
-- **路由层**: 4个GET端点
-  - /api/v1/ai/cost/summary — 实时用量概览(day/month)
-  - /api/v1/ai/cost/breakdown — 按用户/Agent明细
-  - /api/v1/ai/cost/trend — 日趋势图数据
-  - /api/v1/ai/cost/report — 月度完整报告
-- **Prometheus**: 4新指标(ai_tokens_total/ai_cost_yuan_total/ai_quota_blocked_total/ai_model_downgrade_total)
-- **错误码**: +4个(AI_QUOTA_EXCEEDED/AI_BUDGET_EXCEEDED/AI_DAILY_LIMIT_EXCEEDED/AI_COST_CHECK_FAILED)
-- **环境变量**: +3个可选(AI_DAILY_TOKEN_LIMIT/AI_MONTHLY_BUDGET_YUAN/AI_DOWNGRADE_MODEL)
-- **月报任务**: monthly-cost-report.ts(结构化日志+站内通知)
-- **测试(+56)**: cost-service(28) + cost-routes(15) + monthly-report(9) + metrics(+4)
-- 基线: 748测试全绿(55文件) / TypeScript零错误
-- **下一步**: Wave 3其他(BL-005 ACI半自动/BL-002数据分析/BL-012审批流)
+---
 
-## BL-023 操作确认记录+AI决策回放 ✅ 完成 (670→692测试)
-- **Schema**: ConfirmationRecord模型 + ConfirmationStatus枚举 + 5个索引
-  - 完整决策链: aiInput/triggeredRules/evidence/aiRecommendation
-  - ADR-019落地: riskLevel/operationType/expiresAt/changeDetails
-- **服务层**: confirmation-service.ts
-  - createConfirmation: AI生成确认请求
-  - respondToConfirmation: 用户确认/拒绝 + 过期自动检测 + 审计日志
-  - listConfirmations: 分页列表 + status/operationType/riskLevel过滤
-  - getDecisionReplay: 完整决策链回放(输入→规则→证据→建议→用户决策)
-- **路由层**: 4个端点
-  - POST /api/v1/confirmations — 创建确认请求
-  - POST /api/v1/confirmations/:id/respond — 用户确认/拒绝
-  - GET /api/v1/confirmations — 确认记录列表
-  - GET /api/v1/confirmations/:id/replay — 决策回放
-- **改造**: app.ts注册路由 + prisma.ts租户守卫 + error-codes新增3码
-- **测试(+22)**: Schema校验(5) + 创建(2) + 响应(5) + 列表(4) + 回放(3) + Zod(3)
-- 基线: 692测试全绿(52文件) / TypeScript零错误
-- **下一步**: Wave 1供应链(等外部反馈) / Wave 2其他项
+## 历史归档摘要（Phase 1a/1b 全部完成）
 
-## BL-021 AI幻觉防护增强 ✅ 完成 (628→670测试)
-- **新增文件(1)**:
-  - services/ai/hallucination-guard.ts: 4大防护能力
-    - (1) 关键指标自动校验: AI回复数字 vs 工具返回数字，偏差>1%标记警告
-    - (2) 数据来源标注: 从_dataSource/_queryTime提取，构建来源说明
-    - (3) 财务审计尾注: finance/settlement人格强制附加来源+时间+免责声明
-    - (4) 数据冲突检测: 不同工具同名字段偏差>5%触发冲突告警
-- **改造文件(2)**:
-  - types.ts: 新增SSEDataValidation事件类型
-  - chat-orchestrator.ts: tool_call完成后调用validateResponse，yield data_validation事件
-- **测试(+42)**:
-  - hallucination-guard.test.ts(38): 数字提取/校验/来源标注/财务尾注/冲突检测/集成
-  - chat-orchestrator.test.ts(+4): BL-021集成测试(调用验证/审计尾注/无工具跳过/不一致检测)
-- **brain.json同步**: testBaseline=670 / BL-021 status=done
-- 基线: 670测试全绿(51文件) / TypeScript零错误
-- **下一步**: Wave 1剩余(BL-025 1688Adapter等供应链) / 等外部反馈
+> Phase 1a/1b 所有 US（US-P1a-001/002/005/006/009/010/011，US-P1b-001~008）均已 done。
+> Phase 2a 已完成：BL-009 工具市场 MVP / BL-004 AI人格系统 / v3.3 CTO全面审计 /
+>   BL-020 PIPL数据安全合规 / BL-021 AI幻觉防护增强 / BL-023 操作确认记录+AI决策回放 /
+>   BL-022 AI成本监控仪表盘 / 飞书告警服务+RPA采集指标(DEBT-002)
+> 测试增长轨迹：91→123→201→250→328→408→454→488→569→585→628→670→692→748→808→845
 
-## Phase 2路线图 + BL-020 PIPL合规 ✅ 完成 (585→628测试)
-- **Phase 2路线图**: Wave 1-3规划写入brain.json(phase2Roadmap段落)
-- **供应链三线**: 1688诚信通已申请 / 爱库存商务对接中 / ztdy写API落实中
-- **BL-020 新增文件(4)**:
-  - lib/crypto.ts: AES-256-GCM加密/解密(scrypt KDF+随机salt+随机IV)
-  - lib/data-masking.ts: 7类敏感字段脱敏(手机/姓名/ID/IP/交易号)+递归自动脱敏
-  - services/privacy/privacy-service.ts: 数据导出(PIPL第45条)+数据删除(第47条)+保留策略
-  - routes/privacy/index.ts: 2个端点(GET /export + POST /deletion-request)
-- **改造文件(1)**: app.ts注册privacyRouter
-- **测试(+43)**: crypto(12) + data-masking(17) + privacy-service(14)
-- **brain.json同步**: testBaseline=628 / BL-020 status=done / phase2Roadmap段落 / currentStatus
-- 基线: 628测试全绿(50文件) / TypeScript零错误 / ESLint零错误
-- **下一步**: BL-021 AI幻觉防护增强 / 等供应链外部反馈
+---
 
-## v3.3 CTO全面审计冲刺 ✅ 完成 (569→585测试)
-- **审计**: 6路并行Agent（文档/代码/Schema/测试/安全/基础设施）
-- **P0 文档同步(4项)**:
-  - brain.json currentPhase "Phase 1b"→"Phase 2a"
-  - brain.json version "2.7.0"→"3.3.0"
-  - brain.json testBaseline 新增(=585)
-  - brain.json errorCodes tool类别 3→6(补3个工具市场错误码)
-- **P0 Schema修复(15项)**:
-  - AgentType枚举补 settlement（代码已有，Schema漏了）
-  - 12处外键补显式onDelete策略(Restrict/Cascade/SetNull)
-  - 3处补缺失索引(assignedUserId/parentId/userId)
-- **P1 安全加固(2项)**:
-  - CS+Tools路由全部path params加Zod UUID/格式校验(7个端点)
-  - Auth路由err.message泄露修复(3处，改用错误码注册表常量)
-- **P1 代码质量(1项)**:
-  - prisma.ts最后2处RULE-22违规消除(declare global+显式类型标注)
-- **P2 测试补全(+16)**:
-  - prisma.test.ts(8测试): tenantGuard逻辑验证
-  - builtin-tools.test.ts(8测试): 9工具元数据一致性/handler/schema完整性
-- **CLAUDE.md**: v3.2→v3.3
-- 基线: 585测试全绿(47文件) / TypeScript零错误 / ESLint零错误
-- **下一步**: ECS部署验证 / Phase 2 路线图规划 / BL-024 1688 API Spike
+## 会话 -3：BL-022 AI成本监控 + BL-023 操作确认记录 ✅ (692→748测试)
 
-## Phase 2a: BL-004 AI人格系统 ✅ 完成 (488→569测试)
-- **架构**: Code-first人格注册表，8个AgentType独立人格
-- **新增文件(3)**:
-  - persona-registry.ts: 8个人格定义(灵犀/账房先生/运营搭子/结算助手/报表官/客服小灵/系统管家/工具助手)
-  - persona-registry.test.ts: 49测试
-  - system-prompt.test.ts: 25测试
-- **改造文件(6)**:
-  - system-prompt.ts: 按agentType构建不同提示词，master零回归
-  - chat-orchestrator.ts: 传agentType到prompt+tools(2行)
-  - tool-resolver.ts: 按人格toolCategories过滤工具 + 7新测试
-  - builtin-tools.ts: 导出TOOL_META_CATEGORIES(3行)
-  - routes/ai: agentType枚举+settlement/tool
-  - eslint.config.mjs: varsIgnorePattern修复
-- **人格工具过滤**: finance→finance+analytics / operation→operation+analytics / report→analytics / customer_service→operation / master+tool→全部
-- 基线: 569测试全绿(45文件) / TypeScript零错误 / ESLint零错误
-- **下一步**: ECS部署验证 / ACI观察期数据收集 / Phase 2a其他BL
+- **BL-022**：cost-service.ts / 4端点 / Prometheus 4指标 / 月报任务 / +56测试
+- **BL-023**：ConfirmationRecord Schema / confirmation-service.ts / 4端点 / +22测试
+- 基线：748测试全绿 / TypeScript零错误
 
-## Phase 2a: BL-009 工具市场 MVP ✅ 完成 (454→488测试)
-- **架构**: DB驱动的工具发现 + 执行委托 + 硬编码降级
-- **新增服务层(4文件)**:
-  - builtin-tools.ts: 9个内置工具元数据映射
-  - tool-definition-service.ts: ToolDefinition CRUD + 幂等seed
-  - tool-instance-service.ts: 激活/停用/列表（全幂等）
-  - tool-resolver.ts: 桥接层(DB→OpenAI格式 + 执行委托 + 降级)
-- **路由层**: 6个REST端点(/api/v1/tools下)
-- **编排器集成**: chat-orchestrator从静态TOOL_DEFINITIONS切换为动态getActiveToolDefinitions
-- **种子脚本**: 时皙租户9个工具定义+9个激活实例
-- **ECS部署验证**: 种子成功 + PM2重启 + 灵犀桥接正常
-- 基线: 488测试全绿(43文件) / TypeScript零错误
-- **下一步**: BL-004 AI人格系统 / ACI观察期数据收集
+---
 
-## v3.3 健康冲刺 ✅ 完成 (408→454测试)
-- **P0 租户隔离修复(5处)**:
-  - cs-message-service confirmDraft: delete→deleteMany / update→updateMany + tenantId
-  - cs-session-service updateSessionStatus: update→updateMany + tenantId
-  - conversation-service updateConversationMeta: 新增tenantId参数 + updateMany
-  - jwt-service revokeTokens: 新增tenantId参数 + tenantId过滤
-  - 所有调用方(chat-orchestrator/auth路由)同步更新
-- **Prisma租户守卫扩展**: $extends中间件，写操作自动检测tenantId缺失(test环境抛错/dev环境warn)
-- **P1 lingxi-bridge静默异常修复**: JSON.parse catch添加logger.warn
-- **P2 测试补全(+46)**:
-  - env.test.ts(18测试): Zod schema校验/类型/默认值/必填字段
-  - redis.test.ts(4测试): 实例导出/lazyConnect/重试配置
-  - schemas.test.ts(23测试): 6个实体schema+5个过滤器schema+transform验证
-  - 租户隔离测试: 跨租户操作拒绝验证
-- 基线: 454测试全绿(39文件) / TypeScript零错误 / ESLint零警告
-- **下一步**: Wave 10 E2E冒烟测试 / Phase 2规划
+## 会话 -2：飞书告警 + RPA监控 ✅ (808测试)
 
-## Wave 9.5 Critic审查 ✅ 完成
-- **三维度审查**: 安全(P0×3 P1×5 P2×6) + 架构(P1×1 P2×2) + 文档(P0×1 P1×2)
-- **启动门禁Bug**: tsx未安装在根级→session-guard无法执行，已修复
-- **代码安全修复(5项)**:
-  - tool-registry: 9个工具全部添加Zod参数校验(日期/页码/枚举) + 10KB参数长度上限
-  - chat-orchestrator: stripInternalFields递归处理嵌套对象/数组 + error不泄露参数原文
-  - cs-message-service+routes: AppError类型化错误替代字符串匹配
-  - RULE-22修复: cs-message-service `as unknown as DraftMetadata`消除
-  - metrics.ts: async路由try/catch + recordRateLimitRejection/recordAiRequest接入
-- **文档同步**: brain.json CS错误码3→8个 / 否定词+2 / 退款关键词完整化
-- 基线: 408测试全绿(36文件) / TypeScript零错误
-- **遗留P2(Wave 10+)**: system-prompt硬编码营销数据 / CS限流增强 / 上下文字节限制
-- **下一步**: Wave 10 E2E冒烟测试(3个场景)
+- 飞书告警服务：支持飞书应用机器人(App ID+Secret) + 兼容已有3个Webhook机器人
+- RPA采集 Prometheus 指标接入（DEBT-002）
+- 牵牛花骨架屏误判 bug 修复（`/compass` → `/compass/ad` 安全断言）
+- 基线：808测试全绿(59文件)
 
-## v3.2审计冲刺 ✅ 完成 (328→408测试)
-- **第一轮**: request-logger(+9) + cache-refresh(+7)测试 / conversation-service类型修复(StoredToolCall/StoredToolResult) / env.ts console.error→process.stderr.write / brain.json validationStatus→verified + Prisma settlement枚举清理
-- **第二轮**: error-codes(+9) + audit-cleanup(+5) + metrics(+6)测试 / cs-message-service isDraftMetadata类型守卫 / chat-orchestrator isPlainObject类型守卫+JSON.parse运行时校验 / tool-registry JSON.parse校验+attachDataSource泛型约束
-- 基线: 408测试全绿(36文件) / TypeScript零错误 / console.error零处 / as unknown as Record零处
-- **第三轮**: lingxi-bridge.ts飞书SDK类型安全化 — 定义FeishuEventMessage/FeishuEventSender/FeishuMessageEvent接口 + asFeishuEvent类型守卫，4处as Record全部消除，error handler也移除as Error
-- **src/非测试文件as Record残留**: 仅3处合理用法(prisma.ts官方模式/cs-message-service类型守卫内部/tool-registry运行时校验后赋值)，零违规
+---
 
-## Wave 9: ACI客服MVP ✅ 完成
-- Phase 1b最后一个核心US，ACI客服中枢定位"决策中枢"
-- **Day 1**: types.ts + emotion-detector.ts + faq-matcher.ts + return-judgment-engine.ts
-  - 决策树引擎: P0→P4 9节点串行评估，executionAllowed硬编码false
-  - 情绪检测: 高/中强度关键词+否定词排除+退款意图检测
-  - FAQ匹配: 15条硬编码FAQ，关键词匹配，isReturnRelated触发判断
-  - +58测试(250→308)
-- **Day 2**: 4个CRUD服务 + cs-orchestrator.ts
-  - 编排: 消息持久化→情绪检测→FAQ匹配→订单查询→退货判断→草稿→工单
-  - 独立于chat-orchestrator（LLM流式），共享MallAdapter/Prisma
-  - +8测试(308→316)
-- **Day 3**: routes/cs/index.ts + app.ts注册
-  - 6个端点: incoming/confirm/sessions/session-detail/messages/tickets
-  - +12测试(316→328)
-- **附带修复**: v3.1审计遗留变更提交 + Prisma 7.x版本冲突修复
-- 基线: 328测试全绿 / TypeScript零错误 / ESLint零错误
-- 11个AC全部覆盖
+## 会话 -1：抖店 RPA ✅ (808→845测试)
 
-## Wave 8: 5个运营查询工具 ✅ 完成
-- 新增3个工具: getSlowSuppliers/getUserGrowthTrend/getSupplierWithdraws
-- 工具总数 6→9，测试 226→250（+24）
-- 5个AC场景全覆盖: AC-01/05已有工具 + AC-02/03/04新增
-- 修复BE bug: getSlowSuppliers并发batch早退机制
-- 基线: 250测试全绿 / TypeScript零错误 / ESLint零错误
-- 下一步: Wave 9 (ACI客服MVP US-P1b-005)
+- **新增文件(4)**:
+  - `platform/platform-rpa.ts`: 平台 RPA 基类（15种写操作URL拦截）
+  - `platform/douyin-rpa.ts`: 抖店商家后台采集（fxg.jinritemai.com）
+  - `run-douyin.ts`: 抖店运行入口
+  - `__tests__/douyin-rpa.test.ts`: 26个测试
+- **采集结果**: 11条动账明细（结算流水），37列数据
+  - 订单实付应结、平台服务费、达人佣金、运费、退款、净额、入账/出账
+  - 比API数据多20+字段（佣金分解、保险扣费、偏远配送费等）
+- **技术要点**:
+  - Cookie持久化无感登入（首次需短信验证码，已跑通）
+  - 双层数据获取：API拦截优先 + DOM表格降级
+  - 合并表头处理：`thead tr:last-child th` 跳过colspan分组行
+  - 安全断言修正：`/compass` → `/compass/ad`
+- **凭证**: `.env.rpa` 已配 `DOUYIN_PHONE=15394461792`
+- **数据文件**: `rpa-data/settlements/douyin/*.json`
+- 基线：845测试全绿(59文件) / TypeScript零错误
 
-## v3.0 八路审计 ✅ 完成 (89→92分)
-- 8路并行审计: 文档一致性/代码质量/数据模型/测试质量/基础设施/Memory/产品一致性/安全专项
-- P1修复: RULE-23(5文件process.env→env对象) + Memory密钥明文清理
-- P1关闭: HS256已由env.ts门禁保障 / RBAC推迟到Wave 9
-- 基线: 226测试全绿 / TypeScript零错误 / ESLint零错误 / RULE-23零违规
+---
 
-## Wave 7.5: 灵犀桥接 ✅ 完成（ECS部署验证通过）
-- 新建 services/feishu-bridge/lingxi-bridge.ts — 灵犀桥接核心模块(~280行)
-  - 飞书WSClient长连接 + orchestrateChat直调（零HTTP开销）
-  - 会话映射(feishuChatId→conversationId) + TTL 4小时
-  - 去重/限流/队列/输入校验 — 复用Bridge 1成熟模式
-  - 特殊指令: "新对话"/"重置"/"状态"
-  - 功能开关: FEISHU_LINGXI_APP_ID不设则不启动
-- 修改 app.ts — feature-flagged启动+优雅关闭
-- 修改 env.ts — 4个新环境变量(APP_ID/SECRET/TENANT_ID/USER_ID)
-- 修改 docker-compose.yml — 透传4个环境变量
-- 新增 20个测试(lingxi-bridge.test.ts)
-- 基线: 226测试全绿 / TypeScript零错误 / ESLint零错误
-- 下一步: 部署到ECS，配置灵犀env，实际飞书消息验证闭环
+## 当前会话：文档一致性审查 (DocSync) ✅
 
-## v2.7 会话门禁系统 ✅ 完成
-- 新建 scripts/session-guard.ts — 启动/提交/结束三道门禁 + ADR影响扩散检查
-- 升级 CLAUDE.md v2.7 — 启动协议和结束协议从"清单"变"门禁脚本调用"
-- 新增 RULE-21~24: 测试只增不减/禁类型绕过/env集中管理/ADR影响扩散
-- brain.json 新增 sessionGuard 段落（含rootCauseAnalysis）+ definitionOfDone 新增 docSync/testIntegrity 检查项
-- Critic Agent 升级为三维度审查: 安全+架构+文档一致性
-- 团队文档 v3.1 更新
-- 设计理念参考：Anthropic "Effective Harnesses for Long-Running Agents"
+- brain.json testBaseline 修正：748 → 845
+- phase2Roadmap BL 任务补 status 字段（BL-020/021/022/023→done，BL-018→blocked，其余→pending）
+- supplyChainStatus.aikucun 矛盾修正（与 ADR-031 对齐，爱库存已移除）
+- missingRoles.docSyncAgent 更新为已正式化
+- brain.json lastUpdated 更新至 2026-04-03
+- claude-progress.txt 旧条目归档压缩（保留最近3会话详细记录）
 
-## v2.6 CTO全面审计 ✅ 全部完成
-- 3个P0 bug修复: 限流key失效/HS256降级/userName硬编码
-- sendError自动查表重构 + 16个错误码message对齐brain.json
-- +26测试: chat-orchestrator(14) + wechat-auth(12)
-- brain.json全量同步: 5个任务状态+currentPhase+deployment+测试数量
-- 供应商对账15处残留清理(5个文档26处标注)
-- Schema补强: 级联策略(20处)+UserShop索引+confidence改Decimal+Notification补updatedAt
-- 基础设施: prisma/pino-pretty移devDeps+RATE_LIMIT加Zod+Dockerfile chmod+engines收紧
-- 死代码清理: 4空壳路由+7个.gitkeep+注释路由删除
-- CLAUDE.md版本对齐v2.6
-- Memory清理: 删2(aci_hub+erp_status)+更新4+新建2(phase_status+tech_decisions)
-- 团队升级: missingRoles增DocSync Agent+v3.1能力升级(BE/QA/Critic/DevOps)
-- 验证: 201测试全绿/TypeScript零错误/ESLint零错误
+### 牵牛花 RPA 状态（补录）
 
-## Phase 1b 进行中
+| 项目 | 状态 |
+|------|------|
+| 代码文件 | ✅ `platform/qianniuhua-rpa.ts` 已存在（~735行）|
+| 登录逻辑 | ✅ 完整（账号密码 + 短信两路，骨架屏 bug 已修）|
+| doCollect() | ⚠️ **占位符** — 仅快照（url/bodyText/表格行数），无结构化数据 |
+| doDryRun() | ✅ 会截图首页+库存+采购+财务+订单 5 个页面 |
+| DOM 规格文档 | ⚠️ `docs/21-牵牛花平台DOM规格.md` 存在，选择器待 inspect 确认 |
+| 测试 | ⚠️ 仅 2 条（类型链），无业务覆盖 |
 
-### Wave 7: AI对话引擎 (US-P1b-003) ✅ 核心完成
-- 新建 services/ai/types.ts — SSE事件+ChatMessage+工具类型定义
-- 新建 services/ai/ai-client.ts — 百炼Qwen API封装(流式+非流式, 原生fetch)
-- 新建 services/ai/tool-registry.ts — 6个工具定义+执行映射+幻觉防护(_dataSource标记)
-- 新建 services/ai/system-prompt.ts — 8条严格规则(幻觉防护+工具失败处理+日期推断)
-- 新建 services/ai/conversation-service.ts — 会话CRUD+10条上下文窗口+token计量(上限10000)
-- 新建 services/ai/chat-orchestrator.ts — SSE流式编排+tool_call循环+P0安全修复
-- 新建 routes/ai/index.ts — POST /chat (SSE流式) + GET /conversations
-- P0 Critic修复: 内部字段剥离/AiErrorCode类型收紧/SSE write保护/fail-secure参数解析
-- 新增 29 个测试 (ai-client 12 + tool-registry 8 + conversation 9 + routes 10 - 重叠)
-- 剩余: AuditLog记录(token消耗)待补充
+**下一步（牵牛花）**：
+1. 运行 `npx tsx src/adapters/rpa/run-qianniuhua.ts` 获取真实截图
+2. 用截图 inspect 确认 KPI 卡片 CSS class 和表格选择器，补全 `docs/21`
+3. 实现 `doCollect()`：采集首页 KPI（13指标）+ 门店明细表（14家）
+4. 补充测试至 15+ 条
 
-### US-P1b-007: Rate Limiting 增强 ✅ 完成
-- 租户级限流 100req/min + 用户级 30req/min + AI专项 10req/min
-- Retry-After header + 环境变量可配置 + fail-secure(Redis不可用=503)
-- +13 测试
+---
 
-### US-P1b-008: 数据库备份自动化 ✅ 完成
-- backup.sh: pg_dump + OSS上传 + 保留策略(日30天/月1年) + 企微告警预留
-- restore.sh: 本地/OSS恢复 + 安全确认提示
-- pg-wal-archive.conf + crontab.example
+## 下一步可选
 
-### 验证结果
-- 201测试全绿 (19文件，从175增长到201，+26新测试 via v2.6审计)
-- ESLint零错误
-- TypeScript编译零错误
-
-### Wave 5+6: JWT RS256 + 微信登录 + 多租户 ✅ 完成
-
-#### Day 1: JWT RS256签发/验证 + env升级 ✅
-- 新建 services/auth/jwt-service.ts (253行)
-  - RS256签发/验证（支持HS256降级兼容）
-  - Access Token 15min + Refresh Token 7d
-  - Refresh Token Rotation（一个token只能用一次）
-  - 登出黑名单（Redis TTL = token剩余有效期）
-  - parseExpiry()解析时间字符串
-  - TokenRotationError自定义错误类
-- 升级 middleware/auth.ts — 从直接jwt.verify改为调用jwt-service
-- 升级 lib/env.ts — 新增JWT_PRIVATE_KEY/JWT_PUBLIC_KEY（RS256 PEM）
-- 新增14个测试 (jwt-service.test.ts)
-
-#### Day 2: 微信登录 + 4个auth端点 ✅
-- 新建 services/auth/wechat-auth.ts (178行)
-  - code2Session — 微信code换openid
-  - findOrCreateByWechat — 查找或创建用户
-  - bindPhone — 手机号绑定+账号合并
-  - WechatAuthError自定义错误类
-  - session_key不下发客户端（安全原则）
-- 新建 routes/auth/index.ts (201行) — 4个端点:
-  - POST /api/v1/auth/wechat-login — 微信登录（登录限流5次/分钟）
-  - POST /api/v1/auth/bind-phone — 绑定手机号（需认证）
-  - POST /api/v1/auth/refresh — 刷新Token（Rotation）
-  - POST /api/v1/auth/logout — 登出（黑名单）
-- 升级 app.ts — 挂载 /api/v1/auth 公开路由
-- AuditLog记录: 登录/注册/合并/绑定/登出
-- 新增11个测试 (auth.test.ts) + 安装supertest
-
-#### Day 3: 多租户Prisma注入 ✅
-- 新建 lib/tenant-context.ts
-  - AsyncLocalStorage实现请求级tenantId传播
-  - getTenantId() / getUserId() — 服务层直接获取，无需手动传参
-  - getTenantPrisma() — 返回自动注入tenantId的Prisma客户端
-- 升级 middleware/tenant.ts
-  - requireTenant中间件改用tenantStorage.run()包装next()
-  - Prisma扩展新增updateMany/deleteMany/count/aggregate
-- 新增7个测试 (tenant-context.test.ts)
-
-#### 验证结果
-- 123测试全绿 (13文件，从91增长到123，+32新测试)
-- ESLint零错误
-- TypeScript编译零错误
-
-#### 文件变更清单
-| 操作 | 文件 | 行数 |
-|------|------|------|
-| 新建 | services/auth/jwt-service.ts | 253 |
-| 新建 | services/auth/wechat-auth.ts | 178 |
-| 新建 | routes/auth/index.ts | 201 |
-| 新建 | lib/tenant-context.ts | 55 |
-| 新建 | __tests__/services/auth/jwt-service.test.ts | 183 |
-| 新建 | __tests__/routes/auth.test.ts | 217 |
-| 新建 | __tests__/lib/tenant-context.test.ts | 68 |
-| 修改 | middleware/auth.ts | HS256→RS256(jwt-service) |
-| 修改 | middleware/tenant.ts | +AsyncLocalStorage |
-| 修改 | lib/env.ts | +JWT_PRIVATE/PUBLIC_KEY |
-| 修改 | app.ts | +authRouter挂载 |
-| 修改 | __tests__/middleware/auth.test.ts | mock改为jwt-service |
-
-### 下一步: Wave 7.5 — 飞书号2接入AI对话引擎 (2天)
-- 飞书号2通道代码连接工作站AI对话引擎(US-P1b-003)
-- 飞书消息→路由到AI对话引擎→tool_call查真实数据→飞书回复
-- 依赖Wave 7 AI对话引擎(已完成)
-
-## Phase 1a 全部完成 ✅
-
-## Phase 1b 路线图 (21工作日 → 14工作日加速版)
-- Wave 4: P1b-006A Bridge生产化 ✅ 完成
-- Wave 5+6: JWT RS256+微信登录+多租户 ✅ 完成 (3天)
-- Wave 7: P1b-003 AI对话引擎 ✅ 核心完成 (含P0 Critic修复)
-- P1b-007: Rate Limiting增强 ✅ 完成
-- P1b-008: 数据库备份自动化 ✅ 完成
-- Wave 7.5: P1b-006B 飞书号2接入AI对话引擎 ✅ 完成 + v3.0审计P1修复
-- Wave 8: P1b-004 5个运营查询 ✅ 完成 (工具6→9, 测试226→250)
-- Wave 9: P1b-005 ACI客服MVP (3d)
+1. **牵牛花 doCollect() 实现**（需先 dry-run 确认 DOM 选择器）
+2. **美团/饿了么/京东到家 RPA**（凭证表有账号）
+3. **抖店翻页+日期筛选优化**（目前只采默认11条）
+4. **银企通 CebApiAdapter**（等银行确认是否已开通 CifNo/UserID）
+5. **BL-025 1688 Adapter**（等诚信通审核，申请于 2026-03-31）
