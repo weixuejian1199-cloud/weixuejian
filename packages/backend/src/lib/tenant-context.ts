@@ -8,7 +8,7 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { prisma } from './prisma.js';
-import { createTenantPrismaExtension } from '../middleware/tenant.js';
+import { createTenantPrismaExtension } from './prisma-tenant-extension.js';
 
 // ─── 上下文存储 ───────────────────────────────────────────
 

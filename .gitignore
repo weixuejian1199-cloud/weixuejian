@@ -33,5 +33,12 @@ logs/
 # Keys
 keys/
 
+# RPA
+.env.rpa
+cookies/
+screenshots/
+*.session
+rpa-data/
+
 # Lock files (pnpm-lock.yaml is the canonical lock — ignore npm lock in sub-packages)
 packages/**/package-lock.json

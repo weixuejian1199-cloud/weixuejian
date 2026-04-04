@@ -38,12 +38,21 @@ const tenantGuardExtension = Prisma.defineExtension({
   },
 });
 
+// ─── 连接池参数注入 ─────────────────────────────────────────
+function buildDatasourceUrl(): string | undefined {
+  const url = env.DATABASE_URL;
+  if (!url) return undefined;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}connection_limit=${env.DB_POOL_SIZE}&pool_timeout=${env.DB_POOL_TIMEOUT}`;
+}
+
 declare global { var __prisma: PrismaClient | undefined; }
 
 const basePrisma =
   globalThis.__prisma ??
   new PrismaClient({
     log: isProduction ? ['error', 'warn'] : ['query', 'info', 'warn', 'error'],
+    datasourceUrl: buildDatasourceUrl(),
   });
 
 // Prisma $extends() returns a branded type incompatible with PrismaClient.

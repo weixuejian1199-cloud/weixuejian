@@ -8,8 +8,13 @@
  */
 import * as lark from '@larksuiteoapi/node-sdk';
 import { spawn } from 'node:child_process';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { config } from './lib/config.mjs';
 import { log } from './lib/logger.mjs';
+
+const IMAGE_TMP_DIR = '/tmp/qixu-images';
+try { mkdirSync(IMAGE_TMP_DIR, { recursive: true }); } catch {}
 
 // ─── 飞书客户端 ──────────────────────────────────────────
 
@@ -170,6 +175,31 @@ function callClaude(message, sessionId) {
   });
 }
 
+// ─── 下载飞书图片 ────────────────────────────────────────
+
+async function downloadFeishuImage(messageId, imageKey) {
+  try {
+    const resp = await client.im.messageResource.get({
+      path: { message_id: messageId, file_key: imageKey },
+      params: { type: 'image' },
+    });
+    if (resp?.data) {
+      const filePath = join(IMAGE_TMP_DIR, `${imageKey}.jpg`);
+      const chunks = [];
+      for await (const chunk of resp.data) {
+        chunks.push(chunk);
+      }
+      const buffer = Buffer.concat(chunks);
+      writeFileSync(filePath, buffer);
+      log.info({ imageKey, size: buffer.length }, 'Image downloaded');
+      return filePath;
+    }
+  } catch (err) {
+    log.error({ imageKey, err: err.message }, 'Image download failed');
+  }
+  return null;
+}
+
 // ─── 处理飞书消息 ────────────────────────────────────────
 
 async function handleMessage(data) {
@@ -179,8 +209,35 @@ async function handleMessage(data) {
 
   const chatId = message.chat_id;
 
+  // 图片消息：下载图片后让 Claude 分析
+  if (message.message_type === 'image') {
+    let imageKey;
+    try { imageKey = JSON.parse(message.content).image_key; } catch { return; }
+    if (!imageKey) return;
+
+    enqueueTask(chatId, async () => {
+      const filePath = await downloadFeishuImage(message.message_id, imageKey);
+      if (!filePath) {
+        await sendText(chatId, '图片下载失败了，你可以用文字描述一下。');
+        return;
+      }
+      try {
+        const sessionId = getSessionId(chatId);
+        const result = await callClaude(`用户发了一张图片，请用Read工具查看这个文件并分析图片内容：${filePath}`, sessionId);
+        if (result.session_id) saveSessionId(chatId, result.session_id);
+        const answer = result.result || result.error || '(没有返回内容)';
+        const maxLen = config.bridge.maxResponseLen;
+        await sendText(chatId, answer.length > maxLen ? answer.slice(0, maxLen) + '\n...(已截断)' : answer);
+      } catch (err) {
+        log.error({ chatId, err: err.message }, 'Image analysis failed');
+        await sendText(chatId, `图片分析出了点问题：${err.message}`);
+      }
+    });
+    return;
+  }
+
   if (message.message_type !== 'text') {
-    await sendText(chatId, '目前只支持文本消息。');
+    await sendText(chatId, '目前只支持文本和图片消息。');
     return;
   }
 

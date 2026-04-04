@@ -291,6 +291,40 @@ body {
   font-size: 11px;
 }
 
+/* ========== 嵌入指挥台 iframe：仅主工作区 ========== */
+html.tool-embed,
+html.tool-embed body {
+  height: 100%;
+  overflow: hidden;
+}
+html.tool-embed .header,
+html.tool-embed .sidebar,
+html.tool-embed .footer,
+html.tool-embed .ai-float-btn,
+html.tool-embed #notifPanel,
+html.tool-embed #onboardingModal {
+  display: none !important;
+}
+html.tool-embed .main {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: var(--bg);
+}
+html.tool-embed .view-content {
+  display: none;
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+html.tool-embed .view-content.active {
+  display: block;
+}
+
 /* ========== Search Bar ========== */
 .search-bar {
   position: relative;
@@ -1480,6 +1514,13 @@ button, .tool-use-btn, .quick-start-btn, .workflow-start-btn, .agent-config-btn,
 </style>
 </head>
 <body>
+<script>
+(function () {
+  if (/[?&]embed=1(?:&|$)/.test(window.location.search)) {
+    document.documentElement.classList.add('tool-embed');
+  }
+})();
+</script>
 
 <!-- ========== HEADER ========== -->
 <header class="header">
@@ -1557,6 +1598,10 @@ button, .tool-use-btn, .quick-start-btn, .workflow-start-btn, .agent-config-btn,
 
   <div class="sidebar-section">
     <div class="sidebar-section-title">快捷入口</div>
+    <a class="nav-item" href="v3-02-super-admin.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>指挥中心</span>
+    </a>
     <div class="nav-item" onclick="alert('系统设置开发中')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
       <span>系统设置</span>
@@ -2337,6 +2382,7 @@ button, .tool-use-btn, .quick-start-btn, .workflow-start-btn, .agent-config-btn,
   </div>
 </section>
 
+
 </main>
 
 <!-- ========== Config Modal ========== -->
@@ -2496,8 +2542,8 @@ function closeOnboarding() {
   document.getElementById('onboardingModal').classList.remove('show');
   localStorage.setItem('toolcenter_onboarded', '1');
 }
-// Show onboarding on first visit
-if (!localStorage.getItem('toolcenter_onboarded')) {
+// Show onboarding on first visit（嵌入指挥台时不弹）
+if (!localStorage.getItem('toolcenter_onboarded') && !document.documentElement.classList.contains('tool-embed')) {
   setTimeout(function() {
     document.getElementById('onboardingModal').classList.add('show');
   }, 500);
@@ -2517,6 +2563,35 @@ document.querySelectorAll('.ai-composer-example').forEach(function(ex) {
     if (input) input.value = ex.textContent;
   });
 });
+
+// ===== 平台账号分类 Tab =====
+function switchRpaTab(btn, tabId) {
+  document.querySelectorAll('#rpaTabBar .channel-tab').forEach(function(t) { t.classList.remove('active'); });
+  btn.classList.add('active');
+  document.querySelectorAll('.rpa-tab-content').forEach(function(c) { c.style.display = 'none'; });
+  var target = document.getElementById('rpa-tab-' + tabId);
+  if (target) target.style.display = '';
+}
+
+// ===== URL Hash 自动定位 =====
+// 支持格式：#rpa=capital / #view=toolbox / #view=tool-detail（含连字符）
+function applyToolCenterHash() {
+  var hash = window.location.hash;
+  if (!hash) return;
+  var rpaMatch = hash.match(/^#rpa=(\w+)$/);
+  if (rpaMatch) {
+    switchView('rpa');
+    var btn = document.querySelector('#rpaTabBar .channel-tab[data-tab="' + rpaMatch[1] + '"]');
+    if (btn) switchRpaTab(btn, rpaMatch[1]);
+    return;
+  }
+  var viewMatch = hash.match(/^#view=([\w-]+)$/);
+  if (viewMatch) {
+    switchView(viewMatch[1]);
+  }
+}
+applyToolCenterHash();
+window.addEventListener('hashchange', applyToolCenterHash);
 </script>
 
 </body>

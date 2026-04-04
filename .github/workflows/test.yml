@@ -1,6 +1,6 @@
 # ============================================================
-# CI: Lint + Test
-# 每次 push / PR 自动运行 ESLint 和 Vitest
+# CI: Lint + Test + web-admin build
+# 每次 push / PR：ESLint、后端 tsc、Vitest、管理端生产构建
 # ============================================================
 
 name: Test & Lint
@@ -70,6 +70,11 @@ jobs:
 
       - name: TypeScript compile check
         run: cd packages/backend && npx tsc --noEmit
+
+      - name: Build web-admin
+        run: pnpm --filter @enterprise/web-admin build
+        env:
+          VITE_API_BASE_URL: ''
 
       - name: Run tests
         run: pnpm test

@@ -97,7 +97,7 @@ describe('createConfirmationSchema', () => {
   });
 
   it('应接受可选字段缺失', () => {
-    const { resourceType, resourceId, ...minimal } = baseInput;
+    const { resourceType: _resourceType, resourceId: _resourceId, ...minimal } = baseInput;
     const result = createConfirmationSchema.safeParse(minimal);
     expect(result.success).toBe(true);
   });

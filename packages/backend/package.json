@@ -10,7 +10,12 @@
     "test:watch": "vitest",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "rpa:ceb": "tsx src/adapters/rpa/run-ceb.ts",
+    "rpa:ceb:slow": "tsx src/adapters/rpa/run-ceb.ts --slow",
+    "rpa:qianniuhua": "tsx src/adapters/rpa/run-qianniuhua.ts",
+    "rpa:qianniuhua:dry": "tsx src/adapters/rpa/run-qianniuhua.ts --dry-run",
+    "test:rpa": "vitest run src/adapters/rpa/"
   },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.60.0",
@@ -23,7 +28,9 @@
     "ioredis": "^5.10.0",
     "jsonwebtoken": "^9.0.0",
     "pino": "^9.6.0",
+    "playwright": "^1.59.1",
     "uuid": "^11.0.0",
+    "xlsx": "^0.18.5",
     "zod": "^3.24.0"
   },
   "devDependencies": {

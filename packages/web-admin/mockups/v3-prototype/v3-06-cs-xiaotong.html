@@ -531,9 +531,44 @@
   .modal-btn:hover { border-color: var(--accent); }
   .modal-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
   .modal-btn.primary:hover { opacity: 0.85; }
+
+  /* ===== 嵌入客服工作台 iframe：隐藏顶栏与本页侧栏，仅保留主工作区 ===== */
+  html.xiaoxi-embed,
+  html.xiaoxi-embed body {
+    height: 100%;
+    overflow: hidden;
+  }
+  html.xiaoxi-embed #onboardingModal { display: none !important; }
+  html.xiaoxi-embed .header { display: none !important; }
+  html.xiaoxi-embed .layout {
+    margin-top: 0 !important;
+    flex: 1;
+    min-height: 0;
+  }
+  html.xiaoxi-embed .sidebar { display: none !important; }
+  html.xiaoxi-embed .main {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  /* 嵌入 iframe 内：保证各板块可滚动，内容不被裁切 */
+  html.xiaoxi-embed .view-panel {
+    flex: 1;
+    min-height: 0;
+  }
 </style>
 </head>
 <body>
+<script>
+(function () {
+  if (/[?&]embed=1(?:&|$)/.test(window.location.search)) {
+    document.documentElement.classList.add('xiaoxi-embed');
+  }
+})();
+</script>
 
 <!-- ===== Onboarding Modal ===== -->
 <div class="modal-overlay" id="onboardingModal">
@@ -1450,19 +1485,31 @@
   const chatArea = document.getElementById('chatArea');
   chatArea.scrollTop = chatArea.scrollHeight;
 
-  // View switching
+  // View switching（el 可选：来自 hash / 父页 iframe 时无 DOM 元素）
   function switchView(viewName, el) {
-    // Update sidebar
     document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
-    el.classList.add('active');
-    // Update view panels
+    if (el) {
+      el.classList.add('active');
+    } else {
+      document.querySelectorAll('.sidebar-item[data-view]').forEach(i => {
+        if (i.getAttribute('data-view') === viewName) i.classList.add('active');
+      });
+    }
     document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
     const panel = document.getElementById('view-' + viewName);
     if (panel) panel.classList.add('active');
-    // Update title
     const titles = { chat: '对话管理', knowledge: '知识库管理', rules: '规则配置', analytics: '数据分析', training: '训练记录' };
-    document.getElementById('viewTitle').textContent = titles[viewName] || '';
+    const vt = document.getElementById('viewTitle');
+    if (vt) vt.textContent = titles[viewName] || '';
   }
+  window.switchView = switchView;
+
+  function applyLocationHash() {
+    var m = window.location.hash.match(/^#view=([\w-]+)$/);
+    if (m) switchView(m[1], null);
+  }
+  applyLocationHash();
+  window.addEventListener('hashchange', applyLocationHash);
 
   // Chat list click
   function chatClick(el) {

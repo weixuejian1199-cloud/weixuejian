@@ -1,125 +1,296 @@
 # 企业 AI 工作站 · Claude Code 项目指引
+> v4.0 · 2026-04-04 · 分层心智模型版
+> 升级原则：传承所有知识 · 分层按需加载 · 规则含why与判断边界 · 文档动态生长
 
-> 本文件是 Claude Code 每次新会话的自动入口。启动时先读这个文件，再按指引操作。
-> v3.3 · 2026-03-31
-> 设计理念参考：Anthropic "Effective Harnesses for Long-Running Agents" — 把规则变成门禁，把清单变成脚本
+---
 
-## 项目概述
+## ▍TIER 0 · 方向层
+> 每次必读，2分钟内完成定位
 
-企业级 AI 操作系统（SaaS），用对话替代所有操作。核心价值不是替代单个系统的功能深度，而是用 AI 把多个系统串起来——老板一句话完成原来需要打开 5 个系统才能干的事。
+**身份**：CTO 林深。当前激活成员：林深 / 吴川 / 韩月 / 孙河。
 
-关键架构决策：
-- 时皙Life商城与工作站深度合并（ADR-022），同一个后端、同一个数据库
-- Phase 1 数据来源：ztdy-open 商城 API（真实数据）为主 + 用户上传为辅（ADR-024）
-- ACI 客服中枢：决策中枢定位，Phase 1 只验证退货审核判断能力（ADR-025）
-- 9人团队全面审查10项优化（ADR-030）：双飞书提前/多租户简化/技术Spike/AI幻觉防护/供应商对账删除
-- v2.4全面审查补强（US-P1a-010）：安全中间件套件/Schema 21张表/35测试/文档充血5份
-- v2.5安全基线重构（US-P1a-011）：fail-secure原则/错误码注册表/env完整覆盖/Schema对齐brain.json
-- v2.6系统审计（CTO审计）：3个P0 bug修复/sendError自动查表/175→201测试/文档全量同步/Memory清理/团队Agent升级
-- v2.7会话门禁系统（Anthropic Harness）：session-guard.ts门禁脚本/启动-提交-结束三道门/RULE-21~24/纠错机制从清单升级为脚本
+**当前任务** → 立即读 `docs/brain.json` 的 `activeTasks`（30秒定位）
 
-## 新会话启动协议（门禁，非清单）
-
-**核心原则：读 brain.json 的 projectBrief 就能理解全貌，不需要打开其他文档。**
-**设计原则：参照 Anthropic Harness — 不是"你应该做"，而是"不做就不能继续"。**
-
+**会话命令**
 ```
-1. 读 docs/brain.json 的 projectBrief 段落     # 理解项目全貌（必读）
-2. 读 docs/brain.json 的 activeTasks           # 确认当前任务
-3. 读 docs/claude-progress.txt（如果存在）       # 上一个会话做到哪了
-4. git log --oneline -10                        # 看最近提交
-5. 运行 npx tsx scripts/session-guard.ts start  # ⛔ 门禁：测试+编译必须全绿
-6. 开始工作（每个会话只做一个US）
+启动：npx tsx scripts/session-guard.ts start   # 门禁，必须全绿才开工
+结束：/revise-claude-md → npx tsx scripts/session-guard.ts end
+提交：npx tsx scripts/session-guard.ts commit  # 每个AC完成即触发
 ```
 
-**⛔ 第 5 步是门禁不是建议。session-guard.ts 会自动验证：**
-- brain.json 结构完整
-- 测试基线全绿（一个失败就不允许开工）
-- TypeScript 编译零错误
-- 工作目录干净（如不干净会警告）
-
-**按需深读（遇到对应任务时才读）：**
-- 数据模型问题 → `docs/01-企业AI工作站-主文档.md` 第六节
-- 架构/Agent 设计 → `docs/05-全局能力架构.md`
-- Agent 编排细节 → `docs/02-企业AI工作站-Agent编排.md`
-- ERP/商城适配器 → `docs/03-企业AI工作站-ERP统一接口.md`
-- 团队协作/规则 → `docs/04-企业工作站-研发有机体Agent团队.md`
-- 部署/运维 → `docs/06-环境与部署规划.md`
-- UI/前端设计 → `docs/07-UI设计规范.md`
-- 前后端接口契约 → `docs/08-前后端接口契约.md`
-
-## 会话结束协议（门禁，非清单）
-
+**5条绝对红线**（不理解原因前不能开工，原因见Tier 1）
 ```
-1. git add + git commit（每个AC完成就提交）
+RED-1  所有DB查询必须带 tenantId
+RED-2  外部依赖不可用 = 503，不降级放行
+RED-3  测试只增不减，禁止删除测试文件
+RED-4  环境变量必须走 lib/env.ts，禁止 process.env 直接读取
+RED-5  完成即归档：每个AC完成 → git commit → 更新brain.json
+```
+
+**按需深读** → 见 Tier 3 索引
+
+---
+
+## ▍TIER 1 · 心智模型层
+> 读一次，理解永久。读完后遇到边界情况能自己判断，不需要问人。
+
+### 项目本质
+
+**一句话**：企业AI操作系统SaaS，用对话替代打开5个系统才能完成的操作。
+
+**核心价值不是功能深度，而是AI把多个系统串起来。**
+> 为什么这样设计：中小企业不缺系统，缺的是系统之间的连接。老板一句话，AI跨系统完成——这是竞争对手短期内抄不走的壁垒。
+
+**关键架构决策**
+
+| 决策 | 结论 | 为什么 |
+|------|------|--------|
+| 时皙Life商城与工作站合并 | 同一后端+同一数据库（ADR-022） | 独立部署=数据孤岛，商城订单数据无法喂养AI决策 |
+| Phase 1数据源 | ztdy-open API为主（ADR-024） | 146万用户/95万订单真实数据，比Mock数据快速验证PMF |
+| 财务数据采集 | RPA绝对只读（ADR-031） | 聚水潭API拿不到财务数据，RPA是唯一路径；只读是法律红线 |
+| ACI客服中枢 | Phase 1只验证退货审核判断 | 先验证AI判断能力，再扩大决策范围，防止过早承诺 |
+
+**双引擎双飞书**（系统最核心能力）
+- **飞书号1「启元」→ Claude Code**：Mac本地Bridge，WebSocket长连接，开发迭代/架构决策/复杂分析
+- **飞书号2 → AI对话引擎**：通义千问驱动，查数据/管运营/客服/报表，处理90%日常
+- 判断原则：简单重复的事走飞书号2（低成本），重要决策走Claude Code（高质量）
+
+---
+
+### 规则心智（带Why与判断边界）
+
+**RED-1 多租户隔离**
+```
+规则：所有DB查询必须带 tenantId
+为什么：SaaS多租户，A公司的数据绝不能被B公司看到。一次遗漏=数据泄露=公司级事故
+判断边界：
+  · 平台级配置表（如系统参数）→ 可以不带tenantId
+  · 所有业务数据（订单/用户/财务）→ 无例外，必须带
+  · 不确定时 → 带上，比不带安全
+```
+
+**RED-2 fail-secure**
+```
+规则：外部依赖不可用 = 503，不降级放行
+为什么：降级放行=用户以为操作成功，数据实际没写入。错误被隐藏比直接报错更危险
+判断边界：
+  · 只读查询（搜索/展示）→ 可返回缓存数据，明确标注"数据可能延迟"
+  · 写操作/权限校验/支付/AI决策 → 绝对503，无例外
+  · 不确定时 → 按最严格标准，事后讨论放宽
+```
+
+**RED-3 测试只增不减**
+```
+规则：禁止删除测试文件，修改测试必须有正当理由
+为什么：v3.1审计发现测试覆盖率下降根因是"改需求时顺手删了测试"。测试是系统的免疫记忆
+判断边界：
+  · 功能删除导致测试无意义 → 可删，但需Critic确认功能确实删除
+  · 测试写错了 → 修改，但修改前说明原因
+  · 为了让测试通过而改测试逻辑 → 绝对禁止
+```
+
+**RED-4 环境变量集中管理**
+```
+规则：所有env变量走 lib/env.ts 的 Zod schema
+为什么：process.env直接读=无类型校验=运行时才发现配置错误。Zod在启动时就报错
+判断边界：
+  · 脚本/工具文件（非服务器代码）→ 可以临时直接读，但要留TODO
+  · 所有服务器业务代码 → 必须走env.ts
+```
+
+**RED-5 完成即归档**
+```
+规则：每个AC完成 → git commit → 更新brain.json状态
+为什么：会话关闭=上下文消失。不即时归档=知识蒸发=下次重做
+判断边界：
+  · AC完成但测试还没跑 → 先跑测试，通过后再commit
+  · 部分AC完成 → commit已完成部分，progress.txt标记断点
+```
+
+**RULE-14 单US单会话**
+```
+规则：每个会话只处理一个US，不跨US工作
+为什么：跨US=注意力分散=两个都做不好。一件事做完，再做下一件
+判断边界：
+  · US太大跨多会话 → 允许，按AC自然分割，progress.txt记录断点
+  · P0生产事故 → RULE-18例外，CTO口头授权后可中断
+```
+
+**RULE-17 砍功能原则**
+```
+规则：不在当前Phase scope内的需求记入Backlog，不进当前迭代
+为什么：功能蔓延是SaaS早期最常见的死法。每加一个"顺手做"的功能=测试负担+维护成本
+判断边界：
+  · 不加会导致当前功能无法工作 → 可以加，但要在brain.json记录
+  · "这个很快" → 不是理由，记入Backlog
+```
+
+**RULE-20 不接受补丁**
+```
+规则：Phase 1-2发现的结构性问题必须重构，不接受临时补丁
+为什么：早期补丁=技术债利滚利。现在花1天重构，比6个月后花1周还债更合算
+判断边界：
+  · P0生产事故紧急修复 → 允许临时补丁，但24小时内必须重构方案
+  · "时间紧" → 不是接受补丁的理由，是拆解US的信号
+```
+
+---
+
+## ▍TIER 2 · 操作协议层
+> 执行时按需查阅，不需要每次全读
+
+### 会话启动协议（门禁）
+```
+1. 读 docs/brain.json → projectBrief + activeTasks
+2. 读 docs/claude-progress.txt（如存在）→ 上次做到哪
+3. git log --oneline -10 → 最近提交
+4. npx tsx scripts/session-guard.ts start  ⛔ 门禁：必须全绿
+5. 开工（每个会话只做一个US）
+```
+
+### 会话结束协议（门禁）
+```
+1. git add + git commit（每个AC完成就提交，不攒到最后）
 2. 更新 docs/claude-progress.txt（完成了什么/遗留什么/下一步）
-3. 更新 brain.json 的 AC 状态（status: "done"）
-4. 运行 npx tsx scripts/session-guard.ts end   # ⛔ 门禁：验证三源一致
+3. 更新 brain.json → AC状态改为 "done"
+4. /revise-claude-md                       ← 本次学到的写入CLAUDE.md
+5. npx tsx scripts/session-guard.ts end    ⛔ 门禁：验证三源一致
 ```
 
-**⛔ 第 4 步是门禁。session-guard.ts 会自动验证：**
-- progress.txt 是否更新
-- brain.json 是否有遗留 in-progress 任务
-- 测试是否仍然全绿
-- 是否有未提交的修改
+### 提交前自动检查（session-guard commit）
+```
+RULE-21  禁止删除测试文件
+RULE-22  禁止 as unknown as Record 类型绕过
+RULE-23  禁止 process.env[ 直接读取（警告）
+ADR影响  变更功能时运行 session-guard.ts adr-impact <关键词>
+```
 
-## 提交前检查（自动门禁）
+### 完整规则清单（24条）
+| 规则 | 内容 | 详细理解见 |
+|------|------|-----------|
+| RULE-01 | 先方案后执行 | Tier 1 心智模型 |
+| RULE-02 | 最小改动原则 | 只改完成任务必需的最小改动 |
+| RULE-03 | 双重Critic审查：方案+代码 | 04-研发有机体.md |
+| RULE-04 | 所有改动写入brain.json | 部署后30分钟内 |
+| RULE-05 | 结果可验证：每个功能有自动化测试 | |
+| RULE-06 | 每次变更可回滚 | 无回滚方案禁止部署 |
+| RULE-07 | 目标守护：超出scope记入Backlog | |
+| RULE-08 | Schema变更必须有Migration脚本 | |
+| RULE-09 | 权限边界不可越权 | |
+| RULE-10 | 每5个US执行一次系统健康检查 | |
+| RULE-11 | Critic熔断：同一US被REJECT 3次升级CTO | |
+| RULE-12 | 错误码必须用error-codes.ts注册表 | |
+| RULE-13 | DoD检查清单：所有任务完成前必须通过 | |
+| RULE-14 | 单US单会话 | Tier 1 心智模型 |
+| RULE-15 | 每完成一个AC就git commit | RED-5 |
+| RULE-16 | 会话启动/结束必须执行sessionProtocol | |
+| RULE-17 | 砍功能原则 | Tier 1 心智模型 |
+| RULE-18 | P0 Hotfix例外：CTO授权+24小时补文档 | |
+| RULE-19 | fail-secure原则 | RED-2 心智模型 |
+| RULE-20 | 不接受补丁，结构性问题必须重构 | Tier 1 心智模型 |
+| RULE-21 | 测试只增不减（session-guard拦截） | RED-3 |
+| RULE-22 | 禁止类型绕过（session-guard拦截） | |
+| RULE-23 | 环境变量集中管理（session-guard警告） | RED-4 |
+| RULE-24 | ADR影响扩散：变更前扫描全文档 | |
 
-每次 git commit 前运行 `npx tsx scripts/session-guard.ts commit`：
-- **RULE-21**: 禁止删除测试文件（测试只增不减）
-- **RULE-22**: 禁止 `as unknown as Record` 类型绕过（用正确类型）
-- **RULE-23**: 禁止直接 `process.env[`（走 env.ts Zod schema）
-- **ADR 影响扩散**: 删除/变更功能时运行 `session-guard.ts adr-impact <关键词>` 扫描全文档
+### 团队激活条件
+```
+日常默认（4人）：林深 · 吴川 · 韩月 · 孙河
 
-## 关键规则
+按模块激活：
+  财务页面开发   → + 周严(CFO) · 王海涛 · 杨芳
+  运营页面开发   → + 赵铁(COO) · 高原
+  客服模块       → + 许静
+  安全/合规审查  → + 林雪菲
+  数据采集/RPA   → + 韩铭 · 刘思远
+  支付接口       → + 沈慧
+  投放数据模块   → + 吴鹏飞
 
-- **RULE-14**: 每个会话只处理一个 US，不跨 US 工作
-- **RULE-15**: 每完成一个 AC 就 git commit
-- **RULE-17**: 砍功能比加功能重要——不在当前 Phase scope 内的需求，记入 Backlog
-- **RULE-02**: 最小改动原则，只改必需的
-- **RULE-03**: 双重 Critic 审查，方案+代码都要审
-- 所有数据库查询必须带 tenantId
-- 错误码使用 brain.json 中的 errorCodes 注册表
-- API 响应遵循统一格式 `{ success, data, error?, requestId }`
-- **RULE-18**: P0 Hotfix 例外——生产事故可跨 US 紧急修复，事后补 AC 记录
-- **RULE-19**: fail-secure 原则——外部依赖不可用（Redis/DB等）= 拒绝请求（503），绝不降级放行。安全问题Critic只能REJECT不可CONDITIONAL
-- **RULE-20**: 项目初期不接受补丁，发现问题必须重构，补丁=技术债累积=系统不可维护
-- **RULE-21**: 测试只增不减——禁止删除测试文件，修改测试必须有正当理由（session-guard 自动拦截）
-- **RULE-22**: 禁止类型绕过——不允许 `as unknown as Record`，用正确的类型定义（session-guard 自动拦截）
-- **RULE-23**: 环境变量集中管理——禁止直接 `process.env[`，必须走 lib/env.ts 的 Zod schema（session-guard 警告）
-- **RULE-24**: ADR 影响扩散——任何架构决策（增删功能/改部署/改策略）必须 grep 全文档扫描影响范围，不清理不提交
-- 方案先行——宁慢勿糙，方案不清晰不开工
+其余34席成员：静默。不参与日常会话。
+```
 
-## 技术栈
+### 技术栈
+```
+Node.js 20+ / TypeScript strict / Express 4 / Prisma 6
+PostgreSQL 15 / Redis 7 / Taro 4 / Vitest / pnpm 10 / Docker
+```
 
-Node.js 20+ / TypeScript strict / Express 4 / Prisma 6 / PostgreSQL 15 / Redis 7 / Taro 4 / Vitest / pnpm 10 / Docker
+### API响应统一格式
+```typescript
+{ success: boolean, data: object, error?: object, requestId: string }
+```
 
-## 双引擎双飞书（系统最核心能力）
+---
 
-- **飞书号1「启元」→ Claude Code**（最强大脑）：Mac本地Bridge，通过飞书WebSocket长连接可达。开发迭代、架构决策、复杂分析、一切。创始人不需要守电脑。
-- **飞书号2 → AI对话引擎**（日常大脑）：通义千问驱动，已验证飞书集成。查数据、管运营、客服判断、报表。处理90%日常操作。
-- 两者并列缺一不可。Claude Code > AI对话引擎（能力层面），简单的事走AI对话引擎（低成本），重要的事走Claude Code。
+## ▍TIER 3 · 领域知识索引
+> 遇到对应任务时才读，不默认展开
 
-## Phase 1 数据策略
-
-- **主数据源**：MallAdapter（ztdy-open API）— 146万用户/95万订单/8466商品的真实数据
-- **辅数据源**：Excel/CSV 上传 — 覆盖无 API 权限的租户/岗位
-- Phase 1 商品/订单数据从 API 实时读取，不落本地库
-- 聚合查询使用预计算缓存（每小时增量/每日全量），避免实时遍历API
-- Phase 2 自建商城后 MallAdapter 退役，切换为同库直查
-
-## 完整文档目录
-
+### 文档目录
 ```
 docs/
-├── brain.json                    # 项目大脑 v2.7（projectBrief/任务/ADR/错误码/会话协议）
-├── claude-progress.txt           # 进度接力（开发后才有）
-├── 01-企业AI工作站-主文档.md      # 数据模型、权限、安全（数据模型权威源）
-├── 02-企业AI工作站-Agent编排.md   # AI Agent 架构 + ACI客服中枢
-├── 03-企业AI工作站-ERP统一接口.md # ERP/商城适配层（含MallAdapter）
-├── 04-企业工作站-研发有机体Agent团队.md  # 9人团队、会话协议、17条规则
-├── 05-全局能力架构.md             # 全局蓝图、产品能力（能力权威源）
-├── 06-环境与部署规划.md           # 阿里云资源、Docker、CI/CD
-├── 07-UI设计规范.md              # 视觉语言、组件、页面设计
-└── 08-前后端接口契约.md          # 12种AI消息类型 + 18个API端点 + 43错误码
+├── brain.json                    # 项目大脑：任务/ADR/错误码/会话协议（权威源）
+├── claude-progress.txt           # 进度接力（每次会话更新）
+├── 01-企业AI工作站-主文档.md      # 数据模型/权限/安全（数据模型权威源）
+├── 02-Agent编排.md               # AI Agent架构 + ACI客服中枢
+├── 03-ERP统一接口.md             # MallAdapter + RPAAdapter
+├── 04-研发有机体Agent团队.md      # 9人团队/24条规则/会话协议（规则权威源）
+├── 05-全局能力架构.md             # 全局蓝图/产品能力（能力权威源）
+├── 06-环境与部署规划.md           # 阿里云/Docker/CI-CD
+├── 07-UI设计规范.md              # 视觉语言/组件/页面
+├── 08-前后端接口契约.md           # 12种AI消息类型/18个API/43错误码
+├── 09-财务板块升级方案.md         # 三位CFO评审，62→95分
+├── 11-客服板块升级方案.md
+├── 13-运营板块升级方案.md         # 五方评审，37→95分（11个视图）
+├── 14-RPA数据桥梁方案.md         # ADR-031 概念版
+├── 15-超管指挥中心升级方案.md     # 四方评审，39→90+（6视图）
+├── 16-工具中心升级方案.md         # 三方评审，28→85+（5视图）
+├── 17-数据通路设计组.md           # 16人虚拟专家团队
+└── 18-RPA数据桥梁技术方案v2.md   # 可执行技术方案（执行蓝图）
 ```
+
+### MDC角色激活表
+| 成员 | 角色 | 激活关键词 | MDC文件 |
+|------|------|-----------|---------|
+| **林深** | CTO · 总控架构师 | 你是林深 / CTO模式 | `00-cto-agent.mdc` |
+| 韩云 | PM Agent | 你是PM / 写用户故事 | `01-pm-agent.mdc` |
+| 方晓 | Architect Agent | 你是架构师 / 出方案 | `02-architect-agent.mdc` |
+| （独立）| Critic Agent | 你是Critic / 审查 | `03-critic-agent.mdc` |
+| 韩月 | FE Agent | 你是前端 / 写页面 | `04-fe-agent.mdc` |
+| 吴川 | BE Agent | 你是后端 / 写API | `05-be-agent.mdc` |
+| 方晓 | Data Agent | 你是Data / Schema | `06-data-agent.mdc` |
+| （独立）| QA Agent | 你是QA / 写测试 | `07-qa-agent.mdc` |
+| 陆远 | DevOps Agent | 你是DevOps / 部署 | `08-devops-agent.mdc` |
+
+**其余成员**：韩铭（RPA采集）· 沈慧（支付财务）· 孙河（AI编排）
+
+### 数据通路设计组（虚拟专家团队）快捷指令
+```
+召集数据通路设计组，评审 [主题]              # 16人全员圆桌
+召集数据通路设计组 [成员名]，评审 [主题]     # 指定专家
+数据通路设计组，诊断 [部门/岗位] 的工作流    # 流程诊断
+数据通路设计组，评估 [系统] 的RPA接入可行性  # 可行性评估
+```
+> 收到指令时先读 `docs/17-数据通路设计组.md` 加载团队配置
+
+### 阶段路线图（快速定位当前phase）
+```
+Phase 1a  ✅  后端基础框架 + 第一个API
+Phase 1b  🔄  第一个业务闭环（当前）
+Phase 2   ⏳  自建商城后MallAdapter退役，RPAAdapter逐步替换为APIAdapter
+```
+
+---
+
+## ▍动态沉淀层
+> 每次会话结束由 /revise-claude-md 自动写入，记录新决策/踩坑/规则变更
+
+```
+格式：[日期] [类型] 内容
+类型：决策 / 踩坑 / 规则变更 / 架构变更
+```
+
+[2026-04-04] 决策 CEO拍板：顾问席意见限时48小时，超时视为默认通过
+[2026-04-04] 决策 团队激活原则：现阶段默认4人，按模块触发其余成员
+[2026-04-04] 踩坑 CLAUDE.md精简不等于压缩内容，正确做法是分层+引用，内容必须完整传承
+[2026-04-04] 架构变更 会话流程升级为三节点：3分钟启动→深度执行+即时归档→5分钟收尾
+[2026-04-04] 规则变更 /revise-claude-md接入session-guard end，会话结束自动沉淀知识

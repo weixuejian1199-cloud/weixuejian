@@ -940,15 +940,6 @@ body {
 
 <!-- ========== SIDEBAR ========== -->
 <nav class="sidebar">
-  <!-- 创始人·作战台入口（侧栏第一项语义，与工具中心一致）：仅 super_admin 可见 -->
-  <div class="sidebar-section" data-role-required="super_admin" style="display:none">
-    <a class="nav-item" href="v3-02-super-admin.html" style="text-decoration:none;color:inherit">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-      <span>AI 今日看板</span>
-      <span class="nav-badge">3</span>
-    </a>
-  </div>
-  <div class="sidebar-divider" data-role-required="super_admin" style="display:none"></div>
 
   <div class="sidebar-section">
     <div class="nav-item active" data-view="overview">
@@ -1032,6 +1023,16 @@ body {
   <div class="sidebar-divider"></div>
 
   <div class="sidebar-section">
+    <div class="sidebar-section-title">即时零售</div>
+    <div class="nav-item" data-view="qianniuhua">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>牵牛花多店</span>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section">
     <div class="sidebar-section-title">对话记录</div>
     <div class="chat-item active">
       <span class="chat-item-title">清明活动方案 & 备货</span>
@@ -1054,7 +1055,7 @@ body {
   <div class="sidebar-bottom">
     <div class="nav-item">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      <span>设置</span>
+      <span>系统设置</span>
     </div>
   </div>
 </nav>
@@ -1877,6 +1878,187 @@ body {
   </div>
 </section>
 
+<!-- ==================== VIEW: 牵牛花多店经营数据 ==================== -->
+<section class="view-content" data-view="qianniuhua">
+  <div class="channel-filter">
+    <button class="channel-tab active" onclick="setChannel(this)">全部渠道</button>
+    <button class="channel-tab" onclick="setChannel(this)">美团闪购</button>
+    <button class="channel-tab" onclick="setChannel(this)">饿了么</button>
+    <button class="channel-tab" onclick="setChannel(this)">京东到家</button>
+  </div>
+
+  <!-- 数据源说明 + 同步状态 -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted)">
+      <span class="status-dot" style="background:var(--green)"></span>
+      <span>牵牛花数据 · 今日 06:30 同步成功</span>
+      <span style="color:var(--divider)">|</span>
+      <span>14 家门店 · 数据口径：T+1</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="filter-btn" onclick="alert('手动触发同步，请稍候...')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:4px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>手动同步
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI 卡片（6列）-->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">有效订单金额</div>
+      <div class="kpi-value">¥32,707</div>
+      <div class="kpi-change up">+3.2% 周比</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">有效订单数</div>
+      <div class="kpi-value">868</div>
+      <div class="kpi-change down">-1.4% 周比</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">客单价</div>
+      <div class="kpi-value">¥37.68</div>
+      <div class="kpi-change up">+0.8% 周比</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">实付金额</div>
+      <div class="kpi-value">¥20,731</div>
+      <div class="kpi-change up">+2.1% 周比</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">顾客数</div>
+      <div class="kpi-value">871</div>
+      <div class="kpi-change up">+0.3% 周比</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">整单超时率</div>
+      <div class="kpi-value" style="color:var(--red)">5.85%</div>
+      <div class="kpi-change down" style="color:var(--red)">↑0.5pp 需关注</div>
+    </div>
+  </div>
+
+  <!-- 预警 -->
+  <div class="alert-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+    <div class="alert-card danger">
+      <div class="alert-type">超时率预警</div>
+      <div class="alert-msg">回溪换新店超时率 12.58%，朝阳门店 15.31%，超行业阈值(8%)</div>
+      <span class="alert-action">查看门店详情</span>
+    </div>
+    <div class="alert-card warn">
+      <div class="alert-type">库存信号</div>
+      <div class="alert-msg">库存数据对接进行中，当前展示快照数据，实时库存预计近期上线</div>
+      <span class="alert-action">跟进接入进度</span>
+    </div>
+    <div class="alert-card info">
+      <div class="alert-type">渠道结构</div>
+      <div class="alert-msg">美团闪购占 GMV 62%，饿了么 23%，京东到家 15%，结构健康</div>
+      <span class="alert-action">查看渠道分布</span>
+    </div>
+  </div>
+
+  <!-- 门店明细 + AI助手 -->
+  <div class="content-grid">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">门店明细 <span style="font-size:12px;font-weight:400;color:var(--text-muted)">14 家 · 今日数据</span></span>
+        <button class="card-action">导出 Excel</button>
+      </div>
+      <table class="data-table">
+        <thead><tr>
+          <th>#</th><th>门店</th><th class="text-right">订单金额</th><th class="text-right">订单数</th>
+          <th class="text-right">客单价</th><th class="text-right">实付金额</th>
+          <th class="text-right">配送费</th><th class="text-right">顾客数</th><th class="text-right">超时率</th>
+        </tr></thead>
+        <tbody>
+          <tr><td class="mono">1</td><td><strong>京东便利店(连美总店)</strong></td><td class="mono text-right">¥7,560</td><td class="mono text-right">175</td><td class="mono text-right">¥43.20</td><td class="mono text-right">¥4,254</td><td class="mono text-right">¥969</td><td class="mono text-right">173</td><td class="mono text-right" style="color:var(--green)">0%</td></tr>
+          <tr><td class="mono">2</td><td><strong>京东便利店(回溪换新店)</strong></td><td class="mono text-right">¥5,383</td><td class="mono text-right">153</td><td class="mono text-right">¥35.18</td><td class="mono text-right">¥3,960</td><td class="mono text-right">¥246</td><td class="mono text-right">155</td><td class="mono text-right" style="color:var(--red)">12.58% ⚠</td></tr>
+          <tr><td class="mono">3</td><td><strong>京东便利店(朝阳门店)</strong></td><td class="mono text-right">¥4,820</td><td class="mono text-right">138</td><td class="mono text-right">¥34.93</td><td class="mono text-right">¥3,510</td><td class="mono text-right">¥312</td><td class="mono text-right">140</td><td class="mono text-right" style="color:var(--red)">15.31% ⚠</td></tr>
+          <tr><td class="mono">4</td><td><strong>京东便利店(望京店)</strong></td><td class="mono text-right">¥3,960</td><td class="mono text-right">112</td><td class="mono text-right">¥35.36</td><td class="mono text-right">¥2,890</td><td class="mono text-right">¥198</td><td class="mono text-right">114</td><td class="mono text-right">4.46%</td></tr>
+          <tr><td class="mono">5</td><td><strong>京东便利店(三里屯店)</strong></td><td class="mono text-right">¥3,280</td><td class="mono text-right">96</td><td class="mono text-right">¥34.17</td><td class="mono text-right">¥2,430</td><td class="mono text-right">¥178</td><td class="mono text-right">98</td><td class="mono text-right" style="color:var(--red)">11.76% ⚠</td></tr>
+          <tr><td class="mono">6</td><td><strong>京东便利店(国贸店)</strong></td><td class="mono text-right">¥2,910</td><td class="mono text-right">84</td><td class="mono text-right">¥34.64</td><td class="mono text-right">¥2,120</td><td class="mono text-right">¥152</td><td class="mono text-right">86</td><td class="mono text-right">3.57%</td></tr>
+          <tr><td class="mono">7</td><td><strong>京东便利店(西单店)</strong></td><td class="mono text-right">¥2,680</td><td class="mono text-right">76</td><td class="mono text-right">¥35.26</td><td class="mono text-right">¥1,980</td><td class="mono text-right">¥138</td><td class="mono text-right">78</td><td class="mono text-right" style="color:var(--green)">1.32%</td></tr>
+          <tr id="qnhHiddenRows" style="display:none"><td colspan="9" style="padding:0"></td></tr>
+        </tbody>
+      </table>
+      <!-- 隐藏行 -->
+      <table class="data-table" id="qnhExtraTable" style="display:none">
+        <tbody>
+          <tr><td class="mono">8</td><td><strong>京东便利店(中关村店)</strong></td><td class="mono text-right">¥2,340</td><td class="mono text-right">68</td><td class="mono text-right">¥34.41</td><td class="mono text-right">¥1,740</td><td class="mono text-right">¥124</td><td class="mono text-right">70</td><td class="mono text-right">5.88%</td></tr>
+          <tr><td class="mono">9</td><td><strong>京东便利店(五道口店)</strong></td><td class="mono text-right">¥2,100</td><td class="mono text-right">62</td><td class="mono text-right">¥33.87</td><td class="mono text-right">¥1,560</td><td class="mono text-right">¥112</td><td class="mono text-right">64</td><td class="mono text-right">4.84%</td></tr>
+          <tr><td class="mono">10</td><td><strong>京东便利店(软件园三期)</strong></td><td class="mono text-right">¥1,890</td><td class="mono text-right">56</td><td class="mono text-right">¥33.75</td><td class="mono text-right">¥1,380</td><td class="mono text-right">¥98</td><td class="mono text-right">58</td><td class="mono text-right" style="color:var(--green)">0%</td></tr>
+          <tr><td class="mono">11</td><td><strong>京东便利店(上地店)</strong></td><td class="mono text-right">¥1,620</td><td class="mono text-right">48</td><td class="mono text-right">¥33.75</td><td class="mono text-right">¥1,190</td><td class="mono text-right">¥86</td><td class="mono text-right">50</td><td class="mono text-right">6.25%</td></tr>
+          <tr><td class="mono">12</td><td><strong>京东便利店(清河店)</strong></td><td class="mono text-right">¥1,380</td><td class="mono text-right">42</td><td class="mono text-right">¥32.86</td><td class="mono text-right">¥1,020</td><td class="mono text-right">¥76</td><td class="mono text-right">44</td><td class="mono text-right">7.14%</td></tr>
+          <tr><td class="mono">13</td><td><strong>京东便利店(亦庄店)</strong></td><td class="mono text-right">¥880</td><td class="mono text-right">28</td><td class="mono text-right">¥31.43</td><td class="mono text-right">¥660</td><td class="mono text-right">¥52</td><td class="mono text-right">30</td><td class="mono text-right">3.57%</td></tr>
+          <tr><td class="mono">14</td><td><strong>京东便利店(回龙观店)</strong></td><td class="mono text-right">¥904</td><td class="mono text-right">30</td><td class="mono text-right">¥30.13</td><td class="mono text-right">¥677</td><td class="mono text-right">¥47</td><td class="mono text-right">32</td><td class="mono text-right">6.67%</td></tr>
+        </tbody>
+      </table>
+      <div style="padding:12px 16px;border-top:1px solid var(--divider);display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:12px;color:var(--text-muted)">共 14 家门店 · 展示今日数据 · 3家超时率异常</span>
+        <button class="card-action" id="qnhExpandBtn" onclick="toggleQnhRows()">展开全部 14 家</button>
+      </div>
+    </div>
+
+    <div class="card ai-panel">
+      <div class="card-header"><span class="card-title">AI 即时零售助手</span></div>
+      <div class="ai-messages" id="aiMsg-qianniuhua">
+        <div class="msg ai">牵牛花今日数据已同步：<br><br>
+        <strong>14家门店综合</strong>：GMV ¥32,707 / 订单 868 单 / 客单价 ¥37.68<br><br>
+        <strong>⚠ 需关注：</strong><br>
+        - 回溪换新店超时率 12.58%（超阈值8%）<br>
+        - 朝阳门店超时率 15.31%（超阈值8%）<br>
+        - 三里屯店超时率 11.76%（超阈值8%）<br><br>
+        建议：检查骑手运力或评估是否调整配送半径（调整前请核算对GMV的影响）。需要我生成超时率改善方案吗？<br><br>
+        <span class="action-btn">生成超时改善方案</span><span class="action-btn secondary">导出门店数据</span></div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" placeholder="如：哪家门店今天亏损了..." onkeydown="if(event.key==='Enter')sendMsg(this)">
+        <button class="ai-send" onclick="sendMsg(this.previousElementSibling)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 渠道分布 -->
+  <div class="card content-full">
+    <div class="card-header">
+      <span class="card-title">渠道 GMV 分布</span>
+      <span style="font-size:12px;color:var(--text-muted)">今日汇总 · 口径同门店明细 · 美团闪购为主渠道</span>
+    </div>
+    <div style="padding:20px;display:grid;grid-template-columns:repeat(3,1fr);gap:20px">
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:13px;font-weight:600">美团闪购</span>
+          <span class="status-tag orange">主渠道</span>
+        </div>
+        <div style="font-size:22px;font-weight:700;font-family:var(--font-mono);margin-bottom:4px">¥20,278</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">62.0% · 538单</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:62%;background:var(--orange)"></div></div>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:13px;font-weight:600">饿了么</span>
+          <span class="status-tag blue">辅渠道</span>
+        </div>
+        <div style="font-size:22px;font-weight:700;font-family:var(--font-mono);margin-bottom:4px">¥7,523</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">23.0% · 200单</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:23%;background:var(--blue)"></div></div>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:13px;font-weight:600">京东到家</span>
+          <span class="status-tag green">辅渠道</span>
+        </div>
+        <div style="font-size:22px;font-weight:700;font-family:var(--font-mono);margin-bottom:4px">¥4,906</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">15.0% · 130单</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:15%;background:var(--green)"></div></div>
+      </div>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid var(--divider);font-size:12px;color:var(--text-muted)">
+      <strong style="color:var(--text-primary)">维护岗位：</strong>运营岗 罗峰 / 高原 · 平台账号在系统设置 &gt; 平台账号管理中维护
+    </div>
+  </div>
+</section>
+
 </main>
 
 <!-- ========== FOOTER ========== -->
@@ -2067,6 +2249,16 @@ if (localStorage.getItem('ops_onboarded')) {
 // ===== Notification panel (placeholder) =====
 function toggleNotifications() {
   alert('通知面板：4条异常预警、2条售后升级、1条系统更新');
+}
+
+// ===== 牵牛花门店展开/折叠 =====
+var qnhExpanded = false;
+function toggleQnhRows() {
+  qnhExpanded = !qnhExpanded;
+  var extraTable = document.getElementById('qnhExtraTable');
+  var btn = document.getElementById('qnhExpandBtn');
+  if (extraTable) extraTable.style.display = qnhExpanded ? '' : 'none';
+  if (btn) btn.textContent = qnhExpanded ? '收起' : '展开全部 14 家';
 }
 
 // ===== Filter buttons =====

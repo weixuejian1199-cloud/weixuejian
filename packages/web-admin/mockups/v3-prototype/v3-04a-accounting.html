@@ -1083,6 +1083,210 @@ body {
 
 /* Tooltip for disabled items */
 .nav-item.disabled[title] { position: relative; }
+
+/* ========== Voucher Detail Modal (小金·金蝶借贷分录规范) ========== */
+.voucher-modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 400;
+  display: flex; align-items: center; justify-content: center;
+}
+.voucher-modal-overlay.hidden { display: none; }
+.voucher-modal {
+  background: var(--bg);
+  border-radius: 16px;
+  width: 700px; max-width: 92vw; max-height: 82vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,.16);
+  overflow: hidden;
+}
+.voucher-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--divider);
+  flex-shrink: 0;
+}
+.voucher-modal-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.voucher-modal-close {
+  width: 28px; height: 28px; border: none; background: none; cursor: pointer;
+  font-size: 18px; color: var(--text-muted); border-radius: 6px;
+  display: flex; align-items: center; justify-content: center; transition: background .15s;
+}
+.voucher-modal-close:hover { background: var(--hover-bg); }
+.voucher-modal-meta {
+  display: flex; gap: 20px; flex-wrap: wrap;
+  padding: 10px 20px;
+  font-size: 12px; color: var(--text-secondary);
+  background: var(--input-bg);
+  border-bottom: 1px solid var(--divider);
+  flex-shrink: 0;
+}
+.voucher-modal-meta span { display: flex; align-items: center; gap: 4px; }
+.voucher-detail-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+  overflow-y: auto;
+}
+.voucher-detail-table th {
+  padding: 9px 16px;
+  font-size: 11px; font-weight: 600; color: var(--text-muted); letter-spacing: .5px;
+  background: var(--input-bg); border-bottom: 1px solid var(--divider);
+  text-align: left; white-space: nowrap;
+}
+.voucher-detail-table td {
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--divider);
+  color: var(--text-primary);
+}
+/* 金蝶规范：借方蓝色，贷方橙红色 */
+.voucher-detail-table .debit-amt {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  color: #2563EB; font-weight: 500; text-align: right;
+}
+.voucher-detail-table .credit-amt {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  color: #D97706; font-weight: 500; text-align: right;
+}
+.voucher-detail-table tfoot td {
+  font-weight: 700; border-top: 2px solid var(--divider);
+  background: var(--input-bg);
+}
+.voucher-modal-footer {
+  padding: 12px 20px;
+  display: flex; justify-content: space-between; align-items: center;
+  border-top: 1px solid var(--divider);
+  font-size: 12px; color: var(--text-muted);
+  flex-shrink: 0;
+}
+.balance-ok { color: var(--green); font-weight: 500; }
+.balance-err { color: var(--red); font-weight: 500; }
+
+/* ========== 内控警告（小畅·好会计合规规范）========== */
+.btn.disabled-ic {
+  opacity: 0.4; cursor: not-allowed; pointer-events: none;
+}
+.ic-tooltip-wrap { position: relative; display: inline-block; }
+.ic-tooltip-wrap:hover .ic-tooltip { display: block; }
+.ic-tooltip {
+  display: none; position: absolute; bottom: calc(100% + 6px); left: 50%;
+  transform: translateX(-50%);
+  background: #1A1A1A; color: #fff;
+  font-size: 11px; padding: 5px 10px; border-radius: 6px; white-space: nowrap;
+  z-index: 999; pointer-events: none;
+}
+.ic-tooltip::after {
+  content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  border: 5px solid transparent; border-top-color: #1A1A1A;
+}
+/* 已记账凭证行样式 */
+.voucher-posted-row { opacity: 0.85; }
+.btn-view-only {
+  font-size: 11px; padding: 3px 8px;
+  background: var(--input-bg); border: 1px solid var(--input-border);
+  border-radius: 6px; cursor: pointer; color: var(--text-muted);
+  font-family: var(--font); transition: all .15s;
+}
+.btn-view-only:hover { background: var(--hover-bg); color: var(--text-primary); }
+
+/* ========== 科目余额表（小金·金蝶首屏设计参考）========== */
+.trial-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.trial-table th {
+  padding: 9px 14px;
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+  background: var(--input-bg); border-bottom: 1px solid var(--divider);
+  text-align: right; white-space: nowrap;
+}
+.trial-table th:first-child, .trial-table th:nth-child(2) { text-align: left; }
+.trial-table td {
+  padding: 9px 14px; border-bottom: 1px solid var(--divider);
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  color: var(--text-secondary); text-align: right;
+  font-size: 12px;
+}
+.trial-table td:first-child { font-family: var(--font); font-size: 12px; text-align: left; color: var(--text-muted); }
+.trial-table td:nth-child(2) { font-family: var(--font); text-align: left; color: var(--text-primary); font-size: 13px; }
+.trial-table tr.cat-row td { font-weight: 700; color: var(--text-primary); background: var(--input-bg); font-family: var(--font); }
+.trial-table tr.cat-row td:first-child { font-size: 11px; letter-spacing: .8px; text-transform: uppercase; color: var(--text-muted); }
+.trial-table tr.total-row td { font-weight: 700; color: var(--text-primary); border-top: 2px solid var(--divider); }
+.trial-table tbody tr:hover { background: var(--hover-bg); cursor: pointer; }
+.debit-bal { color: #2563EB; }
+.credit-bal { color: #D97706; }
+
+/* ========== 凭证模板 ========== */
+.tpl-cat-bar { display:flex; gap:6px; margin-bottom:18px; flex-wrap:wrap; }
+.tpl-cat-btn { padding:5px 14px; border:1px solid var(--divider); border-radius:20px; font-size:12px; font-weight:500; color:var(--text-secondary); background:none; cursor:pointer; transition:all .15s; }
+.tpl-cat-btn:hover { border-color:var(--blue); color:var(--blue); }
+.tpl-cat-btn.active { background:var(--blue); border-color:var(--blue); color:#fff; }
+.tpl-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; }
+.tpl-card { background:var(--bg); border:1px solid var(--divider); border-radius:12px; padding:16px; transition:box-shadow .15s; }
+.tpl-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.08); }
+.tpl-card-header { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.tpl-card-icon { width:32px; height:32px; border-radius:8px; background:var(--input-bg); display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+.tpl-card-name { font-size:14px; font-weight:600; color:var(--text-primary); }
+.tpl-card-cat { font-size:11px; color:var(--text-muted); margin-top:2px; }
+.tpl-card-summary { font-size:12px; color:var(--text-secondary); margin-bottom:10px; padding:6px 10px; background:var(--input-bg); border-radius:6px; }
+.tpl-entries { margin-bottom:12px; }
+.tpl-entry-row { display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:4px 0; border-bottom:1px solid var(--divider); }
+.tpl-entry-row:last-child { border-bottom:none; }
+.tpl-entry-subject { color:var(--text-secondary); flex:1; }
+.tpl-entry-dir { padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; margin-left:8px; }
+.tpl-entry-dir.debit { background:#EFF6FF; color:#2563EB; }
+.tpl-entry-dir.credit { background:#FFFBEB; color:#D97706; }
+.tpl-entry-amount { font-family:var(--font-mono); color:var(--text-muted); font-size:11px; margin-left:8px; }
+.tpl-card-actions { display:flex; gap:8px; }
+.tpl-card-actions .btn { flex:1; font-size:12px; padding:6px 12px; }
+
+/* ========== 总账/明细账 ========== */
+.ledger-tab-bar { display:flex; gap:0; border-bottom:2px solid var(--divider); margin-bottom:20px; }
+.ledger-tab { padding:8px 20px; font-size:13px; font-weight:500; color:var(--text-secondary); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px; transition:all .15s; }
+.ledger-tab:hover { color:var(--text-primary); }
+.ledger-tab.active { color:var(--blue); border-bottom-color:var(--blue); font-weight:600; }
+.ledger-sub-pane { display:none; }
+.ledger-sub-pane.active { display:block; }
+.general-ledger-table { width:100%; border-collapse:collapse; font-size:13px; }
+.general-ledger-table th { padding:9px 12px; font-size:11px; font-weight:600; color:var(--text-muted); letter-spacing:.5px; background:var(--input-bg); border-bottom:1px solid var(--divider); text-align:left; white-space:nowrap; }
+.general-ledger-table th.num { text-align:right; }
+.general-ledger-table td { padding:9px 12px; border-bottom:1px solid var(--divider); color:var(--text-primary); font-size:13px; }
+.general-ledger-table td.num { text-align:right; font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.general-ledger-table tr.cat-group td { font-weight:700; background:var(--input-bg); font-size:11px; letter-spacing:.6px; color:var(--text-muted); text-transform:uppercase; }
+.general-ledger-table tbody tr:hover { background:var(--hover-bg); cursor:pointer; }
+.subledger-layout { display:flex; gap:16px; height:calc(100vh - 220px); }
+.subledger-left { width:220px; flex-shrink:0; background:var(--sidebar-bg); border:1px solid var(--divider); border-radius:10px; overflow-y:auto; }
+.subledger-left-title { padding:10px 14px; font-size:11px; font-weight:600; letter-spacing:.6px; color:var(--text-muted); border-bottom:1px solid var(--divider); }
+.subledger-subject-item { padding:9px 14px; font-size:12px; cursor:pointer; border-bottom:1px solid var(--divider); display:flex; align-items:center; gap:6px; transition:background .1s; }
+.subledger-subject-item:hover { background:var(--hover-bg); }
+.subledger-subject-item.active { background:var(--blue); color:#fff; }
+.subledger-subject-item .ssi-code { font-family:var(--font-mono); font-size:11px; color:var(--text-muted); }
+.subledger-subject-item.active .ssi-code { color:rgba(255,255,255,.7); }
+.subledger-right { flex:1; overflow:hidden; display:flex; flex-direction:column; }
+.subledger-toolbar { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-shrink:0; }
+.subledger-table { width:100%; border-collapse:collapse; font-size:13px; }
+.subledger-table th { padding:9px 12px; font-size:11px; font-weight:600; color:var(--text-muted); background:var(--input-bg); border-bottom:1px solid var(--divider); text-align:left; white-space:nowrap; }
+.subledger-table th.num,.subledger-table td.num { text-align:right; font-family:var(--font-mono); }
+.subledger-table td { padding:9px 12px; border-bottom:1px solid var(--divider); font-size:13px; }
+.subledger-table tbody tr:hover { background:var(--hover-bg); }
+.subledger-table .running-bal { font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-weight:500; }
+
+/* ========== 应收/应付账款 ========== */
+.ar-ap-summary { display:flex; gap:14px; margin-bottom:20px; }
+.ar-ap-kpi { flex:1; background:var(--bg); border:1px solid var(--divider); border-radius:10px; padding:14px 18px; }
+.ar-ap-kpi .kpi-label { font-size:11px; color:var(--text-muted); margin-bottom:4px; }
+.ar-ap-kpi .kpi-val { font-size:22px; font-weight:700; font-family:var(--font-mono); color:var(--text-primary); }
+.ar-ap-kpi .kpi-sub { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+.aging-bar { display:flex; height:6px; border-radius:3px; overflow:hidden; gap:1px; margin-top:8px; }
+.aging-seg { height:100%; border-radius:2px; }
+.age-tag { display:inline-block; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:600; white-space:nowrap; }
+.age-tag.safe { background:#ECFDF5; color:#059669; }
+.age-tag.warn { background:#FFFBEB; color:#D97706; }
+.age-tag.danger { background:#FEF2F2; color:#DC2626; }
+.ar-ap-table { width:100%; border-collapse:collapse; font-size:13px; }
+.ar-ap-table th { padding:9px 12px; font-size:11px; font-weight:600; color:var(--text-muted); background:var(--input-bg); border-bottom:1px solid var(--divider); text-align:left; white-space:nowrap; }
+.ar-ap-table th.num,.ar-ap-table td.num { text-align:right; font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.ar-ap-table td { padding:9px 12px; border-bottom:1px solid var(--divider); font-size:13px; }
+.ar-ap-table tbody tr:hover { background:var(--hover-bg); cursor:pointer; }
+.ar-ap-table .row-actions { display:flex; gap:6px; white-space:nowrap; }
+.ar-ap-table .row-actions .btn { padding:3px 10px; font-size:11px; }
 </style>
 </head>
 <body>
@@ -1136,15 +1340,6 @@ body {
 
 <!-- ========== SIDEBAR ========== -->
 <nav class="sidebar">
-  <!-- 创始人·作战台入口（侧栏第一项语义，与工具中心一致）：仅 super_admin 可见 -->
-  <div class="sidebar-section" data-role-required="super_admin" style="display:none">
-    <a class="nav-item" href="v3-02-super-admin.html" style="text-decoration:none;color:inherit">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-      <span>AI 今日看板</span>
-      <span class="nav-badge">3</span>
-    </a>
-  </div>
-  <div class="sidebar-divider" data-role-required="super_admin" style="display:none"></div>
   <div class="sidebar-section">
     <div class="nav-item active" data-view="overview">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -1172,7 +1367,7 @@ body {
       <span data-simple="账户科目">会计科目</span>
       <span class="new-tag">NEW</span>
     </div>
-    <div class="nav-item disabled" title="即将上线">
+    <div class="nav-item" data-view="voucher-template">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="12" y2="16"/></svg>
       <span>凭证模板</span>
     </div>
@@ -1187,15 +1382,15 @@ body {
       <span data-simple="记账中心">凭证中心</span>
       <span class="nav-badge">5</span>
     </div>
-    <div class="nav-item disabled" title="即将上线">
+    <div class="nav-item" data-view="ledger">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
       <span>总账/明细账</span>
     </div>
-    <div class="nav-item disabled" title="即将上线">
+    <div class="nav-item" data-view="ar">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="17" y1="17" x2="7" y2="7"/><polyline points="7 17 7 7 17 7"/></svg>
       <span data-simple="别人欠我的">应收账款</span>
     </div>
-    <div class="nav-item disabled" title="即将上线">
+    <div class="nav-item" data-view="ap">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="7" x2="17" y2="17"/><polyline points="17 7 17 17 7 17"/></svg>
       <span data-simple="我欠别人的">应付账款</span>
     </div>
@@ -1207,6 +1402,10 @@ body {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
       <span>发票管理</span>
       <span class="new-tag">NEW</span>
+    </div>
+    <div class="nav-item" data-view="trial-balance">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      <span data-simple="账目余额">科目余额表</span>
     </div>
     <div class="nav-item" data-view="platform-recon">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.828L3 3"/><path d="m21 3-8 8"/></svg>
@@ -1236,6 +1435,17 @@ body {
   <div class="sidebar-divider"></div>
 
   <div class="sidebar-section">
+    <div class="sidebar-section-title">系统</div>
+    <a class="nav-item" href="v3-07-admin-config.html#rpa=accounting" style="text-decoration:none;color:inherit" title="账务类平台账号">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+      <span>平台账号</span>
+      <span style="font-size:9px;color:var(--text-muted);margin-left:auto;white-space:nowrap">账务类</span>
+    </a>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <div class="sidebar-section">
     <div class="sidebar-section-title">对话记录</div>
     <div class="chat-item active" data-chat="1">
       <span class="chat-item-title">3月利润表环比分析</span>
@@ -1257,7 +1467,7 @@ body {
         <circle cx="12" cy="12" r="3"/>
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
       </svg>
-      <span>设置</span>
+      <span>系统设置</span>
     </div>
   </div>
 </nav>
@@ -1359,13 +1569,13 @@ body {
           <button class="card-action">新建凭证 +</button>
         </div>
         <table class="voucher-table">
-          <thead><tr><th>凭证字号</th><th>日期</th><th>摘要</th><th>渠道</th><th>科目</th><th>金额</th><th>制单人</th><th>来源</th><th>状态</th></tr></thead>
+          <thead><tr><th>凭证字号</th><th>日期</th><th>摘要</th><th>渠道</th><th>金额</th><th>制单人</th><th>来源</th><th>状态</th><th style="color:var(--blue);font-size:10px">点击查看分录</th></tr></thead>
           <tbody>
-            <tr><td class="code">付-031</td><td>03-31</td><td>付供应商货款-华美包材</td><td style="color:#999">-</td><td>应付账款-华美</td><td class="amount">¥45,000.00</td><td>李芳</td><td><span class="source-tag manual">手工</span></td><td><span class="status-tag pending">待审核</span></td></tr>
-            <tr><td class="code">收-018</td><td>03-31</td><td>收天猫3月货款结算</td><td><span style="font-size:12px;color:#666;background:#F5F5F5;padding:2px 8px;border-radius:4px">天猫</span></td><td>银行存款-招商</td><td class="amount">¥28,600.00</td><td>AI</td><td><span class="source-tag ai">&#10024; AI</span></td><td><span class="status-tag pending">待审核</span></td></tr>
-            <tr><td class="code">记-045</td><td>03-30</td><td>计提3月员工工资及社保</td><td style="color:#999">-</td><td>应付职工薪酬</td><td class="amount">¥86,400.00</td><td>李芳</td><td><span class="source-tag manual">手工</span></td><td><span class="status-tag posted">已记账</span></td></tr>
-            <tr><td class="code">记-044</td><td>03-30</td><td>办公用品采购入库</td><td style="color:#999">-</td><td>管理费用-办公费</td><td class="amount">¥2,340.00</td><td>张敏</td><td><span class="source-tag manual">手工</span></td><td><span class="status-tag approved">已审核</span></td></tr>
-            <tr><td class="code">转-012</td><td>03-29</td><td>抖音信息流广告投放</td><td><span style="font-size:12px;color:#666;background:#F5F5F5;padding:2px 8px;border-radius:4px">抖店</span></td><td>销售费用-推广</td><td class="amount">¥12,800.00</td><td>AI</td><td><span class="source-tag ai">&#10024; AI</span></td><td><span class="status-tag posted">已记账</span></td></tr>
+            <tr onclick="openVoucherModal('pay-031')" style="cursor:pointer"><td class="code">付-031</td><td>03-31</td><td>付供应商货款-华美包材</td><td style="color:#999">-</td><td class="amount">¥45,000.00</td><td>李芳</td><td><span class="source-tag manual">手工</span></td><td><span class="status-tag pending">待审核</span></td><td style="color:var(--text-muted);font-size:11px">→</td></tr>
+            <tr onclick="openVoucherModal('rec-018')" style="cursor:pointer"><td class="code">收-018</td><td>03-31</td><td>收天猫3月货款结算</td><td><span style="font-size:12px;color:#666;background:#F5F5F5;padding:2px 8px;border-radius:4px">天猫</span></td><td class="amount">¥28,600.00</td><td>AI</td><td><span class="source-tag ai">&#10024; AI</span></td><td><span class="status-tag pending">待审核</span></td><td style="color:var(--text-muted);font-size:11px">→</td></tr>
+            <tr onclick="openVoucherModal('jou-045')" style="cursor:pointer"><td class="code">记-045</td><td>03-30</td><td>计提3月员工工资及社保</td><td style="color:#999">-</td><td class="amount">¥86,400.00</td><td>李芳</td><td><span class="source-tag manual">手工</span></td><td><span class="status-tag posted">已记账</span></td><td style="color:var(--text-muted);font-size:11px">→</td></tr>
+            <tr onclick="openVoucherModal('jou-044')" style="cursor:pointer"><td class="code">记-044</td><td>03-30</td><td>办公用品采购入库</td><td style="color:#999">-</td><td class="amount">¥2,340.00</td><td>张敏</td><td><span class="source-tag manual">手工</span></td><td><span class="status-tag approved">已审核</span></td><td style="color:var(--text-muted);font-size:11px">→</td></tr>
+            <tr onclick="openVoucherModal('tra-012')" style="cursor:pointer"><td class="code">转-012</td><td>03-29</td><td>抖音信息流广告投放</td><td><span style="font-size:12px;color:#666;background:#F5F5F5;padding:2px 8px;border-radius:4px">抖店</span></td><td class="amount">¥12,800.00</td><td>AI</td><td><span class="source-tag ai">&#10024; AI</span></td><td><span class="status-tag posted">已记账</span></td><td style="color:var(--text-muted);font-size:11px">→</td></tr>
           </tbody>
         </table>
       </div>
@@ -1452,8 +1662,8 @@ body {
             <tr><td class="code">1405</td><td>库存商品</td><td><span class="cat-tag asset">资产</span></td><td>借方</td><td>SKU</td><td class="amount">¥326,800.00</td><td style="color:var(--green)">&#10003;</td></tr>
             <tr><td class="code">2202</td><td>应付账款</td><td><span class="cat-tag liability">负债</span></td><td>贷方</td><td>客商</td><td class="amount">¥168,500.00</td><td style="color:var(--green)">&#10003;</td></tr>
             <tr><td class="code">2241</td><td>合同负债(预收)</td><td><span class="cat-tag liability">负债</span></td><td>贷方</td><td>渠道</td><td class="amount">¥42,000.00</td><td style="color:var(--green)">&#10003;</td></tr>
-            <tr><td class="code">5001</td><td>主营业务收入</td><td><span class="cat-tag income-expense">损益</span></td><td>贷方</td><td>渠道+SKU</td><td class="amount" style="color:#999">-</td><td style="color:var(--green)">&#10003;</td></tr>
-            <tr><td class="code">5401</td><td>主营业务成本</td><td><span class="cat-tag income-expense">损益</span></td><td>借方</td><td>渠道+SKU</td><td class="amount" style="color:#999">-</td><td style="color:var(--green)">&#10003;</td></tr>
+            <tr><td class="code">6001</td><td>主营业务收入</td><td><span class="cat-tag income-expense">损益</span></td><td>贷方</td><td>渠道+SKU</td><td class="amount" style="color:#999">-</td><td style="color:var(--green)">&#10003;</td></tr>
+            <tr><td class="code">6401</td><td>主营业务成本</td><td><span class="cat-tag income-expense">损益</span></td><td>借方</td><td>渠道+SKU</td><td class="amount" style="color:#999">-</td><td style="color:var(--green)">&#10003;</td></tr>
             <tr><td class="code">6601</td><td>销售费用</td><td><span class="cat-tag income-expense">损益</span></td><td>借方</td><td>渠道</td><td class="amount" style="color:#999">-</td><td style="color:var(--green)">&#10003;</td></tr>
             <tr><td class="code" style="padding-left:32px">6601.01</td><td style="padding-left:16px;color:var(--text-secondary)">平台佣金</td><td><span class="cat-tag income-expense">损益</span></td><td>借方</td><td>渠道</td><td class="amount" style="color:#999">-</td><td style="color:var(--green)">&#10003;</td></tr>
             <tr><td class="code" style="padding-left:32px">6601.02</td><td style="padding-left:16px;color:var(--text-secondary)">推广费</td><td><span class="cat-tag income-expense">损益</span></td><td>借方</td><td>渠道+活动</td><td class="amount" style="color:#999">-</td><td style="color:var(--green)">&#10003;</td></tr>
@@ -1521,29 +1731,37 @@ body {
         <table class="voucher-table">
           <thead><tr><th>凭证字号</th><th>日期</th><th>摘要</th><th>渠道</th><th>借方科目</th><th>贷方科目</th><th style="text-align:right">金额</th><th>制单人</th><th>来源</th><th>状态</th><th>操作</th></tr></thead>
           <tbody>
-            <tr>
+            <tr onclick="openVoucherModal('pay-031')" style="cursor:pointer">
               <td class="code">付-031</td><td>03-31</td><td>付供应商货款-华美包材</td><td style="color:#999">-</td><td>应付账款-华美</td><td>银行存款-招商</td><td class="amount">¥45,000.00</td><td>李芳</td><td><span class="source-tag manual">手工</span></td><td><span class="status-tag pending">待审核</span></td>
-              <td><button class="btn" style="padding:3px 8px;font-size:11px">审核</button> <button class="btn" style="padding:3px 8px;font-size:11px">退回</button></td>
+              <!-- 内控：制单人=李芳=当前用户，审核按钮硬阻断 -->
+              <td>
+                <span class="ic-tooltip-wrap">
+                  <button class="btn disabled-ic" style="padding:3px 8px;font-size:11px" disabled>审核</button>
+                  <span class="ic-tooltip">内控：制单人不可自审，请由其他会计审核</span>
+                </span>
+                <button class="btn" style="padding:3px 8px;font-size:11px">退回</button>
+              </td>
             </tr>
-            <tr>
+            <tr onclick="openVoucherModal('rec-018')" style="cursor:pointer">
               <td class="code">收-018</td><td>03-31</td><td>收天猫3月货款结算</td><td><span style="font-size:12px;color:#666;background:#F5F5F5;padding:2px 8px;border-radius:4px">天猫</span></td><td>银行存款-招商</td><td>应收账款-天猫</td><td class="amount">¥28,600.00</td><td>AI</td><td><span class="source-tag ai">&#10024; AI</span></td><td><span class="status-tag pending">待审核</span></td>
               <td><button class="btn" style="padding:3px 8px;font-size:11px">审核</button> <button class="btn" style="padding:3px 8px;font-size:11px">退回</button></td>
             </tr>
-            <tr>
-              <td class="code">记-045</td><td>03-30</td><td>计提3月员工工资及社保</td><td style="color:#999">-</td><td>应付职工薪酬</td><td>银行存款-招商</td><td class="amount">¥86,400.00</td><td>李芳</td><td><span class="source-tag manual">手工</span></td><td><span class="status-tag posted">已记账</span></td>
-              <td><button class="btn" style="padding:3px 8px;font-size:11px">查看</button></td>
+            <tr class="voucher-posted-row" onclick="openVoucherModal('jou-045')" style="cursor:pointer">
+              <!-- A类修正：计提工资借方应为管理费用/销售费用，贷方应付职工薪酬 -->
+              <td class="code">记-045</td><td>03-30</td><td>计提3月员工工资及社保</td><td style="color:#999">-</td><td>管理费用/销售费用-工资</td><td>应付职工薪酬</td><td class="amount">¥86,400.00</td><td>李芳</td><td><span class="source-tag manual">手工</span></td><td><span class="status-tag posted">已记账</span></td>
+              <td><button class="btn-view-only" title="已记账凭证不可修改，如需更正请使用红字冲销">查看分录</button></td>
             </tr>
-            <tr>
+            <tr onclick="openVoucherModal('jou-044')" style="cursor:pointer">
               <td class="code">记-044</td><td>03-30</td><td>办公用品采购入库</td><td style="color:#999">-</td><td>管理费用-办公</td><td>银行存款-招商</td><td class="amount">¥2,340.00</td><td>张敏</td><td><span class="source-tag manual">手工</span></td><td><span class="status-tag approved">已审核</span></td>
               <td><button class="btn" style="padding:3px 8px;font-size:11px">记账</button> <button class="btn" style="padding:3px 8px;font-size:11px">反审</button></td>
             </tr>
-            <tr>
+            <tr class="voucher-posted-row" onclick="openVoucherModal('tra-012')" style="cursor:pointer">
               <td class="code">转-012</td><td>03-29</td><td>抖音信息流广告投放</td><td><span style="font-size:12px;color:#666;background:#F5F5F5;padding:2px 8px;border-radius:4px">抖店</span></td><td>销售费用-推广</td><td>银行存款-招商</td><td class="amount">¥12,800.00</td><td>AI</td><td><span class="source-tag ai">&#10024; AI</span></td><td><span class="status-tag posted">已记账</span></td>
-              <td><button class="btn" style="padding:3px 8px;font-size:11px">查看</button></td>
+              <td><button class="btn-view-only" title="已记账凭证不可修改，如需更正请使用红字冲销">查看分录</button></td>
             </tr>
-            <tr>
+            <tr class="voucher-posted-row" onclick="openVoucherModal('red-003')" style="cursor:pointer">
               <td class="code">红-003</td><td>03-28</td><td>红冲：天猫退货退款</td><td><span style="font-size:12px;color:#666;background:#F5F5F5;padding:2px 8px;border-radius:4px">天猫</span></td><td>主营业务收入</td><td>应收账款-天猫</td><td class="amount negative">¥-1,280.00</td><td>AI</td><td><span class="source-tag ai">&#10024; AI</span></td><td><span class="status-tag posted">已记账</span></td>
-              <td><button class="btn" style="padding:3px 8px;font-size:11px">查看</button></td>
+              <td><button class="btn-view-only" title="红字冲销凭证不可修改">查看分录</button></td>
             </tr>
           </tbody>
         </table>
@@ -1603,14 +1821,19 @@ body {
       </div>
 
       <div class="card">
+        <!-- 进项发票内容（默认显示） -->
+        <div id="invoice-incoming">
         <table class="voucher-table">
-          <thead><tr><th>发票代码</th><th>发票号码</th><th>开票日期</th><th>销方名称</th><th style="text-align:right">金额</th><th style="text-align:right">税额</th><th style="text-align:right">价税合计</th><th>认证状态</th><th>关联凭证</th></tr></thead>
+          <thead><tr><th>发票代码</th><th>发票号码</th><th>开票日期</th><th>销方名称</th><th style="text-align:right">金额</th><th style="text-align:right">税额</th><th style="text-align:right">价税合计</th><th>认证状态</th><th>操作</th><th>关联凭证</th></tr></thead>
           <tbody>
-            <tr><td class="code">044001...</td><td class="code">12345678</td><td>03-28</td><td>华美包材有限公司</td><td class="amount">¥39,823.01</td><td class="amount">¥5,176.99</td><td class="amount">¥45,000.00</td><td><span class="status-tag posted">已认证 &#10003;</span></td><td class="code">付-031</td></tr>
-            <tr><td class="code">044001...</td><td class="code">12345679</td><td>03-25</td><td>顺丰速运</td><td class="amount">¥28,407.08</td><td class="amount">¥3,692.92</td><td class="amount">¥32,100.00</td><td><span class="status-tag pending">待认证</span></td><td style="color:#999">-</td></tr>
-            <tr><td class="code">044001...</td><td class="code">12345680</td><td>03-20</td><td>美达化工</td><td class="amount">¥75,221.24</td><td class="amount">¥9,778.76</td><td class="amount">¥85,000.00</td><td><span class="status-tag pending">待认证</span></td><td style="color:#999">-</td></tr>
+            <tr><td class="code">044001...</td><td class="code">12345678</td><td>03-28</td><td>华美包材有限公司</td><td class="amount">¥39,823.01</td><td class="amount">¥5,176.99</td><td class="amount">¥45,000.00</td><td><span class="status-tag posted">已认证 &#10003;</span></td><td style="color:var(--text-muted);font-size:11px">已在电子税务局完成</td><td class="code">付-031</td></tr>
+            <tr><td class="code">044001...</td><td class="code">12345679</td><td>03-25</td><td>顺丰速运</td><td class="amount">¥28,407.08</td><td class="amount">¥3,692.92</td><td class="amount">¥32,100.00</td><td><span class="status-tag pending">待认证</span></td><td><button class="btn" style="padding:3px 10px;font-size:11px" title="请先在电子税务局完成勾选认证，再回此处标记">标记已认证</button></td><td style="color:#999">-</td></tr>
+            <tr><td class="code">044001...</td><td class="code">12345680</td><td>03-20</td><td>美达化工</td><td class="amount">¥75,221.24</td><td class="amount">¥9,778.76</td><td class="amount">¥85,000.00</td><td><span class="status-tag pending">待认证</span></td><td><button class="btn" style="padding:3px 10px;font-size:11px" title="请先在电子税务局完成勾选认证，再回此处标记">标记已认证</button></td><td style="color:#999">-</td></tr>
           </tbody>
         </table>
+        <div style="padding:8px 16px;font-size:11px;color:var(--text-muted);background:var(--input-bg);border-top:1px solid var(--divider)">
+          &#9432; "标记已认证"仅记录状态，实际增值税抵扣认证须在<strong>国家电子税务局增值税发票综合服务平台</strong>完成勾选。认证截止日：<strong style="color:var(--orange)">2026-04-15</strong>
+        </div>
         <div class="stats-bar">
           <span>本月进项 12 张</span>
           <span class="divider">|</span>
@@ -1619,8 +1842,33 @@ body {
           <span>待认证 4 张</span>
           <span class="divider">|</span>
           <span>进项税额合计 <strong style="font-family:var(--font-mono)">¥18,648.67</strong></span>
+        </div>
+        </div>
+        <!-- 销项发票内容（小畅补充） -->
+        <div id="invoice-outgoing" style="display:none">
+        <table class="voucher-table">
+          <thead><tr><th>发票代码</th><th>发票号码</th><th>开票日期</th><th>购方名称</th><th>渠道</th><th style="text-align:right">金额</th><th style="text-align:right">税额</th><th style="text-align:right">价税合计</th><th>状态</th><th>关联订单</th></tr></thead>
+          <tbody>
+            <tr><td class="code">026001...</td><td class="code">87654321</td><td>03-31</td><td>个人消费者</td><td><span style="font-size:12px;color:#666;background:#F5F5F5;padding:2px 8px;border-radius:4px">天猫</span></td><td class="amount">¥125,310.62</td><td class="amount">¥16,290.38</td><td class="amount">¥141,601.00</td><td><span class="status-tag posted">已开具</span></td><td style="font-size:11px;color:var(--text-muted)">天猫3月批量</td></tr>
+            <tr><td class="code">026001...</td><td class="code">87654322</td><td>03-31</td><td>个人消费者</td><td><span style="font-size:12px;color:#666;background:#F5F5F5;padding:2px 8px;border-radius:4px">抖店</span></td><td class="amount">¥138,230.09</td><td class="amount">¥17,969.91</td><td class="amount">¥156,200.00</td><td><span class="status-tag posted">已开具</span></td><td style="font-size:11px;color:var(--text-muted)">抖店3月批量</td></tr>
+            <tr><td class="code">026001...</td><td class="code">87654323</td><td>03-28</td><td>福建美容院采购商</td><td><span style="font-size:12px;color:#666;background:#F5F5F5;padding:2px 8px;border-radius:4px">小程序</span></td><td class="amount">¥28,318.58</td><td class="amount">¥3,681.42</td><td class="amount">¥32,000.00</td><td><span class="status-tag posted">已开具</span></td><td class="code">SP-20260328</td></tr>
+            <tr><td class="code">-</td><td class="code">-</td><td>03-15</td><td>个人消费者（退货红冲）</td><td><span style="font-size:12px;color:#666;background:#F5F5F5;padding:2px 8px;border-radius:4px">天猫</span></td><td class="amount negative">¥-1,132.74</td><td class="amount negative">¥-147.26</td><td class="amount negative">¥-1,280.00</td><td><span class="status-tag draft">红字发票</span></td><td style="font-size:11px;color:var(--text-muted)">对应红-003</td></tr>
+          </tbody>
+        </table>
+        <div class="stats-bar">
+          <span>本月销项 3 张（+1张红字）</span>
           <span class="divider">|</span>
-          <span style="color:var(--orange)">认证截止 2026-04-15</span>
+          <span>已开具金额 <strong style="font-family:var(--font-mono)">¥329,521.00</strong></span>
+          <span class="divider">|</span>
+          <span>销项税额合计 <strong style="font-family:var(--font-mono)">¥37,941.71</strong></span>
+        </div>
+        </div>
+        <!-- 发票台账内容 -->
+        <div id="invoice-ledger" style="display:none;padding:40px;text-align:center;color:var(--text-muted)">
+          <div style="font-size:32px;margin-bottom:12px">&#128196;</div>
+          <div style="font-weight:500;margin-bottom:6px">发票台账</div>
+          <div style="font-size:12px">进销项发票汇总 · 支持按月/季导出</div>
+          <button class="btn" style="margin-top:16px">&#10024; AI生成台账报告</button>
         </div>
       </div>
     </div>
@@ -1906,11 +2154,23 @@ body {
           </div>
           <div class="tax-event">
             <div class="tax-date">4月15日</div>
-            <div class="tax-desc">进项发票认证截止</div>
+            <div class="tax-desc">进项发票勾选认证截止 <span style="font-size:11px;color:var(--text-muted);margin-left:4px">（需在电子税务局操作）</span></div>
+          </div>
+          <div class="tax-event">
+            <div class="tax-date">4月15日</div>
+            <div class="tax-desc">城市维护建设税申报 <span style="font-size:11px;color:var(--text-muted);margin-left:4px">增值税附征 · 税率7%</span></div>
+          </div>
+          <div class="tax-event">
+            <div class="tax-date">4月15日</div>
+            <div class="tax-desc">教育费附加 + 地方教育附加 <span style="font-size:11px;color:var(--text-muted);margin-left:4px">3% + 2%，随增值税同期申报</span></div>
           </div>
           <div class="tax-event">
             <div class="tax-date">4月20日</div>
-            <div class="tax-desc">个税代扣代缴</div>
+            <div class="tax-desc">个税代扣代缴（3月工资个税）</div>
+          </div>
+          <div class="tax-event">
+            <div class="tax-date">季度末</div>
+            <div class="tax-desc">印花税申报 <span style="font-size:11px;color:var(--text-muted);margin-left:4px">购销合同 · 万分之三</span></div>
           </div>
         </div>
       </div>
@@ -1922,10 +2182,11 @@ body {
         <div style="padding:20px">
           <table class="voucher-table" style="max-width:480px">
             <tbody>
-              <tr><td style="font-weight:500">销项税额</td><td class="amount">¥58,266.00</td><td style="font-size:11px;color:var(--text-muted)">按销售收入x13%简算</td></tr>
-              <tr><td style="font-weight:500">进项税额</td><td class="amount">¥38,648.67</td><td style="font-size:11px;color:var(--text-muted)">已认证+待认证</td></tr>
-              <tr style="font-weight:600;border-top:2px solid var(--divider)"><td style="font-weight:700">应纳增值税</td><td class="amount" style="font-weight:700;font-size:16px">¥19,617.33</td><td></td></tr>
+              <tr><td style="font-weight:500">销项税额</td><td class="amount">¥58,266.00</td><td style="font-size:11px;color:var(--text-muted)">按各渠道销售收入×适用税率 <span style="color:var(--orange)">（此处13%简算，美团渠道实为6%）</span></td></tr>
+              <tr><td style="font-weight:500">进项税额</td><td class="amount">¥38,648.67</td><td style="font-size:11px;color:var(--text-muted)">已认证+待认证（税务局口径）</td></tr>
+              <tr style="font-weight:600;border-top:2px solid var(--divider)"><td style="font-weight:700">应纳增值税（估算）</td><td class="amount" style="font-weight:700;font-size:16px">¥19,617.33</td><td style="font-size:11px;color:var(--orange)">按13%简算，实际申报以税务局为准</td></tr>
               <tr><td style="font-weight:500">税负率</td><td class="amount">4.38%</td><td style="font-size:11px;color:var(--green)">行业参考：3-5%，正常 &#10003;</td></tr>
+              <tr><td style="font-weight:500">附加税估算</td><td class="amount" style="color:var(--text-secondary)">¥2,354.08</td><td style="font-size:11px;color:var(--text-muted)">城建税7%+教育附加3%+地方2%=12%</td></tr>
             </tbody>
           </table>
         </div>
@@ -2107,8 +2368,782 @@ body {
     </div>
   </div>
 </section>
+<!-- ==================== VIEW: TRIAL BALANCE（小金·科目余额表）==================== -->
+<section class="view-content" data-view="trial-balance">
+  <div class="view-toolbar">
+    <div class="view-toolbar-left">
+      <h3 style="font-size:16px;font-weight:600">科目余额表 · 2026年3月</h3>
+      <span style="font-size:12px;color:var(--text-muted);padding:3px 10px;background:var(--input-bg);border-radius:6px">已结账至2月 · 3月暂结</span>
+    </div>
+    <div class="view-toolbar-right">
+      <button class="btn">导出Excel</button>
+      <button class="btn primary">&#10024; AI分析异常科目</button>
+    </div>
+  </div>
+
+  <div class="content-grid">
+    <div class="left-col">
+      <div class="card">
+        <table class="trial-table">
+          <thead>
+            <tr>
+              <th style="text-align:left;width:80px">科目编码</th>
+              <th style="text-align:left">科目名称</th>
+              <th>期初余额（借）</th>
+              <th>期初余额（贷）</th>
+              <th>本期发生（借）</th>
+              <th>本期发生（贷）</th>
+              <th>期末余额（借）</th>
+              <th>期末余额（贷）</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="cat-row"><td colspan="8">— 资产类 —</td></tr>
+            <tr><td>1001</td><td>库存现金</td><td>¥5,200</td><td>-</td><td>¥2,000</td><td>¥1,800</td><td class="debit-bal">¥5,400</td><td>-</td></tr>
+            <tr><td>1002</td><td>银行存款</td><td>¥2,510,300</td><td>-</td><td>¥448,200</td><td>¥163,140</td><td class="debit-bal">¥2,795,360</td><td>-</td></tr>
+            <tr><td>1122</td><td>应收账款</td><td>¥76,200</td><td>-</td><td>¥28,600</td><td>¥15,200</td><td class="debit-bal">¥89,600</td><td>-</td></tr>
+            <tr><td>1405</td><td>库存商品</td><td>¥298,400</td><td>-</td><td>¥245,900</td><td>¥217,500</td><td class="debit-bal">¥326,800</td><td>-</td></tr>
+            <tr class="cat-row"><td colspan="8">— 负债类 —</td></tr>
+            <tr><td>2202</td><td>应付账款</td><td>-</td><td>¥142,600</td><td>¥62,100</td><td>¥88,000</td><td>-</td><td class="credit-bal">¥168,500</td></tr>
+            <tr><td>2211</td><td>应付职工薪酬</td><td>-</td><td>¥0</td><td>¥82,400</td><td>¥86,400</td><td>-</td><td class="credit-bal">¥4,000</td></tr>
+            <tr><td>2221</td><td>应交税费-增值税</td><td>-</td><td>¥16,240</td><td>¥38,648</td><td>¥58,266</td><td>-</td><td class="credit-bal">¥35,858</td></tr>
+            <tr><td>2241</td><td>合同负债（预收）</td><td>-</td><td>¥52,000</td><td>¥32,000</td><td>¥22,000</td><td>-</td><td class="credit-bal">¥42,000</td></tr>
+            <tr class="cat-row"><td colspan="8">— 损益类（本期发生）—</td></tr>
+            <tr><td>6001</td><td>主营业务收入</td><td>-</td><td>-</td><td>¥1,280</td><td>¥449,480</td><td>-</td><td class="credit-bal">¥448,200</td></tr>
+            <tr><td>6401</td><td>主营业务成本</td><td>-</td><td>-</td><td>¥217,500</td><td>¥560</td><td class="debit-bal">¥216,940</td><td>-</td></tr>
+            <tr><td>6601</td><td>销售费用</td><td>-</td><td>-</td><td>¥77,272</td><td>-</td><td class="debit-bal">¥77,272</td><td>-</td></tr>
+            <tr><td>6602</td><td>管理费用</td><td>-</td><td>-</td><td>¥12,400</td><td>-</td><td class="debit-bal">¥12,400</td><td>-</td></tr>
+            <tr><td>6603</td><td>财务费用</td><td>-</td><td>-</td><td>¥1,628</td><td>-</td><td class="debit-bal">¥1,628</td><td>-</td></tr>
+            <tr class="total-row">
+              <td colspan="2" style="font-family:var(--font);font-weight:700">合计</td>
+              <td>¥2,890,100</td><td>¥210,840</td>
+              <td>¥1,049,028</td><td>¥1,014,466</td>
+              <td class="debit-bal" style="font-weight:700">¥3,525,400</td>
+              <td class="credit-bal" style="font-weight:700">¥250,358</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="stats-bar">
+          <span style="color:var(--green)">&#10003; 试算平衡通过</span>
+          <span class="divider">|</span>
+          <span>共 82 个科目有发生额</span>
+          <span class="divider">|</span>
+          <span>数据截至 2026-03-31 23:59</span>
+          <span class="divider">|</span>
+          <span style="color:var(--orange)">&#9888; 待审核凭证 5 笔未入账，期末余额含未记账数据</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card ai-panel">
+      <div class="card-header">
+        <span class="card-title">AI 会计助手</span>
+        <button class="card-action"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
+      </div>
+      <div class="ai-messages">
+        <div class="msg user">检查一下有没有异常科目</div>
+        <div class="msg ai">
+          <div class="msg-title">科目余额健康检查完成</div>
+          <ul>
+            <li style="color:var(--green)">&#10003; 借贷试算平衡</li>
+            <li style="color:var(--green)">&#10003; 资产类科目余额方向全部正确</li>
+            <li style="color:var(--orange)">&#9888; 应付职工薪酬期末贷方余额 ¥4,000 异常偏低，请确认3月工资是否全部发放</li>
+            <li style="color:var(--orange)">&#9888; 销售费用本期 ¥77,272，占收入 17.2%，较上月提升 2pp，建议关注推广费节奏</li>
+          </ul>
+          <div style="margin-top:8px;padding:8px 12px;background:#F0F5FF;border-radius:8px;font-size:12px;color:var(--blue)">
+            &#128161; 提示：5笔待审核凭证尚未记账，期末余额为估算值，建议完成审核后再出正式科目余额表。
+          </div>
+        </div>
+      </div>
+      <div class="ai-input-bar">
+        <input class="ai-input" type="text" placeholder="如：生成科目余额表PDF..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button class="ai-send-btn" onclick="sendMsg()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ==================== Task C: 凭证模板 ==================== -->
+<section class="view-content" data-view="voucher-template">
+  <div class="view-toolbar">
+    <div class="view-toolbar-left">
+      <h3 style="font-size:16px;font-weight:600">凭证模板</h3>
+      <span style="font-size:12px;color:var(--text-muted);padding:3px 10px;background:var(--input-bg);border-radius:6px">共 12 个模板</span>
+    </div>
+    <div class="view-toolbar-right">
+      <button class="btn primary" onclick="alert('新建模板')">+ 新建模板</button>
+    </div>
+  </div>
+
+  <div class="content-grid" style="grid-template-columns:1fr auto">
+    <div>
+      <div class="tpl-cat-bar">
+        <button class="tpl-cat-btn active" onclick="filterTpl(this,'all')">全部</button>
+        <button class="tpl-cat-btn" onclick="filterTpl(this,'wage')">工资类</button>
+        <button class="tpl-cat-btn" onclick="filterTpl(this,'purchase')">采购类</button>
+        <button class="tpl-cat-btn" onclick="filterTpl(this,'tax')">税务类</button>
+        <button class="tpl-cat-btn" onclick="filterTpl(this,'period')">期末结转</button>
+        <button class="tpl-cat-btn" onclick="filterTpl(this,'custom')">自定义</button>
+      </div>
+
+      <div class="tpl-grid" id="tplGrid">
+
+        <!-- 工资类 -->
+        <div class="tpl-card" data-tpl-cat="wage">
+          <div class="tpl-card-header">
+            <div class="tpl-card-icon">💼</div>
+            <div>
+              <div class="tpl-card-name">计提工资</div>
+              <div class="tpl-card-cat">工资类</div>
+            </div>
+          </div>
+          <div class="tpl-card-summary">摘要：计提×月份工资</div>
+          <div class="tpl-entries">
+            <div class="tpl-entry-row">
+              <span class="tpl-entry-subject">管理费用-工资 [6602]</span>
+              <span class="tpl-entry-dir debit">借</span>
+              <span class="tpl-entry-amount">金额</span>
+            </div>
+            <div class="tpl-entry-row">
+              <span class="tpl-entry-subject">应付职工薪酬 [2211]</span>
+              <span class="tpl-entry-dir credit">贷</span>
+              <span class="tpl-entry-amount">金额</span>
+            </div>
+          </div>
+          <div class="tpl-card-actions">
+            <button class="btn" onclick="alert('编辑模板')">编辑</button>
+            <button class="btn primary" onclick="useTpl('计提工资')">使用</button>
+          </div>
+        </div>
+
+        <div class="tpl-card" data-tpl-cat="wage">
+          <div class="tpl-card-header">
+            <div class="tpl-card-icon">💳</div>
+            <div>
+              <div class="tpl-card-name">发放工资</div>
+              <div class="tpl-card-cat">工资类</div>
+            </div>
+          </div>
+          <div class="tpl-card-summary">摘要：发放×月份工资</div>
+          <div class="tpl-entries">
+            <div class="tpl-entry-row">
+              <span class="tpl-entry-subject">应付职工薪酬 [2211]</span>
+              <span class="tpl-entry-dir debit">借</span>
+              <span class="tpl-entry-amount">金额</span>
+            </div>
+            <div class="tpl-entry-row">
+              <span class="tpl-entry-subject">银行存款-招商 [1002.01]</span>
+              <span class="tpl-entry-dir credit">贷</span>
+              <span class="tpl-entry-amount">金额</span>
+            </div>
+          </div>
+          <div class="tpl-card-actions">
+            <button class="btn" onclick="alert('编辑模板')">编辑</button>
+            <button class="btn primary" onclick="useTpl('发放工资')">使用</button>
+          </div>
+        </div>
+
+        <!-- 采购类 -->
+        <div class="tpl-card" data-tpl-cat="purchase">
+          <div class="tpl-card-header">
+            <div class="tpl-card-icon">📦</div>
+            <div>
+              <div class="tpl-card-name">采购入库</div>
+              <div class="tpl-card-cat">采购类</div>
+            </div>
+          </div>
+          <div class="tpl-card-summary">摘要：采购×商品入库</div>
+          <div class="tpl-entries">
+            <div class="tpl-entry-row">
+              <span class="tpl-entry-subject">库存商品 [1405]</span>
+              <span class="tpl-entry-dir debit">借</span>
+              <span class="tpl-entry-amount">金额</span>
+            </div>
+            <div class="tpl-entry-row">
+              <span class="tpl-entry-subject">应付账款 [2202]</span>
+              <span class="tpl-entry-dir credit">贷</span>
+              <span class="tpl-entry-amount">金额</span>
+            </div>
+          </div>
+          <div class="tpl-card-actions">
+            <button class="btn" onclick="alert('编辑模板')">编辑</button>
+            <button class="btn primary" onclick="useTpl('采购入库')">使用</button>
+          </div>
+        </div>
+
+        <div class="tpl-card" data-tpl-cat="purchase">
+          <div class="tpl-card-header">
+            <div class="tpl-card-icon">🏦</div>
+            <div>
+              <div class="tpl-card-name">付供应商货款</div>
+              <div class="tpl-card-cat">采购类</div>
+            </div>
+          </div>
+          <div class="tpl-card-summary">摘要：付×供应商货款</div>
+          <div class="tpl-entries">
+            <div class="tpl-entry-row">
+              <span class="tpl-entry-subject">应付账款 [2202]</span>
+              <span class="tpl-entry-dir debit">借</span>
+              <span class="tpl-entry-amount">金额</span>
+            </div>
+            <div class="tpl-entry-row">
+              <span class="tpl-entry-subject">银行存款-招商 [1002.01]</span>
+              <span class="tpl-entry-dir credit">贷</span>
+              <span class="tpl-entry-amount">金额</span>
+            </div>
+          </div>
+          <div class="tpl-card-actions">
+            <button class="btn" onclick="alert('编辑模板')">编辑</button>
+            <button class="btn primary" onclick="useTpl('付供应商货款')">使用</button>
+          </div>
+        </div>
+
+        <!-- 税务类 -->
+        <div class="tpl-card" data-tpl-cat="tax">
+          <div class="tpl-card-header">
+            <div class="tpl-card-icon">🧾</div>
+            <div>
+              <div class="tpl-card-name">缴纳增值税</div>
+              <div class="tpl-card-cat">税务类</div>
+            </div>
+          </div>
+          <div class="tpl-card-summary">摘要：缴纳×月增值税</div>
+          <div class="tpl-entries">
+            <div class="tpl-entry-row">
+              <span class="tpl-entry-subject">应交税费-增值税 [2221]</span>
+              <span class="tpl-entry-dir debit">借</span>
+              <span class="tpl-entry-amount">金额</span>
+            </div>
+            <div class="tpl-entry-row">
+              <span class="tpl-entry-subject">银行存款-招商 [1002.01]</span>
+              <span class="tpl-entry-dir credit">贷</span>
+              <span class="tpl-entry-amount">金额</span>
+            </div>
+          </div>
+          <div class="tpl-card-actions">
+            <button class="btn" onclick="alert('编辑模板')">编辑</button>
+            <button class="btn primary" onclick="useTpl('缴纳增值税')">使用</button>
+          </div>
+        </div>
+
+        <div class="tpl-card" data-tpl-cat="tax">
+          <div class="tpl-card-header">
+            <div class="tpl-card-icon">📑</div>
+            <div>
+              <div class="tpl-card-name">代扣个人所得税</div>
+              <div class="tpl-card-cat">税务类</div>
+            </div>
+          </div>
+          <div class="tpl-card-summary">摘要：代扣×月个税</div>
+          <div class="tpl-entries">
+            <div class="tpl-entry-row">
+              <span class="tpl-entry-subject">应付职工薪酬 [2211]</span>
+              <span class="tpl-entry-dir debit">借</span>
+              <span class="tpl-entry-amount">金额</span>
+            </div>
+            <div class="tpl-entry-row">
+              <span class="tpl-entry-subject">应交税费-个人所得税 [2221.03]</span>
+              <span class="tpl-entry-dir credit">贷</span>
+              <span class="tpl-entry-amount">金额</span>
+            </div>
+          </div>
+          <div class="tpl-card-actions">
+            <button class="btn" onclick="alert('编辑模板')">编辑</button>
+            <button class="btn primary" onclick="useTpl('代扣个税')">使用</button>
+          </div>
+        </div>
+
+        <!-- 期末结转 -->
+        <div class="tpl-card" data-tpl-cat="period">
+          <div class="tpl-card-header">
+            <div class="tpl-card-icon">🔄</div>
+            <div>
+              <div class="tpl-card-name">结转主营业务收入</div>
+              <div class="tpl-card-cat">期末结转</div>
+            </div>
+          </div>
+          <div class="tpl-card-summary">摘要：结转×月主营收入</div>
+          <div class="tpl-entries">
+            <div class="tpl-entry-row">
+              <span class="tpl-entry-subject">主营业务收入 [6001]</span>
+              <span class="tpl-entry-dir debit">借</span>
+              <span class="tpl-entry-amount">金额</span>
+            </div>
+            <div class="tpl-entry-row">
+              <span class="tpl-entry-subject">本年利润 [4103]</span>
+              <span class="tpl-entry-dir credit">贷</span>
+              <span class="tpl-entry-amount">金额</span>
+            </div>
+          </div>
+          <div class="tpl-card-actions">
+            <button class="btn" onclick="alert('编辑模板')">编辑</button>
+            <button class="btn primary" onclick="useTpl('结转收入')">使用</button>
+          </div>
+        </div>
+
+        <div class="tpl-card" data-tpl-cat="period">
+          <div class="tpl-card-header">
+            <div class="tpl-card-icon">📊</div>
+            <div>
+              <div class="tpl-card-name">结转主营业务成本</div>
+              <div class="tpl-card-cat">期末结转</div>
+            </div>
+          </div>
+          <div class="tpl-card-summary">摘要：结转×月主营成本</div>
+          <div class="tpl-entries">
+            <div class="tpl-entry-row">
+              <span class="tpl-entry-subject">本年利润 [4103]</span>
+              <span class="tpl-entry-dir debit">借</span>
+              <span class="tpl-entry-amount">金额</span>
+            </div>
+            <div class="tpl-entry-row">
+              <span class="tpl-entry-subject">主营业务成本 [6401]</span>
+              <span class="tpl-entry-dir credit">贷</span>
+              <span class="tpl-entry-amount">金额</span>
+            </div>
+          </div>
+          <div class="tpl-card-actions">
+            <button class="btn" onclick="alert('编辑模板')">编辑</button>
+            <button class="btn primary" onclick="useTpl('结转成本')">使用</button>
+          </div>
+        </div>
+
+        <!-- 自定义 -->
+        <div class="tpl-card" data-tpl-cat="custom">
+          <div class="tpl-card-header">
+            <div class="tpl-card-icon">⭐</div>
+            <div>
+              <div class="tpl-card-name">收天猫货款结算</div>
+              <div class="tpl-card-cat">自定义</div>
+            </div>
+          </div>
+          <div class="tpl-card-summary">摘要：收天猫×月货款结算</div>
+          <div class="tpl-entries">
+            <div class="tpl-entry-row">
+              <span class="tpl-entry-subject">银行存款-招商 [1002.01]</span>
+              <span class="tpl-entry-dir debit">借</span>
+              <span class="tpl-entry-amount">金额</span>
+            </div>
+            <div class="tpl-entry-row">
+              <span class="tpl-entry-subject">应收账款-天猫 [1122]</span>
+              <span class="tpl-entry-dir credit">贷</span>
+              <span class="tpl-entry-amount">金额</span>
+            </div>
+          </div>
+          <div class="tpl-card-actions">
+            <button class="btn" onclick="alert('编辑模板')">编辑</button>
+            <button class="btn primary" onclick="useTpl('收天猫货款')">使用</button>
+          </div>
+        </div>
+
+      </div><!-- /tplGrid -->
+    </div>
+  </div>
+</section>
+
+<!-- ==================== Task D: 总账/明细账 ==================== -->
+<section class="view-content" data-view="ledger">
+  <div class="view-toolbar">
+    <div class="view-toolbar-left">
+      <h3 style="font-size:16px;font-weight:600">总账 / 明细账</h3>
+      <span style="font-size:12px;color:var(--text-muted);padding:3px 10px;background:var(--input-bg);border-radius:6px">2026年3月</span>
+    </div>
+    <div class="view-toolbar-right">
+      <select class="btn" style="padding:6px 12px;font-size:12px">
+        <option>2026年3月</option>
+        <option>2026年2月</option>
+        <option>2026年1月</option>
+      </select>
+      <button class="btn">导出Excel</button>
+    </div>
+  </div>
+
+  <div class="ledger-tab-bar">
+    <div class="ledger-tab active" onclick="switchLedgerTab(this,'general')">总账</div>
+    <div class="ledger-tab" onclick="switchLedgerTab(this,'sub')">明细账</div>
+  </div>
+
+  <!-- 总账 -->
+  <div class="ledger-sub-pane active" id="ledger-general">
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="general-ledger-table">
+        <thead>
+          <tr>
+            <th style="width:90px">科目编码</th>
+            <th>科目名称</th>
+            <th class="num">期初余额</th>
+            <th class="num">本期借方</th>
+            <th class="num">本期贷方</th>
+            <th class="num">期末余额</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="cat-group"><td colspan="6">— 资产类 —</td></tr>
+          <tr><td>1001</td><td>库存现金</td><td class="num">5,200.00</td><td class="num debit-bal">2,000.00</td><td class="num credit-bal">1,800.00</td><td class="num debit-bal" style="font-weight:600">5,400.00</td></tr>
+          <tr><td>1002</td><td>银行存款</td><td class="num">2,510,300.00</td><td class="num debit-bal">448,200.00</td><td class="num credit-bal">163,140.00</td><td class="num debit-bal" style="font-weight:600">2,795,360.00</td></tr>
+          <tr style="color:var(--text-secondary);font-size:12px"><td style="padding-left:28px">1002.01</td><td style="padding-left:16px">招商银行·基本户</td><td class="num">1,890,200.00</td><td class="num debit-bal">380,000.00</td><td class="num credit-bal">163,140.00</td><td class="num debit-bal">2,107,060.00</td></tr>
+          <tr style="color:var(--text-secondary);font-size:12px"><td style="padding-left:28px">1002.02</td><td style="padding-left:16px">工商银行·一般户</td><td class="num">620,100.00</td><td class="num debit-bal">68,200.00</td><td class="num credit-bal">—</td><td class="num debit-bal">688,300.00</td></tr>
+          <tr><td>1122</td><td>应收账款</td><td class="num">76,200.00</td><td class="num debit-bal">28,600.00</td><td class="num credit-bal">15,200.00</td><td class="num debit-bal" style="font-weight:600">89,600.00</td></tr>
+          <tr><td>1405</td><td>库存商品</td><td class="num">298,400.00</td><td class="num debit-bal">245,900.00</td><td class="num credit-bal">217,500.00</td><td class="num debit-bal" style="font-weight:600">326,800.00</td></tr>
+          <tr class="cat-group"><td colspan="6">— 负债类 —</td></tr>
+          <tr><td>2202</td><td>应付账款</td><td class="num">142,600.00</td><td class="num debit-bal">62,100.00</td><td class="num credit-bal">88,000.00</td><td class="num credit-bal" style="font-weight:600">168,500.00</td></tr>
+          <tr><td>2211</td><td>应付职工薪酬</td><td class="num">0.00</td><td class="num debit-bal">82,400.00</td><td class="num credit-bal">86,400.00</td><td class="num credit-bal" style="font-weight:600">4,000.00</td></tr>
+          <tr><td>2221</td><td>应交税费</td><td class="num">16,240.00</td><td class="num debit-bal">38,648.00</td><td class="num credit-bal">58,266.00</td><td class="num credit-bal" style="font-weight:600">35,858.00</td></tr>
+          <tr><td>2241</td><td>合同负债（预收）</td><td class="num">52,000.00</td><td class="num debit-bal">32,000.00</td><td class="num credit-bal">22,000.00</td><td class="num credit-bal" style="font-weight:600">42,000.00</td></tr>
+          <tr class="cat-group"><td colspan="6">— 损益类（本期）—</td></tr>
+          <tr><td>6001</td><td>主营业务收入</td><td class="num">—</td><td class="num debit-bal">1,280.00</td><td class="num credit-bal">449,480.00</td><td class="num credit-bal" style="font-weight:600">448,200.00</td></tr>
+          <tr><td>6401</td><td>主营业务成本</td><td class="num">—</td><td class="num debit-bal">217,500.00</td><td class="num credit-bal">560.00</td><td class="num debit-bal" style="font-weight:600">216,940.00</td></tr>
+          <tr><td>6601</td><td>销售费用</td><td class="num">—</td><td class="num debit-bal">77,272.00</td><td class="num credit-bal">—</td><td class="num debit-bal" style="font-weight:600">77,272.00</td></tr>
+          <tr><td>6602</td><td>管理费用</td><td class="num">—</td><td class="num debit-bal">12,400.00</td><td class="num credit-bal">—</td><td class="num debit-bal" style="font-weight:600">12,400.00</td></tr>
+          <tr><td>6603</td><td>财务费用</td><td class="num">—</td><td class="num debit-bal">1,628.00</td><td class="num credit-bal">—</td><td class="num debit-bal" style="font-weight:600">1,628.00</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 明细账 -->
+  <div class="ledger-sub-pane" id="ledger-sub">
+    <div class="subledger-layout">
+      <div class="subledger-left">
+        <div class="subledger-left-title">科目选择</div>
+        <div class="subledger-subject-item active" onclick="selectSubject(this,'银行存款 [1002]')">
+          <span class="ssi-code">1002</span> 银行存款
+        </div>
+        <div class="subledger-subject-item" onclick="selectSubject(this,'应收账款 [1122]')">
+          <span class="ssi-code">1122</span> 应收账款
+        </div>
+        <div class="subledger-subject-item" onclick="selectSubject(this,'应付账款 [2202]')">
+          <span class="ssi-code">2202</span> 应付账款
+        </div>
+        <div class="subledger-subject-item" onclick="selectSubject(this,'库存商品 [1405]')">
+          <span class="ssi-code">1405</span> 库存商品
+        </div>
+        <div class="subledger-subject-item" onclick="selectSubject(this,'主营业务收入 [6001]')">
+          <span class="ssi-code">6001</span> 主营业务收入
+        </div>
+        <div class="subledger-subject-item" onclick="selectSubject(this,'主营业务成本 [6401]')">
+          <span class="ssi-code">6401</span> 主营业务成本
+        </div>
+        <div class="subledger-subject-item" onclick="selectSubject(this,'销售费用 [6601]')">
+          <span class="ssi-code">6601</span> 销售费用
+        </div>
+        <div class="subledger-subject-item" onclick="selectSubject(this,'应付职工薪酬 [2211]')">
+          <span class="ssi-code">2211</span> 应付职工薪酬
+        </div>
+      </div>
+      <div class="subledger-right">
+        <div class="subledger-toolbar">
+          <span id="subjectTitle" style="font-size:15px;font-weight:600">银行存款 [1002]</span>
+          <span style="font-size:12px;color:var(--text-muted);padding:3px 10px;background:var(--input-bg);border-radius:6px">余额方向：借方</span>
+          <button class="btn" style="margin-left:auto">导出</button>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden;flex:1">
+          <table class="subledger-table">
+            <thead>
+              <tr>
+                <th style="width:90px">日期</th>
+                <th>摘要</th>
+                <th>凭证号</th>
+                <th class="num">借方</th>
+                <th class="num">贷方</th>
+                <th class="num">余额</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="background:var(--input-bg)">
+                <td style="color:var(--text-muted);font-size:12px">期初</td>
+                <td style="color:var(--text-muted);font-size:12px">期初余额</td>
+                <td></td>
+                <td class="num running-bal debit-bal">2,510,300.00</td>
+                <td class="num">—</td>
+                <td class="num running-bal" style="font-weight:700">2,510,300.00</td>
+              </tr>
+              <tr>
+                <td>03-05</td><td>收天猫2月货款结算</td><td style="font-family:var(--font-mono);font-size:11px">收-012</td>
+                <td class="num debit-bal">220,000.00</td><td class="num">—</td>
+                <td class="num running-bal">2,730,300.00</td>
+              </tr>
+              <tr>
+                <td>03-10</td><td>付供应商货款-华美包材</td><td style="font-family:var(--font-mono);font-size:11px">付-028</td>
+                <td class="num">—</td><td class="num credit-bal">45,000.00</td>
+                <td class="num running-bal">2,685,300.00</td>
+              </tr>
+              <tr>
+                <td>03-15</td><td>收抖音3月结算</td><td style="font-family:var(--font-mono);font-size:11px">收-015</td>
+                <td class="num debit-bal">158,200.00</td><td class="num">—</td>
+                <td class="num running-bal">2,843,500.00</td>
+              </tr>
+              <tr>
+                <td>03-20</td><td>缴纳增值税</td><td style="font-family:var(--font-mono);font-size:11px">税-006</td>
+                <td class="num">—</td><td class="num credit-bal">35,858.00</td>
+                <td class="num running-bal">2,807,642.00</td>
+              </tr>
+              <tr>
+                <td>03-25</td><td>发放员工工资</td><td style="font-family:var(--font-mono);font-size:11px">工-008</td>
+                <td class="num">—</td><td class="num credit-bal">82,400.00</td>
+                <td class="num running-bal">2,725,242.00</td>
+              </tr>
+              <tr>
+                <td>03-31</td><td>付供应商货款-华美包材</td><td style="font-family:var(--font-mono);font-size:11px">付-031</td>
+                <td class="num">—</td><td class="num credit-bal">45,000.00</td>
+                <td class="num running-bal">2,680,242.00</td>
+              </tr>
+              <tr>
+                <td>03-31</td><td>收天猫3月货款结算</td><td style="font-family:var(--font-mono);font-size:11px">收-018</td>
+                <td class="num debit-bal">28,600.00</td><td class="num">—</td>
+                <td class="num running-bal">2,708,842.00</td>
+              </tr>
+              <tr style="background:var(--input-bg);font-weight:700">
+                <td colspan="3" style="text-align:right;padding-right:16px;color:var(--text-muted);font-size:12px">本期合计</td>
+                <td class="num debit-bal">406,800.00</td>
+                <td class="num credit-bal">208,258.00</td>
+                <td class="num running-bal">2,708,842.00</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== Task E: 应收账款 ==================== -->
+<section class="view-content" data-view="ar">
+  <div class="view-toolbar">
+    <div class="view-toolbar-left">
+      <h3 style="font-size:16px;font-weight:600">应收账款</h3>
+      <span style="font-size:12px;padding:3px 10px;background:#ECFDF5;color:#059669;border-radius:6px;font-weight:500">未收 ¥89,600</span>
+    </div>
+    <div class="view-toolbar-right">
+      <button class="btn">导出Excel</button>
+      <button class="btn primary">&#10024; AI催收建议</button>
+    </div>
+  </div>
+
+  <!-- KPI 汇总 -->
+  <div class="ar-ap-summary">
+    <div class="ar-ap-kpi">
+      <div class="kpi-label">应收总额</div>
+      <div class="kpi-val">¥89,600</div>
+      <div class="kpi-sub">含 4 家客户/平台</div>
+    </div>
+    <div class="ar-ap-kpi">
+      <div class="kpi-label">30天内</div>
+      <div class="kpi-val" style="color:#059669">¥42,000</div>
+      <div class="kpi-sub">正常</div>
+      <div class="aging-bar"><div class="aging-seg" style="width:47%;background:#059669"></div></div>
+    </div>
+    <div class="ar-ap-kpi">
+      <div class="kpi-label">30-60天</div>
+      <div class="kpi-val" style="color:#D97706">¥28,600</div>
+      <div class="kpi-sub">关注</div>
+      <div class="aging-bar"><div class="aging-seg" style="width:32%;background:#D97706"></div></div>
+    </div>
+    <div class="ar-ap-kpi">
+      <div class="kpi-label">&gt;60天逾期</div>
+      <div class="kpi-val" style="color:#DC2626">¥19,000</div>
+      <div class="kpi-sub">2笔，需催收</div>
+      <div class="aging-bar"><div class="aging-seg" style="width:21%;background:#DC2626"></div></div>
+    </div>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="ar-ap-table">
+      <thead>
+        <tr>
+          <th>客户/平台</th>
+          <th class="num">账单金额</th>
+          <th class="num">已收</th>
+          <th class="num" style="color:#DC2626">未收</th>
+          <th>账龄</th>
+          <th>状态</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div style="font-weight:600">天猫旗舰店</div><div style="font-size:11px;color:var(--text-muted)">3月结算</div></td>
+          <td class="num">¥28,600</td><td class="num">¥0</td>
+          <td class="num" style="color:#DC2626;font-weight:600">¥28,600</td>
+          <td><span class="age-tag warn">30-60天</span></td>
+          <td><span class="status-tag" style="background:#FEF9C3;color:#92400E;padding:2px 8px;border-radius:4px;font-size:11px">待收款</span></td>
+          <td><div class="row-actions"><button class="btn primary" onclick="alert('标记已收款')">标记已收</button><button class="btn" onclick="alert('催收备注')">催收备注</button></div></td>
+        </tr>
+        <tr>
+          <td><div style="font-weight:600">抖音店铺</div><div style="font-size:11px;color:var(--text-muted)">3月结算</div></td>
+          <td class="num">¥42,000</td><td class="num">¥0</td>
+          <td class="num" style="color:#D97706;font-weight:600">¥42,000</td>
+          <td><span class="age-tag safe">&lt;30天</span></td>
+          <td><span class="status-tag" style="background:#FEF9C3;color:#92400E;padding:2px 8px;border-radius:4px;font-size:11px">待收款</span></td>
+          <td><div class="row-actions"><button class="btn primary" onclick="alert('标记已收款')">标记已收</button><button class="btn" onclick="alert('催收备注')">催收备注</button></div></td>
+        </tr>
+        <tr>
+          <td><div style="font-weight:600">美团多店（牵牛花）</div><div style="font-size:11px;color:var(--text-muted)">2月结算</div></td>
+          <td class="num">¥12,000</td><td class="num">¥0</td>
+          <td class="num" style="color:#DC2626;font-weight:600">¥12,000</td>
+          <td><span class="age-tag danger">&gt;60天</span></td>
+          <td><span class="status-tag" style="background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:4px;font-size:11px">逾期</span></td>
+          <td><div class="row-actions"><button class="btn primary" onclick="alert('标记已收款')">标记已收</button><button class="btn" onclick="alert('催收备注')">催收备注</button></div></td>
+        </tr>
+        <tr>
+          <td><div style="font-weight:600">京东自营</div><div style="font-size:11px;color:var(--text-muted)">1月结算</div></td>
+          <td class="num">¥7,000</td><td class="num">¥0</td>
+          <td class="num" style="color:#DC2626;font-weight:600">¥7,000</td>
+          <td><span class="age-tag danger">&gt;90天</span></td>
+          <td><span class="status-tag" style="background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:4px;font-size:11px">逾期</span></td>
+          <td><div class="row-actions"><button class="btn primary" onclick="alert('标记已收款')">标记已收</button><button class="btn" onclick="alert('催收备注')">催收备注</button></div></td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr style="background:var(--input-bg);font-weight:700">
+          <td>合计</td>
+          <td class="num">¥89,600</td>
+          <td class="num">¥0</td>
+          <td class="num" style="color:#DC2626">¥89,600</td>
+          <td colspan="3"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</section>
+
+<!-- ==================== Task E: 应付账款 ==================== -->
+<section class="view-content" data-view="ap">
+  <div class="view-toolbar">
+    <div class="view-toolbar-left">
+      <h3 style="font-size:16px;font-weight:600">应付账款</h3>
+      <span style="font-size:12px;padding:3px 10px;background:#FEF9C3;color:#92400E;border-radius:6px;font-weight:500">未付 ¥168,500</span>
+    </div>
+    <div class="view-toolbar-right">
+      <button class="btn">导出Excel</button>
+      <button class="btn primary">&#10024; AI付款建议</button>
+    </div>
+  </div>
+
+  <!-- KPI 汇总 -->
+  <div class="ar-ap-summary">
+    <div class="ar-ap-kpi">
+      <div class="kpi-label">应付总额</div>
+      <div class="kpi-val">¥168,500</div>
+      <div class="kpi-sub">含 4 家供应商</div>
+    </div>
+    <div class="ar-ap-kpi">
+      <div class="kpi-label">本月到期</div>
+      <div class="kpi-val" style="color:#D97706">¥88,000</div>
+      <div class="kpi-sub">需本月完成付款</div>
+      <div class="aging-bar"><div class="aging-seg" style="width:52%;background:#D97706"></div></div>
+    </div>
+    <div class="ar-ap-kpi">
+      <div class="kpi-label">下月到期</div>
+      <div class="kpi-val" style="color:#059669">¥55,500</div>
+      <div class="kpi-sub">充裕</div>
+      <div class="aging-bar"><div class="aging-seg" style="width:33%;background:#059669"></div></div>
+    </div>
+    <div class="ar-ap-kpi">
+      <div class="kpi-label">逾期未付</div>
+      <div class="kpi-val" style="color:#DC2626">¥25,000</div>
+      <div class="kpi-sub">1笔，影响信用</div>
+      <div class="aging-bar"><div class="aging-seg" style="width:15%;background:#DC2626"></div></div>
+    </div>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <table class="ar-ap-table">
+      <thead>
+        <tr>
+          <th>供应商</th>
+          <th class="num">应付金额</th>
+          <th class="num">已付</th>
+          <th class="num" style="color:#D97706">未付</th>
+          <th>到期日</th>
+          <th>状态</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div style="font-weight:600">华美包材有限公司</div><div style="font-size:11px;color:var(--text-muted)">纸箱·内衬·胶带</div></td>
+          <td class="num">¥88,000</td><td class="num">¥45,000</td>
+          <td class="num" style="color:#D97706;font-weight:600">¥43,000</td>
+          <td style="font-size:12px;color:#D97706">2026-04-10</td>
+          <td><span class="status-tag" style="background:#FEF9C3;color:#92400E;padding:2px 8px;border-radius:4px;font-size:11px">待付款</span></td>
+          <td><div class="row-actions"><button class="btn primary" onclick="alert('标记已付款')">标记已付</button><button class="btn" onclick="alert('申请付款')">申请付款</button></div></td>
+        </tr>
+        <tr>
+          <td><div style="font-weight:600">顺丰速运</div><div style="font-size:11px;color:var(--text-muted)">物流服务费</div></td>
+          <td class="num">¥35,500</td><td class="num">¥0</td>
+          <td class="num" style="color:#059669;font-weight:600">¥35,500</td>
+          <td style="font-size:12px;color:#059669">2026-05-01</td>
+          <td><span class="status-tag" style="background:#ECFDF5;color:#065F46;padding:2px 8px;border-radius:4px;font-size:11px">未到期</span></td>
+          <td><div class="row-actions"><button class="btn primary" onclick="alert('标记已付款')">标记已付</button><button class="btn" onclick="alert('申请付款')">申请付款</button></div></td>
+        </tr>
+        <tr>
+          <td><div style="font-weight:600">云仓科技（仓储）</div><div style="font-size:11px;color:var(--text-muted)">仓储管理服务</div></td>
+          <td class="num">¥20,000</td><td class="num">¥0</td>
+          <td class="num" style="color:#059669;font-weight:600">¥20,000</td>
+          <td style="font-size:12px;color:#059669">2026-04-30</td>
+          <td><span class="status-tag" style="background:#ECFDF5;color:#065F46;padding:2px 8px;border-radius:4px;font-size:11px">未到期</span></td>
+          <td><div class="row-actions"><button class="btn primary" onclick="alert('标记已付款')">标记已付</button><button class="btn" onclick="alert('申请付款')">申请付款</button></div></td>
+        </tr>
+        <tr>
+          <td><div style="font-weight:600">天新广告（推广）</div><div style="font-size:11px;color:var(--text-muted)">3月推广服务费</div></td>
+          <td class="num">¥25,000</td><td class="num">¥0</td>
+          <td class="num" style="color:#DC2626;font-weight:600">¥25,000</td>
+          <td style="font-size:12px;color:#DC2626">2026-03-31</td>
+          <td><span class="status-tag" style="background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:4px;font-size:11px">逾期</span></td>
+          <td><div class="row-actions"><button class="btn primary" onclick="alert('标记已付款')">标记已付</button><button class="btn" onclick="alert('申请付款')">申请付款</button></div></td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr style="background:var(--input-bg);font-weight:700">
+          <td>合计</td>
+          <td class="num">¥168,500</td>
+          <td class="num">¥45,000</td>
+          <td class="num" style="color:#D97706">¥123,500</td>
+          <td colspan="3"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</section>
 
 </main>
+
+<!-- ========== VOUCHER DETAIL MODAL（小金·金蝶借贷分录规范）========== -->
+<div class="voucher-modal-overlay hidden" id="voucherModal">
+  <div class="voucher-modal">
+    <div class="voucher-modal-header">
+      <span class="voucher-modal-title" id="vModalTitle">凭证详情</span>
+      <button class="voucher-modal-close" onclick="closeVoucherModal()">&#10005;</button>
+    </div>
+    <div class="voucher-modal-meta" id="vModalMeta"></div>
+    <div style="overflow-y:auto;flex:1">
+      <table class="voucher-detail-table" style="width:100%">
+        <thead>
+          <tr>
+            <th style="width:35%">摘要</th>
+            <th style="width:35%">会计科目</th>
+            <th style="text-align:right;color:#2563EB">借方金额</th>
+            <th style="text-align:right;color:#D97706">贷方金额</th>
+          </tr>
+        </thead>
+        <tbody id="vModalEntries"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2" style="font-family:var(--font);font-weight:700;text-align:left">合计</td>
+            <td class="debit-amt" id="vModalDebitTotal">-</td>
+            <td class="credit-amt" id="vModalCreditTotal">-</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div class="voucher-modal-footer" id="vModalFooter">
+      <span class="balance-ok">&#10003; 借贷平衡</span>
+      <span>附件：1 张</span>
+    </div>
+  </div>
+</div>
 
 <!-- ========== FOOTER ========== -->
 <footer class="footer">
@@ -2380,6 +3415,179 @@ document.querySelectorAll('.nav-item.disabled').forEach(function(item) {
     e.stopPropagation();
   });
 });
+
+// ===== 凭证详情数据（小金·金蝶多借多贷规范）=====
+var VOUCHER_DATA = {
+  'pay-031': {
+    code: '付-031', date: '2026-03-31', creator: '李芳', source: '手工', status: '待审核', attachments: 1,
+    entries: [
+      { summary: '付供应商货款-华美包材', account: '应付账款-华美包材有限公司 [2202]', debit: 45000, credit: 0 },
+      { summary: '付供应商货款-华美包材', account: '银行存款-招商银行基本户 [1002.01]', debit: 0, credit: 45000 }
+    ]
+  },
+  'rec-018': {
+    code: '收-018', date: '2026-03-31', creator: 'AI ✨', source: 'AI自动生成', status: '待审核', attachments: 0,
+    entries: [
+      { summary: '收天猫3月货款结算', account: '银行存款-招商银行基本户 [1002.01]', debit: 28600, credit: 0 },
+      { summary: '核销应收账款-天猫', account: '应收账款-天猫旗舰店 [1122]', debit: 0, credit: 28600 }
+    ]
+  },
+  'jou-045': {
+    code: '记-045', date: '2026-03-30', creator: '李芳', source: '手工', status: '已记账（不可修改）', attachments: 0,
+    entries: [
+      { summary: '计提3月管理人员工资', account: '管理费用-工资 [6602]', debit: 52000, credit: 0 },
+      { summary: '计提3月销售人员工资', account: '销售费用-工资 [6601]', debit: 28000, credit: 0 },
+      { summary: '计提管理人员社保公积金', account: '管理费用-社保公积金 [6602]', debit: 3920, credit: 0 },
+      { summary: '计提销售人员社保公积金', account: '销售费用-社保公积金 [6601]', debit: 2480, credit: 0 },
+      { summary: '确认应付工资-合计', account: '应付职工薪酬-工资 [2211]', debit: 0, credit: 80000 },
+      { summary: '确认应付社保-合计', account: '应付职工薪酬-社保公积金 [2211]', debit: 0, credit: 6400 }
+    ]
+  },
+  'jou-044': {
+    code: '记-044', date: '2026-03-30', creator: '张敏', source: '手工', status: '已审核', attachments: 1,
+    entries: [
+      { summary: '采购办公用品', account: '管理费用-办公费 [6602]', debit: 2340, credit: 0 },
+      { summary: '支付采购款', account: '银行存款-招商银行基本户 [1002.01]', debit: 0, credit: 2340 }
+    ]
+  },
+  'tra-012': {
+    code: '转-012', date: '2026-03-29', creator: 'AI ✨', source: 'AI自动生成', status: '已记账（不可修改）', attachments: 1,
+    entries: [
+      { summary: '抖音信息流广告投放费', account: '销售费用-推广费-信息流 [6601.02]', debit: 12800, credit: 0 },
+      { summary: '支付广告投放款', account: '银行存款-招商银行基本户 [1002.01]', debit: 0, credit: 12800 }
+    ]
+  },
+  'red-003': {
+    code: '红-003', date: '2026-03-28', creator: 'AI ✨', source: 'AI自动生成（红字冲销）', status: '已记账（红字凭证）', attachments: 0,
+    entries: [
+      { summary: '红冲：天猫退货冲减收入', account: '主营业务收入-天猫 [6001]', debit: 0, credit: -1280 },
+      { summary: '红冲：天猫退货冲减成本', account: '主营业务成本-天猫 [6401]', debit: -560, credit: 0 },
+      { summary: '红冲：退货冲减应收账款', account: '应收账款-天猫旗舰店 [1122]', debit: -1280, credit: 0 }
+    ]
+  }
+};
+
+// ===== 凭证详情Modal =====
+function openVoucherModal(id) {
+  var d = VOUCHER_DATA[id];
+  if (!d) return;
+
+  document.getElementById('vModalTitle').innerHTML =
+    '<span class="code" style="font-size:14px">' + d.code + '</span>' +
+    '<span style="margin-left:10px;font-size:13px;font-weight:400;color:var(--text-secondary)">' + d.date + ' · ' + d.status + '</span>';
+
+  document.getElementById('vModalMeta').innerHTML =
+    '<span>制单人：<strong>' + d.creator + '</strong></span>' +
+    '<span>来源：' + d.source + '</span>' +
+    '<span>附件：' + d.attachments + ' 张</span>';
+
+  var tbody = document.getElementById('vModalEntries');
+  tbody.innerHTML = '';
+  var totalDebit = 0, totalCredit = 0;
+
+  d.entries.forEach(function(e) {
+    var tr = document.createElement('tr');
+    var debitTxt = e.debit ? '¥' + Math.abs(e.debit).toLocaleString('zh-CN', {minimumFractionDigits: 2}) : '';
+    var creditTxt = e.credit ? '¥' + Math.abs(e.credit).toLocaleString('zh-CN', {minimumFractionDigits: 2}) : '';
+    if (e.debit < 0 || e.credit < 0) { debitTxt = debitTxt ? '-' + debitTxt : ''; creditTxt = creditTxt ? '-' + creditTxt : ''; }
+    tr.innerHTML =
+      '<td>' + e.summary + '</td>' +
+      '<td style="font-size:12px;color:var(--text-secondary)">' + e.account + '</td>' +
+      '<td class="debit-amt">' + debitTxt + '</td>' +
+      '<td class="credit-amt">' + creditTxt + '</td>';
+    tbody.appendChild(tr);
+    totalDebit += Math.abs(e.debit);
+    totalCredit += Math.abs(e.credit);
+  });
+
+  var fmt = function(n) { return '¥' + n.toLocaleString('zh-CN', {minimumFractionDigits: 2}); };
+  document.getElementById('vModalDebitTotal').textContent = fmt(totalDebit);
+  document.getElementById('vModalCreditTotal').textContent = fmt(totalCredit);
+
+  var balanced = Math.abs(totalDebit - totalCredit) < 0.01;
+  document.getElementById('vModalFooter').innerHTML =
+    '<span class="' + (balanced ? 'balance-ok' : 'balance-err') + '">' +
+      (balanced ? '✓ 借贷平衡' : '⚠ 借贷不平衡！请检查') +
+    '</span>' +
+    '<span>附件：' + d.attachments + ' 张</span>';
+
+  document.getElementById('voucherModal').classList.remove('hidden');
+}
+
+function closeVoucherModal() {
+  document.getElementById('voucherModal').classList.add('hidden');
+}
+// 点击遮罩关闭
+document.getElementById('voucherModal').addEventListener('click', function(e) {
+  if (e.target === this) closeVoucherModal();
+});
+
+// ===== 发票Tab切换（进项/销项/台账）=====
+(function() {
+  var tabs = document.querySelectorAll('#invoice-tab-bar .tab-item');
+  if (!tabs.length) return;
+})();
+
+// 覆盖 invoice 视图的 tab 切换逻辑
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('.tab-item');
+  if (!btn) return;
+  var parent = btn.closest('[data-view="invoice"]');
+  if (!parent) return;
+
+  var tabBar = btn.parentElement;
+  tabBar.querySelectorAll('.tab-item').forEach(function(t) { t.classList.remove('active'); });
+  btn.classList.add('active');
+
+  var text = btn.textContent.trim();
+  var incoming = parent.querySelector('#invoice-incoming');
+  var outgoing = parent.querySelector('#invoice-outgoing');
+  var ledger = parent.querySelector('#invoice-ledger');
+  if (!incoming) return;
+
+  incoming.style.display = text === '进项发票' ? '' : 'none';
+  if (outgoing) outgoing.style.display = text === '销项发票' ? '' : 'none';
+  if (ledger) ledger.style.display = text === '发票台账' ? '' : 'none';
+});
+
+// ===== 凭证模板分类筛选 =====
+function filterTpl(btn, cat) {
+  document.querySelectorAll('.tpl-cat-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  document.querySelectorAll('.tpl-card').forEach(function(card) {
+    card.style.display = (cat === 'all' || card.dataset.tplCat === cat) ? '' : 'none';
+  });
+}
+
+// ===== 凭证模板「使用」—— 跳到凭证中心并预填摘要 =====
+function useTpl(name) {
+  document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+  var voucherNav = document.querySelector('.nav-item[data-view="voucher"]');
+  if (voucherNav) voucherNav.classList.add('active');
+  document.querySelectorAll('.view-content').forEach(function(v) { v.classList.remove('active'); });
+  var voucherView = document.querySelector('.view-content[data-view="voucher"]');
+  if (voucherView) voucherView.classList.add('active');
+  var summaryInput = document.querySelector('[data-view="voucher"] input[placeholder]');
+  if (summaryInput) summaryInput.value = name + ' —';
+}
+
+// ===== 总账/明细账 Tab 切换 =====
+function switchLedgerTab(tab, pane) {
+  var parent = tab.closest('[data-view="ledger"]');
+  parent.querySelectorAll('.ledger-tab').forEach(function(t) { t.classList.remove('active'); });
+  tab.classList.add('active');
+  parent.querySelectorAll('.ledger-sub-pane').forEach(function(p) { p.classList.remove('active'); });
+  var target = parent.querySelector('#ledger-' + pane);
+  if (target) target.classList.add('active');
+}
+
+// ===== 明细账科目选择 =====
+function selectSubject(item, name) {
+  item.closest('.subledger-left').querySelectorAll('.subledger-subject-item').forEach(function(i) { i.classList.remove('active'); });
+  item.classList.add('active');
+  var title = item.closest('[data-view="ledger"]').querySelector('#subjectTitle');
+  if (title) title.textContent = name;
+}
 </script>
 </body>
 </html>

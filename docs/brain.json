@@ -208,7 +208,7 @@
       "externalIM": "技术参考：已验证的WebSocket IM+SSE流式输出+文件上传分析流程+系统监控面板。选择性合并到对话通道和驾驶舱，Phase 3",
       "shishi": "时皙商城(27表/207验收/22页面) → 已决策合并(ADR-022)，技术栈迁移(NestJS→Express, MySQL→PostgreSQL, uni-app→Taro)，Phase 2-3"
     },
-    "currentStatus": "Phase 2 进行中。当前基线：628测试全绿(50文件)/ESLint零错误/TypeScript零错误。BL-020 PIPL合规已完成(crypto+masking+privacy服务+2端点+43测试)。供应链三线并行(1688/爱库存/ztdy)。下一步BL-021幻觉防护。"
+    "currentStatus": "Phase 2 进行中。当前基线：845测试全绿(59文件)/ESLint零错误/TypeScript零错误。Phase 2a已完成：BL-009工具市场/BL-004AI人格/BL-020PIPL合规/BL-021幻觉防护/BL-022成本监控/BL-023操作确认记录。供应链：1688诚信通申请中/ztdy写API落实中（爱库存已移除，ADR-031）。RPA：抖店已采集，牵牛花doCollect()待实现。"
   },
   "securityDesign": {
     "authentication": "JWT HS256(Phase 1临时) → RS256(Phase 1b US-P1b-001升级), access 15min, refresh 7d, Redis黑名单(fail-secure: Redis不可用=拒绝请求503)",
@@ -230,7 +230,7 @@
   "currentPhase": "Phase 2",
   "phaseGoal": "Phase 2: 供应链多源(1688+爱库存+ztdy写操作)+AI选品+订单路由+ACI半自动+数据分析引擎+PIPL合规",
   "phaseDeadline": "2026-06-30",
-  "phaseNote": "Phase 1全部交付(585测试)。Phase 2路线图2026-03-31规划。供应链三线并行：1688诚信通已申请/爱库存商务对接中/ztdy写API落实中。Wave 1先推无外部依赖项(BL-020合规+BL-021幻觉防护)，供应链就绪后推BL-025/BL-018。",
+  "phaseNote": "Phase 1全部交付(845测试)。Phase 2a已完成(BL-009/004/020/021/022/023)。供应链：1688诚信通申请中/ztdy写API落实中（爱库存已移除，ADR-031）。Wave 2推进BL-025/BL-018就绪后推BL-026/BL-028。",
   "phase2Roadmap": {
     "wave1": {
       "title": "供应链基础+安全合规",
